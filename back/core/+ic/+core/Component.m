@@ -25,6 +25,11 @@ classdef Component < ic.core.ComponentBase
             this@ic.core.ComponentBase(id);
         end
 
+        function delete(this)
+            % DELETE invalidates the component and detaches it from its parent
+            this.detachFromParent();
+        end
+
         function set.Parent(this, parent)
             % > SET.PARENT reattaches the component to the newly defined parent
 
@@ -74,9 +79,29 @@ classdef Component < ic.core.ComponentBase
 
             % parent sends an event requesting for removal of the child
             data = struct("id", this.ID);
-            this.Parent.publish("@ic.remove", data);
+            this.Parent.publish("@remove", data);
+
             % remove from parent children
             this.Parent.removeChild(this)
+        end
+    end
+    methods (Access = ?ic.core.Container, Hidden)
+        function frame = getFrame(this)
+            % > GETFRAME walks up the parent chain to find the Frame
+            frame = [];
+            current = this.Parent;
+            while ~isempty(current) && isvalid(current)
+                if isa(current, "ic.Frame")
+                    frame = current;
+                    return;
+                end
+                if isa(current, "ic.core.Component")
+                    current = current.Parent;
+                else
+                    % Reached a Container that is not a Component (shouldn't happen in normal use)
+                    return;
+                end
+            end
         end
     end
 

@@ -57,38 +57,80 @@ classdef Container < handle
         end
     end
 
-    methods (Access = private, Hidden)
-        function safeFn(this, fn, varargin)
-            % > SAFEFCN only evaluates the second input if the container is a valid object
-            if this.isvalid()
-                fn(varargin{:});
-            end
-        end
-    end
-
-    methods (Access = ?ic.Component, Hidden)
-
-        function removeChild(this, child)
-            % > REMOVECHILD removes a component from the list of children
-            this.Children([this.Children.ID] == child.ID) = [];
-        end
+    methods (Access = ?ic.core.Component, Hidden)
 
         function addChild(this, child)
             % > ADDCHILD inserts a new child inside the container. Used by the component whenever its parent property is reassigned
             this.Children(end + 1) = child;
-            addlistener(child, "ObjectBeingDestroyed", ...
-                @(src,~) this.safeFn(@(x) this.removeChild(x), src));
 
-            % parent sends event to insert child
-            if ~contains(child.ID, "/")
-                data =  struct("type", class(child), "id", child.ID);
-                this.publish("@ic.insert", data);
-            end
+            data = struct("type", class(child), "id", child.ID);
+            this.publish("@insert", data); %#ok<MCNPN>
+
+            % register the child and its subtree in the Frame registry
+            this.registerSubtree(child);
 
             % flush the queue into the parent
             child.flush();
         end
+
+        function removeChild(this, child)
+            % > REMOVECHILD removes a component from the list of children
+            if isvalid(child) && any([this.Children.ID] == child.ID)
+                this.Children([this.Children.ID] == child.ID) = [];
+                this.deregisterSubtree(child);
+            end
+        end
     end
 
+    methods (Access = protected)
+        function registerSubtree(this, component)
+            % > REGISTERSUBTREE registers a component and all its descendants in the Frame registry
+            % > note: Finds Frame once and passes it down for efficiency
+            if isa(this, "ic.core.Component")
+                frame = this.getFrame(); %#ok<MCNPN>
+            else
+                frame = [];
+            end
+            if ~isempty(frame)
+                this.registerSubtreeWithFrame(component, frame);
+            end
+        end
+
+        function deregisterSubtree(this, component)
+            % > DEREGISTERSUBTREE removes a component and all its descendants from the Frame registry
+            % > note: Finds Frame once and passes it down for efficiency
+            if isa(this, "ic.core.Component")
+                frame = this.getFrame(); %#ok<MCNPN>
+            else
+                frame = [];
+            end
+            if ~isempty(frame)
+                this.deregisterSubtreeWithFrame(component, frame);
+            end
+        end
+    end
+
+    methods (Access = protected, Static)
+        function registerSubtreeWithFrame(component, frame)
+            % > REGISTERSUBTREEWITHFRAME registers a component and its descendants using the given Frame
+            frame.registerDescendant(component);
+            if isa(component, "ic.core.Container")
+                for ii = 1:numel(component.Children)
+                    ic.core.Container.registerSubtreeWithFrame(...
+                        component.Children(ii), frame);
+                end
+            end
+        end
+
+        function deregisterSubtreeWithFrame(component, frame)
+            % > DEREGISTERSUBTREEWITHFRAME deregisters a component and its descendants using the given Frame
+            frame.deregisterDescendant(component.ID);
+            if isa(component, "ic.core.Container")
+                for ii = 1:numel(component.Children)
+                    ic.core.Container.deregisterSubtreeWithFrame(component.Children(ii), frame);
+                end
+            end
+        end
+    end
 
 end

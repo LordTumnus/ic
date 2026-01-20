@@ -4,6 +4,8 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
     properties (SetAccess = private)
         % > VIEW the view bridge that handles HTML communication
         View ic.core.View
+        % > REGISTRY map of component IDs to components for O(1) event dispatch
+        Registry = dictionary(string.empty(), ic.core.ComponentBase.empty())
     end
 
     properties (Dependent)
@@ -115,9 +117,26 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             this.View.send(evt);
         end
 
-        function moveEventToEnd(this, evt)
-            % > MOVEEVENTTOEND delegates to the View
-            this.View.moveEventToEnd(evt);
+        function registerDescendant(this, component)
+            % > REGISTERDESCENDANT adds a component to the registry for O(1) event dispatch
+            this.Registry(component.ID) = component;
+        end
+
+        function deregisterDescendant(this, id)
+            % > DEREGISTERDESCENDANT removes a component from the registry
+            if this.Registry.isKey(id)
+                this.Registry(id) = [];
+            end
+        end
+
+        function registerSubtree(this, component)
+            % > REGISTERSUBTREE registers a component and its subtree (Frame is the registry)
+            ic.core.Container.registerSubtreeWithFrame(component, this);
+        end
+
+        function deregisterSubtree(this, component)
+            % > DEREGISTERSUBTREE deregisters a component and its subtree (Frame is the registry)
+            ic.core.Container.deregisterSubtreeWithFrame(component, this);
         end
     end
 

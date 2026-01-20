@@ -130,7 +130,7 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
         end
     end
 
-    methods (Access = protected)
+    methods (Access = {?ic.core.View}, Hidden)
         function receive(this, name, data)
             % > RECEIVE finds an event in the subscriptions and executes its callback
             % > note: RECEIVE is executed whenever an event from the view is received and the component id from the event matches the one stored in the component
