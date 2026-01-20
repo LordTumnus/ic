@@ -27,7 +27,9 @@ classdef Component < ic.core.ComponentBase
 
         function delete(this)
             % DELETE invalidates the component and detaches it from its parent
-            this.detachFromParent();
+            if ~isempty(this.Parent)
+                this.detachFromParent();
+            end
         end
 
         function set.Parent(this, parent)
@@ -36,18 +38,13 @@ classdef Component < ic.core.ComponentBase
             if isempty(parent)
                 % detach from parent if setting to empty
                 this.detachFromParent();
-                this.Parent = [];
-                return;
-            end
-
-            if isempty(this.Parent)
+            elseif isempty(this.Parent)
                 % originally detached, just attach to new parent
                 this.attachToParent(parent);
-                this.Parent = parent;
-                return;
+            else
+                % reparenting
+                this.switchParent(parent);
             end
-            % detach the component from its old parent
-            this.switchParent(parent);
             this.Parent = parent;
         end
     end
@@ -83,9 +80,6 @@ classdef Component < ic.core.ComponentBase
 
         function detachFromParent(this)
             % > DETACHFROMPARENT asks the parent to remove the component from the view
-            if ~this.isAttached()
-                return;
-            end
 
             % parent sends an event requesting for removal of the child
             data = struct("id", this.ID);

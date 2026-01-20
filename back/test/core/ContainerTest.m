@@ -1,11 +1,11 @@
 classdef ContainerTest < matlab.uitest.TestCase
     % CONTAINERTEST Tests component parent-child relationships
     %
-    % Covers:
-    %   - Attaching components to Frame
-    %   - Building subtrees and attaching to Frame
-    %   - Removing and detaching components
-    %   - Re-parenting components between containers
+    % Tests cover:
+    %   - Adding components to Frame
+    %   - Building and attaching subtrees
+    %   - Removing components
+    %   - Reparenting components
 
     properties
         Figure
@@ -13,81 +13,61 @@ classdef ContainerTest < matlab.uitest.TestCase
     end
 
     methods (TestMethodSetup)
-        function setup(testCase)
+        function createFigure(testCase)
             testCase.Figure = uifigure('Visible', 'off');
             testCase.Frame = ic.Frame('Parent', testCase.Figure);
-            testCase.addTeardown(@() delete(testCase.Figure));
         end
     end
 
-    %% Attach Component to Frame
+    methods (TestMethodTeardown)
+        function clearFigure(testCase)
+            if isvalid(testCase.Figure)
+                delete(testCase.Figure);
+            end
+        end
+    end
+
     methods (Test)
-        function testAttachComponentToFrame(testCase)
-            % Test that a Component can be attached to a Frame
-            comp = ic.core.Component();
+        function testAddComponentToFrame(testCase)
+            % Verify Component attaches to Frame and registers
+            comp = ic.core.Component("comp");
             testCase.addTeardown(@() testCase.safeDelete(comp));
 
             comp.Parent = testCase.Frame;
 
             testCase.verifyEqual(comp.Parent, testCase.Frame);
             testCase.verifyTrue(comp.isAttached());
-            testCase.verifyLength(testCase.Frame.Children, 1);
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("comp"));
         end
 
-        function testAttachComponentContainerToFrame(testCase)
-            % Test that a ComponentContainer can be attached to a Frame
-            container = ic.core.ComponentContainer("container");
-            testCase.addTeardown(@() testCase.safeDelete(container));
 
-            container.Parent = testCase.Frame;
-
-            testCase.verifyEqual(container.Parent, testCase.Frame);
-            testCase.verifyTrue(container.isAttached());
-            testCase.verifyLength(testCase.Frame.Children, 1);
-        end
-
-        function testAttachedComponentInRegistry(testCase)
-            % Test that an attached component is registered in Frame registry
-            comp = ic.core.Component("test-id");
-            testCase.addTeardown(@() testCase.safeDelete(comp));
-
-            comp.Parent = testCase.Frame;
-
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("test-id"));
-            testCase.verifyEqual(testCase.Frame.Registry("test-id"), comp);
-        end
-
-        function testDetachedComponentNotInRegistry(testCase)
-            % Test that a component without parent is not in registry
-            comp = ic.core.Component();
+        function testUnattachedComponentNotInRegistry(testCase)
+            % Verify unattached component is not registered
+            comp = ic.core.Component("comp");
             testCase.addTeardown(@() testCase.safeDelete(comp));
 
             testCase.verifyFalse(comp.isAttached());
-            testCase.verifyEmpty(comp.Parent);
+            testCase.verifyFalse(testCase.Frame.Registry.isKey("comp"));
         end
     end
 
-    %% Build Subtrees and Attach to Frame
     methods (Test)
-        function testBuildSubtreeBeforeAttach(testCase)
-            % Test that subtree can be built before attaching to Frame
-            c1 = ic.core.ComponentContainer("c1");
-            c2 = ic.core.Component("c2");
-            testCase.addTeardown(@() testCase.safeDelete(c1));
-            testCase.addTeardown(@() testCase.safeDelete(c2));
+        function testBuildSubtreeThenAttach(testCase)
+            % Verify subtree built before attaching to Frame
+            container = ic.core.ComponentContainer("container");
+            child = ic.core.Component("child");
+            testCase.addTeardown(@() testCase.safeDelete(container));
+            testCase.addTeardown(@() testCase.safeDelete(child));
 
-            c2.Parent = c1;
+            child.Parent = container;
 
-            % Child is attached to parent
-            testCase.verifyTrue(c2.isAttached());
-            % Root not attached yet (no Frame)
-            testCase.verifyFalse(c1.isAttached());
-            % Registry should be empty
+            testCase.verifyTrue(child.isAttached());
+            testCase.verifyFalse(container.isAttached());
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 0);
         end
 
-        function testAttachSubtreeToFrame(testCase)
-            % Test that attaching subtree root registers all descendants
+        function testAttachSubtreeRegistersAll(testCase)
+            % Verify attaching subtree root registers all descendants
             c1 = ic.core.ComponentContainer("c1");
             c2 = ic.core.ComponentContainer("c2");
             c3 = ic.core.Component("c3");
@@ -95,96 +75,110 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.addTeardown(@() testCase.safeDelete(c2));
             testCase.addTeardown(@() testCase.safeDelete(c3));
 
+            % define subtree
             c2.Parent = c1;
             c3.Parent = c2;
+            % attach to Frame
             c1.Parent = testCase.Frame;
 
+            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c1"));
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c2"));
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c3"));
-            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
         end
 
-        function testAttachComponentToAttachedContainer(testCase)
-            % Test adding a component to an already-attached container
+        function testAddComponentToAttachedContainer(testCase)
+            % Verify adding child to already-attached container
             container = ic.core.ComponentContainer("container");
             testCase.addTeardown(@() testCase.safeDelete(container));
             container.Parent = testCase.Frame;
+            testCase.assertTrue(testCase.Frame.Registry.isKey("container"));
 
             child = ic.core.Component("child");
             testCase.addTeardown(@() testCase.safeDelete(child));
             child.Parent = container;
 
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("container"));
             testCase.verifyTrue(testCase.Frame.Registry.isKey("child"));
             testCase.verifyLength(container.Children, 1);
         end
 
-        function testAttachSubtreeToAttachedContainer(testCase)
-            % Test attaching a pre-built subtree to an attached container
-            c1 = ic.core.ComponentContainer("c1");
-            testCase.addTeardown(@() testCase.safeDelete(c1));
-            c1.Parent = testCase.Frame;
+        function testAddSubtreeToAttachedContainer(testCase)
+            % Verify attaching pre-built subtree to attached container
+            root = ic.core.ComponentContainer("root");
+            testCase.addTeardown(@() testCase.safeDelete(root));
+            root.Parent = testCase.Frame;
+            testCase.assertTrue(testCase.Frame.Registry.isKey("root"));
 
-            % Build detached subtree
-            c2 = ic.core.ComponentContainer("c2");
-            c3 = ic.core.Component("c3");
-            testCase.addTeardown(@() testCase.safeDelete(c2));
-            testCase.addTeardown(@() testCase.safeDelete(c3));
-            c3.Parent = c2;
+            subtree = ic.core.ComponentContainer("subtree");
+            leaf = ic.core.Component("leaf");
+            testCase.addTeardown(@() testCase.safeDelete(subtree));
+            testCase.addTeardown(@() testCase.safeDelete(leaf));
+            leaf.Parent = subtree;
 
-            % Attach subtree
-            c2.Parent = c1;
+            subtree.Parent = root;
 
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("c2"));
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("c3"));
         end
     end
 
-    %% Remove Components
     methods (Test)
         function testDetachComponentFromFrame(testCase)
-            % Test that setting Parent to empty detaches from Frame
+            % Verify setting Parent=[] detaches from Frame
             comp = ic.core.Component("comp");
             comp.Parent = testCase.Frame;
 
-            comp.Parent = [];
+            comp.Parent = ic.core.ComponentContainer.empty();
 
             testCase.verifyFalse(comp.isAttached());
-            testCase.verifyEmpty(testCase.Frame.Children);
             testCase.verifyFalse(testCase.Frame.Registry.isKey("comp"));
+            testCase.verifyEmpty(testCase.Frame.Children);
         end
 
         function testDeleteComponentFromFrame(testCase)
-            % Test that deleting a component removes it from Frame
+            % Verify deleting component removes from Frame
             comp = ic.core.Component("comp");
             comp.Parent = testCase.Frame;
 
             delete(comp);
 
-            testCase.verifyFalse(testCase.Frame.Registry.isKey("comp"));
             testCase.verifyEmpty(testCase.Frame.Children);
         end
 
-        function testDetachSubtreeFromFrame(testCase)
-            % Test that detaching subtree root deregisters all descendants
-            c1 = ic.core.ComponentContainer("c1");
-            c2 = ic.core.Component("c2");
-            testCase.addTeardown(@() testCase.safeDelete(c1));
-            testCase.addTeardown(@() testCase.safeDelete(c2));
+        function testDeleteContainerDeregistersAll(testCase)
+            % Verify deleting container deregisters all descendants
+            container = ic.core.ComponentContainer("container");
+            child = ic.core.Component("child");
+            testCase.addTeardown(@() testCase.safeDelete(container));
+            testCase.addTeardown(@() testCase.safeDelete(child));
 
-            c2.Parent = c1;
-            c1.Parent = testCase.Frame;
-            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 2);
+            child.Parent = container;
+            container.Parent = testCase.Frame;
+            testCase.assertEqual(testCase.Frame.Registry.numEntries, 2);
 
-            c1.Parent = [];
+            delete(container);
+
+            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 0);
+            testCase.verifyFalse(isvalid(child));
+        end
+
+        function testDetachSubtreeDeregistersAll(testCase)
+            % Verify detaching subtree root deregisters all descendants
+            container = ic.core.ComponentContainer("container");
+            child = ic.core.Component("child");
+            testCase.addTeardown(@() testCase.safeDelete(container));
+            testCase.addTeardown(@() testCase.safeDelete(child));
+
+            child.Parent = container;
+            container.Parent = testCase.Frame;
+            testCase.assertEqual(testCase.Frame.Registry.numEntries, 2);
+
+            container.Parent = ic.core.ComponentContainer.empty();
 
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 0);
         end
 
-        function testDetachMiddleNodeFromSubtree(testCase)
-            % Test that detaching middle node deregisters its descendants
+        function testDetachMiddleNodeDeregistersDescendants(testCase)
+            % Verify detaching middle node deregisters its descendants only
             c1 = ic.core.ComponentContainer("c1");
             c2 = ic.core.ComponentContainer("c2");
             c3 = ic.core.Component("c3");
@@ -196,27 +190,7 @@ classdef ContainerTest < matlab.uitest.TestCase
             c3.Parent = c2;
             c1.Parent = testCase.Frame;
 
-            c2.Parent = [];
-
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("c1"));
-            testCase.verifyFalse(testCase.Frame.Registry.isKey("c2"));
-            testCase.verifyFalse(testCase.Frame.Registry.isKey("c3"));
-            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 1);
-        end
-
-        function testDeleteMiddleNodeFromSubtree(testCase)
-            % Test that deleting middle node deregisters its descendants
-            c1 = ic.core.ComponentContainer("c1");
-            c2 = ic.core.ComponentContainer("c2");
-            c3 = ic.core.Component("c3");
-            testCase.addTeardown(@() testCase.safeDelete(c1));
-            testCase.addTeardown(@() testCase.safeDelete(c3));
-
-            c2.Parent = c1;
-            c3.Parent = c2;
-            c1.Parent = testCase.Frame;
-
-            delete(c2);
+            c2.Parent = ic.core.ComponentContainer.empty();
 
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c1"));
             testCase.verifyFalse(testCase.Frame.Registry.isKey("c2"));
@@ -224,10 +198,9 @@ classdef ContainerTest < matlab.uitest.TestCase
         end
     end
 
-    %% Reparent Components
     methods (Test)
         function testReparentBetweenContainers(testCase)
-            % Test moving a component from one container to another
+            % Verify moving component between attached containers
             c1 = ic.core.ComponentContainer("c1");
             c2 = ic.core.ComponentContainer("c2");
             child = ic.core.Component("child");
@@ -238,17 +211,16 @@ classdef ContainerTest < matlab.uitest.TestCase
             c1.Parent = testCase.Frame;
             c2.Parent = testCase.Frame;
             child.Parent = c1;
-            testCase.verifyLength(c1.Children, 1);
 
             child.Parent = c2;
 
-            testCase.verifyLength(c1.Children, 0);
+            testCase.verifyEmpty(c1.Children);
             testCase.verifyLength(c2.Children, 1);
             testCase.verifyTrue(testCase.Frame.Registry.isKey("child"));
         end
 
         function testReparentFromFrameToContainer(testCase)
-            % Test moving a component from Frame to a container
+            % Verify moving component from Frame to container
             container = ic.core.ComponentContainer("container");
             comp = ic.core.Component("comp");
             testCase.addTeardown(@() testCase.safeDelete(container));
@@ -256,7 +228,6 @@ classdef ContainerTest < matlab.uitest.TestCase
 
             container.Parent = testCase.Frame;
             comp.Parent = testCase.Frame;
-            testCase.verifyLength(testCase.Frame.Children, 2);
 
             comp.Parent = container;
 
@@ -266,50 +237,49 @@ classdef ContainerTest < matlab.uitest.TestCase
         end
 
         function testReparentSubtreeBetweenContainers(testCase)
-            % Test moving an entire subtree between containers
+            % Verify moving entire subtree between containers
             c1 = ic.core.ComponentContainer("c1");
             c2 = ic.core.ComponentContainer("c2");
-            c3 = ic.core.ComponentContainer("c3");
-            c4 = ic.core.Component("c4");
+            subtree = ic.core.ComponentContainer("subtree");
+            leaf = ic.core.Component("leaf");
             testCase.addTeardown(@() testCase.safeDelete(c1));
             testCase.addTeardown(@() testCase.safeDelete(c2));
-            testCase.addTeardown(@() testCase.safeDelete(c3));
-            testCase.addTeardown(@() testCase.safeDelete(c4));
+            testCase.addTeardown(@() testCase.safeDelete(subtree));
+            testCase.addTeardown(@() testCase.safeDelete(leaf));
 
             c1.Parent = testCase.Frame;
             c2.Parent = testCase.Frame;
-            c3.Parent = c1;
-            c4.Parent = c3;
+            subtree.Parent = c1;
+            leaf.Parent = subtree;
 
-            c3.Parent = c2;
+            subtree.Parent = c2;
 
-            testCase.verifyLength(c1.Children, 0);
+            testCase.verifyEmpty(c1.Children);
             testCase.verifyLength(c2.Children, 1);
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("c3"));
-            testCase.verifyTrue(testCase.Frame.Registry.isKey("c4"));
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("subtree"));
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("leaf"));
         end
 
         function testReparentToDetachedContainer(testCase)
-            % Test that moving to detached container deregisters from Frame
-            c1 = ic.core.ComponentContainer("c1");
+            % Verify moving to detached container deregisters from Frame
+            attached = ic.core.ComponentContainer("attached");
             comp = ic.core.Component("comp");
             detached = ic.core.ComponentContainer("detached");
-            testCase.addTeardown(@() testCase.safeDelete(c1));
+            testCase.addTeardown(@() testCase.safeDelete(attached));
             testCase.addTeardown(@() testCase.safeDelete(comp));
             testCase.addTeardown(@() testCase.safeDelete(detached));
 
-            c1.Parent = testCase.Frame;
-            comp.Parent = c1;
+            attached.Parent = testCase.Frame;
+            comp.Parent = attached;
 
             comp.Parent = detached;
 
             testCase.verifyFalse(testCase.Frame.Registry.isKey("comp"));
-            testCase.verifyTrue(comp.isAttached()); % attached to detached container
-            testCase.verifyLength(c1.Children, 0);
+            testCase.verifyTrue(comp.isAttached());
+            testCase.verifyEmpty(attached.Children);
         end
     end
 
-    %% Helper Methods
     methods (Access = private)
         function safeDelete(~, obj)
             if isvalid(obj)

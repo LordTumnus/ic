@@ -23,7 +23,6 @@ classdef Container < handle
             % > ADDCHILD inserts a new child inside the container. Used by the component whenever its parent property is reassigned
             this.Children(end + 1) = child;
 
-
             % register the child and its subtree in the Frame registry
             this.registerSubtree(child);
 
@@ -33,7 +32,7 @@ classdef Container < handle
 
         function removeChild(this, child)
             % > REMOVECHILD removes a component from the list of children
-            if isvalid(child) && any([this.Children.ID] == child.ID)
+            if any([this.Children.ID] == child.ID)
                 this.Children([this.Children.ID] == child.ID) = [];
                 this.deregisterSubtree(child);
             end
@@ -85,7 +84,8 @@ classdef Container < handle
             frame.deregisterDescendant(component.ID);
             if isa(component, "ic.core.Container")
                 for ii = 1:numel(component.Children)
-                    ic.core.Container.deregisterSubtreeWithFrame(component.Children(ii), frame);
+                    ic.core.Container.deregisterSubtreeWithFrame(...
+                        component.Children(ii), frame);
                 end
             end
         end
