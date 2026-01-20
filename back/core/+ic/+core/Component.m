@@ -33,11 +33,19 @@ classdef Component < ic.core.ComponentBase
         function set.Parent(this, parent)
             % > SET.PARENT reattaches the component to the newly defined parent
 
+            if isempty(parent)
+                % detach from parent if setting to empty
+                this.detachFromParent();
+                return;
+            end
+
+            if isempty(this.Parent)
+                % originally detached, just attach to new parent
+                this.attachToParent();
+                return;
+            end
             % detach the component from its old parent
-            this.detachFromParent();
-            this.Parent = parent;
-            % attach to the new parent
-            this.attachToParent();
+            this.switchParent(parent);
         end
     end
 
@@ -60,15 +68,18 @@ classdef Component < ic.core.ComponentBase
     end
 
     methods (Access = protected, Hidden)
-        function attachToParent(this)
+        function attachToParent(this, parent)
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
             % > note: called during @Component.Parent post-set
 
             if ~this.isAttached()
                 return;
             end
-            % add to parent children
-            this.Parent.addChild(this);
+            data = struct("type", class(this), "id", this.ID);
+            parent.publish("@insert", data);
+
+            parent.addChild(this);
+            this.Parent = parent;
         end
 
         function detachFromParent(this)
@@ -83,6 +94,17 @@ classdef Component < ic.core.ComponentBase
 
             % remove from parent children
             this.Parent.removeChild(this)
+            this.Parent = [];
+        end
+
+        function switchParent(this, newParent)
+            % > SWITCHPARENT reassigns the component to a new parent container
+            data = struct("id", this.ID, "parent", newParent.ID);
+            this.Parent.publish("@reparent", data);
+
+            this.Parent.removeChild(this);
+            newParent.addChild(this);
+            this.Parent = newParent;
         end
     end
     methods (Access = ?ic.core.Container, Hidden)

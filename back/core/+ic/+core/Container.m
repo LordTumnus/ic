@@ -63,8 +63,6 @@ classdef Container < handle
             % > ADDCHILD inserts a new child inside the container. Used by the component whenever its parent property is reassigned
             this.Children(end + 1) = child;
 
-            data = struct("type", class(child), "id", child.ID);
-            this.publish("@insert", data); %#ok<MCNPN>
 
             % register the child and its subtree in the Frame registry
             this.registerSubtree(child);
