@@ -23,7 +23,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    properties (Constant, Hidden)
       % > HTMLSOURCE path of the HTML file that will be loaded inside the HTML component
       % TODO: fix the path of the source file
-      HTMLSource = fullfile(fileparts(mfilename("fullpath")), "..", "..", "..", "js", "dist", "index.html");
+      HTMLSource = fullfile(fileparts(mfilename("fullpath")), "..", "..", "..", "..", "front", "dist", "index.html");
    end
 
 

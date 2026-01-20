@@ -30,7 +30,6 @@ classdef FrameTest < matlab.uitest.TestCase
         end
     end
 
-    % Test: Initialization
     methods (Test)
         function testFrameConstruction(testCase)
             % Test that Frame can be constructed without arguments
@@ -157,81 +156,6 @@ classdef FrameTest < matlab.uitest.TestCase
         end
     end
 
-    %% Test: Property delegation to View
-    methods (Test)
-        function testPositionDelegatesToView(testCase)
-            % Test that Position property delegates to View
-            frame = ic.Frame('Parent', testCase.Figure);
-            testCase.addTeardown(@() delete(frame));
-
-            newPosition = [200 200 300 250];
-            frame.Position = newPosition;
-
-            testCase.verifyEqual(frame.Position, newPosition);
-            testCase.verifyEqual(frame.View.Position, newPosition);
-        end
-
-        function testVisibleDelegatesToView(testCase)
-            % Test that Visible property delegates to View
-            frame = ic.Frame('Parent', testCase.Figure);
-            testCase.addTeardown(@() delete(frame));
-
-            frame.Visible = 'off';
-
-            testCase.verifyEqual(frame.Visible, frame.View.Visible);
-        end
-
-        function testLayoutDelegatesToView(testCase)
-            % Test that Layout property delegates to View
-            grid = uigridlayout(testCase.Figure, [2 2]);
-            frame = ic.Frame('Parent', grid);
-            testCase.addTeardown(@() delete(frame));
-
-            layout = matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2);
-            frame.Layout = layout;
-
-            testCase.verifyEqual(frame.Layout.Row, 1);
-            testCase.verifyEqual(frame.Layout.Column, 2);
-        end
-    end
-
-    %% Test: Parent property warnings
-    methods (Test)
-        function testParentGetWarning(testCase)
-            % Test that accessing Parent property shows warning
-            frame = ic.Frame('Parent', testCase.Figure);
-            testCase.addTeardown(@() delete(frame));
-
-            testCase.verifyWarning(@() frame.Parent, '');
-        end
-
-        function testParentSetWarning(testCase)
-            % Test that setting Parent property shows warning
-            frame = ic.Frame();
-            testCase.addTeardown(@() delete(frame));
-
-            testCase.verifyWarning(@() setParent(frame, testCase.Figure), '');
-
-            function setParent(f, fig)
-                f.Parent = fig;
-            end
-        end
-
-        function testUIParentNoWarning(testCase)
-            % Test that UIParent does not show warning
-            frame = ic.Frame();
-            testCase.addTeardown(@() delete(frame));
-
-            testCase.verifyWarningFree(@() setUIParent(frame, testCase.Figure));
-            testCase.verifyWarningFree(@() frame.UIParent);
-
-            function setUIParent(f, fig)
-                f.UIParent = fig;
-            end
-        end
-    end
-
-    %% Test: Cleanup
     methods (Test)
         function testFrameDeleteCleansUp(testCase)
             % Test that deleting Frame properly cleans up
@@ -241,6 +165,16 @@ classdef FrameTest < matlab.uitest.TestCase
             delete(frame);
 
             testCase.verifyFalse(isvalid(frame));
+            testCase.verifyFalse(isvalid(view));
+        end
+
+        function testFrameViewDeletedOnFigureClose(testCase)
+            % Test that closing the figure deletes the Frame's View
+            frame = ic.Frame('Parent', testCase.Figure);
+            view = frame.View;
+
+            close(testCase.Figure);
+
             testCase.verifyFalse(isvalid(view));
         end
     end

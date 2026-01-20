@@ -36,11 +36,17 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             % initialize the view
             args = namedargs2cell(args);
             this.View = ic.core.View(this, args{:});
+
+            addlistener(this.View, "ObjectBeingDestroyed", ...
+                @(~,~) this.delete());
         end
 
         function delete(this)
             % DELETE cleans up the Frame and its View
-            delete(this.View);
+            if isvalid(this.View)
+                this.View.delete();
+            end
+            delete@ic.core.Container(this);
         end
 
         function position = get.Position(this)
