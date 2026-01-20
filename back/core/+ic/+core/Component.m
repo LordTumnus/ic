@@ -36,16 +36,19 @@ classdef Component < ic.core.ComponentBase
             if isempty(parent)
                 % detach from parent if setting to empty
                 this.detachFromParent();
+                this.Parent = [];
                 return;
             end
 
             if isempty(this.Parent)
                 % originally detached, just attach to new parent
-                this.attachToParent();
+                this.attachToParent(parent);
+                this.Parent = parent;
                 return;
             end
             % detach the component from its old parent
             this.switchParent(parent);
+            this.Parent = parent;
         end
     end
 
@@ -72,14 +75,10 @@ classdef Component < ic.core.ComponentBase
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
             % > note: called during @Component.Parent post-set
 
-            if ~this.isAttached()
-                return;
-            end
             data = struct("type", class(this), "id", this.ID);
             parent.publish("@insert", data);
 
             parent.addChild(this);
-            this.Parent = parent;
         end
 
         function detachFromParent(this)
@@ -93,8 +92,7 @@ classdef Component < ic.core.ComponentBase
             this.Parent.publish("@remove", data);
 
             % remove from parent children
-            this.Parent.removeChild(this)
-            this.Parent = [];
+            this.Parent.removeChild(this);
         end
 
         function switchParent(this, newParent)
@@ -104,7 +102,6 @@ classdef Component < ic.core.ComponentBase
 
             this.Parent.removeChild(this);
             newParent.addChild(this);
-            this.Parent = newParent;
         end
     end
     methods (Access = ?ic.core.Container, Hidden)

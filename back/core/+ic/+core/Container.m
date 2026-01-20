@@ -17,46 +17,6 @@ classdef Container < handle
         end
     end
 
-
-    methods (Access = public)
-        function out = find(this, fn)
-            % > FIND uses the breadth first traversal method to find the first descendant of the container that evaluates the test function to true
-            arguments (Input)
-                % > THIS the container
-                this (1,1) ic.core.Container
-                % > FN predicate that returns a single logical argument that determines whether a descendant passes or not the test
-                fn (1,1) function_handle
-            end
-            arguments (Output)
-                % > OUT the first descendant that satisfies the test function
-                out ic.core.ComponentBase {mustBeScalarOrEmpty}
-            end
-
-            % check for the container itseld
-            if fn(this)
-                out = this;
-                return
-            end
-            % initialize the queue with the direct children of the container
-            queue = this.Children;
-            while ~isempty(queue)
-                % evaluate the predicate and return if true
-                if fn(queue(1))
-                    out = queue(1);
-                    return;
-                end
-                % push children (if any)
-                if isa(queue(1),"ic.core.Container")
-                    children = queue(1).Children;
-                    queue((end+1):(end+numel(children))) = children;
-                end
-                % pop visited component from queue
-                queue(1) = [];
-            end
-            out = ic.core.ComponentBase.empty();
-        end
-    end
-
     methods (Access = ?ic.core.Component, Hidden)
 
         function addChild(this, child)
