@@ -2,6 +2,13 @@
  * Core types for MATLAB-JavaScript communication.
  */
 
+
+
+/** HTML connector from MATLAB. */
+export interface MatlabHTML extends EventTarget {
+    Data: JsEvent[]
+}
+
 /** Event received from / sent to MATLAB. */
 export interface JsEvent {
   /** Target component ID */
