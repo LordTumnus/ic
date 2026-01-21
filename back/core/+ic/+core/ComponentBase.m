@@ -179,15 +179,19 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
 
         function sendReactiveProperty(this, name)
             % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
-            evt = ic.event.JsEvent(this.ID, "@prop/" + name, this.(name));
+            evt = ic.event.JsEvent(...
+             this.ID, ...
+             "@prop/" + name,...
+             struct("value", this.(name), "name", name));
             this.send(evt);
         end
 
         function subscribeToReactiveProperty(this, name)
             % > SUBSCRIBETOREACTIVEPROPERTY subscribes to property changes from the view, and sets the component property when the view notifies the event
             this.subscribe("@prop/" + name, ...
-                @(~,~,value) setValueSilently(name, value))
+                @(~,~,data) setValueSilently(data.name, data.value))
 
+            % nested function to avoid echoing the property change back to the view
             function setValueSilently(name, value)
                 task = onCleanup(@() reenableListener(name));
                 this.ReactivePropListeners(name).Enabled = false;
