@@ -38,14 +38,17 @@ classdef Component < ic.core.ComponentBase
             if isempty(parent)
                 % detach from parent if setting to empty
                 this.detachFromParent();
+                this.Parent = parent;
             elseif isempty(this.Parent)
                 % originally detached, just attach to new parent
+                this.Parent = parent;
                 this.attachToParent(parent);
             else
                 % reparenting
-                this.switchParent(parent);
+                oldParent = this.Parent;
+                this.Parent = parent;
+                this.switchParent(oldParent, parent);
             end
-            this.Parent = parent;
         end
     end
 
@@ -70,7 +73,6 @@ classdef Component < ic.core.ComponentBase
     methods (Access = protected, Hidden)
         function attachToParent(this, parent)
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
-            % > note: called during @Component.Parent post-set
 
             data = struct("type", class(this), "id", this.ID);
             parent.publish("@insert", data);
@@ -89,12 +91,23 @@ classdef Component < ic.core.ComponentBase
             this.Parent.removeChild(this);
         end
 
-        function switchParent(this, newParent)
+        function switchParent(this, oldParent, newParent)
             % > SWITCHPARENT reassigns the component to a new parent container
-            data = struct("id", this.ID, "parent", newParent.ID);
-            this.Parent.publish("@reparent", data);
 
-            this.Parent.removeChild(this);
+            if isAttached(oldParent)
+                % check that the new parent is attached to the same frame
+                oldFrame = this.getFrame();
+                newFrame = newParent.getFrame();
+
+                if isempty(newFrame) || (oldFrame.ID ~= newFrame.ID)
+                    error("ic:core:Component:ReparentingAcrossFrames", ......
+                        "Cannot reparent component across different frames.");
+                end
+            end
+            data = struct("id", this.ID, "parent", newParent.ID);
+            oldParent.publish("@reparent", data);
+
+            oldParent.removeChild(this);
             newParent.addChild(this);
         end
     end
