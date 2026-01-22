@@ -1,4 +1,5 @@
 import Bridge from './lib/core/bridge';
+import Registry from './lib/core/registry';
 import type { MatlabHTML } from './lib/types';
 
 declare global {
@@ -14,14 +15,15 @@ declare global {
  */
 window.setup = (matlabHtml: MatlabHTML) => {
   const bridge = Bridge.instance;
+  const registry = Registry.instance;
 
-  // Initialize the Bridge with the MATLAB HTML element
+  // TODO (Phase 5): Create and register Frame here BEFORE wiring dispatcher
+  // const frame = new Frame();
+  // registry.register(frame);
+
+  // Wire incoming events from Bridge to Registry for dispatch
+  bridge.setDispatcher((event) => registry.dispatch(event));
+
+  // Initialize the Bridge (starts listening for MATLAB events)
   bridge.setup(matlabHtml);
-
-  // Wire incoming events to the Registry (Phase 3)
-  // For now, just log events until Registry is implemented
-  bridge.setDispatcher((event) => {
-    console.log('[main] Received event from MATLAB:', event);
-    // TODO: Registry.dispatch(event) - will be added in Phase 3
-  });
 };

@@ -61,3 +61,22 @@ export type EventCallback = (name: string, data: unknown) => void;
 
 /** Unsubscribe function returned by subscribe(). */
 export type Unsubscribe = () => void;
+
+/**
+ * Minimal interface for components that can be registered in the Registry.
+ *
+ */
+export interface Registrable {
+  /** Unique component identifier */
+  readonly id: string;
+  /**
+   * Handle an incoming event.
+   *
+   * Returns a Promise to support async operations like dynamic imports.
+   *
+   * @param id - Unique event ID for request/response correlation
+   * @param name - Event name (e.g., "@insert", "@prop/Label", "click")
+   * @param data - Event payload
+   */
+  receive(id: string, name: string, data: unknown): Promise<void>;
+}

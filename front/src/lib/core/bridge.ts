@@ -7,7 +7,7 @@
 import type { JsEvent, MatlabHTML } from '../types';
 
 /** Callback type for dispatching events (typically to Registry). */
-type Dispatcher = (event: JsEvent) => void;
+type Dispatcher = (event: JsEvent) => Promise<void>;
 
 /**
  * Bridge class - singleton that manages MATLAB ↔ JS communication.
@@ -95,9 +95,14 @@ class Bridge {
 
   /**
    * Handle MATLAB's DataChanged events.
+   *
+   * Events are processed sequentially with await to ensure proper ordering.
+   * This prevents race conditions where a component receives events before
+   * it finishes being created (e.g., @insert followed by @prop).
+   *
    * Arrow function to preserve `this` binding when used as event listener.
    */
-  private handleDataChanged = (): void => {
+  private handleDataChanged = async (): Promise<void> => {
     if (!this.matlabElement || !this.dispatcher) return;
 
     const data = this.matlabElement.Data;
@@ -105,7 +110,7 @@ class Bridge {
 
     for (const event of data) {
       try {
-        this.dispatcher(event);
+        await this.dispatcher(event);
       } catch (error) {
         console.error('[Bridge] Error dispatching event:', error);
       }
