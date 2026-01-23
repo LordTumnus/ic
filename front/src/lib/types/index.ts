@@ -56,8 +56,27 @@ export interface PropEventData {
   value: unknown;
 }
 
+/**
+ * Definition for an event that a component can publish to MATLAB.
+ *
+ */
+export interface EventDefinition {
+  /** Event name sent to MATLAB */
+  name: string;
+}
+
+/**
+ * Definition for a method that MATLAB can invoke on a component.
+ *
+ */
+export interface MethodDefinition {
+  /** Method name */
+  name: string;
+}
+
+
 /** Subscription callback. Receives event name and data. */
-export type EventCallback = (name: string, data: unknown) => void;
+export type EventCallback = (id: string, name: string, data: unknown) => void;
 
 /** Unsubscribe function returned by subscribe(). */
 export type Unsubscribe = () => void;

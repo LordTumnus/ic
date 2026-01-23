@@ -42,6 +42,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             for ii = 1:numel(reactiveProps)
                 this.addPropReactivity(reactiveProps(ii).Name);
             end
+            % subscribe to changes from properties coming from the view
+            this.subscribeToReactiveProperties();
 
             % setup reactivity for events marked as "Reactive"
             metaEvents = mc.EventList;
@@ -157,16 +159,13 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             this.ReactivePropListeners(propertyName) = ...
                 addlistener(this, propertyName, "PostSet", ...
                 @(src, ~) this.sendReactiveProperty(src.Name));
-
-            % subscribe to changes from the property coming from the view
-            this.subscribeToReactiveProperty(propertyName);
         end
 
         function addEventReactivity(this, eventName)
             % > ADDEVENTREACTIVITY subscribes to events from the view with the specified name, and re-notifies them as Matlab events
             this.subscribe("@event/" + eventName, ...
-                @(~,~,value) notify(...
-                    this, eventName, ic.event.MEvent(value)));
+                @(~,~,data) notify(...
+                    this, eventName, ic.event.MEvent(data)));
         end
     end
 
@@ -181,14 +180,14 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
             evt = ic.event.JsEvent(...
              this.ID, ...
-             "@prop/" + name,...
-             struct("value", this.(name), "name", name));
+             "@prop/",...
+             struct("name", name, "value", this.(name)));
             this.send(evt);
         end
 
-        function subscribeToReactiveProperty(this, name)
-            % > SUBSCRIBETOREACTIVEPROPERTY subscribes to property changes from the view, and sets the component property when the view notifies the event
-            this.subscribe("@prop/" + name, ...
+        function subscribeToReactiveProperties(this)
+            % > SUBSCRIBETOREACTIVEPROPERTIES subscribes to property changes from the view, and sets the component property when the view notifies the event
+            this.subscribe("@prop", ...
                 @(~,~,data) setValueSilently(data.name, data.value))
 
             % nested function to avoid echoing the property change back to the view
