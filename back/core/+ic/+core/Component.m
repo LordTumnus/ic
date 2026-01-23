@@ -74,7 +74,15 @@ classdef Component < ic.core.ComponentBase
         function attachToParent(this, parent)
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
 
-            data = struct("type", class(this), "id", this.ID);
+            % Get component definition via introspection
+            definition = this.getComponentDefinition();
+
+            data = struct(...
+                "type", class(this), ...
+                "id", this.ID, ...
+                "props", definition.props, ...
+                "events", definition.events, ...
+                "methods", definition.methods);
             parent.publish("@insert", data);
 
             parent.addChild(this);

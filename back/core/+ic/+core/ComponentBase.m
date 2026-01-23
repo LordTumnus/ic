@@ -41,9 +41,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
                 [metaProps.SetObservable]]));
             for ii = 1:numel(reactiveProps)
                 this.addPropReactivity(reactiveProps(ii).Name);
+                this.subscribeToReactiveProperty(reactiveProps(ii).Name);
             end
-            % subscribe to changes from properties coming from the view
-            this.subscribeToReactiveProperties();
 
             % setup reactivity for events marked as "Reactive"
             metaEvents = mc.EventList;
@@ -167,6 +166,54 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
                 @(~,~,data) notify(...
                     this, eventName, ic.event.MEvent(data)));
         end
+
+        function definition = getComponentDefinition(this)
+            % > GETCOMPONENTDEFINITION returns a struct with all reactive
+            % properties, events, and methods for the component.
+            % This is used when inserting the component into the view to
+            % provide the JavaScript side with the component schema.
+
+            mc = meta.class.fromName(class(this));
+
+            % Gather reactive properties
+            metaProps = mc.PropertyList;
+            reactiveProps = metaProps(...
+                strcmp({metaProps.Description}, "Reactive") & ...
+                [metaProps.SetObservable]);
+
+            props = struct('name', {}, 'value', {});
+            for ii = 1:numel(reactiveProps)
+                propName = reactiveProps(ii).Name;
+                props(ii).name = propName;
+                props(ii).value = this.(propName);
+            end
+
+            % Gather reactive events
+            metaEvents = mc.EventList;
+            reactiveEvents = metaEvents(...
+                strcmp({metaEvents.Description}, "Reactive"));
+
+            events = struct('name', {});
+            for jj = 1:numel(reactiveEvents)
+                events(jj).name = reactiveEvents(jj).Name;
+            end
+
+            % Gather reactive methods
+            metaMethods = mc.MethodList;
+            reactiveMethods = metaMethods(...
+                strcmp({metaMethods.Description}, "Reactive"));
+
+            methods = struct('name', {});
+            for kk = 1:numel(reactiveMethods)
+                methods(kk).name = reactiveMethods(kk).Name;
+            end
+
+            % Return combined definition
+            definition = struct(...
+                'props', props, ...
+                'events', events, ...
+                'methods', methods);
+        end
     end
 
     methods (Access = private)
@@ -176,18 +223,18 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             this.Subscriptions(name) = [];
         end
 
-        function sendReactiveProperty(this, name)
+        function sendReactiveProperty(this, propertyName)
             % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
             evt = ic.event.JsEvent(...
              this.ID, ...
-             "@prop/",...
-             struct("name", name, "value", this.(name)));
+             "@prop/" + propertyName, ...
+             struct("name", propertyName, "value", this.(propertyName)));
             this.send(evt);
         end
 
-        function subscribeToReactiveProperties(this)
+        function subscribeToReactiveProperty(this, propertyName)
             % > SUBSCRIBETOREACTIVEPROPERTIES subscribes to property changes from the view, and sets the component property when the view notifies the event
-            this.subscribe("@prop", ...
+            this.subscribe("@prop/" + propertyName, ...
                 @(~,~,data) setValueSilently(data.name, data.value))
 
             % nested function to avoid echoing the property change back to the view

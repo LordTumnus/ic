@@ -33,6 +33,12 @@ export interface InsertEventData {
   type: string;
   /** Unique ID for the new component */
   id: string;
+  /** Reactive properties with their current values */
+  props: PropDefinition[];
+  /** Reactive events the component can emit to MATLAB */
+  events: EventDefinition[];
+  /** Reactive methods that MATLAB can invoke on the component */
+  methods: MethodDefinition[];
 }
 
 /** Data for @remove events. */
@@ -49,7 +55,7 @@ export interface ReparentEventData {
 }
 
 /** Data for @prop events. */
-export interface PropEventData {
+export interface PropDefinition {
   /** Property name */
   name: string;
   /** Property value */

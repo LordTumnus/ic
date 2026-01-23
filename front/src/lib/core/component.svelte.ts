@@ -16,7 +16,7 @@ import type {
   Registrable,
   EventCallback,
   Unsubscribe,
-  PropEventData,
+  PropDefinition,
   EventDefinition,
   MethodDefinition,
   Resolution
@@ -105,7 +105,7 @@ class Component implements Registrable {
           this._reactiveState[name] = value;
           // Publish to MATLAB unless this update came from MATLAB
           if (!this._updatingFromMatlab) {
-            this.publish(`@prop`, { name, value });
+            this.publish(`@prop/${name}`, { name, value });
           }
         },
         enumerable: true,
@@ -136,35 +136,42 @@ class Component implements Registrable {
         enumerable: true,
         configurable: true
       });
-
-      this.subscribe(methodName, (id: string, _name: string, data?: unknown) => {
-        const result = (stateObj[methodName] as (data?: unknown) => Resolution)(data);
-        this.publish(`@resp/${id}`, result);
-      });
     }
 
     this.svelteProps = stateObj;
 
     // Set up built-in event handlers (@prop, @method, etc.)
-    this._setupBuiltInHandlers();
+    this._setupListeners(propDefinitions.map((p) => p.name), methodDefinitions.map((m) => m.name));
   }
 
   /**
-   * Set up built-in event handlers.
+   * Set up listeners
    *
    * Handles:
-   * - @prop events from MATLAB to update reactive props (MATLAB → Svelte)
-   * - @method events from MATLAB to invoke component methods (MATLAB → Svelte)
+   * - @properties events from MATLAB to update reactive props (MATLAB → Svelte)
+   * - @methods events from MATLAB to invoke component methods (MATLAB → Svelte)
    */
-  private _setupBuiltInHandlers(): void {
+  private _setupListeners(properties: string[], methods: string[]): void {
     // Handle @prop events from MATLAB
-    this.subscribe('@prop', (_id: string, _name: string, data: unknown) => {
-      // Set flag to prevent echo back to MATLAB
-      this._updatingFromMatlab = true;
-      const propData = data as PropEventData;
-      this._reactiveState[propData.name] = propData.value;
-      this._updatingFromMatlab = false;
-    });
+    for (const prop of properties) {
+      this.subscribe(`@prop/${prop}`, (_id: string, _name: string, data: unknown) => {
+        // Set flag to prevent echo back to MATLAB
+        this._updatingFromMatlab = true;
+        const propData = data as PropDefinition;
+        this._reactiveState[propData.name] = propData.value;
+        this._updatingFromMatlab = false;
+      });
+    }
+
+    // Handle @method events from MATLAB
+    for (const method of methods) {
+      this.subscribe(method, (id: string, _name: string, data: unknown) => {
+        const methodFunc = this._reactiveState[method] as (data?: unknown) => Resolution;
+        const result = methodFunc(data);
+        // Publish response back to MATLAB
+        this.publish(`@resp/${id}`, result);
+      });
+    }
   }
 
   /**
