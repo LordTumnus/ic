@@ -6,6 +6,11 @@ classdef Container < handle
         Children ic.core.Component
     end
 
+    properties (Constant, Abstract)
+        % > TARGETS the list of possible targets for the container's children
+        Targets string
+    end
+
     methods
         function delete(this)
             % DELETE invalidates the container and also deletes its children

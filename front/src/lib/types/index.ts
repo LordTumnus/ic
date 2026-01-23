@@ -27,8 +27,8 @@ export interface Resolution {
   data: unknown;
 }
 
-/** Data for @insert events. Sent by PARENT to create a CHILD. */
-export interface InsertEventData {
+/** Component definition sent within @insert events. */
+export interface ComponentDefinition {
   /** MATLAB class name (e.g., "ic.components.Button") */
   type: string;
   /** Unique ID for the new component */
@@ -39,6 +39,14 @@ export interface InsertEventData {
   events: EventDefinition[];
   /** Reactive methods that MATLAB can invoke on the component */
   methods: MethodDefinition[];
+}
+
+/** Data for @insert events. Sent by PARENT to create a CHILD. */
+export interface InsertEventData {
+  /** The component definition */
+  component: ComponentDefinition;
+  /** Target container element name  */
+  target: string;
 }
 
 /** Data for @remove events. */
@@ -52,6 +60,8 @@ export interface ReparentEventData {
   id: string;
   /** New parent ID */
   parent: string;
+  /** Target container element name  */
+  target: string;
 }
 
 /** Data for @prop events. */
@@ -100,7 +110,7 @@ export interface Registrable {
    * Returns a Promise to support async operations like dynamic imports.
    *
    * @param id - Unique event ID for request/response correlation
-   * @param name - Event name (e.g., "@insert", "@prop/Label", "click")
+   * @param name - Event name
    * @param data - Event payload
    */
   receive(id: string, name: string, data: unknown): Promise<void>;

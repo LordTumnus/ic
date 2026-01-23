@@ -41,13 +41,10 @@ classdef Component < ic.core.ComponentBase
                 this.Parent = parent;
             elseif isempty(this.Parent)
                 % originally detached, just attach to new parent
-                this.Parent = parent;
-                this.attachToParent(parent);
+                this.setParent(parent);
             else
                 % reparenting
-                oldParent = this.Parent;
-                this.Parent = parent;
-                this.switchParent(oldParent, parent);
+                this.reparent(parent);
             end
         end
     end
@@ -56,6 +53,29 @@ classdef Component < ic.core.ComponentBase
         function tf = isAttached(this)
             % > ISATTACHED returns a flag indicating whether the component has a valid parent or not
             tf = ~isempty(this.Parent) && isvalid(this.Parent);
+        end
+
+        function setParent(this, parent, target)
+            % > SETPARENT sets the parent
+            arguments (Input)
+                this % ic.core.Component
+                parent % ic.core.Container
+                target (1,1) string = "default"
+            end
+            this.Parent = parent;
+            this.attachToParent(parent, target);
+        end
+
+        function reparent(this, newParent, target)
+            % > REPARENT reassigns the component to a new parent container
+            arguments (Input)
+                this % ic.core.Component
+                newParent % ic.core.Container
+                target (1,1) string = "default"
+            end
+            oldParent = this.Parent;
+            this.Parent = newParent;
+            this.switchParent(oldParent, newParent, target);
         end
     end
 
@@ -70,19 +90,29 @@ classdef Component < ic.core.ComponentBase
         end
     end
 
-    methods (Access = protected, Hidden)
-        function attachToParent(this, parent)
+    methods (Access = private, Hidden)
+
+        function attachToParent(this, parent, target)
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
+
+            if (target ~= "default") && ~ismember(target, parent.Targets)
+                error("ic:core:Component:InvalidTarget", ....
+                    "The target '%s' is not valid for the parent container of type '%s'. Valid targets are: %s", ...
+                    target, class(parent), strjoin(parent.Targets, ", "));
+            end
 
             % Get component definition via introspection
             definition = this.getComponentDefinition();
 
-            data = struct(...
-                "type", class(this), ...
-                "id", this.ID, ...
-                "props", definition.props, ...
-                "events", definition.events, ...
-                "methods", definition.methods);
+            data = struct( ...
+                "component", struct( ...
+                    "type", class(this), ...
+                    "id", this.ID, ...
+                    "props", definition.props, ...
+                    "events", definition.events, ...
+                    "methods", definition.methods), ...
+                "target", target ...
+            );
             parent.publish("@insert", data);
 
             parent.addChild(this);
@@ -99,7 +129,7 @@ classdef Component < ic.core.ComponentBase
             this.Parent.removeChild(this);
         end
 
-        function switchParent(this, oldParent, newParent)
+        function switchParent(this, oldParent, newParent, target)
             % > SWITCHPARENT reassigns the component to a new parent container
 
             if isAttached(oldParent)
@@ -112,7 +142,15 @@ classdef Component < ic.core.ComponentBase
                         "Cannot reparent component across different frames.");
                 end
             end
-            data = struct("id", this.ID, "parent", newParent.ID);
+
+            if (target ~= "default") && ~ismember(target, newParent.Targets)
+                error("ic:core:Component:InvalidTarget", ....
+                    "The target '%s' is not valid for the new parent container of type '%s'. Valid targets are: %s", ...
+                    target, class(newParent), strjoin(newParent.Targets, ", "));
+            end
+
+            data = struct(...
+                "id", this.ID, "parent", newParent.ID, "target", target);
             oldParent.publish("@reparent", data);
 
             oldParent.removeChild(this);

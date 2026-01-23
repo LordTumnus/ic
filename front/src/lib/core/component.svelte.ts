@@ -23,11 +23,6 @@ import type {
 } from '../types';
 import Bridge from './bridge';
 
-/** Definition for a prop with its default value. */
-export interface PropDefinition {
-  name: string;
-  value: unknown;
-}
 
 /**
  * Component class - base class for all UI components.
