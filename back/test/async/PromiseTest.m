@@ -136,6 +136,18 @@ classdef PromiseTest < matlab.unittest.TestCase
             testCase.verifyEqual(p1.get(), "final value");
         end
 
+        function testResolveWithAlreadyResolvedPromise(testCase)
+            % Verify resolving with an already-resolved promise resolves immediately
+            p1 = ic.async.Promise();
+            p2 = ic.async.Promise();
+
+            p2.resolve(7);
+            p1.resolve(p2);
+
+            testCase.verifyTrue(p1.isResolved());
+            testCase.verifyEqual(p1.get(), 7);
+        end
+
         function testDeepPromiseChaining(testCase)
             % Verify multiple levels of promise chaining
             p1 = ic.async.Promise();

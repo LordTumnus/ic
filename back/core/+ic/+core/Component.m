@@ -84,29 +84,12 @@ classdef Component < ic.core.ComponentBase
             if isempty(parent)
                 % detach from parent if setting to empty
                 this.detachFromParent();
-                this.Parent_ = parent;
-                this.Target_ = string.empty();
             elseif isempty(this.Parent)
                 % originally detached, just attach to new parent
-                resolvedTarget = this.resolveAndValidateTarget(target, parent);
-                this.Parent_ = parent;
-                this.Target_ = resolvedTarget;
-                this.attachToParent(parent, this.Target_);
+                this.attachToParent(parent, target);
             else
                 % reparenting
-                % Resolve and validate target before updating state
-                if isempty(target) && ~isempty(this.Target_) && ...
-                   ismember(this.Target_, parent.Targets)
-                    % Keep current target if valid for new parent
-                    resolvedTarget = this.Target_;
-                else
-                    resolvedTarget = ...
-                        this.resolveAndValidateTarget(target, parent);
-                end
-                oldParent = this.Parent;
-                this.Parent_ = parent;
-                this.Target_ = resolvedTarget;
-                this.switchParent(oldParent, parent, this.Target);
+                this.switchParent(parent, target);
             end
         end
     end
@@ -144,6 +127,10 @@ classdef Component < ic.core.ComponentBase
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
             % Note: target is already validated by setParent
 
+            resolvedTarget = this.resolveAndValidateTarget(target, parent);
+            this.Parent_ = parent;
+            this.Target_ = resolvedTarget;
+
             % Get component definition via introspection
             definition = this.getComponentDefinition();
 
@@ -154,7 +141,7 @@ classdef Component < ic.core.ComponentBase
                     "props", definition.props, ...
                     "events", definition.events, ...
                     "methods", definition.methods), ...
-                "target", target ...
+                "target", resolvedTarget ...
             );
             % assign manually cell to struct
             data.component.targets = definition.targets;
@@ -167,29 +154,54 @@ classdef Component < ic.core.ComponentBase
         function detachFromParent(this)
             % > DETACHFROMPARENT asks the parent to remove the component from the view
 
+            if isempty(this.Parent_)
+                this.Parent_ = [];
+                this.Target_ = string.empty();
+                return;
+            end
+
             % parent sends an event requesting for removal of the child
             data = struct("id", this.ID);
-            this.Parent.publish("@remove", data);
+            this.Parent_.publish("@remove", data);
 
             % remove from parent children
-            this.Parent.removeChild(this);
+            this.Parent_.removeChild(this);
+
+            % clear parent linkage
+            this.Parent_ = [];
+            this.Target_ = string.empty();
         end
 
-        function switchParent(this, oldParent, newParent, target)
+        function switchParent(this, newParent, target)
             % > SWITCHPARENT reassigns the component to a new parent container
 
-            if isAttached(oldParent)
-                % check that the new parent is attached to the same frame
-                oldFrame = this.getFrame();
+            % resolve and validate target before updating state
+            if isempty(target) && ~isempty(this.Target_) && ...
+                ismember(this.Target_, newParent.Targets)
+                resolvedTarget = this.Target_;
+            else
+                resolvedTarget = ...
+                    this.resolveAndValidateTarget(target, newParent);
+            end
+            oldParent = this.Parent_;
+            oldFrame = this.getFrame();
+            newFrame = [];
+            if isa(newParent, "ic.Frame")
+                newFrame = newParent;
+            elseif isa(newParent, "ic.core.Component")
                 newFrame = newParent.getFrame();
-
-                if isempty(newFrame) || (oldFrame.ID ~= newFrame.ID)
+            end
+            if ~isempty(oldParent) && ...
+               isvalid(oldParent) && ...
+               isAttached(oldParent)
+                if isempty(newFrame) || ~isequal(oldFrame, newFrame)
                     error("ic:core:Component:ReparentingAcrossFrames", ......
                         "Cannot reparent component across different frames.");
                 end
             end
 
-            % Note: target is already validated by setParent
+            this.Parent_ = newParent;
+            this.Target_ = resolvedTarget;
 
             data = struct(...
                 "id", this.ID, "parent", newParent.ID, "target", target);

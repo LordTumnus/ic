@@ -7,8 +7,8 @@ classdef ComponentContainer < ic.core.Component & ...
     methods
         function delete(this)
             % DELETE invalidates the component container and also deletes its children
-            delete@ic.core.Component(this);
             delete@ic.core.Container(this);
+            delete@ic.core.Component(this);
         end
     end
 

@@ -51,9 +51,13 @@ classdef Promise < handle
             % if the resolution value is a new promise, then this one is not
             % considered to have resolved until the new one does.
             if isa(value, "ic.async.Promise")
-                addlistener(value, "PromiseFullfilled", ...
-                    @(~,~) this.resolve(value.get()));
-                return;
+                if value.isResolved()
+                    value = value.get();
+                else
+                    addlistener(value, "PromiseFullfilled", ...
+                        @(~,~) this.resolve(value.get()));
+                    return;
+                end
             end
 
             this.Fullfilled = true;

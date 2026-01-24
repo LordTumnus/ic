@@ -262,6 +262,28 @@ classdef ContainerTest < matlab.uitest.TestCase
                 testCase.Frame.View.Queue(end).Data.parent, "c2");
         end
 
+        function testReparentAcrossFramesErrors(testCase)
+            % Verify moving component across different frames errors
+            fig2 = uifigure('Visible', 'off');
+            testCase.addTeardown(@() delete(fig2));
+            frame2 = ic.Frame('Parent', fig2);
+
+            c1 = ic.core.ComponentContainer("c1");
+            c2 = ic.core.ComponentContainer("c2");
+            child = ic.core.Component("child");
+
+            c1.Parent = testCase.Frame;
+            c2.Parent = frame2;
+            child.Parent = c1;
+
+            function reparentAcross()
+                child.Parent = c2;
+            end
+
+            testCase.verifyError(@reparentAcross, ...
+                "ic:core:Component:ReparentingAcrossFrames");
+        end
+
         function testReparentFromFrameToContainer(testCase)
             % Verify moving component from Frame to container
             container = ic.core.ComponentContainer("container");

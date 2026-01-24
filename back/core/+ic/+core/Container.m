@@ -18,7 +18,18 @@ classdef Container < handle
                 % > THIS the container
                 this (1,1) ic.core.Container
             end
-            delete(this.Children);
+
+            % detach children while parent is still valid
+            children = this.Children;
+            if isa(this, "ic.core.Component")
+                for ii = 1:numel(children)
+                    if isvalid(children(ii))
+                        children(ii).Parent = [];
+                    end
+                end
+            end
+            % and then delete them
+            delete(children);
         end
     end
 

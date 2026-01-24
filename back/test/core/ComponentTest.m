@@ -225,7 +225,6 @@ classdef ComponentTest < matlab.uitest.TestCase
             container.Parent = testCase.Frame;
 
             % Check the @insert event data
-            disp(testCase.Frame.View.Queue.Data.component)
             insertEvents = testCase.Frame.View.Queue(...
                 [testCase.Frame.View.Queue.Name] == "@insert");
             containerInsert = insertEvents(...
