@@ -20,10 +20,6 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         Parent (1,1) matlab.ui.container.Container
     end
 
-    properties (Constan)
-        % > TARGETS the list of possible targets for the frame's children (none, as frame is root)
-        Targets string = string.empty()
-    end
 
     methods
         function this = Frame(args)
@@ -116,6 +112,13 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         end
     end
 
+    methods (Access = {?ic.core.Container, ?ic.core.Component}, Hidden)
+        function frame = getFrame(this)
+            % > GETFRAME returns self since Frame is the root
+            frame = this;
+        end
+    end
+
     methods (Access = protected)
         function send(this, evt)
             % > SEND delegates to the View instead of parent
@@ -136,6 +139,7 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             % > GETCOMPONENTDEFINITION returns the component definition struct for this frame
             definition = getComponentDefinition@ic.core.ComponentBase(this);
             definition.targets = num2cell(string.empty());
+        end
     end
 
     methods (Access = {?ic.core.Container})

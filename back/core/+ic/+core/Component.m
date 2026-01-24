@@ -5,10 +5,20 @@
 % > superdoc
 classdef Component < ic.core.ComponentBase
 
-    properties (AbortSet)
-        % > PARENT: The container that holds the component
-        Parent ic.core.Container {mustBeScalarOrEmpty}
+    properties (Access = private)
+        % > PARENT_: backing property for Parent
+        Parent_ = [] % ic.core.Container
+        % > TARGET_: backing property for Target
+        Target_ string = string.empty()
     end
+
+    properties (Dependent, AbortSet)
+        % > PARENT: The container that holds the component
+        Parent
+        % > TARGET: The target within the parent container where the component is placed
+        Target
+    end
+
 
     methods
         function this = Component(id)
@@ -32,20 +42,28 @@ classdef Component < ic.core.ComponentBase
             end
         end
 
+        function parent = get.Parent(this)
+            % > GET.PARENT returns the parent container
+            parent = this.Parent_;
+        end
+
         function set.Parent(this, parent)
             % > SET.PARENT reattaches the component to the newly defined parent
+            this.setParent(parent);
+        end
 
-            if isempty(parent)
-                % detach from parent if setting to empty
-                this.detachFromParent();
-                this.Parent = parent;
-            elseif isempty(this.Parent)
-                % originally detached, just attach to new parent
-                this.setParent(parent);
-            else
-                % reparenting
-                this.reparent(parent);
+        function target = get.Target(this)
+            % > GET.TARGET returns the target
+            target = this.Target_;
+        end
+
+        function set.Target(this, target)
+            % > SET.TARGET reattaches the component to the parent using the newly defined target
+            if isempty(this.Parent)
+                error("ic:core:Component:NoParent", ...
+                    "Cannot set Target when Parent is empty.");
             end
+            this.setParent(this.Parent, target);
         end
     end
 
@@ -60,22 +78,37 @@ classdef Component < ic.core.ComponentBase
             arguments (Input)
                 this % ic.core.Component
                 parent % ic.core.Container
-                target (1,1) string = "default"
+                target string = string.empty()
             end
-            this.Parent = parent;
-            this.attachToParent(parent, target);
-        end
 
-        function reparent(this, newParent, target)
-            % > REPARENT reassigns the component to a new parent container
-            arguments (Input)
-                this % ic.core.Component
-                newParent % ic.core.Container
-                target (1,1) string = "default"
+            if isempty(parent)
+                % detach from parent if setting to empty
+                this.detachFromParent();
+                this.Parent_ = parent;
+                % Note: Target is not cleared through setter (would error with empty Parent)
+                % It will be set appropriately on re-attachment
+            elseif isempty(this.Parent)
+                % originally detached, just attach to new parent
+                % Validate target before updating state
+                resolvedTarget = this.resolveAndValidateTarget(target, parent);
+                this.Parent_ = parent;
+                this.Target_ = resolvedTarget;
+                this.attachToParent(parent, this.Target);
+            else
+                % reparenting
+                % Resolve and validate target before updating state
+                if isempty(target) && ~isempty(this.Target) && ...
+                   ismember(this.Target, parent.Targets)
+                    % Keep current target if valid for new parent
+                    resolvedTarget = this.Target;
+                else
+                    resolvedTarget = this.resolveAndValidateTarget(target, parent);
+                end
+                oldParent = this.Parent;
+                this.Parent_ = parent;
+                this.Target_ = resolvedTarget;
+                this.switchParent(oldParent, parent, this.Target);
             end
-            oldParent = this.Parent;
-            this.Parent = newParent;
-            this.switchParent(oldParent, newParent, target);
         end
     end
 
@@ -92,14 +125,25 @@ classdef Component < ic.core.ComponentBase
 
     methods (Access = private, Hidden)
 
+        function resolvedTarget = resolveAndValidateTarget(~, target, parent)
+            % > RESOLVEANDVALIDATETARGET resolves empty target to "default" and validates
+            if isempty(target)
+                resolvedTarget = "default";
+            else
+                resolvedTarget = target;
+            end
+
+            % Validate target is allowed by parent (skip for "default" which is always valid)
+            if ~strcmp(resolvedTarget, "default") && ~ismember(resolvedTarget, parent.Targets)
+                error("ic:core:Component:InvalidTarget", ...
+                    "The target '%s' is not valid for the parent container of type '%s'. Valid targets are: %s", ...
+                    resolvedTarget, class(parent), strjoin(parent.Targets, ", "));
+            end
+        end
+
         function attachToParent(this, parent, target)
             % > ATTACHTOPARENT sends all the events stored in the queue through the parent
-
-            if (target ~= "default") && ~ismember(target, parent.Targets)
-                error("ic:core:Component:InvalidTarget", ....
-                    "The target '%s' is not valid for the parent container of type '%s'. Valid targets are: %s", ...
-                    target, class(parent), strjoin(parent.Targets, ", "));
-            end
+            % Note: target is already validated by setParent
 
             % Get component definition via introspection
             definition = this.getComponentDefinition();
@@ -144,11 +188,7 @@ classdef Component < ic.core.ComponentBase
                 end
             end
 
-            if (target ~= "default") && ~ismember(target, newParent.Targets)
-                error("ic:core:Component:InvalidTarget", ....
-                    "The target '%s' is not valid for the new parent container of type '%s'. Valid targets are: %s", ...
-                    target, class(newParent), strjoin(newParent.Targets, ", "));
-            end
+            % Note: target is already validated by setParent
 
             data = struct(...
                 "id", this.ID, "parent", newParent.ID, "target", target);

@@ -6,9 +6,9 @@ classdef Container < handle
         Children ic.core.Component
     end
 
-    properties (Constant, Abstract)
+    properties
         % > TARGETS the list of possible targets for the container's children
-        Targets string
+        Targets string = string.empty()
     end
 
     methods
@@ -37,8 +37,13 @@ classdef Container < handle
 
         function removeChild(this, child)
             % > REMOVECHILD removes a component from the list of children
-            if any([this.Children.ID] == child.ID)
-                this.Children([this.Children.ID] == child.ID) = [];
+            if isempty(this.Children)
+                return;
+            end
+            childIDs = [this.Children.ID];
+            mask = childIDs == child.ID;
+            if any(mask)
+                this.Children(mask) = [];
                 this.deregisterSubtree(child);
             end
         end
@@ -86,12 +91,18 @@ classdef Container < handle
 
         function deregisterSubtreeWithFrame(component, frame)
             % > DEREGISTERSUBTREEWITHFRAME deregisters a component and its descendants using the given Frame
-            frame.deregisterDescendant(component.ID);
-            if isa(component, "ic.core.Container")
-                for ii = 1:numel(component.Children)
-                    ic.core.Container.deregisterSubtreeWithFrame(...
-                        component.Children(ii), frame);
+            % Note: try-catch handles edge cases during cascading deletes where
+            % components may become invalid before deregistration completes
+            try
+                frame.deregisterDescendant(component.ID);
+                if isa(component, "ic.core.Container")
+                    for ii = 1:numel(component.Children)
+                        ic.core.Container.deregisterSubtreeWithFrame(...
+                            component.Children(ii), frame);
+                    end
                 end
+            catch
+                % Silently ignore errors during destruction - component already invalid
             end
         end
     end

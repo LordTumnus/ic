@@ -45,7 +45,7 @@ classdef ContainerTest < matlab.uitest.TestCase
                 testCase.Frame.View.Queue(end).Name, "@insert");
             testCase.verifyEqual(...
                 testCase.Frame.View.Queue(end).ComponentID, "@ic.frame");
-            testCase.verifyEqual(testCase.Frame.View.Queue(end).Data.id, "c1");
+            testCase.verifyEqual(testCase.Frame.View.Queue(end).Data.component.id, "c1");
         end
 
 
@@ -74,7 +74,7 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.assertNotEmpty(container.Queue);
             testCase.verifyEqual(container.Queue(end).Name, "@insert");
             testCase.verifyEqual(container.Queue(end).ComponentID, "container");
-            testCase.verifyEqual(container.Queue(end).Data.id, "child");
+            testCase.verifyEqual(container.Queue(end).Data.component.id, "child");
         end
 
         function testAttachSubtreeRegistersAll(testCase)
@@ -102,9 +102,9 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.verifyEqual(...
                     testCase.Frame.View.Queue(end).Name, "@insert");
             testCase.verifyEqual(...
-                        testCase.Frame.View.Queue(1).Data.id, "c1");
+                        testCase.Frame.View.Queue(1).Data.component.id, "c1");
             testCase.verifyEqual(...
-                testCase.Frame.View.Queue(end).Data.id, "c3");
+                testCase.Frame.View.Queue(end).Data.component.id, "c3");
         end
 
         function testAddComponentToAttachedContainer(testCase)
@@ -123,7 +123,7 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.verifyEqual(...
                 testCase.Frame.View.Queue(end).Name, "@insert");
             testCase.verifyEqual(...
-                testCase.Frame.View.Queue(end).Data.id, "child");
+                testCase.Frame.View.Queue(end).Data.component.id, "child");
         end
 
         function testAddSubtreeToAttachedContainer(testCase)
@@ -144,9 +144,9 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.verifyEqual(...
                 testCase.Frame.View.Queue(end).Name, "@insert");
             testCase.verifyEqual(...
-                testCase.Frame.View.Queue(end-1).Data.id, "subtree");
+                testCase.Frame.View.Queue(end-1).Data.component.id, "subtree");
             testCase.verifyEqual(...
-                testCase.Frame.View.Queue(end).Data.id, "leaf");
+                testCase.Frame.View.Queue(end).Data.component.id, "leaf");
         end
     end
 
@@ -315,6 +315,59 @@ classdef ContainerTest < matlab.uitest.TestCase
                 testCase.Frame.View.Queue(end).Data.id, "subtree");
             testCase.verifyEqual(...
                 testCase.Frame.View.Queue(end).Data.parent, "c2");
+        end
+
+        function testChangeTargetWithinContainer(testCase)
+            % Verify changing Target triggers @reparent event
+            container = ic.core.ComponentContainer("container");
+            container.Targets = ["left", "right"];
+            container.Parent = testCase.Frame;
+
+            comp = ic.core.Component("comp");
+            comp.setParent(container, "left");
+
+            % Change target within same container
+            comp.Target = "right";
+
+            % Verify component stays in same container
+            testCase.verifyLength(container.Children, 1);
+            testCase.verifyEqual(comp.Target, "right");
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("comp"));
+
+            % Verify @reparent event with new target
+            testCase.assertNotEmpty(testCase.Frame.View.Queue);
+            testCase.verifyEqual(...
+                testCase.Frame.View.Queue(end).Name, "@reparent");
+            testCase.verifyEqual(...
+                testCase.Frame.View.Queue(end).ComponentID, "container");
+            testCase.verifyEqual(...
+                testCase.Frame.View.Queue(end).Data.id, "comp");
+            testCase.verifyEqual(...
+                testCase.Frame.View.Queue(end).Data.parent, "container");
+            testCase.verifyEqual(...
+                testCase.Frame.View.Queue(end).Data.target, "right");
+        end
+
+        function testChangeTargetToInvalidValueErrors(testCase)
+            % Verify setting invalid Target throws error and state is unchanged
+            container = ic.core.ComponentContainer("container");
+            container.Targets = ["left", "right"];
+            container.Parent = testCase.Frame;
+
+            comp = ic.core.Component("comp");
+            comp.setParent(container, "left");
+
+            function setInvalidTarget()
+                comp.Target = "invalid";
+            end
+
+            testCase.verifyError(@setInvalidTarget, ...
+                "ic:core:Component:InvalidTarget");
+
+            % Verify component state unchanged after failed target change
+            testCase.verifyEqual(comp.Target, "left");
+            testCase.verifyEqual(comp.Parent, container);
+            testCase.verifyLength(container.Children, 1);
         end
 
         function testReparentToDetachedContainer(testCase)
