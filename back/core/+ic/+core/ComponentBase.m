@@ -82,6 +82,11 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
                 promise ic.async.Promise
             end
 
+            if ~startsWith(name, "@") && ~this.isReactiveMethod(name)
+                error("ic:core:ComponentBase:PublishReactiveMethod", ...
+                      "Cannot publish reactive method '%s'. Reactive methods are invoked directly on the component instance.", name);
+            end
+
             evt = ic.event.JsEvent(this.ID, name, data);
             this.send(evt);
 
@@ -247,6 +252,15 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
                     this.ReactivePropListeners(n).Enabled = true;
                 end
             end
+        end
+
+        function isReactiveMethod = isReactiveMethod(this, methodName)
+            % > ISREACTIVEMETHOD returns whether the specified method is marked as reactive
+            mc = meta.class.fromName(class(this));
+            metaMethods = mc.MethodList;
+            reactiveMethods = metaMethods(...
+                strcmp({metaMethods.Description}, "Reactive"));
+            isReactiveMethod = any(strcmp({reactiveMethods.Name}, methodName));
         end
 
     end

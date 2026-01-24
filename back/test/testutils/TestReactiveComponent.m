@@ -21,4 +21,11 @@ classdef TestReactiveComponent < ic.core.Component
             definition = this.getComponentDefinition();
         end
     end
+
+    methods (Description = "Reactive")
+        function out = Ping(~, value)
+            % Simple reactive method used for schema publishing tests
+            out = publish("Ping", value);
+        end
+    end
 end

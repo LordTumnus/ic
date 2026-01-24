@@ -66,11 +66,11 @@ classdef ComponentTest < matlab.uitest.TestCase
             % Verify publish stores events in queue when not attached
             comp = ic.core.Component("comp");
 
-            comp.publish("myEvent", struct("x", 1));
-            comp.publish("myEvent", struct("x", 2));
+            comp.publish("@myEvent", struct("x", 1));
+            comp.publish("@myEvent", struct("x", 2));
 
             testCase.verifyLength(comp.Queue, 2);
-            testCase.verifyEqual(comp.Queue(1).Name, "myEvent");
+            testCase.verifyEqual(comp.Queue(1).Name, "@myEvent");
             testCase.verifyEqual(comp.Queue(2).Data.x, 2);
         end
 
@@ -79,11 +79,11 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp = ic.core.Component("comp");
             comp.Parent = testCase.Frame;
 
-            comp.publish("customEvent", struct("payload", "test"));
+            comp.publish("@customEvent", struct("payload", "test"));
 
             % Find the custom event in queue (after @insert)
             customEvents = testCase.Frame.View.Queue(...
-                [testCase.Frame.View.Queue.Name] == "customEvent");
+                [testCase.Frame.View.Queue.Name] == "@customEvent");
 
             testCase.verifyNotEmpty(customEvents);
             testCase.verifyEqual(customEvents(1).Data.payload, "test");
@@ -96,16 +96,16 @@ classdef ComponentTest < matlab.uitest.TestCase
 
             % Build subtree while detached
             child.Parent = container;
-            child.publish("event1", struct("n", 1));
-            child.publish("event2", struct("n", 2));
+            child.publish("@event1", struct("n", 1));
+            child.publish("@event2", struct("n", 2));
 
             % Attach - flush should happen automatically
             container.Parent = testCase.Frame;
 
             % Verify events reached the Frame's view queue
             names = [testCase.Frame.View.Queue.Name];
-            testCase.verifyTrue(any(names == "event1"));
-            testCase.verifyTrue(any(names == "event2"));
+            testCase.verifyTrue(any(names == "@event1"));
+            testCase.verifyTrue(any(names == "@event2"));
         end
 
         function testPublishReturnsPromise(testCase)
@@ -113,7 +113,7 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp = ic.core.Component("comp");
             comp.Parent = testCase.Frame;
 
-            promise = comp.publish("fetchData", struct());
+            promise = comp.publish("@fetchData", struct());
 
             testCase.verifyClass(promise, 'ic.async.Promise');
             testCase.verifyFalse(promise.isResolved());
@@ -124,11 +124,11 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp = ic.core.Component("comp");
             comp.Parent = testCase.Frame;
 
-            promise = comp.publish("fetchData", struct());
+            promise = comp.publish("@fetchData", struct());
 
             % Find the event ID to construct response
             fetchEvents = testCase.Frame.View.Queue(...
-                [testCase.Frame.View.Queue.Name] == "fetchData");
+                [testCase.Frame.View.Queue.Name] == "@fetchData");
             eventId = fetchEvents(end).Id;
 
             % Simulate view response
@@ -197,6 +197,24 @@ classdef ComponentTest < matlab.uitest.TestCase
     end
 
     methods (Test)
+        function testReactiveMethodPingCall(testCase)
+            % Verify reactive method can be called from MATLAB
+            comp = TestReactiveComponent("comp");
+
+            out = comp.Ping(123);
+
+            testCase.verifyInstanceOf(out, 'ic.async.Promise');
+        end
+
+        function testPublishPongErrors(testCase)
+            % Verify publishing Pong errors (not a reactive method)
+            comp = TestReactiveComponent("comp");
+            comp.Parent = testCase.Frame;
+
+            testCase.verifyError(@() comp.publish("Pong", struct("value", 1)), ...
+                "ic:core:ComponentBase:PublishReactiveMethod");
+        end
+
         function testGetComponentDefinitionReturnsSchema(testCase)
             % Verify getComponentDefinition returns complete schema
             comp = TestReactiveComponent("comp");
@@ -214,8 +232,28 @@ classdef ComponentTest < matlab.uitest.TestCase
             eventNames = {definition.events.name};
             testCase.verifyTrue(any(strcmp(eventNames, 'ButtonClicked')));
 
+            % Check reactive methods
+            testCase.verifyNotEmpty(definition.methods);
+            methodNames = {definition.methods.name};
+            testCase.verifyTrue(any(strcmp(methodNames, 'Ping')));
+
             % Check default targets
             testCase.verifyEqual(definition.targets, {"default"});
+        end
+
+        function testReactiveMethodPublishedInInsert(testCase)
+            % Verify reactive methods are published to the view on insert
+            comp = TestReactiveComponent("comp");
+            comp.Parent = testCase.Frame;
+
+            insertEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@insert");
+            compInsert = insertEvents(...
+                [insertEvents.Data.component.id] == "comp");
+
+            testCase.verifyNotEmpty(compInsert);
+            methodNames = {compInsert.Data.component.methods.name};
+            testCase.verifyTrue(any(strcmp(methodNames, 'Ping')));
         end
 
         function testComponentContainerDefinitionIncludesTargets(testCase)
