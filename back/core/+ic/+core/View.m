@@ -10,7 +10,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
       TicToc = false;
    end
 
-   properties (SetAccess = protected)
+   properties (SetAccess = {?ic.core.View, ?ic.Frame, ?matlab.uitest.TestCase})
       % > QUEUE list of events that will be published when the parent of the component is defined
       Queue = ic.event.JsEvent.empty();
    end

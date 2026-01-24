@@ -85,24 +85,23 @@ classdef Component < ic.core.ComponentBase
                 % detach from parent if setting to empty
                 this.detachFromParent();
                 this.Parent_ = parent;
-                % Note: Target is not cleared through setter (would error with empty Parent)
-                % It will be set appropriately on re-attachment
+                this.Target_ = string.empty();
             elseif isempty(this.Parent)
                 % originally detached, just attach to new parent
-                % Validate target before updating state
                 resolvedTarget = this.resolveAndValidateTarget(target, parent);
                 this.Parent_ = parent;
                 this.Target_ = resolvedTarget;
-                this.attachToParent(parent, this.Target);
+                this.attachToParent(parent, this.Target_);
             else
                 % reparenting
                 % Resolve and validate target before updating state
-                if isempty(target) && ~isempty(this.Target) && ...
-                   ismember(this.Target, parent.Targets)
+                if isempty(target) && ~isempty(this.Target_) && ...
+                   ismember(this.Target_, parent.Targets)
                     % Keep current target if valid for new parent
-                    resolvedTarget = this.Target;
+                    resolvedTarget = this.Target_;
                 else
-                    resolvedTarget = this.resolveAndValidateTarget(target, parent);
+                    resolvedTarget = ...
+                        this.resolveAndValidateTarget(target, parent);
                 end
                 oldParent = this.Parent;
                 this.Parent_ = parent;
@@ -154,10 +153,12 @@ classdef Component < ic.core.ComponentBase
                     "id", this.ID, ...
                     "props", definition.props, ...
                     "events", definition.events, ...
-                    "methods", definition.methods, ...
-                    "targets", definition.targets), ...
+                    "methods", definition.methods), ...
                 "target", target ...
             );
+            % assign manually cell to struct
+            data.component.targets = definition.targets;
+
             parent.publish("@insert", data);
 
             parent.addChild(this);

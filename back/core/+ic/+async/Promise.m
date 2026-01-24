@@ -45,7 +45,7 @@ classdef Promise < handle
                 % > THIS the promise
                 this (1,1) ic.async.Promise
                 % > VALUE the value to which the promise resolves. If it is another promise, then the first promise does not get resolved until the new one does
-                value (1,1) % any
+                value % any
             end
 
             % if the resolution value is a new promise, then this one is not
@@ -81,6 +81,11 @@ classdef Promise < handle
 
             % create the output promise
             other = ic.async.Promise();
+            % if this promise is already fullfilled, resolve other immediately
+            if this.Fullfilled
+                other.resolve(evaluateCallback(callback, this.get()));
+                return;
+            end
             % attach a listener that resolves "other" when this promise gets
             % fullfilled
             addlistener(this, "PromiseFullfilled", ...
@@ -123,11 +128,23 @@ classdef Promise < handle
 
             promises = [promises{:}];
             this = ic.async.Promise();
+
+            % early return if all promises are fullfilled
+            fullfilled = [promises.Fullfilled];
+            if all(fullfilled)
+                values = arrayfun(@(p) p.get(), promises, 'UniformOutput', false);
+                this.resolve(values);
+                return;
+            end
+
+            % otherwise attach listener to unresolved promises
             arrayfun(@(x) addlistener(x, "PromiseFullfilled", ...
-                @(~, ~) checkAll()), promises);
+                @(~, ~) checkAll()), promises(~fullfilled));
             function checkAll()
                 if all([promises.Fullfilled])
-                    this.resolve({promises.get()});
+                    % Use arrayfun to collect all values (not just first)
+                    values = arrayfun(@(p) p.get(), promises, 'UniformOutput', false);
+                    this.resolve(values);
                 end
             end
         end
