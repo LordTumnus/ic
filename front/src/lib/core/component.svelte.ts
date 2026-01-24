@@ -5,13 +5,13 @@
  * - Reactive props that sync with MATLAB
  * - Event subscriptions and dispatch
  * - Svelte component mounting/unmounting
- * - Parent-child relationships for rendering
+ * - Parent-child relationships via snippets
  *
  * Must be in a .svelte.ts file for $state rune to work!
  */
 
-import { mount, unmount } from 'svelte';
-import type { Component as SvelteComponent } from 'svelte';
+import { mount, unmount, createRawSnippet } from 'svelte';
+import type { Component as SvelteComponent, Snippet } from 'svelte';
 import type {
   Registrable,
   EventCallback,
@@ -22,6 +22,7 @@ import type {
   Resolution
 } from '../types';
 import Bridge from './bridge';
+import { handleInsert, handleRemove, handleReparent } from './container';
 
 
 /**
@@ -48,6 +49,24 @@ class Component implements Registrable {
   /** Child components (reactive array for Svelte rendering). */
   children: Component[] = $state([]);
 
+  /**
+   * Child snippets organized by target slot name.
+   * @internal Used by container-logic.ts
+   */
+  _slots: Record<string, Snippet[]> = $state({});
+
+  /**
+   * Reference to parent component (for reparenting).
+   * @internal Used by container-logic.ts
+   */
+  _parentComponent: Component | null = null;
+
+  /**
+   * This component's snippet (created lazily, used when inserted into a parent).
+   * @internal Used by container-logic.ts
+   */
+  _snippet: Snippet | null = null;
+
   /** Event subscriptions: event name → set of callbacks. */
   private subscriptions: Map<string, Set<EventCallback>> = new Map();
 
@@ -59,7 +78,6 @@ class Component implements Registrable {
 
   /**
    * Internal reactive storage for reactive properties and methods.
-   * The public `props` object has getters/setters that point here.
    */
   private _reactiveState: Record<string, unknown>;
 
@@ -81,6 +99,7 @@ class Component implements Registrable {
     propDefinitions: PropDefinition[] = [],
     eventDefinitions: EventDefinition[] = [],
     methodDefinitions: MethodDefinition[] = [],
+    targetDefinitions: string[] = ["default"],
     svelteComponent: SvelteComponent<Record<string, unknown>> | null = null
   ) {
     this.id = id;
@@ -133,10 +152,28 @@ class Component implements Registrable {
       });
     }
 
+    // Add slots for target definitions
+    for (const targetName of targetDefinitions) {
+      if (!this._slots[targetName]) {
+        this._slots[targetName] = [];
+      }
+
+      Object.defineProperty(stateObj, targetName, {
+        get: () => this._slots[targetName],
+        enumerable: true,
+        configurable: true
+      });
+    }
+
     this.svelteProps = stateObj;
 
-    // Set up built-in event handlers (@prop, @method, etc.)
+    // Set up built-in event handlers
     this._setupListeners(propDefinitions.map((p) => p.name), methodDefinitions.map((m) => m.name));
+
+    // Set up container handlers (@insert, @remove, @reparent)
+    this.subscribe('@insert', (id, name, data) => handleInsert(this, id, name, data));
+    this.subscribe('@remove', (id, name, data) => handleRemove(this, id, name, data));
+    this.subscribe('@reparent', (id, name, data) => handleReparent(this, id, name, data));
   }
 
   /**
@@ -167,6 +204,35 @@ class Component implements Registrable {
         this.publish(`@resp/${id}`, result);
       });
     }
+  }
+
+  /**
+   * Create a Svelte snippet for this component.
+   *
+   */
+  createSnippet(): Snippet {
+    return createRawSnippet(() => ({
+      render: () => `<div style="display: contents" data-ic-id="${this.id}"></div>`,
+      setup: (element: Element) => {
+        if (!this._svelteComponent) {
+          console.error(`[Component] Cannot create snippet: "${this.id}" has no Svelte component`);
+          return;
+        }
+
+        this._svelteInstance = mount(this._svelteComponent, {
+          target: element,
+          props: this.svelteProps
+        });
+
+        // Return cleanup function
+        return () => {
+          if (this._svelteInstance) {
+            unmount(this._svelteInstance);
+            this._svelteInstance = null;
+          }
+        };
+      }
+    }));
   }
 
   /**

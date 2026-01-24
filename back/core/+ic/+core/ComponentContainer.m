@@ -11,4 +11,12 @@ classdef ComponentContainer < ic.core.Component & ...
             delete@ic.core.Container(this);
         end
     end
+
+    methods (Access = protected)
+        function definition = getComponentDefinition(this)
+            % > GETCOMPONENTDEFINITION returns the component definition struct for this component container
+            definition = getComponentDefinition@ic.core.Component(this);
+            definition.targets = num2cell(["default", this.Targets]);
+        end
+    end
 end

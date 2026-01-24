@@ -20,6 +20,11 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         Parent (1,1) matlab.ui.container.Container
     end
 
+    properties (Constan)
+        % > TARGETS the list of possible targets for the frame's children (none, as frame is root)
+        Targets string = string.empty()
+    end
+
     methods
         function this = Frame(args)
             % > FRAME creates a frame component that can hold other interactive components
@@ -126,6 +131,11 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             % > DEREGISTERSUBTREE deregisters a component and its subtree (Frame is the registry)
             ic.core.Container.deregisterSubtreeWithFrame(component, this);
         end
+
+        function definition = getComponentDefinition(this)
+            % > GETCOMPONENTDEFINITION returns the component definition struct for this frame
+            definition = getComponentDefinition@ic.core.ComponentBase(this);
+            definition.targets = num2cell(string.empty());
     end
 
     methods (Access = {?ic.core.Container})

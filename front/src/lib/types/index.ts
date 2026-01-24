@@ -39,6 +39,8 @@ export interface ComponentDefinition {
   events: EventDefinition[];
   /** Reactive methods that MATLAB can invoke on the component */
   methods: MethodDefinition[];
+  /** Target container elements */
+  targets?: string[];
 }
 
 /** Data for @insert events. Sent by PARENT to create a CHILD. */
