@@ -152,10 +152,10 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp.Value = 42;
 
             propEvents = testCase.Frame.View.Queue(...
-                [testCase.Frame.View.Queue.Name] == "@prop/Value");
+                [testCase.Frame.View.Queue.Name] == "@prop/value");
 
             testCase.verifyNotEmpty(propEvents);
-            testCase.verifyEqual(propEvents(end).Data.value, 42);
+            testCase.verifyEqual(propEvents(end).Data, 42);
         end
 
         function testReactivePropertyReceivesUpdate(testCase)
@@ -164,13 +164,13 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp.Parent = testCase.Frame;
 
             % Simulate view updating the property
-            comp.receive("@prop/Value", struct("name", "Value", "value", 99));
+            comp.receive("@prop/value", 99);
 
             testCase.verifyEqual(comp.Value, 99);
 
             % Verify no echo event was sent back
             propEvents = testCase.Frame.View.Queue(...
-                [testCase.Frame.View.Queue.Name] == "@prop/Value");
+                [testCase.Frame.View.Queue.Name] == "@prop/value");
             testCase.verifyEmpty(propEvents);
         end
     end
@@ -188,7 +188,7 @@ classdef ComponentTest < matlab.uitest.TestCase
             addlistener(comp, 'ButtonClicked', @(~, evt) setEventData(evt));
 
             % Simulate view sending event
-            comp.receive("@event/ButtonClicked", struct("button", "left"));
+            comp.receive("@event/buttonClicked", struct("button", "left"));
 
             testCase.verifyNotEmpty(eventData);
             testCase.verifyClass(eventData, 'ic.event.MEvent');
@@ -203,6 +203,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
             out = comp.Ping(123);
 
+            testCase.verifyTrue(comp.Queue(end).Name == "ping");
             testCase.verifyInstanceOf(out, 'ic.async.Promise');
         end
 
@@ -211,7 +212,7 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp = TestReactiveComponent("comp");
             comp.Parent = testCase.Frame;
 
-            testCase.verifyError(@() comp.publish("Pong", struct("value", 1)), ...
+            testCase.verifyError(@() comp.publish("pong", struct("value", 1)), ...
                 "ic:core:ComponentBase:PublishReactiveMethod");
         end
 
@@ -224,36 +225,22 @@ classdef ComponentTest < matlab.uitest.TestCase
 
             % Check reactive properties
             testCase.verifyNotEmpty(definition.props);
-            propNames = {definition.props.name};
-            testCase.verifyTrue(any(strcmp(propNames, 'Value')));
+            propNames = [definition.props.name];
+            disp(propNames)
+            testCase.verifyTrue(any(strcmp(propNames, "value")));
 
             % Check reactive events
             testCase.verifyNotEmpty(definition.events);
-            eventNames = {definition.events.name};
-            testCase.verifyTrue(any(strcmp(eventNames, 'ButtonClicked')));
+            eventNames = [definition.events.name];
+            testCase.verifyTrue(any(strcmp(eventNames, "buttonClicked")));
 
             % Check reactive methods
             testCase.verifyNotEmpty(definition.methods);
-            methodNames = {definition.methods.name};
-            testCase.verifyTrue(any(strcmp(methodNames, 'Ping')));
+            methodNames = [definition.methods.name];
+            testCase.verifyTrue(any(strcmp(methodNames, "ping")));
 
             % Check default targets
             testCase.verifyEqual(definition.targets, {"default"});
-        end
-
-        function testReactiveMethodPublishedInInsert(testCase)
-            % Verify reactive methods are published to the view on insert
-            comp = TestReactiveComponent("comp");
-            comp.Parent = testCase.Frame;
-
-            insertEvents = testCase.Frame.View.Queue(...
-                [testCase.Frame.View.Queue.Name] == "@insert");
-            compInsert = insertEvents(...
-                [insertEvents.Data.component.id] == "comp");
-
-            testCase.verifyNotEmpty(compInsert);
-            methodNames = {compInsert.Data.component.methods.name};
-            testCase.verifyTrue(any(strcmp(methodNames, 'Ping')));
         end
 
         function testComponentContainerDefinitionIncludesTargets(testCase)

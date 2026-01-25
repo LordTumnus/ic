@@ -25,7 +25,7 @@ classdef TestReactiveComponent < ic.core.Component
     methods (Description = "Reactive")
         function out = Ping(~, value)
             % Simple reactive method used for schema publishing tests
-            out = publish("Ping", value);
+            out = publish("ping", value);
         end
     end
 end

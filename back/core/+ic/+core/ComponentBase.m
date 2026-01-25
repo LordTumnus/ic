@@ -87,7 +87,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
                       "Cannot publish reactive method '%s'. Reactive methods are invoked directly on the component instance.", name);
             end
 
-            evt = ic.event.JsEvent(this.ID, name, data);
+            evtName = ic.utils.toCamelCase(name);
+            evt = ic.event.JsEvent(this.ID, evtName, data);
             this.send(evt);
 
             % initialize a promise and resolve it when the same event id is received from the view
@@ -167,9 +168,9 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
 
         function addEventReactivity(this, eventName)
             % > ADDEVENTREACTIVITY subscribes to events from the view with the specified name, and re-notifies them as Matlab events
-            this.subscribe("@event/" + eventName, ...
-                @(~,~,data) notify(...
-                    this, eventName, ic.event.MEvent(data)));
+            camelName = ic.utils.toCamelCase("@event/" + eventName);
+            this.subscribe(camelName, ...
+                @(~,~,data) notify(this, eventName, ic.event.MEvent(data)));
         end
 
         function definition = getComponentDefinition(this)
@@ -189,7 +190,7 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             props = struct('name', {}, 'value', {});
             for ii = 1:numel(reactiveProps)
                 propName = reactiveProps(ii).Name;
-                props(ii).name = propName;
+                props(ii).name = ic.utils.toCamelCase(propName);
                 props(ii).value = this.(propName);
             end
 
@@ -200,7 +201,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
 
             events = struct('name', {});
             for jj = 1:numel(reactiveEvents)
-                events(jj).name = reactiveEvents(jj).Name;
+                eventName = reactiveEvents(jj).Name;
+                events(jj).name = ic.utils.toCamelCase(eventName);
             end
 
             % Gather reactive methods
@@ -210,7 +212,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
 
             methods = struct('name', {});
             for kk = 1:numel(reactiveMethods)
-                methods(kk).name = reactiveMethods(kk).Name;
+                methodName = reactiveMethods(kk).Name;
+                methods(kk).name = ic.utils.toCamelCase(methodName);
             end
 
             % Return combined definition
@@ -231,23 +234,20 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
 
         function sendReactiveProperty(this, propertyName)
             % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
-            evt = ic.event.JsEvent(...
-             this.ID, ...
-             "@prop/" + propertyName, ...
-             struct("name", propertyName, "value", this.(propertyName)));
-            this.send(evt);
+            this.publish("@prop/" + propertyName, this.(propertyName));
         end
 
         function subscribeToReactiveProperty(this, propertyName)
             % > SUBSCRIBETOREACTIVEPROPERTIES subscribes to property changes from the view, and sets the component property when the view notifies the event
-            this.subscribe("@prop/" + propertyName, ...
-                @(~,~,data) setValueSilently(data.name, data.value))
+            camelName = ic.utils.toCamelCase("@prop/" + propertyName);
+            this.subscribe(camelName, ...
+                @(~,~,data) setValueSilently(propertyName, data))
 
             % nested function to avoid echoing the property change back to the view
-            function setValueSilently(name, value)
-                task = onCleanup(@() reenableListener(name));
-                this.ReactivePropListeners(name).Enabled = false;
-                this.(name) = value;
+            function setValueSilently(propName, value)
+                task = onCleanup(@() reenableListener(propName));
+                this.ReactivePropListeners(propName).Enabled = false;
+                this.(propName) = value;
                 function reenableListener(n)
                     this.ReactivePropListeners(n).Enabled = true;
                 end
