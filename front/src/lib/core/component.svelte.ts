@@ -211,7 +211,7 @@ class Component implements Registrable {
    */
   createSnippet(): Snippet {
     return createRawSnippet(() => ({
-      render: () => `<div style="display: contents" data-ic-id="${this.id}"></div>`,
+      render: () => `<div style="display: contents" id="${this.id}"></div>`,
       setup: (element: Element) => {
         if (!this._svelteComponent) {
           console.error(`[Component] Cannot create snippet: "${this.id}" has no Svelte component`);

@@ -12,10 +12,6 @@
  */
 
 const componentMap: Record<string, string> = {
-  // Core
-  // 'ic.Frame': '../components/core/Frame.svelte',
-
-  // Components
   // ...
 };
 
