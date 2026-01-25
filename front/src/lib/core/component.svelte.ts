@@ -119,7 +119,7 @@ class Component implements Registrable {
           this._reactiveState[name] = value;
           // Publish to MATLAB unless this update came from MATLAB
           if (!this._updatingFromMatlab) {
-            this.publish(`@prop/${name}`, { name, value });
+            this.publish(`@prop/${name}`, value );
           }
         },
         enumerable: true,
@@ -189,8 +189,7 @@ class Component implements Registrable {
       this.subscribe(`@prop/${prop}`, (_id: string, _name: string, data: unknown) => {
         // Set flag to prevent echo back to MATLAB
         this._updatingFromMatlab = true;
-        const propData = data as PropDefinition;
-        this._reactiveState[propData.name] = propData.value;
+        this._reactiveState[prop] = data;
         this._updatingFromMatlab = false;
       });
     }

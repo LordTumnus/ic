@@ -1,5 +1,5 @@
-function out = toCamelCase(text)
-% > TOCAMELCASE converts a string to camelCase.
+function out = toPascalCase(text)
+% > TOPASCALCASE converts a string to PascalCase.
 %
 % Accepts string or char inputs. Returns a string.
     out = arrayfun(@convert, ic.utils.toSnakeCase(string(text)));
@@ -10,7 +10,7 @@ function out = toCamelCase(text)
         if isempty(parts)
             result = "";
         else
-            parts(2:end) = capitalize(parts(2:end));
+            parts = capitalize(parts);  % all parts capitalized
             result = join(parts, "");
         end
     end
