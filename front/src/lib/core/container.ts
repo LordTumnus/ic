@@ -35,10 +35,10 @@ export async function handleInsert(
   const snippet = child.createSnippet();
   child._snippet = snippet;
 
-  if (!parent._slots[target]) {
+  if (!parent._snippets[target]) {
     throw new Error(`[Component] @insert: Target slot "${target}" not defined in component "${parent.id}"`);
   }
-  parent._slots[target].push(snippet);
+  parent._snippets[target].push(snippet);
   parent.children.push(child);
 }
 
@@ -63,10 +63,10 @@ export async function handleRemove(
   const child = parent.children[childIndex];
 
   // Remove snippet from slots (triggers Svelte cleanup via snippet's destroy)
-  for (const slotName of Object.keys(parent._slots)) {
-    const snippetIndex = parent._slots[slotName].indexOf(child._snippet!);
+  for (const slotName of Object.keys(parent._snippets)) {
+    const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
     if (snippetIndex !== -1) {
-      parent._slots[slotName].splice(snippetIndex, 1);
+      parent._snippets[slotName].splice(snippetIndex, 1);
       break;
     }
   }
@@ -99,10 +99,10 @@ export async function handleReparent(
   const child = parent.children[childIndex];
 
   // Remove snippet from current parent's slots
-  for (const slotName of Object.keys(parent._slots)) {
-    const snippetIndex = parent._slots[slotName].indexOf(child._snippet!);
+  for (const slotName of Object.keys(parent._snippets)) {
+    const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
     if (snippetIndex !== -1) {
-      parent._slots[slotName].splice(snippetIndex, 1);
+      parent._snippets[slotName].splice(snippetIndex, 1);
       break;
     }
   }
@@ -124,10 +124,10 @@ export async function handleReparent(
 
   // Add to new parent's slots
   const slotName = target || 'default';
-  if (!newParent._slots[slotName]) {
-    newParent._slots[slotName] = [];
+  if (!newParent._snippets[slotName]) {
+    newParent._snippets[slotName] = [];
   }
-  newParent._slots[slotName].push(newSnippet);
+  newParent._snippets[slotName].push(newSnippet);
 
   // Add to new parent's children
   newParent.children.push(child);

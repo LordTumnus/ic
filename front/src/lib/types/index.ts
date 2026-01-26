@@ -2,11 +2,14 @@
  * Core types for MATLAB-JavaScript communication.
  */
 
+import type { Snippet } from 'svelte';
+
+
 
 
 /** HTML connector from MATLAB. */
 export interface MatlabHTML extends EventTarget {
-    Data: JsEvent[]
+  Data: JsEvent[]
 }
 
 /** Event received from / sent to MATLAB. */
@@ -76,8 +79,8 @@ export interface PropDefinition {
 
 /**
  * Definition for an event that a component can publish to MATLAB.
- *
- */
+*
+*/
 export interface EventDefinition {
   /** Event name sent to MATLAB */
   name: string;
@@ -85,13 +88,18 @@ export interface EventDefinition {
 
 /**
  * Definition for a method that MATLAB can invoke on a component.
- *
- */
+*
+*/
 export interface MethodDefinition {
   /** Method name */
   name: string;
 }
 
+/**
+ * Snippets record passed to Svelte components.
+ * Always contains a 'default' key, plus any additional targets from MATLAB.
+ */
+export type Snippets = { default: Snippet[] } & Record<string, Snippet[]>;
 
 /** Subscription callback. Receives event name and data. */
 export type EventCallback = (id: string, name: string, data: unknown) => void;

@@ -19,7 +19,8 @@ import type {
   PropDefinition,
   EventDefinition,
   MethodDefinition,
-  Resolution
+  Resolution,
+  Snippets
 } from '../types';
 import Bridge from './bridge';
 import { handleInsert, handleRemove, handleReparent } from './container';
@@ -51,9 +52,9 @@ class Component implements Registrable {
 
   /**
    * Child snippets organized by target slot name.
-   * @internal Used by container-logic.ts
+   * @internal Used by container.ts
    */
-  _slots: Record<string, Snippet[]> = $state({});
+  _snippets: Snippets = $state({ default: [] });
 
   /**
    * Reference to parent component (for reparenting).
@@ -152,18 +153,19 @@ class Component implements Registrable {
       });
     }
 
-    // Add slots for target definitions
+    // Initialize snippet arrays for each target definition
     for (const targetName of targetDefinitions) {
-      if (!this._slots[targetName]) {
-        this._slots[targetName] = [];
+      if (!this._snippets[targetName]) {
+        this._snippets[targetName] = [];
       }
-
-      Object.defineProperty(stateObj, targetName, {
-        get: () => this._slots[targetName],
-        enumerable: true,
-        configurable: true
-      });
     }
+
+    // Expose all snippets as a single 'snippets' prop
+    Object.defineProperty(stateObj, 'snippets', {
+      get: () => this._snippets,
+      enumerable: true,
+      configurable: true
+    });
 
     this.svelteProps = stateObj;
 
