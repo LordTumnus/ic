@@ -105,21 +105,11 @@ class Bridge {
   private handleDataChanged = async (): Promise<void> => {
     if (!this.matlabElement || !this.dispatcher) return;
 
-    let debug = document.createElement('div');
-    document.body.appendChild(debug);
-
-    debug.innerHTML += 'Events received:';
-
-
     const data = this.matlabElement.Data;
     if (!Array.isArray(data)) return;
 
-    debug.innerHTML += '/ Array received:';
-    document.body.appendChild(debug);
-
     for (const event of data) {
       try {
-        debug.innerHTML += `/ Dispatching event: ${event.name} for component ${event.component}`;
         await this.dispatcher(event);
       } catch (error) {
         console.error('[Bridge] Error dispatching event:', error);
