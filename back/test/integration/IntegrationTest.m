@@ -29,8 +29,6 @@ classdef IntegrationTest < matlab.uitest.TestCase
         function createFigure(testCase)
             testCase.Figure = uifigure('Visible', 'off');
             testCase.Frame = ic.Frame('Parent', testCase.Figure);
-            % Allow Frame to initialize
-            drawnow;
         end
     end
 
@@ -62,7 +60,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
             result = promise.get();
             testCase.assertTrue(result.Success, ...
                 'getState should succeed');
-            testCase.verifyEqual(result.Data.label, "Initial Label", ...
+            testCase.verifyEqual(result.Data.label, 'Initial Label', ...
                 'Svelte should have received initial label');
             testCase.verifyEqual(result.Data.counter, 42, ...
                 'Svelte should have received initial counter');
@@ -84,8 +82,8 @@ classdef IntegrationTest < matlab.uitest.TestCase
             p1.wait(testCase.TIMEOUT);
             p2.wait(testCase.TIMEOUT);
 
-            testCase.verifyEqual(p1.get().Data.label, "First");
-            testCase.verifyEqual(p2.get().Data.label, "Second");
+            testCase.verifyEqual(p1.get().Data.label, 'First');
+            testCase.verifyEqual(p2.get().Data.label, 'Second');
         end
     end
 
@@ -95,7 +93,6 @@ classdef IntegrationTest < matlab.uitest.TestCase
 
             comp = ic.test.TestComponent("test1");
             comp.Parent = testCase.Frame;
-            drawnow;
 
             % Change property after attachment
             comp.Label = "Updated from MATLAB";
@@ -106,7 +103,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
 
             testCase.assertTrue(promise.isResolved());
             testCase.verifyEqual(promise.get().Data.label,...
-             "Updated from MATLAB", ...
+             'Updated from MATLAB', ...
              'Svelte should have received property update');
         end
 
@@ -140,7 +137,6 @@ classdef IntegrationTest < matlab.uitest.TestCase
             % Verify multiple rapid property updates are all received
             comp = ic.test.TestComponent("test1");
             comp.Parent = testCase.Frame;
-            drawnow;
 
             % Rapid-fire updates
             comp.Label = "Update 1";
@@ -152,7 +148,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
             promise.wait(testCase.TIMEOUT);
 
             % Svelte should have the final values
-            testCase.verifyEqual(promise.get().Data.label, "Final Update");
+            testCase.verifyEqual(promise.get().Data.label, 'Final Update');
             testCase.verifyEqual(promise.get().Data.counter, 100);
         end
     end
@@ -170,7 +166,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
             testCase.assertTrue(promise.isResolved(), ...
                 'Echo should receive response');
             testCase.assertTrue(promise.get().Success);
-            testCase.verifyEqual(promise.get().Data, "Hello from MATLAB", ...
+            testCase.verifyEqual(promise.get().Data, 'Hello from MATLAB', ...
                 'Echo should return the same value');
         end
 
@@ -184,7 +180,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
             promise.wait(testCase.TIMEOUT);
 
             testCase.assertTrue(promise.isResolved());
-            testCase.verifyEqual(promise.get().Data.name, "test");
+            testCase.verifyEqual(promise.get().Data.name, 'test');
         end
 
         function testIncrementCounterMethod(testCase)

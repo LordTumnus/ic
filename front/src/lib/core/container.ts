@@ -6,6 +6,7 @@
  * circular dependencies (Component ↔ Factory).
  */
 
+import { flushSync } from 'svelte';
 import type { InsertEventData, RemoveEventData, ReparentEventData } from '../types';
 import type Component from './component.svelte';
 import Factory from './factory';
@@ -40,6 +41,8 @@ export async function handleInsert(
   }
   parent._snippets[target].push(snippet);
   parent.children.push(child);
+
+  flushSync();
 }
 
 /**

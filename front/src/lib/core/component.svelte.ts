@@ -293,6 +293,10 @@ class Component implements Registrable {
   /**
    * Handle an incoming event from MATLAB.
    *
+   * Callbacks are awaited sequentially to ensure proper ordering.
+   * This is critical for @insert handlers which are async and must
+   * complete before subsequent events (like method calls) are processed.
+   *
    * @param id - Unique event ID
    * @param name - Event name
    * @param data - Event payload
@@ -301,7 +305,7 @@ class Component implements Registrable {
     const callbacks = this.subscriptions.get(name);
     if (callbacks) {
       for (const callback of callbacks) {
-        callback(id, name, data);
+        await callback(id, name, data);
       }
     }
   }

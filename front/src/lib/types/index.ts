@@ -99,8 +99,8 @@ export interface MethodDefinition {
  */
 export type Snippets = { default: Snippet[] } & Record<string, Snippet[]>;
 
-/** Subscription callback. Receives event name and data. */
-export type EventCallback = (id: string, name: string, data: unknown) => void;
+/** Subscription callback. Receives event name and data. May be async. */
+export type EventCallback = (id: string, name: string, data: unknown) => void | Promise<void>;
 
 /** Unsubscribe function returned by subscribe(). */
 export type Unsubscribe = () => void;
