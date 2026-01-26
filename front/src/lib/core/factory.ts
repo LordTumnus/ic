@@ -35,15 +35,15 @@ class Factory {
    * @throws Error if the type is not registered in component-map.ts
    */
   async loadSvelteComponent(type: string): Promise<SvelteComponent<Record<string, unknown>>> {
-    const path = componentMap[type];
-    if (!path) {
+    const loader = componentMap[type];
+    if (!loader) {
       throw new Error(
         `Unknown component type "${type}". ` +
         `Make sure it's registered in component-map.ts.`
       );
     }
 
-    const module = await import(path);
+    const module = await loader() as { default: SvelteComponent<Record<string, unknown>> };
     return module.default;
   }
 

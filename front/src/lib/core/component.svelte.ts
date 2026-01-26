@@ -101,7 +101,7 @@ class Component implements Registrable {
     eventDefinitions: EventDefinition[] = [],
     methodDefinitions: MethodDefinition[] = [],
     targetDefinitions: string[] = ["default"],
-    svelteComponent: SvelteComponent<Record<string, unknown>> | null = null
+    svelteComponent: SvelteComponent<any> | null = null
   ) {
     this.id = id;
     this.type = type;

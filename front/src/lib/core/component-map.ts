@@ -1,18 +1,26 @@
 /**
- * Component Map - Maps MATLAB types to Svelte component paths.
+ * Component Map - Maps MATLAB types to Svelte component loaders.
  *
  * This file is the single source of truth for which MATLAB classes
  * correspond to which Svelte components.
  *
  * When adding a new component:
  * 1. Create the Svelte component file
- * 2. Add its mapping here
+ * 2. Add its mapping here using the glob import
  *
- * Paths are relative to this file (src/lib/core/).
+ * Uses import.meta.glob for Vite-compatible dynamic imports.
  */
 
-const componentMap: Record<string, string> = {
-  // ...
+// Vite glob import - eagerly discovers all Svelte components at build time
+const modules = import.meta.glob('../components/**/*.svelte');
+
+/**
+ * Maps MATLAB type names to their module loader functions.
+ * The loader functions return a Promise that resolves to the component module.
+ */
+const componentMap: Record<string, () => Promise<unknown>> = {
+  // Test components (for integration testing)
+  'ic.test.TestComponent': modules['../components/test/TestComponent.svelte'],
 };
 
 export default componentMap;

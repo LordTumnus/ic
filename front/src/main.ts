@@ -4,6 +4,9 @@ import Component from './lib/core/component.svelte';
 import Frame from './lib/components/core/frame/Frame.svelte';
 import type { MatlabHTML } from './lib/types';
 
+import MockMatlabHTML from '../test/mocks/matlab-html';
+
+
 declare global {
   interface Window {
     setup: (matlabHtml: MatlabHTML) => void;

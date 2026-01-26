@@ -85,15 +85,30 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    end
 
    methods (Access = private)
-      function onReceive(this, evt)
+      function onReceive(this, data)
          % > ONRECEIVE dispatches events from the view to the component they are targeted to
          % > note: Uses O(1) Registry lookup instead of O(n) tree traversal
-         if evt.component == "@ic.frame"
-            % Event targeted at the Frame itself
-            this.Frame.receive(evt.name, evt.data);
-         elseif this.Frame.Registry.isKey(evt.component)
-            comp = this.Frame.Registry(evt.component);
-            comp.receive(evt.name, evt.data);
+         % > note: data is an array of events from JavaScript (cell array or struct array)
+         if isempty(data)
+            return;
+         end
+
+         % Handle both cell array and struct array formats from JSON
+         if iscell(data)
+            events = data;
+         else
+            events = num2cell(data);
+         end
+
+         for ii = 1:numel(events)
+            evt = events{ii};
+            if evt.component == "@ic.frame"
+               % Event targeted at the Frame itself
+               this.Frame.receive(evt.name, evt.data);
+            elseif this.Frame.Registry.isKey(evt.component)
+               comp = this.Frame.Registry(evt.component);
+               comp.receive(evt.name, evt.data);
+            end
          end
       end
    end
