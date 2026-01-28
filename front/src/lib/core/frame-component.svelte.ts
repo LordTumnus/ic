@@ -26,7 +26,7 @@ class FrameComponent extends Component {
   ) {
     super('ic-frame', 'ic.Frame', propDefinitions, eventDefinitions, methodDefinitions, targetDefinitions, svelteComponent);
 
-    FrameStyleManager.instance.init(id);
+    FrameStyleManager.instance.init(this.id);
 
     this.subscribe('@theme', (_id, _name, data) => {
       FrameStyleManager.instance.setTheme(data as ThemeEventData);

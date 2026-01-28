@@ -11,7 +11,7 @@
   let { snippets }: { snippets: Snippets } = $props();
 </script>
 
-<div class="ic-frame">
+<div id="ic-frame" class="ic-frame">
   {#each snippets.default ?? [] as child}
     {@render child()}
   {/each}

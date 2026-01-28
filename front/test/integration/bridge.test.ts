@@ -12,10 +12,20 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { tick } from 'svelte';
 import Bridge from '$lib/core/bridge';
 import Registry from '$lib/core/registry';
-import Component from '$lib/core/component.svelte';
+import FrameComponent from '$lib/core/frame-component.svelte';
 import Frame from '$lib/components/core/frame/Frame.svelte';
 import MockMatlabHTML from '../mocks/matlab-html';
-import type { ComponentDefinition, InsertEventData, RemoveEventData } from '$lib/types';
+import type {
+  ComponentDefinition,
+  InsertEventData,
+  RemoveEventData,
+  StyleEventData,
+  ClearStyleEventData,
+  GlobalStyleEventData,
+  ClearGlobalStyleEventData,
+  ClearGlobalStylesEventData,
+  ThemeEventData
+} from '$lib/types';
 
 // Counter for generating unique IDs across tests
 let testIdCounter = 0;
@@ -62,9 +72,7 @@ function setupBridge(): MockMatlabHTML {
   const registry = Registry.instance;
 
   // Create and register the Frame (root component)
-  const frame = new Component(
-    'ic-frame', 'ic.Frame', [], [], [], ['default'], Frame
-  );
+  const frame = new FrameComponent([], [], [], ['default'], Frame);
   registry.register(frame);
   frame.mount(document.body);
 
@@ -646,6 +654,458 @@ describe('Bridge Integration', () => {
 
       button = document.querySelector('[data-testid="click-btn"]') as HTMLButtonElement;
       expect(button.disabled).toBe(false);
+    });
+  });
+
+  describe('Instance Styling', () => {
+    it('should apply instance styles via @style event', async () => {
+      const id = uniqueId('styleTest');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply style to component
+      await mock.simulateEvent({
+        component: id,
+        name: '@style',
+        data: {
+          selector: '[data-testid="test-component"]',
+          styles: { 'background-color': 'rgb(255, 0, 0)' }
+        } as StyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify rule was inserted into adoptedStyleSheets
+      // (jsdom doesn't compute styles from adoptedStyleSheets, so we check the rule directly)
+      const instanceSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('background-color')
+      );
+      expect(instanceSheet).toBeDefined();
+      expect(instanceSheet!.cssRules[0].cssText).toContain('rgb(255, 0, 0)');
+    });
+
+    it('should clear instance styles via @clearStyle event', async () => {
+      const id = uniqueId('clearStyleTest');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply style
+      await mock.simulateEvent({
+        component: id,
+        name: '@style',
+        data: {
+          selector: '[data-testid="test-component"]',
+          styles: { 'background-color': 'rgb(0, 255, 0)' }
+        } as StyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Clear the style
+      await mock.simulateEvent({
+        component: id,
+        name: '@clearStyle',
+        data: { selector: '[data-testid="test-component"]' } as ClearStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Style should be removed (back to default)
+      const component = document.querySelector('[data-testid="test-component"]') as HTMLElement;
+      const computedStyle = window.getComputedStyle(component);
+      expect(computedStyle.backgroundColor).not.toBe('rgb(0, 255, 0)');
+    });
+
+    it('should clear all instance styles via @clearStyles event', async () => {
+      const id = uniqueId('clearAllTest');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply multiple styles
+      await mock.simulateEvent({
+        component: id,
+        name: '@style',
+        data: {
+          selector: '[data-testid="test-component"]',
+          styles: { 'background-color': 'rgb(0, 0, 255)' }
+        } as StyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await mock.simulateEvent({
+        component: id,
+        name: '@style',
+        data: {
+          selector: '[data-testid="label"]',
+          styles: { 'color': 'rgb(255, 255, 0)' }
+        } as StyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Clear all styles for this component
+      await mock.simulateEvent({
+        component: id,
+        name: '@clearStyles',
+        data: {},
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Both styles should be removed
+      const component = document.querySelector('[data-testid="test-component"]') as HTMLElement;
+      const label = document.querySelector('[data-testid="label"]') as HTMLElement;
+      expect(window.getComputedStyle(component).backgroundColor).not.toBe('rgb(0, 0, 255)');
+      expect(window.getComputedStyle(label).color).not.toBe('rgb(255, 255, 0)');
+    });
+  });
+
+  describe('Global Styling', () => {
+    it('should apply global styles via @globalStyle event', async () => {
+      const id1 = uniqueId('global1');
+      const id2 = uniqueId('global2');
+
+      // Insert two components of the same type
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id1),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id2),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply global style to the component type
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@globalStyle',
+        data: {
+          type: 'ic.test.TestComponent',
+          selector: '[data-testid="test-component"]',
+          styles: { 'border': '2px solid rgb(255, 0, 0)' }
+        } as GlobalStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify both components exist
+      const components = document.querySelectorAll('[data-testid="test-component"]');
+      expect(components.length).toBe(2);
+
+      // Verify rule was inserted with correct selector targeting the type
+      const globalSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('data-ic-type')
+      );
+      expect(globalSheet).toBeDefined();
+      expect(globalSheet!.cssRules[0].cssText).toContain('ic.test.TestComponent');
+      expect(globalSheet!.cssRules[0].cssText).toContain('border');
+    });
+
+    it('should clear global styles via @clearGlobalStyle event', async () => {
+      const id = uniqueId('clearGlobal');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply global style
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@globalStyle',
+        data: {
+          type: 'ic.test.TestComponent',
+          selector: '[data-testid="label"]',
+          styles: { 'font-weight': '700' }
+        } as GlobalStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Clear the global style
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@clearGlobalStyle',
+        data: {
+          type: 'ic.test.TestComponent',
+          selector: '[data-testid="label"]'
+        } as ClearGlobalStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      const label = document.querySelector('[data-testid="label"]') as HTMLElement;
+      expect(window.getComputedStyle(label).fontWeight).not.toBe('700');
+    });
+
+    it('should clear all global styles for a type via @clearGlobalStyles', async () => {
+      const id = uniqueId('clearTypeGlobal');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply multiple global styles
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@globalStyle',
+        data: {
+          type: 'ic.test.TestComponent',
+          selector: '[data-testid="test-component"]',
+          styles: { 'opacity': '0.5' }
+        } as GlobalStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@globalStyle',
+        data: {
+          type: 'ic.test.TestComponent',
+          selector: '[data-testid="label"]',
+          styles: { 'text-decoration': 'underline' }
+        } as GlobalStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify rules were added
+      const globalSheetBefore = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('data-ic-type')
+      );
+      expect(globalSheetBefore!.cssRules.length).toBe(2);
+
+      // Clear all global styles for this type
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@clearGlobalStyles',
+        data: { type: 'ic.test.TestComponent' } as ClearGlobalStylesEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify rules were cleared
+      const globalSheetAfter = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('ic.test.TestComponent')
+      );
+      expect(globalSheetAfter).toBeUndefined();
+    });
+  });
+
+  describe('Theme', () => {
+    it('should apply theme variables via @theme event', async () => {
+      // Apply theme variables
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@theme',
+        data: {
+          '--test-color': 'rgb(128, 0, 128)',
+          '--test-spacing': '20px'
+        } as ThemeEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify theme sheet has the CSS variables
+      // (jsdom doesn't compute styles from adoptedStyleSheets, so we check the rule directly)
+      const themeSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('--test-color')
+      );
+      expect(themeSheet).toBeDefined();
+      expect(themeSheet!.cssRules[0].cssText).toContain('--test-color');
+      expect(themeSheet!.cssRules[0].cssText).toContain('rgb(128, 0, 128)');
+      expect(themeSheet!.cssRules[0].cssText).toContain('--test-spacing');
+      expect(themeSheet!.cssRules[0].cssText).toContain('20px');
+    });
+
+    it('should allow components to use theme variables', async () => {
+      const id = uniqueId('themeVar');
+
+      // Set theme variable
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@theme',
+        data: { '--component-bg': 'rgb(100, 150, 200)' } as ThemeEventData,
+        id: uniqueId('evt'),
+      });
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply instance style that uses theme variable
+      await mock.simulateEvent({
+        component: id,
+        name: '@style',
+        data: {
+          selector: '[data-testid="test-component"]',
+          styles: { 'background-color': 'var(--component-bg)' }
+        } as StyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify the theme variable is defined in theme sheet
+      const themeSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('--component-bg')
+      );
+      expect(themeSheet).toBeDefined();
+      expect(themeSheet!.cssRules[0].cssText).toContain('rgb(100, 150, 200)');
+
+      // Verify instance style references the variable
+      const instanceSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('var(--component-bg)')
+      );
+      expect(instanceSheet).toBeDefined();
+    });
+  });
+
+  describe('Style Precedence', () => {
+    it('instance styles should override global styles', async () => {
+      const id = uniqueId('precedence');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply global style first
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@globalStyle',
+        data: {
+          type: 'ic.test.TestComponent',
+          selector: '[data-testid="test-component"]',
+          styles: { 'background-color': 'rgb(255, 0, 0)' }
+        } as GlobalStyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Apply instance style (should override due to higher specificity)
+      await mock.simulateEvent({
+        component: id,
+        name: '@style',
+        data: {
+          selector: '[data-testid="test-component"]',
+          styles: { 'background-color': 'rgb(0, 255, 0)' }
+        } as StyleEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify both rules exist in the stylesheets
+      // (jsdom doesn't compute styles from adoptedStyleSheets)
+
+      // Global style should use data-ic-type selector (lower specificity)
+      const globalSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes('data-ic-type')
+      );
+      expect(globalSheet).toBeDefined();
+      expect(globalSheet!.cssRules[0].cssText).toContain('rgb(255, 0, 0)');
+
+      // Instance style should use #id selector (higher specificity)
+      const instanceSheet = document.adoptedStyleSheets.find(
+        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
+          s.cssRules[0]?.cssText?.includes(`#${id}`)
+      );
+      expect(instanceSheet).toBeDefined();
+      expect(instanceSheet!.cssRules[0].cssText).toContain('rgb(0, 255, 0)');
     });
   });
 });
