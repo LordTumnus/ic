@@ -20,10 +20,13 @@ import type {
   EventDefinition,
   MethodDefinition,
   Resolution,
-  Snippets
+  Snippets,
+  StyleEventData,
+  ClearStyleEventData
 } from '../types';
 import Bridge from './bridge';
 import { handleInsert, handleRemove, handleReparent } from './container';
+import StyleManager from './style-manager';
 
 
 /**
@@ -176,6 +179,19 @@ class Component implements Registrable {
     this.subscribe('@insert', (id, name, data) => handleInsert(this, id, name, data));
     this.subscribe('@remove', (id, name, data) => handleRemove(this, id, name, data));
     this.subscribe('@reparent', (id, name, data) => handleReparent(this, id, name, data));
+
+    // Set up style handlers
+    this.subscribe('@style', (_id, _name, data) => {
+      const { selector, styles } = data as StyleEventData;
+      StyleManager.instance.setStyles(this.id, selector, styles);
+    });
+    this.subscribe('@clearStyle', (_id, _name, data) => {
+      const { selector } = data as ClearStyleEventData;
+      StyleManager.instance.clearStyle(this.id, selector);
+    });
+    this.subscribe('@clearStyles', () => {
+      StyleManager.instance.clearStyles(this.id);
+    });
   }
 
   /**
@@ -213,7 +229,7 @@ class Component implements Registrable {
    */
   createSnippet(): Snippet {
     return createRawSnippet(() => ({
-      render: () => `<div style="display: contents" id="${this.id}"></div>`,
+      render: () => `<div style="display: contents" id="${this.id}" data-ic-type="${this.type}"></div>`,
       setup: (element: Element) => {
         if (!this._svelteComponent) {
           console.error(`[Component] Cannot create snippet: "${this.id}" has no Svelte component`);
@@ -227,6 +243,7 @@ class Component implements Registrable {
 
         // Return cleanup function
         return () => {
+          StyleManager.instance.clearStyles(this.id);
           if (this._svelteInstance) {
             unmount(this._svelteInstance);
             this._svelteInstance = null;

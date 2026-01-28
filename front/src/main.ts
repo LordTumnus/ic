@@ -1,6 +1,6 @@
 import Bridge from './lib/core/bridge';
 import Registry from './lib/core/registry';
-import Component from './lib/core/component.svelte';
+import FrameComponent from './lib/core/frame-component.svelte';
 import Frame from './lib/components/core/frame/Frame.svelte';
 import type { MatlabHTML } from './lib/types';
 
@@ -23,8 +23,8 @@ window.setup = (matlabHtml: MatlabHTML) => {
   const registry = Registry.instance;
 
   // Create, register and mount Frame into document body
-  const frame = new Component(
-    'ic-frame', 'ic.Frame', [], [], [], ['default'], Frame
+  const frame = new FrameComponent(
+    [], [], [], ['default'], Frame
   );
   registry.register(frame);
   frame.mount(document.body);
