@@ -1,36 +1,33 @@
 /**
  * FrameComponent - Specialized Component for the root Frame.
- * Handles theme and global style events via FrameStyleManager.
+ *
+ * Theme is handled as a regular reactive prop (applied via inline style in Frame.svelte).
+ * Global styles are handled via FrameStyleManager (requires Constructable Stylesheets).
  */
 
 import type { Component as SvelteComponent } from 'svelte';
 import type {
-  PropDefinition,
-  EventDefinition,
-  MethodDefinition,
   GlobalStyleEventData,
   ClearGlobalStyleEventData,
-  ClearGlobalStylesEventData,
-  ThemeEventData
+  ClearGlobalStylesEventData
 } from '../types';
 import Component from './component.svelte';
 import FrameStyleManager from './frame-style-manager';
 
 class FrameComponent extends Component {
-  constructor(
-    propDefinitions: PropDefinition[] = [],
-    eventDefinitions: EventDefinition[] = [],
-    methodDefinitions: MethodDefinition[] = [],
-    targetDefinitions: string[] = ['default'],
-    svelteComponent: SvelteComponent<any> | null = null
-  ) {
-    super('ic-frame', 'ic.Frame', propDefinitions, eventDefinitions, methodDefinitions, targetDefinitions, svelteComponent);
+  constructor(svelteComponent: SvelteComponent<any>) {
+    super(
+      'ic-frame',
+      'ic.Frame',
+      [{ name: 'theme', value: {} }],
+      [],
+      [],
+      ['default'],
+      svelteComponent
+    );
 
     FrameStyleManager.instance.init(this.id);
 
-    this.subscribe('@theme', (_id, _name, data) => {
-      FrameStyleManager.instance.setTheme(data as ThemeEventData);
-    });
     this.subscribe('@globalStyle', (_id, _name, data) => {
       const { type, selector, styles } = data as GlobalStyleEventData;
       FrameStyleManager.instance.setGlobalStyle(type, selector, styles);

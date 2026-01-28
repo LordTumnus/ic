@@ -50,14 +50,11 @@ classdef Theme < handle
     end
 
     methods
-        function css = toCSS(this)
-            % > TOCSS generates CSS custom properties using light-dark() for colors.
+        function css = jsonencode(this, varargin)
+            % > JSONENCODE returns CSS custom properties as a JSON string.
+            % Called automatically when the Theme is serialized for the frontend.
 
-            arguments (Output)
-                css (1,1) struct
-            end
-
-            css = struct();
+            s = struct();
 
             % Color properties use light-dark() syntax
             colorProps = ["Background", "Foreground", ...
@@ -72,11 +69,13 @@ classdef Theme < handle
                 propName = colorProps(ii);
                 cssName = ic.utils.toKebabCase(propName);
                 values = this.(propName);
-                css.(cssName) = sprintf("light-dark(%s, %s)", values(1), values(2));
+                s.(cssName) = sprintf("light-dark(%s, %s)", values(1), values(2));
             end
 
             % Non-color properties are set directly
-            css.radius = this.Radius;
+            s.radius = this.Radius;
+
+            css = jsonencode(s, varargin{:});
         end
     end
 

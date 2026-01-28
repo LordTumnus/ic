@@ -6,12 +6,24 @@
   renders them using {@render}.
 -->
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { Snippets, ThemeEventData } from '$lib/types';
 
-  let { snippets }: { snippets: Snippets } = $props();
+  interface Props {
+    snippets: Snippets;
+    theme?: ThemeEventData;
+  }
+
+  let { snippets, theme = {} }: Props = $props();
+
+  // Build inline style string from theme object
+  const themeStyle = $derived(
+    Object.entries(theme)
+      .map(([prop, value]) => `${prop}: ${value}`)
+      .join('; ')
+  );
 </script>
 
-<div id="ic-frame" class="ic-frame">
+<div id="ic-frame" class="ic-frame" style={themeStyle}>
   {#each snippets.default ?? [] as child}
     {@render child()}
   {/each}

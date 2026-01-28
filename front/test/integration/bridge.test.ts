@@ -72,7 +72,7 @@ function setupBridge(): MockMatlabHTML {
   const registry = Registry.instance;
 
   // Create and register the Frame (root component)
-  const frame = new FrameComponent([], [], [], ['default'], Frame);
+  const frame = new FrameComponent(Frame as any);
   registry.register(frame);
   frame.mount(document.body);
 
@@ -965,11 +965,11 @@ describe('Bridge Integration', () => {
   });
 
   describe('Theme', () => {
-    it('should apply theme variables via @theme event', async () => {
-      // Apply theme variables
+    it('should apply theme variables via @prop/theme', async () => {
+      // Apply theme variables (now via reactive prop)
       await mock.simulateEvent({
         component: 'ic-frame',
-        name: '@theme',
+        name: '@prop/theme',
         data: {
           '--test-color': 'rgb(128, 0, 128)',
           '--test-spacing': '20px'
@@ -979,26 +979,22 @@ describe('Bridge Integration', () => {
 
       await flushAsync();
 
-      // Verify theme sheet has the CSS variables
-      // (jsdom doesn't compute styles from adoptedStyleSheets, so we check the rule directly)
-      const themeSheet = document.adoptedStyleSheets.find(
-        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
-          s.cssRules[0]?.cssText?.includes('--test-color')
-      );
-      expect(themeSheet).toBeDefined();
-      expect(themeSheet!.cssRules[0].cssText).toContain('--test-color');
-      expect(themeSheet!.cssRules[0].cssText).toContain('rgb(128, 0, 128)');
-      expect(themeSheet!.cssRules[0].cssText).toContain('--test-spacing');
-      expect(themeSheet!.cssRules[0].cssText).toContain('20px');
+      // Theme variables are now applied as inline styles on the frame element
+      const frame = document.getElementById('ic-frame');
+      expect(frame).not.toBeNull();
+      expect(frame!.style.cssText).toContain('--test-color');
+      expect(frame!.style.cssText).toContain('rgb(128, 0, 128)');
+      expect(frame!.style.cssText).toContain('--test-spacing');
+      expect(frame!.style.cssText).toContain('20px');
     });
 
     it('should allow components to use theme variables', async () => {
       const id = uniqueId('themeVar');
 
-      // Set theme variable
+      // Set theme variable (via reactive prop)
       await mock.simulateEvent({
         component: 'ic-frame',
-        name: '@theme',
+        name: '@prop/theme',
         data: { '--component-bg': 'rgb(100, 150, 200)' } as ThemeEventData,
         id: uniqueId('evt'),
       });
@@ -1015,6 +1011,11 @@ describe('Bridge Integration', () => {
 
       await flushAsync();
 
+      // Verify theme variable is in frame's inline style
+      const frame = document.getElementById('ic-frame');
+      expect(frame!.style.cssText).toContain('--component-bg');
+      expect(frame!.style.cssText).toContain('rgb(100, 150, 200)');
+
       // Apply instance style that uses theme variable
       await mock.simulateEvent({
         component: id,
@@ -1027,14 +1028,6 @@ describe('Bridge Integration', () => {
       });
 
       await flushAsync();
-
-      // Verify the theme variable is defined in theme sheet
-      const themeSheet = document.adoptedStyleSheets.find(
-        (s: CSSStyleSheet) => s.cssRules.length > 0 &&
-          s.cssRules[0]?.cssText?.includes('--component-bg')
-      );
-      expect(themeSheet).toBeDefined();
-      expect(themeSheet!.cssRules[0].cssText).toContain('rgb(100, 150, 200)');
 
       // Verify instance style references the variable
       const instanceSheet = document.adoptedStyleSheets.find(

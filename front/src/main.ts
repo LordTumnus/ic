@@ -23,9 +23,7 @@ window.setup = (matlabHtml: MatlabHTML) => {
   const registry = Registry.instance;
 
   // Create, register and mount Frame into document body
-  const frame = new FrameComponent(
-    [], [], [], ['default'], Frame
-  );
+  const frame = new FrameComponent(Frame);
   registry.register(frame);
   frame.mount(document.body);
 

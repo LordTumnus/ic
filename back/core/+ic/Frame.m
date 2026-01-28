@@ -6,10 +6,13 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         View ic.core.View
         % > REGISTRY map of component IDs to components for O(1) event dispatch
         Registry = dictionary(string.empty(), ic.core.ComponentBase.empty())
-        % > THEME CSS custom property values for theming
-        Theme ic.style.Theme
         % > GLOBALSTYLES nested dictionary: componentType → (selector → styles struct)
         GlobalStyles = dictionary(string.empty(), dictionary.empty())
+    end
+
+    properties (SetAccess = private, SetObservable, Description = "Reactive")
+        % > THEME CSS custom property values (syncs to frontend automatically via jsonencode)
+        Theme ic.style.Theme
     end
 
     properties (SetObservable, Description = "Reactive")
@@ -137,10 +140,12 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
                 value string
             end
 
+            currentTheme = this.Theme;
+
             for ii = 1:numel(name)
                 propName = ic.utils.toPascalCase(name{ii});
 
-                if ~isprop(this.Theme, propName)
+                if ~isprop(currentTheme, propName)
                     error("ic:Frame:InvalidThemeProperty", ...
                           "Unknown theme property: %s", name{ii});
                 end
@@ -148,20 +153,20 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
                 val = value{ii};
                 if isscalar(val)
                     % Single value: apply to active scheme only
-                    currentValues = this.Theme.(propName);
+                    currentValues = currentTheme.(propName);
                     if this.ColorScheme == "light"
-                        this.Theme.(propName) = [val, currentValues(2)];
+                        currentTheme.(propName) = [val, currentValues(2)];
                     else
-                        this.Theme.(propName) = [currentValues(1), val];
+                        currentTheme.(propName) = [currentValues(1), val];
                     end
                 else
                     % Array [light, dark]: set both values
-                    this.Theme.(propName) = val;
+                    currentTheme.(propName) = val;
                 end
             end
 
-            % Publish the full theme CSS to the view
-            this.publish("@theme", this.Theme.toCSS());
+            % Assign back to trigger reactive sync (Theme.jsonencode serializes to CSS)
+            this.Theme = currentTheme;
         end
 
         function globalStyle(this, componentType, selector, varargin)
