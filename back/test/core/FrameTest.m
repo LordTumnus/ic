@@ -86,4 +86,49 @@ classdef FrameTest < matlab.uitest.TestCase
             testCase.verifyFalse(isvalid(frame));
         end
     end
+
+    methods (Test)
+        function testThemeUpdatesProperty(testCase)
+            % Verify theme() updates the Theme property and triggers sync
+            frame = ic.Frame('Parent', testCase.Figure);
+            testCase.addTeardown(@() delete(frame));
+            frame.View.Queue = ic.event.JsEvent.empty();
+
+            frame.theme("primary", "#123456");
+
+            testCase.verifyEqual(frame.Theme.Primary(1), "#123456");
+            propEvents = frame.View.Queue(...
+                [frame.View.Queue.Name] == "@prop/theme");
+            testCase.verifyNotEmpty(propEvents);
+        end
+
+        function testGlobalStyleSendsEvent(testCase)
+            % Verify globalStyle() publishes @globalStyle event
+            frame = ic.Frame('Parent', testCase.Figure);
+            testCase.addTeardown(@() delete(frame));
+            frame.View.Queue = ic.event.JsEvent.empty();
+
+            frame.globalStyle("ic.Button", ":host", "padding", "8px");
+
+            styleEvents = frame.View.Queue(...
+                [frame.View.Queue.Name] == "@globalStyle");
+            testCase.verifyNotEmpty(styleEvents);
+            testCase.verifyEqual(styleEvents(end).Data.type, "ic.Button");
+            testCase.verifyEqual(styleEvents(end).Data.selector, ":host");
+        end
+
+        function testClearAllGlobalStylesSendsEvent(testCase)
+            % Verify clearAllGlobalStyles() publishes event
+            frame = ic.Frame('Parent', testCase.Figure);
+            testCase.addTeardown(@() delete(frame));
+            frame.globalStyle("ic.Button", ":host", "color", "red");
+            frame.View.Queue = ic.event.JsEvent.empty();
+
+            frame.clearAllGlobalStyles();
+
+            clearEvents = frame.View.Queue(...
+                [frame.View.Queue.Name] == "@clearAllGlobalStyles");
+            testCase.verifyNotEmpty(clearEvents);
+        end
+    end
 end

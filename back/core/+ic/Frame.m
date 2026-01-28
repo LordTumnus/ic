@@ -7,12 +7,12 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         % > REGISTRY map of component IDs to components for O(1) event dispatch
         Registry = dictionary(string.empty(), ic.core.ComponentBase.empty())
         % > GLOBALSTYLES nested dictionary: componentType → (selector → styles struct)
-        GlobalStyles = dictionary(string.empty(), dictionary.empty())
+        GlobalStyles = configureDictionary("string", "dictionary")
     end
 
     properties (SetAccess = private, SetObservable, Description = "Reactive")
         % > THEME CSS custom property values (syncs to frontend automatically via jsonencode)
-        Theme ic.style.Theme
+        Theme ic.style.Theme = ic.style.Theme()
     end
 
     properties (SetObservable, Description = "Reactive")
@@ -47,9 +47,6 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
 
             % call superclass constructor with frame ID
             this@ic.core.ComponentBase("ic-frame");
-
-            % initialize the theme
-            this.Theme = ic.style.Theme();
 
             % initialize the view
             args = namedargs2cell(args);
@@ -226,12 +223,14 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             this.GlobalStyles(componentType) = selectorDict;
 
             % Convert to kebab-case for CSS
-            cssStyles = struct();
             mergedFields = fieldnames(existingStyles);
+            kebabKeys = cell(1, numel(mergedFields));
+            values = cell(1, numel(mergedFields));
             for kk = 1:numel(mergedFields)
-                kebabName = ic.utils.toKebabCase(mergedFields{kk});
-                cssStyles.(kebabName) = existingStyles.(mergedFields{kk});
+                kebabKeys{kk} = char(ic.utils.toKebabCase(mergedFields{kk}));
+                values{kk} = existingStyles.(mergedFields{kk});
             end
+            cssStyles = containers.Map(kebabKeys, values);
 
             this.publish("@globalStyle", struct( ...
                 "type", componentType, ...
@@ -283,7 +282,7 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
                 this (1,1) ic.Frame
             end
 
-            this.GlobalStyles = dictionary(string.empty(), dictionary.empty());
+            this.GlobalStyles = configureDictionary("string", "dictionary");
             this.publish("@clearAllGlobalStyles", struct());
         end
     end

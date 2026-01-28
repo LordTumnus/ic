@@ -198,12 +198,14 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             this.Styles(selector) = existingStyles;
 
             % Convert property names to kebab-case for CSS
-            cssStyles = struct();
             mergedFields = fieldnames(existingStyles);
+            kebabKeys = cell(1, numel(mergedFields));
+            values = cell(1, numel(mergedFields));
             for kk = 1:numel(mergedFields)
-                kebabName = ic.utils.toKebabCase(mergedFields{kk});
-                cssStyles.(kebabName) = existingStyles.(mergedFields{kk});
+                kebabKeys{kk} = char(ic.utils.toKebabCase(mergedFields{kk}));
+                values{kk} = existingStyles.(mergedFields{kk});
             end
+            cssStyles = containers.Map(kebabKeys, values);
 
             % Publish the complete styles for this selector
             this.publish("@style", struct( ...
@@ -384,7 +386,9 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             metaMethods = mc.MethodList;
             reactiveMethods = metaMethods(...
                 strcmp({metaMethods.Description}, "Reactive"));
-            isReactiveMethod = any(strcmp({reactiveMethods.Name}, methodName));
+            % Convert method names to camelCase strings and compare
+            camelNames = arrayfun(@(m) ic.utils.toCamelCase(m.Name), reactiveMethods);
+            isReactiveMethod = any(camelNames == methodName);
         end
 
     end

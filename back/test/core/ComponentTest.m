@@ -201,7 +201,7 @@ classdef ComponentTest < matlab.uitest.TestCase
             % Verify reactive method can be called from MATLAB
             comp = TestReactiveComponent("comp");
 
-            out = comp.Ping(123);
+            out = comp.ping(123);
 
             testCase.verifyTrue(comp.Queue(end).Name == "ping");
             testCase.verifyInstanceOf(out, 'ic.async.Promise');
@@ -305,6 +305,49 @@ classdef ComponentTest < matlab.uitest.TestCase
             % Verify component rejects invalid CSS identifier (starts with digit)
             testCase.verifyError(@() ic.core.Component("123invalid"), ...
                 "ic:core:ComponentBase:InvalidId");
+        end
+    end
+
+    methods (Test)
+        function testStyleSendsEvent(testCase)
+            % Verify style() publishes @style event with CSS properties
+            comp = ic.core.Component("comp");
+            comp.Parent = testCase.Frame;
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            comp.style(":host", "backgroundColor", "#ff0000", "padding", "10px");
+
+            styleEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@style");
+            testCase.verifyNotEmpty(styleEvents);
+            testCase.verifyEqual(styleEvents(end).Data.selector, ":host");
+            testCase.verifyEqual(styleEvents(end).Data.styles('background-color'), "#ff0000");
+        end
+
+        function testGetStyleReturnsStoredStyles(testCase)
+            % Verify getStyle() returns previously set styles
+            comp = ic.core.Component("comp");
+            comp.Parent = testCase.Frame;
+
+            comp.style(":host", "color", "blue");
+            styles = comp.getStyle(":host");
+
+            testCase.verifyEqual(styles.color, "blue");
+        end
+
+        function testClearStyleSendsEvent(testCase)
+            % Verify clearStyle() publishes @clearStyle event
+            comp = ic.core.Component("comp");
+            comp.Parent = testCase.Frame;
+            comp.style(":host", "color", "red");
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            comp.clearStyle(":host");
+
+            clearEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@clearStyle");
+            testCase.verifyNotEmpty(clearEvents);
+            testCase.verifyEqual(clearEvents(end).Data.selector, ":host");
         end
     end
 end
