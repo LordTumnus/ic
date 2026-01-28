@@ -74,5 +74,11 @@ classdef TestComponent < ic.core.Component
 
             out = this.publish("getState", []);
         end
+
+        function out = queryStyle(this)
+            % QUERYSTYLE Query computed CSS styles from the Svelte component
+
+            out = this.publish("queryStyle", {});
+        end
     end
 end

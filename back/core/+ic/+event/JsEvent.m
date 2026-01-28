@@ -32,11 +32,12 @@ classdef JsEvent < handle & matlab.mixin.Heterogeneous
 
         function json = jsonencode(this, varargin)
             % > JSONENCODE converts the event into a JSON text object that can be shared with the view
+            data = this.Data;
             obj = struct(...
                 "component", this.ComponentID, ...
                 "name", this.Name, ...
-                "data", this.Data, ...
                 "id", this.Id);
+            obj.data = data;
             json = jsonencode(obj, varargin{:});
         end
     end

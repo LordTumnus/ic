@@ -23,7 +23,8 @@
     // Method handlers (MATLAB calls these, we provide implementations)
     echo = $bindable((value: unknown): Resolution => ({ success: true, data: value })),
     incrementCounter = $bindable((): Resolution => ({ success: true, data: null })),
-    getState = $bindable((): Resolution => ({ success: true, data: null }))
+    getState = $bindable((): Resolution => ({ success: true, data: null })),
+    queryStyle = $bindable((): Resolution => ({ success: true, data: null }) ),
   }: {
     label?: string;
     counter?: number;
@@ -33,7 +34,10 @@
     echo?: (value: unknown) => Resolution;
     incrementCounter?: () => Resolution;
     getState?: () => Resolution;
+    queryStyle?: () => Resolution;
   } = $props();
+
+  let element: HTMLElement;
 
   // Set up method implementations
   // These override the default implementations provided by the Component class
@@ -53,6 +57,21 @@
         data: { label, counter, enabled }
       };
     };
+    queryStyle = (): Resolution => {
+      if (element) {
+        const styles = getComputedStyle(element);
+        return {
+          success: true,
+          data: {
+            color: styles.color,
+            backgroundColor: styles.backgroundColor,
+            fontSize: styles.fontSize
+          }
+        };
+      } else {
+        return { success: false, data: 'Element not found' };
+      }
+    };
   });
 
   function handleClick() {
@@ -71,7 +90,7 @@
   }
 </script>
 
-<div class="test-component" class:disabled={!enabled} data-testid="test-component">
+<div class="test-component" class:disabled={!enabled} data-testid="test-component" bind:this={element}>
   <div class="header">
     <span class="label" data-testid="label">{label}</span>
     <span class="counter" data-testid="counter">{counter}</span>

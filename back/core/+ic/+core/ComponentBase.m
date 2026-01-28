@@ -387,7 +387,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             reactiveMethods = metaMethods(...
                 strcmp({metaMethods.Description}, "Reactive"));
             % Convert method names to camelCase strings and compare
-            camelNames = arrayfun(@(m) ic.utils.toCamelCase(m.Name), reactiveMethods);
+            camelNames = arrayfun(@(m) ic.utils.toCamelCase(m.Name), ...
+                reactiveMethods);
             isReactiveMethod = any(camelNames == methodName);
         end
 

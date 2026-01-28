@@ -221,4 +221,24 @@ classdef IntegrationTest < matlab.uitest.TestCase
         end
     end
 
+    methods (Test)
+        function testStyleAppliedToComponent(testCase)
+            % Verify style() applies CSS that can be queried from Svelte
+
+            comp = ic.test.TestComponent("test1");
+            comp.Parent = testCase.Frame;
+
+            % Apply a background color style
+            comp.style(".test-component", "backgroundColor", "rgb(255, 0, 0)");
+
+            % Query computed styles from Svelte
+            promise = comp.queryStyle();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            styles = promise.get().Data;
+            testCase.verifyEqual(styles.backgroundColor, 'rgb(255, 0, 0)');
+        end
+    end
+
 end
