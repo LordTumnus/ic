@@ -28,7 +28,8 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
         function this = ComponentBase(id)
             arguments (Input)
                 % > ID unique identifier for the component
-                id string = matlab.lang.internal.uuid();
+                id (1,1) string {mustBeValidCssIdent} = ...
+                    "ic-" + matlab.lang.internal.uuid();
             end
 
             arguments (Output)
@@ -388,4 +389,46 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
 
     end
 
+end
+
+function mustBeValidCssIdent(id)
+% MUSTBEVALIDCSSIDENT validates that the given string is a valid CSS identifier.
+%
+% CSS identifiers (idents) allow: letters (A-Z, a-z), digits (0-9),
+% hyphens (-), underscores (_), and Unicode characters >= U+00A0.
+%
+% Restrictions:
+%   - Cannot be empty
+%   - Cannot start with a digit
+%   - Cannot start with a hyphen followed by a digit
+%
+% See: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/ident
+
+    % Build pattern for valid CSS ident characters
+    validChar = lettersPattern(1) | digitsPattern(1) | characterListPattern("-_");
+
+    % Check non-empty
+    if strlength(id) == 0
+        error("ic:core:ComponentBase:InvalidId", ...
+              "Component ID cannot be empty.");
+    end
+
+    % Check all characters are valid (letters, digits, hyphens, underscores)
+    if ~matches(id, asManyOfPattern(validChar, 1))
+        error("ic:core:ComponentBase:InvalidId", ...
+              "Component ID '%s' contains invalid characters. " + ...
+              "Valid characters are: letters, digits, hyphens, and underscores.", id);
+    end
+
+    % Cannot start with a digit
+    if startsWith(id, digitsPattern(1))
+        error("ic:core:ComponentBase:InvalidId", ...
+              "Component ID '%s' cannot start with a digit.", id);
+    end
+
+    % Cannot start with hyphen followed by digit
+    if startsWith(id, "-" + digitsPattern(1))
+        error("ic:core:ComponentBase:InvalidId", ...
+              "Component ID '%s' cannot start with a hyphen followed by a digit.", id);
+    end
 end

@@ -24,7 +24,7 @@ classdef Component < ic.core.ComponentBase
         function this = Component(id)
             arguments (Input)
                 % > ID unique identifier for the component
-                id string = matlab.lang.internal.uuid();
+                id (1,1) string = "ic-" + matlab.lang.internal.uuid();
             end
 
             arguments (Output)

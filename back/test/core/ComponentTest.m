@@ -293,4 +293,18 @@ classdef ComponentTest < matlab.uitest.TestCase
             testCase.verifyTrue(true);
         end
     end
+
+    methods (Test)
+        function testValidCssIdent(testCase)
+            % Verify component accepts valid CSS identifier
+            comp = ic.core.Component("my-component_123");
+            testCase.verifyEqual(comp.ID, "my-component_123");
+        end
+
+        function testInvalidCssIdent(testCase)
+            % Verify component rejects invalid CSS identifier (starts with digit)
+            testCase.verifyError(@() ic.core.Component("123invalid"), ...
+                "ic:core:ComponentBase:InvalidId");
+        end
+    end
 end
