@@ -239,6 +239,35 @@ classdef IntegrationTest < matlab.uitest.TestCase
             styles = promise.get().Data;
             testCase.verifyEqual(styles.backgroundColor, 'rgb(255, 0, 0)');
         end
+
+        function testColorSchemeChangeUpdatesStyles(testCase)
+            % Verify changing ColorScheme updates CSS variables in components
+
+            comp = ic.test.TestComponent("test1");
+            comp.Parent = testCase.Frame;
+
+            % Style the component using a CSS variable
+            comp.style(".test-component", "backgroundColor", "var(--primary)");
+
+            % Query initial style (light mode: primary = #18181b)
+            promise1 = comp.queryStyle();
+            promise1.wait(testCase.TIMEOUT);
+            testCase.assertTrue(promise1.isResolved());
+            lightBg = promise1.get().Data.backgroundColor;
+
+            % Change to dark mode
+            testCase.Frame.ColorScheme = "dark";
+
+            % Query style again (dark mode: primary = #fafafa)
+            promise2 = comp.queryStyle();
+            promise2.wait(testCase.TIMEOUT);
+            testCase.assertTrue(promise2.isResolved());
+            darkBg = promise2.get().Data.backgroundColor;
+
+            % Verify the background color changed
+            testCase.verifyNotEqual(lightBg, darkBg, ...
+                'Background color should change when switching color scheme');
+        end
     end
 
 end

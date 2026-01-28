@@ -53,10 +53,9 @@ classdef Theme < handle
         function css = jsonencode(this, varargin)
             % > JSONENCODE returns CSS custom properties as a JSON string.
             % Called automatically when the Theme is serialized for the frontend.
+            % Color properties are sent as [light, dark] arrays.
+            % Frontend selects the value based on colorScheme.
 
-            s = struct();
-
-            % Color properties use light-dark() syntax
             colorProps = ["Background", "Foreground", ...
                           "Primary", "PrimaryForeground", ...
                           "Secondary", "SecondaryForeground", ...
@@ -65,17 +64,22 @@ classdef Theme < handle
                           "Destructive", "DestructiveForeground", ...
                           "Border", "Input", "Ring"];
 
+            keys = cell(1, numel(colorProps) + 1);
+            vals = cell(1, numel(colorProps) + 1);
+
             for ii = 1:numel(colorProps)
                 propName = colorProps(ii);
-                cssName = ic.utils.toKebabCase(propName);
+                keys{ii} = char(ic.utils.toKebabCase(propName));
                 values = this.(propName);
-                s.(cssName) = sprintf("light-dark(%s, %s)", values(1), values(2));
+                vals{ii} = cellstr(values);  % [light, dark] array
             end
 
-            % Non-color properties are set directly
-            s.radius = this.Radius;
+            % Non-color properties are set directly (as single values)
+            keys{end} = 'radius';
+            vals{end} = char(this.Radius);
 
-            css = jsonencode(s, varargin{:});
+            m = containers.Map(keys, vals);
+            css = jsonencode(m, varargin{:});
         end
     end
 
