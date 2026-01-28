@@ -39,7 +39,7 @@ classdef FrameTest < matlab.uitest.TestCase
 
             testCase.verifyClass(frame, 'ic.Frame');
             testCase.verifyNotEmpty(frame.ID);
-            testCase.verifyEqual(frame.ID, "@ic.frame");
+            testCase.verifyEqual(frame.ID, "ic-frame");
         end
 
         function testAddFrameToFigure(testCase)

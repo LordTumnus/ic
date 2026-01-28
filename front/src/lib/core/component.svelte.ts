@@ -33,7 +33,7 @@ import { handleInsert, handleRemove, handleReparent } from './container';
  * and receive events from MATLAB.
  */
 class Component implements Registrable {
-  /** Unique component identifier (e.g., "btn1", "@ic.frame"). */
+  /** Unique component identifier (e.g., "btn1", "ic-frame"). */
   readonly id: string;
 
   /** MATLAB class name (e.g., "ic.components.Button"). */

@@ -63,7 +63,7 @@ function setupBridge(): MockMatlabHTML {
 
   // Create and register the Frame (root component)
   const frame = new Component(
-    '@ic.frame', 'ic.Frame', [], [], [], ['default'], Frame
+    'ic-frame', 'ic.Frame', [], [], [], ['default'], Frame
   );
   registry.register(frame);
   frame.mount(document.body);
@@ -121,7 +121,7 @@ describe('Bridge Integration', () => {
       };
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: insertData,
         id: uniqueId('evt'),
@@ -141,7 +141,7 @@ describe('Bridge Integration', () => {
 
       // Insert first component
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id1, {
@@ -158,7 +158,7 @@ describe('Bridge Integration', () => {
 
       // Insert second component
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id2, {
@@ -183,7 +183,7 @@ describe('Bridge Integration', () => {
     it('should render initial prop values', async () => {
       const id = uniqueId('props');
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id, {
@@ -216,7 +216,7 @@ describe('Bridge Integration', () => {
 
       // First insert a component
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -230,7 +230,7 @@ describe('Bridge Integration', () => {
 
       // Now remove it
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@remove',
         data: { id } as RemoveEventData,
         id: uniqueId('evt'),
@@ -252,7 +252,7 @@ describe('Bridge Integration', () => {
 
       // Insert two components
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(keepId),
@@ -262,7 +262,7 @@ describe('Bridge Integration', () => {
       });
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(removeId),
@@ -275,7 +275,7 @@ describe('Bridge Integration', () => {
 
       // Remove only one
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@remove',
         data: { id: removeId } as RemoveEventData,
         id: uniqueId('evt'),
@@ -297,7 +297,7 @@ describe('Bridge Integration', () => {
 
       // Insert component
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -326,7 +326,7 @@ describe('Bridge Integration', () => {
       const id = uniqueId('counterTest');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -355,7 +355,7 @@ describe('Bridge Integration', () => {
       const id = uniqueId('syncTest');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -389,7 +389,7 @@ describe('Bridge Integration', () => {
       const id = uniqueId('eventTest');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -419,7 +419,7 @@ describe('Bridge Integration', () => {
       const id = uniqueId('counterEventTest');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -452,7 +452,7 @@ describe('Bridge Integration', () => {
       const methodCallId = uniqueId('method-call');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id),
@@ -491,7 +491,7 @@ describe('Bridge Integration', () => {
       const methodCallId = uniqueId('method-call');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id, {
@@ -537,7 +537,7 @@ describe('Bridge Integration', () => {
       const methodCallId = uniqueId('method-call');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id, {
@@ -586,7 +586,7 @@ describe('Bridge Integration', () => {
       const id = uniqueId('disabledTest');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id, {
@@ -614,7 +614,7 @@ describe('Bridge Integration', () => {
       const id = uniqueId('toggleTest');
 
       await mock.simulateEvent({
-        component: '@ic.frame',
+        component: 'ic-frame',
         name: '@insert',
         data: {
           component: createTestComponentDefinition(id, {

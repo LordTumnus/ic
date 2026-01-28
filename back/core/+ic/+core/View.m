@@ -102,7 +102,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
 
          for ii = 1:numel(events)
             evt = events{ii};
-            if evt.component == "@ic.frame"
+            if evt.component == "ic-frame"
                % Event targeted at the Frame itself
                this.Frame.receive(evt.name, evt.data);
             elseif this.Frame.Registry.isKey(evt.component)

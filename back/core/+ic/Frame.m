@@ -43,7 +43,7 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             end
 
             % call superclass constructor with frame ID
-            this@ic.core.ComponentBase("@ic.frame");
+            this@ic.core.ComponentBase("ic-frame");
 
             % initialize the theme
             this.Theme = ic.style.Theme();
