@@ -123,3 +123,39 @@ export interface Registrable {
    */
   receive(id: string, name: string, data: unknown): Promise<void>;
 }
+
+// ============================================================================
+// Styling Event Data
+// ============================================================================
+
+/** Data for @style events (instance-level styling). */
+export interface StyleEventData {
+  selector: string;
+  styles: Record<string, string>;
+}
+
+/** Data for @clearStyle events. */
+export interface ClearStyleEventData {
+  selector: string;
+}
+
+/** Data for @globalStyle events (type-level styling). */
+export interface GlobalStyleEventData {
+  type: string;
+  selector: string;
+  styles: Record<string, string>;
+}
+
+/** Data for @clearGlobalStyle events. */
+export interface ClearGlobalStyleEventData {
+  type: string;
+  selector: string;
+}
+
+/** Data for @clearGlobalStyles events. */
+export interface ClearGlobalStylesEventData {
+  type: string;
+}
+
+/** Data for @theme events. CSS variables as kebab-case keys with values ready for CSS. */
+export type ThemeEventData = Record<string, string>;
