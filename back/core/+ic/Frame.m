@@ -6,6 +6,15 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         View ic.core.View
         % > REGISTRY map of component IDs to components for O(1) event dispatch
         Registry = dictionary(string.empty(), ic.core.ComponentBase.empty())
+        % > THEME CSS custom property values for theming
+        Theme ic.style.Theme
+        % > GLOBALSTYLES nested dictionary: componentType → (selector → styles struct)
+        GlobalStyles = dictionary(string.empty(), dictionary.empty())
+    end
+
+    properties (SetObservable, Description = "Reactive")
+        % > COLORSCHEME active color scheme
+        ColorScheme (1,1) string {mustBeMember(ColorScheme, ["light", "dark"])} = "light"
     end
 
     properties (Dependent)
@@ -35,6 +44,9 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
 
             % call superclass constructor with frame ID
             this@ic.core.ComponentBase("@ic.frame");
+
+            % initialize the theme
+            this.Theme = ic.style.Theme();
 
             % initialize the view
             args = namedargs2cell(args);
@@ -109,6 +121,165 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         function tf = isAttached(~)
             % > ISATTACHED Frame is always attached (it's the root)
             tf = true;
+        end
+
+        function theme(this, name, value)
+            % > THEME sets CSS custom property values.
+            % theme("name", "value") - sets value for the ACTIVE color scheme
+            % theme("name", ["light", "dark"]) - sets both light and dark values
+
+            arguments (Input)
+                this (1,1) ic.Frame
+            end
+
+            arguments (Input, Repeating)
+                name (1,1) string
+                value string
+            end
+
+            for ii = 1:numel(name)
+                propName = ic.utils.toPascalCase(name{ii});
+
+                if ~isprop(this.Theme, propName)
+                    error("ic:Frame:InvalidThemeProperty", ...
+                          "Unknown theme property: %s", name{ii});
+                end
+
+                val = value{ii};
+                if isscalar(val)
+                    % Single value: apply to active scheme only
+                    currentValues = this.Theme.(propName);
+                    if this.ColorScheme == "light"
+                        this.Theme.(propName) = [val, currentValues(2)];
+                    else
+                        this.Theme.(propName) = [currentValues(1), val];
+                    end
+                else
+                    % Array [light, dark]: set both values
+                    this.Theme.(propName) = val;
+                end
+            end
+
+            % Publish the full theme CSS to the view
+            this.publish("@theme", this.Theme.toCSS());
+        end
+
+        function globalStyle(this, componentType, selector, varargin)
+            % > GLOBALSTYLE applies CSS styles to all components of a type.
+
+            arguments (Input)
+                this (1,1) ic.Frame
+                componentType (1,1) string
+                selector (1,1) string
+            end
+
+            arguments (Input, Repeating)
+                varargin
+            end
+
+            % Parse styles (same logic as ComponentBase.style)
+            if isscalar(varargin) && isstruct(varargin{1})
+                newStyles = varargin{1};
+            else
+                if mod(numel(varargin), 2) ~= 0
+                    error("ic:Frame:InvalidStyleArgs", ...
+                          "Style properties must be specified as name-value pairs.");
+                end
+                varargin(1:2:end) = ...
+                    cellfun(@string, varargin(1:2:end), 'UniformOutput', false);
+                newStyles = struct(varargin{:});
+            end
+
+            % Get or create selector dictionary for this component type
+            if this.GlobalStyles.isKey(componentType)
+                selectorDict = this.GlobalStyles(componentType);
+            else
+                selectorDict = dictionary(string.empty(), struct.empty());
+            end
+
+            % Merge with existing styles for this selector
+            if selectorDict.isKey(selector)
+                existingStyles = selectorDict(selector);
+            else
+                existingStyles = struct();
+            end
+
+            fields = fieldnames(newStyles);
+            for jj = 1:numel(fields)
+                fname = fields{jj};
+                fvalue = newStyles.(fname);
+                if isstring(fvalue) && fvalue == ""
+                    if isfield(existingStyles, fname)
+                        existingStyles = rmfield(existingStyles, fname);
+                    end
+                else
+                    existingStyles.(fname) = fvalue;
+                end
+            end
+
+            selectorDict(selector) = existingStyles;
+            this.GlobalStyles(componentType) = selectorDict;
+
+            % Convert to kebab-case for CSS
+            cssStyles = struct();
+            mergedFields = fieldnames(existingStyles);
+            for kk = 1:numel(mergedFields)
+                kebabName = ic.utils.toKebabCase(mergedFields{kk});
+                cssStyles.(kebabName) = existingStyles.(mergedFields{kk});
+            end
+
+            this.publish("@globalStyle", struct( ...
+                "type", componentType, ...
+                "selector", selector, ...
+                "styles", cssStyles));
+        end
+
+        function clearGlobalStyle(this, componentType, selector)
+            % > CLEARGLOBALSTYLE removes styles for a specific selector on a component type.
+
+            arguments (Input)
+                this (1,1) ic.Frame
+                componentType (1,1) string
+                selector (1,1) string
+            end
+
+            if this.GlobalStyles.isKey(componentType)
+                selectorDict = this.GlobalStyles(componentType);
+                if selectorDict.isKey(selector)
+                    selectorDict(selector) = [];
+                    this.GlobalStyles(componentType) = selectorDict;
+                end
+            end
+
+            this.publish("@clearGlobalStyle", struct( ...
+                "type", componentType, ...
+                "selector", selector));
+        end
+
+        function clearGlobalStyles(this, componentType)
+            % > CLEARGLOBALSTYLES removes all styles for a component type.
+
+            arguments (Input)
+                this (1,1) ic.Frame
+                componentType (1,1) string
+            end
+
+            if this.GlobalStyles.isKey(componentType)
+                this.GlobalStyles(componentType) = [];
+            end
+
+            this.publish("@clearGlobalStyles", struct("type", componentType));
+        end
+
+        function clearAllGlobalStyles(this)
+            % > CLEARALLGLOBALSTYLES removes all global styles.
+
+            arguments (Input)
+                this (1,1) ic.Frame
+            end
+
+            this.GlobalStyles = dictionary(string.empty(), dictionary.empty());
+            this.publish("@clearAllGlobalStyles", struct());
         end
     end
 
