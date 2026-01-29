@@ -4,6 +4,7 @@
  */
 
 import type { JsEvent, Registrable } from '../types';
+import logger from './logger';
 
 /**
  * Registry class - singleton that maintains a flat map of all components.
@@ -75,9 +76,11 @@ class Registry {
     const component = this.components.get(event.component);
 
     if (!component) {
-      console.warn(
-        `[Registry] No component found for ID "${event.component}". Event "${event.name}" dropped.`
-      );
+      logger.warn('Registry', 'No component found for event', {
+        componentId: event.component,
+        eventName: event.name,
+        action: 'dropped'
+      });
       return;
     }
 

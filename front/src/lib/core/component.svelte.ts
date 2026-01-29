@@ -27,6 +27,7 @@ import type {
 import Bridge from './bridge';
 import { handleInsert, handleRemove, handleReparent } from './container';
 import StyleManager from './style-manager';
+import logger from './logger';
 
 
 /**
@@ -238,7 +239,10 @@ class Component implements Registrable {
       render: () => `<div style="display: contents" id="${this.id}" data-ic-type="${this.type}"></div>`,
       setup: (element: Element) => {
         if (!this._svelteComponent) {
-          console.error(`[Component] Cannot create snippet: "${this.id}" has no Svelte component`);
+          logger.error('Component', 'Cannot create snippet: no Svelte component', {
+            componentId: this.id,
+            type: this.type
+          });
           return;
         }
 

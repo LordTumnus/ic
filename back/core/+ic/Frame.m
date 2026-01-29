@@ -8,6 +8,8 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         Registry = dictionary(string.empty(), ic.core.ComponentBase.empty())
         % > GLOBALSTYLES nested dictionary: componentType → (selector → styles struct)
         GlobalStyles = configureDictionary("string", "dictionary")
+        % > LOGGER stores frontend logs for this frame
+        Logger ic.core.Logger
     end
 
     properties (SetAccess = private, SetObservable, Description = "Reactive")
@@ -18,6 +20,10 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
     properties (SetObservable, Description = "Reactive")
         % > COLORSCHEME active color scheme
         ColorScheme (1,1) string {mustBeMember(ColorScheme, ["light", "dark"])} = "light"
+        % > DEBUG enables frontend logging to MATLAB
+        Debug (1,1) logical = false
+        % > LOGLEVEL minimum log level to display: "debug" | "info" | "warn" | "error"
+        LogLevel (1,1) string {mustBeMember(LogLevel, ["debug", "info", "warn", "error"])} = "debug"
     end
 
     properties (Dependent)
@@ -54,6 +60,16 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
 
             addlistener(this.View, "ObjectBeingDestroyed", ...
                 @(~,~) this.delete());
+
+            % Initialize logger
+            this.Logger = ic.core.Logger();
+
+            % Sync LogLevel changes to Logger
+            addlistener(this, "LogLevel", "PostSet", ...
+                @(~,~) this.Logger.setLogLevel(this.LogLevel));
+
+            % Subscribe to @log events from frontend
+            this.subscribe("@log", @(~, ~, data) this.onLog(data));
         end
 
         function delete(this)
@@ -284,6 +300,25 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
 
             this.GlobalStyles = configureDictionary("string", "dictionary");
             this.publish("@clearAllGlobalStyles", struct());
+        end
+
+        function logger = logs(this)
+            % > LOGS returns the Logger instance for log inspection
+            logger = this.Logger;
+        end
+    end
+
+    methods (Access = private)
+        function onLog(this, data)
+            % > ONLOG handles incoming @log events from the frontend
+
+            % Add to logger (Logger handles level filtering)
+            added = this.Logger.add(data);
+
+            % Print to command window if Debug is on and log was added
+            if this.Debug && added
+                this.Logger.show(1);
+            end
         end
     end
 

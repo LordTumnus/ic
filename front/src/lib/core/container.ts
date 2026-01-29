@@ -18,6 +18,7 @@ import type {
 import type Component from './component.svelte';
 import Factory from './factory';
 import Registry from './registry';
+import logger from './logger';
 
 /**
  * Handle @insert event - create and add a child component.
@@ -71,7 +72,10 @@ export async function handleRemove(
   // Find the child
   const childIndex = parent.children.findIndex((c) => c.id === childId);
   if (childIndex === -1) {
-    console.warn(`[Component] @remove: Child "${childId}" not found in "${parent.id}"`);
+    logger.warn('Container', '@remove: Child not found', {
+      childId,
+      parentId: parent.id
+    });
     return;
   }
 
@@ -120,7 +124,10 @@ export async function handleReparent(
   // Find the child
   const childIndex = parent.children.findIndex((c) => c.id === childId);
   if (childIndex === -1) {
-    console.warn(`[Component] @reparent: Child "${childId}" not found in "${parent.id}"`);
+    logger.warn('Container', '@reparent: Child not found', {
+      childId,
+      parentId: parent.id
+    });
     return;
   }
 
@@ -141,7 +148,10 @@ export async function handleReparent(
   // Find new parent
   const newParent = Registry.instance.get(newParentId) as Component | undefined;
   if (!newParent) {
-    console.error(`[Component] @reparent: New parent "${newParentId}" not found`);
+    logger.error('Container', '@reparent: New parent not found', {
+      childId,
+      newParentId
+    });
     return;
   }
 

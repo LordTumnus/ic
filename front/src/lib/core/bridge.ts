@@ -5,6 +5,7 @@
  */
 
 import type { JsEvent, MatlabHTML } from '../types';
+import logger from './logger';
 
 /** Callback type for dispatching events (typically to Registry). */
 type Dispatcher = (event: JsEvent) => Promise<void>;
@@ -112,7 +113,11 @@ class Bridge {
       try {
         await this.dispatcher(event);
       } catch (error) {
-        console.error('[Bridge] Error dispatching event:', error);
+        logger.error('Bridge', 'Error dispatching event', {
+          error: error instanceof Error ? error.message : String(error),
+          eventName: event.name,
+          componentId: event.component
+        });
       }
     }
   };

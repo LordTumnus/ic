@@ -11,8 +11,10 @@ import type {
   ClearGlobalStyleEventData,
   ClearGlobalStylesEventData
 } from '../types';
+import type { LogLevel } from './logger';
 import Component from './component.svelte';
 import FrameStyleManager from './frame-style-manager';
+import logger from './logger';
 
 // Default theme values matching MATLAB's ic.style.Theme defaults
 // Color properties are [light, dark] arrays; non-color properties are single values
@@ -42,7 +44,9 @@ class FrameComponent extends Component {
       'ic.Frame',
       [
         { name: 'theme', value: defaultTheme },
-        { name: 'colorScheme', value: 'light' }
+        { name: 'colorScheme', value: 'light' },
+        { name: 'debug', value: false },
+        { name: 'logLevel', value: 'debug' }
       ],
       [],
       [],
@@ -66,6 +70,22 @@ class FrameComponent extends Component {
     });
     this.subscribe('@clearAllGlobalStyles', () => {
       FrameStyleManager.instance.clearAllGlobalStyles();
+    });
+
+    // Logger integration
+    this.subscribe('@prop/debug', (_id, _name, data) => {
+      const enabled = data as boolean;
+      if (enabled) {
+        logger.enable((entry) => this.publish('@log', entry));
+        logger.info('Logger', 'Debug mode enabled');
+      } else {
+        logger.info('Logger', 'Debug mode disabled');
+        logger.disable();
+      }
+    });
+
+    this.subscribe('@prop/logLevel', (_id, _name, data) => {
+      logger.configure({ minLevel: data as LogLevel });
     });
   }
 }
