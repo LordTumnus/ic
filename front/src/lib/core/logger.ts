@@ -16,7 +16,7 @@ export interface LogEntry {
   level: LogLevel;
   source: string;
   message: string;
-  context?: Record<string, unknown>;
+  context: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -114,7 +114,7 @@ class Logger {
       level,
       source,
       message,
-      context,
+      context: context ?? {},
       timestamp: Date.now()
     };
 
@@ -136,7 +136,8 @@ class Logger {
   private _consoleOutput(entry: LogEntry): void {
     const prefix = `[${entry.source}]`;
     const consoleMethod = console[entry.level] || console.log;
-    if (entry.context) {
+    // Only include context in console output if it has properties
+    if (Object.keys(entry.context).length > 0) {
       consoleMethod(prefix, entry.message, entry.context);
     } else {
       consoleMethod(prefix, entry.message);

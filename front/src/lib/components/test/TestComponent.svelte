@@ -9,6 +9,7 @@
 -->
 <script lang="ts">
   import type { Resolution } from '$lib/types';
+  import logger from '$lib/core/logger';
 
   let {
     // Reactive props (synced with MATLAB)
@@ -24,7 +25,8 @@
     echo = $bindable((value: unknown): Resolution => ({ success: true, data: value })),
     incrementCounter = $bindable((): Resolution => ({ success: true, data: null })),
     getState = $bindable((): Resolution => ({ success: true, data: null })),
-    queryStyle = $bindable((): Resolution => ({ success: true, data: null }) ),
+    queryStyle = $bindable((): Resolution => ({ success: true, data: null })),
+    triggerLog = $bindable((data: unknown): Resolution => ({ success: true, data: null })),
   }: {
     label?: string;
     counter?: number;
@@ -35,6 +37,7 @@
     incrementCounter?: () => Resolution;
     getState?: () => Resolution;
     queryStyle?: () => Resolution;
+    triggerLog?: (data: unknown) => Resolution;
   } = $props();
 
   let element: HTMLElement;
@@ -71,6 +74,11 @@
       } else {
         return { success: false, data: 'Element not found' };
       }
+    };
+
+    triggerLog = (): Resolution => {
+      logger.error('TestComponent', 'Test log from Svelte');
+      return { success: true, data: null };
     };
   });
 

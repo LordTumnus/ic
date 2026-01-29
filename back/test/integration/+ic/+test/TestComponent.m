@@ -80,5 +80,14 @@ classdef TestComponent < ic.core.Component
 
             out = this.publish("queryStyle", {});
         end
+
+        function out = triggerLog(this)
+            % TRIGGERLOG Triggers a log event from the Svelte component
+            %
+            %   response = comp.triggerLog() tells the Svelte component
+            %   to emit a log entry. Used to test the logging integration.
+
+            out = this.publish("triggerLog", []);
+        end
     end
 end

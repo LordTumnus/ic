@@ -448,8 +448,8 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.verifyEqual(insertEvt.Name, "@insert");
             testCase.verifyTrue(isfield(insertEvt.Data.component, 'staticChildren'));
             testCase.verifyLength(insertEvt.Data.component.staticChildren, 2);
-            testCase.verifyEqual(insertEvt.Data.component.staticChildren(1).id, "container-child1");
-            testCase.verifyEqual(insertEvt.Data.component.staticChildren(2).id, "container-child2");
+            testCase.verifyEqual(insertEvt.Data.component.staticChildren{1}.id, "container-child1");
+            testCase.verifyEqual(insertEvt.Data.component.staticChildren{2}.id, "container-child2");
         end
 
         function testNoSeparateInsertForStaticChildren(testCase)
@@ -472,7 +472,7 @@ classdef ContainerTest < matlab.uitest.TestCase
             container.Parent = testCase.Frame;
 
             insertEvt = testCase.Frame.View.Queue(1);
-            childDef = insertEvt.Data.component.staticChildren(1);
+            childDef = insertEvt.Data.component.staticChildren{1};
             testCase.verifyEqual(childDef.id, "container-child1");
             testCase.verifyEqual(childDef.type, "ic.core.Component");
         end

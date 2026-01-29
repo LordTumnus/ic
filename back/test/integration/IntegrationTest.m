@@ -480,4 +480,40 @@ classdef IntegrationTest < matlab.uitest.TestCase
         end
     end
 
+    % Logging Integration
+    methods (Test)
+        function testLogFlowFromSvelteToMatlab(testCase)
+            % Verify logs from Svelte are captured in Frame.logs
+
+            % Enable debug mode
+            testCase.Frame.Debug = true;
+
+            % Clear any existing logs
+            testCase.Frame.logs.clear();
+
+            % Create component and attach
+            comp = ic.test.TestComponent("logtest");
+            comp.Parent = testCase.Frame;
+
+            % Trigger a log event from Svelte
+            promise = comp.triggerLog();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved(), ...
+                'triggerLog should receive response from Svelte');
+
+            % Verify the log was captured
+            logs = testCase.Frame.logs.all();
+            testCase.verifyGreaterThan(height(logs), 0, ...
+                'Frame.logs should contain entries after triggerLog');
+
+            % Find the TestComponent log entry
+            testComponentLogs = logs(logs.source == "TestComponent", :);
+            testCase.verifyGreaterThan(height(testComponentLogs), 0, ...
+                'Should have log entry from TestComponent');
+            testCase.verifyEqual(testComponentLogs.level(end), "error", ...
+                'Log should be at error level');
+        end
+    end
+
 end

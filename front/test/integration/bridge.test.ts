@@ -1128,6 +1128,119 @@ describe('Bridge Integration', () => {
     });
   });
 
+  describe('Logging', () => {
+    it('should send @log events to MATLAB when debug is enabled', async () => {
+      const id = uniqueId('logTest');
+
+      // Enable debug mode on the frame
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@prop/debug',
+        data: true,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Insert a component with triggerLog method
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id, {
+            methods: [
+              { name: 'echo' },
+              { name: 'incrementCounter' },
+              { name: 'getState' },
+              { name: 'triggerLog' },
+            ],
+          }),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+      mock.sentHistory = []; // Clear history
+
+      // Call triggerLog method which calls logger.error()
+      const methodCallId = uniqueId('method-call');
+      await mock.simulateEvent({
+        component: id,
+        name: 'triggerLog',
+        data: null,
+        id: methodCallId,
+      });
+
+      await flushAsync();
+
+      // Should have sent @log event to MATLAB
+      const sentEvents = mock.sentHistory.flat();
+      const logEvent = sentEvents.find(
+        (e) => e.component === 'ic-frame' && e.name === '@log'
+      );
+      expect(logEvent).toBeDefined();
+      expect(logEvent?.data).toMatchObject({
+        level: 'error',
+        source: 'TestComponent',
+        message: 'Test log from Svelte',
+      });
+    });
+
+    it('should not send @log events when debug is disabled', async () => {
+      const id = uniqueId('logDisabled');
+
+      // Debug is false by default, but explicitly set it
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@prop/debug',
+        data: false,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Insert component
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id, {
+            methods: [
+              { name: 'echo' },
+              { name: 'incrementCounter' },
+              { name: 'getState' },
+              { name: 'triggerLog' },
+            ],
+          }),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+      mock.sentHistory = []; // Clear history
+
+      // Call triggerLog
+      const methodCallId = uniqueId('method-call');
+      await mock.simulateEvent({
+        component: id,
+        name: 'triggerLog',
+        data: null,
+        id: methodCallId,
+      });
+
+      await flushAsync();
+
+      // Should NOT have sent @log event (debug is off)
+      const sentEvents = mock.sentHistory.flat();
+      const logEvent = sentEvents.find(
+        (e) => e.component === 'ic-frame' && e.name === '@log'
+      );
+      expect(logEvent).toBeUndefined();
+    });
+  });
+
   describe('Static Children', () => {
     it('should create and register static children on insert', async () => {
       const containerId = uniqueId('static-container');
