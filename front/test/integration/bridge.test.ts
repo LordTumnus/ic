@@ -63,6 +63,30 @@ function createTestComponentDefinition(
 }
 
 /**
+ * Helper to create a TestStaticContainer definition with a static child.
+ * The static child is a TestComponent with id "{containerId}-child".
+ */
+function createTestStaticContainerDefinition(
+  id: string,
+  childOverrides: Partial<ComponentDefinition> = {}
+): ComponentDefinition {
+  return {
+    type: 'ic.test.TestStaticContainer',
+    id,
+    props: [
+      { name: 'title', value: 'Test Static Container' },
+      { name: 'childCounter', value: 0 },
+    ],
+    events: [],
+    methods: [],
+    targets: ['default'],
+    staticChildren: [
+      createTestComponentDefinition(`${id}-child`, childOverrides),
+    ],
+  };
+}
+
+/**
  * Helper to set up the bridge with a mock MATLAB element.
  * Returns the mock for test assertions.
  */
@@ -1099,6 +1123,230 @@ describe('Bridge Integration', () => {
       );
       expect(instanceSheet).toBeDefined();
       expect(instanceSheet!.cssRules[0].cssText).toContain('rgb(0, 255, 0)');
+    });
+  });
+
+  describe('Static Children', () => {
+    it('should create and register static children on insert', async () => {
+      const containerId = uniqueId('static-container');
+      const childId = `${containerId}-child`;
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestStaticContainerDefinition(containerId),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await waitFor(() => Registry.instance.has(containerId));
+      await flushAsync();
+
+      // Both container and static child should be registered
+      expect(Registry.instance.has(containerId)).toBe(true);
+      expect(Registry.instance.has(childId)).toBe(true);
+
+      // Container should be in the DOM
+      const container = document.querySelector('[data-testid="test-static-container"]');
+      expect(container).not.toBeNull();
+
+      // Static child should be rendered inside the container
+      const childComponent = document.querySelector('[data-testid="test-component"]');
+      expect(childComponent).not.toBeNull();
+    });
+
+    it('should render static child with initial prop values', async () => {
+      const containerId = uniqueId('static-props');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestStaticContainerDefinition(containerId, {
+            props: [
+              { name: 'label', value: 'Static Child Label' },
+              { name: 'counter', value: 42 },
+              { name: 'enabled', value: true },
+            ],
+          }),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await waitFor(() => Registry.instance.has(containerId));
+      await flushAsync();
+
+      // Check static child rendered with correct props
+      const label = document.querySelector('[data-testid="label"]');
+      const counter = document.querySelector('[data-testid="counter"]');
+
+      expect(label?.textContent).toBe('Static Child Label');
+      expect(counter?.textContent).toBe('42');
+    });
+
+    it('should update static child props via @prop events', async () => {
+      const containerId = uniqueId('static-update');
+      const childId = `${containerId}-child`;
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestStaticContainerDefinition(containerId),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await waitFor(() => Registry.instance.has(childId));
+      await flushAsync();
+
+      // Update static child's label prop from MATLAB
+      await mock.simulateEvent({
+        component: childId,
+        name: '@prop/label',
+        data: 'Updated Static Label',
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      const label = document.querySelector('[data-testid="label"]');
+      expect(label?.textContent).toBe('Updated Static Label');
+    });
+
+    it('should deregister static children when container is removed', async () => {
+      const containerId = uniqueId('static-remove');
+      const childId = `${containerId}-child`;
+
+      // Insert container with static child
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestStaticContainerDefinition(containerId),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await waitFor(() => Registry.instance.has(childId));
+      await flushAsync();
+
+      // Verify both are registered
+      expect(Registry.instance.has(containerId)).toBe(true);
+      expect(Registry.instance.has(childId)).toBe(true);
+
+      // Remove the container
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@remove',
+        data: { id: containerId } as RemoveEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Both container AND static child should be deregistered
+      expect(Registry.instance.has(containerId)).toBe(false);
+      expect(Registry.instance.has(childId)).toBe(false);
+
+      // Neither should be in the DOM
+      const container = document.querySelector('[data-testid="test-static-container"]');
+      const child = document.querySelector('[data-testid="test-component"]');
+      expect(container).toBeNull();
+      expect(child).toBeNull();
+    });
+
+    it('should update parent via frontend-only wiring when static child props change', async () => {
+      const containerId = uniqueId('static-wiring');
+      const childId = `${containerId}-child`;
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestStaticContainerDefinition(containerId, {
+            props: [
+              { name: 'label', value: 'Test Label' },
+              { name: 'counter', value: 10 },
+              { name: 'enabled', value: true },
+            ],
+          }),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await waitFor(() => Registry.instance.has(childId));
+      await flushAsync();
+
+      // Verify initial childCounter in container mirrors child's counter
+      let childCounterDisplay = document.querySelector('[data-testid="child-counter"]');
+      expect(childCounterDisplay?.textContent).toBe('Child counter: 10');
+
+      // Update the static child's counter from MATLAB
+      await mock.simulateEvent({
+        component: childId,
+        name: '@prop/counter',
+        data: 99,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify the container's childCounter was updated via the $effect
+      childCounterDisplay = document.querySelector('[data-testid="child-counter"]');
+      expect(childCounterDisplay?.textContent).toBe('Child counter: 99');
+    });
+
+    it('should update child via frontend-only wiring when parent props change', async () => {
+      const containerId = uniqueId('static-wiring-inverse');
+      const childId = `${containerId}-child`;
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestStaticContainerDefinition(containerId, {
+            props: [
+              { name: 'label', value: 'Test Label' },
+              { name: 'counter', value: 5 },
+              { name: 'enabled', value: true },
+            ],
+          }),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await waitFor(() => Registry.instance.has(childId));
+      await flushAsync();
+
+      // Verify initial child counter
+      let childCounter = document.querySelector('[data-testid="counter"]');
+      expect(childCounter?.textContent).toBe('5');
+
+      // Update the CONTAINER's childCounter prop from MATLAB
+      await mock.simulateEvent({
+        component: containerId,
+        name: '@prop/childCounter',
+        data: 77,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Verify the child's counter was updated via the inverse $effect
+      childCounter = document.querySelector('[data-testid="counter"]');
+      expect(childCounter?.textContent).toBe('77');
+
+      // Also verify the container's display updated
+      const childCounterDisplay = document.querySelector('[data-testid="child-counter"]');
+      expect(childCounterDisplay?.textContent).toBe('Child counter: 77');
     });
   });
 });

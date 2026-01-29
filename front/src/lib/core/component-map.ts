@@ -21,6 +21,7 @@ const modules = import.meta.glob('../components/**/*.svelte');
 const componentMap: Record<string, () => Promise<unknown>> = {
   // Test components (for integration testing)
   'ic.test.TestComponent': modules['../components/test/TestComponent.svelte'],
+  'ic.test.TestStaticContainer': modules['../components/test/TestStaticContainer.svelte'],
 };
 
 export default componentMap;
