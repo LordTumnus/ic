@@ -21,7 +21,7 @@ classdef ComponentContainer < ic.core.Component & ...
             % Collect static children for serialization
             staticKids = this.Children([this.Children.IsStatic_]);
             if ~isempty(staticKids)
-                definition.staticChildren = arrayfun(@getComponentDefinition, staticKids);
+                definition.staticChildren = arrayfun(@getComponentDefinition, staticKids, 'UniformOutput', false);
             end
         end
     end
