@@ -8,19 +8,33 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { Snippets, StaticChildrenMap } from '$lib/types';
+  import type { Resolution, Snippets, StaticChildrenMap } from '$lib/types';
 
   let {
     title = $bindable('Static Container'),
     childCounter = $bindable(0),
     snippets = { default: [] } as Snippets,
     staticChildren = new Map() as StaticChildrenMap,
+
+    // Method handler (MATLAB calls this, we provide implementation)
+    getState = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     title?: string;
     childCounter?: number;
     snippets?: Snippets;
     staticChildren?: StaticChildrenMap;
+    getState?: () => Resolution;
   } = $props();
+
+  // Set up method implementation
+  $effect(() => {
+    getState = (): Resolution => {
+      return {
+        success: true,
+        data: { title, childCounter }
+      };
+    };
+  });
 
   // Access the static child by its suffix name
   const child = $derived(staticChildren.get('child'));

@@ -78,7 +78,9 @@ function createTestStaticContainerDefinition(
       { name: 'childCounter', value: 0 },
     ],
     events: [],
-    methods: [],
+    methods: [
+      { name: 'getState' },
+    ],
     targets: ['default'],
     staticChildren: [
       createTestComponentDefinition(`${id}-child`, childOverrides),

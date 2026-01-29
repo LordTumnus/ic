@@ -14,6 +14,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
 %   Test categories:
 %   - Reactive Props: Verify MATLAB->Svelte property sync
 %   - Reactive Methods: Verify MATLAB->Svelte->MATLAB round-trip
+%   - Static Children: Verify static composition pattern
 
     properties
         Figure
@@ -267,6 +268,215 @@ classdef IntegrationTest < matlab.uitest.TestCase
             % Verify the background color changed
             testCase.verifyNotEqual(lightBg, darkBg, ...
                 'Background color should change when switching color scheme');
+        end
+    end
+
+    % Static Children - Insertion
+    methods (Test)
+        function testStaticContainerInsertion(testCase)
+            % Verify container and static child are created in Svelte
+
+            container = ic.test.TestStaticContainer("container1");
+            container.Title = "My Container";
+            container.Child.Label = "Static Child";
+            container.Child.Counter = 42;
+
+            container.Parent = testCase.Frame;
+
+            % Query container state
+            promise = container.getState();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved(), ...
+                'getState should receive response from Svelte');
+            result = promise.get();
+            testCase.assertTrue(result.Success, 'getState should succeed');
+            testCase.verifyEqual(result.Data.title, 'My Container', ...
+                'Svelte should have received container title');
+        end
+
+        function testStaticChildInitialProps(testCase)
+            % Verify static child receives initial property values
+
+            container = ic.test.TestStaticContainer("container2");
+            container.Child.Label = "Initial Label";
+            container.Child.Counter = 100;
+
+            container.Parent = testCase.Frame;
+
+            % Query child state directly
+            promise = container.Child.getState();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            result = promise.get();
+            testCase.verifyEqual(result.Data.label, 'Initial Label', ...
+                'Static child should have received initial label');
+            testCase.verifyEqual(result.Data.counter, 100, ...
+                'Static child should have received initial counter');
+        end
+    end
+
+    % Static Children - Property Updates
+    methods (Test)
+        function testStaticChildPropertyUpdate(testCase)
+            % Verify static child props update after attachment
+
+            container = ic.test.TestStaticContainer("container3");
+            container.Parent = testCase.Frame;
+
+            % Update child property after attachment
+            container.Child.Label = "Updated Label";
+
+            promise = container.Child.getState();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            testCase.verifyEqual(promise.get().Data.label, 'Updated Label', ...
+                'Static child should receive property updates');
+        end
+
+        function testStaticChildCounterUpdate(testCase)
+            % Verify static child counter prop updates
+
+            container = ic.test.TestStaticContainer("container4");
+            container.Parent = testCase.Frame;
+
+            container.Child.Counter = 999;
+
+            promise = container.Child.getState();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            testCase.verifyEqual(promise.get().Data.counter, 999);
+        end
+
+        function testContainerTitleUpdate(testCase)
+            % Verify container title prop updates
+
+            container = ic.test.TestStaticContainer("container5");
+            container.Parent = testCase.Frame;
+
+            container.Title = "New Title";
+
+            promise = container.getState();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            testCase.verifyEqual(promise.get().Data.title, 'New Title');
+        end
+    end
+
+    % Static Children - Parent-Child Linking
+    methods (Test)
+        function testChildCounterSyncsToParent(testCase)
+            % Verify child counter changes sync to parent's childCounter
+            % (via frontend-only $effect wiring)
+
+            container = ic.test.TestStaticContainer("container6");
+            container.Child.Counter = 50;
+            container.Parent = testCase.Frame;
+
+            % After attachment, the frontend $effect should sync
+            % child.counter -> parent.childCounter
+            promise = container.getState();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            testCase.verifyEqual(promise.get().Data.childCounter, 50, ...
+                'Parent childCounter should mirror child counter');
+        end
+
+        function testChildCounterUpdateSyncsToParent(testCase)
+            % Verify updating child counter syncs to parent
+
+            container = ic.test.TestStaticContainer("container7");
+            container.Parent = testCase.Frame;
+
+            % Update child counter after attachment
+            container.Child.Counter = 777;
+
+            % Small delay to allow $effect to run
+            pause(1);
+
+            testCase.verifyEqual(container.ChildCounter, container.Child.Counter);
+
+        end
+
+        function testParentChildCounterSyncsToChild(testCase)
+            % Verify parent childCounter changes sync to child's counter
+            % (via frontend-only inverse $effect wiring)
+
+            container = ic.test.TestStaticContainer("container8");
+            container.Parent = testCase.Frame;
+
+            % Update parent's childCounter
+            container.ChildCounter = 123;
+
+            % Wait for $effect to sync and propagate back to MATLAB
+            pause(1);
+
+            % Verify child counter matches parent's childCounter
+            testCase.verifyEqual(container.Child.Counter, container.ChildCounter, ...
+                'Child counter should mirror parent childCounter');
+        end
+    end
+
+    % Static Children - Removal
+    methods (Test)
+        function testStaticContainerRemoval(testCase)
+            % Verify removing container also removes static child
+
+            container = ic.test.TestStaticContainer("container9");
+            container.Parent = testCase.Frame;
+
+            % Verify both are attached
+            childPromise = container.Child.getState();
+            childPromise.wait(testCase.TIMEOUT);
+            testCase.assertTrue(childPromise.isResolved(), ...
+                'Child should be queryable before removal');
+
+            % Remove container
+            container.Parent = [];
+
+            % After removal, child should no longer be queryable
+            childPromise2 = container.Child.getState();
+
+            % We expect this to NOT resolve (child is gone)
+            pause(0.3);
+            testCase.assertFalse(childPromise2.isResolved(), ...
+                'Child should not respond after container removal');
+        end
+    end
+
+    % Static Children - Method Invocation
+    methods (Test)
+        function testStaticChildMethodInvocation(testCase)
+            % Verify methods can be invoked on static children
+
+            container = ic.test.TestStaticContainer("container10");
+            container.Parent = testCase.Frame;
+
+            % Call echo method on static child
+            promise = container.Child.echo("Hello from static child");
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            testCase.verifyEqual(promise.get().Data, 'Hello from static child');
+        end
+
+        function testStaticChildIncrementCounter(testCase)
+            % Verify incrementCounter method works on static child
+
+            container = ic.test.TestStaticContainer("container11");
+            container.Child.Counter = 10;
+            container.Parent = testCase.Frame;
+
+            promise = container.Child.incrementCounter();
+            promise.wait(testCase.TIMEOUT);
+
+            testCase.assertTrue(promise.isResolved());
+            testCase.verifyEqual(promise.get().Data, 11);
         end
     end
 
