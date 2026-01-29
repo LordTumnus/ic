@@ -410,4 +410,82 @@ classdef ContainerTest < matlab.uitest.TestCase
 
         end
     end
+
+    methods (Test)
+        % Static Children Tests
+
+        function testAddStaticChildBeforeAttachment(testCase)
+            % Verify static children are in Children array immediately
+            container = TestStaticContainer("container");
+
+            testCase.verifyLength(container.Children, 2);
+            testCase.verifyEqual(container.Children(1).ID, "container-child1");
+            testCase.verifyEqual(container.Children(2).ID, "container-child2");
+            % Static children have their Parent set to the container
+            testCase.verifyEqual(container.Children(1).Parent, container);
+        end
+
+        function testStaticChildrenRegisteredOnAttach(testCase)
+            % Verify static children are registered when parent attaches
+            container = TestStaticContainer("container");
+
+            container.Parent = testCase.Frame;
+
+            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("container"));
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("container-child1"));
+            testCase.verifyTrue(testCase.Frame.Registry.isKey("container-child2"));
+        end
+
+        function testStaticChildrenInInsertPayload(testCase)
+            % Verify @insert payload includes staticChildren
+            container = TestStaticContainer("container");
+
+            container.Parent = testCase.Frame;
+
+            testCase.assertNotEmpty(testCase.Frame.View.Queue);
+            insertEvt = testCase.Frame.View.Queue(1);
+            testCase.verifyEqual(insertEvt.Name, "@insert");
+            testCase.verifyTrue(isfield(insertEvt.Data.component, 'staticChildren'));
+            testCase.verifyLength(insertEvt.Data.component.staticChildren, 2);
+            testCase.verifyEqual(insertEvt.Data.component.staticChildren(1).id, "container-child1");
+            testCase.verifyEqual(insertEvt.Data.component.staticChildren(2).id, "container-child2");
+        end
+
+        function testNoSeparateInsertForStaticChildren(testCase)
+            % Verify static children don't trigger separate @insert events
+            container = TestStaticContainer("container");
+
+            container.Parent = testCase.Frame;
+
+            % Should only have ONE @insert event (for the container)
+            insertEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@insert");
+            testCase.verifyLength(insertEvents, 1);
+            testCase.verifyEqual(insertEvents(1).Data.component.id, "container");
+        end
+
+        function testStaticChildrenDefinitionHasIdAndType(testCase)
+            % Verify staticChildren definitions include id and type
+            container = TestStaticContainer("container");
+
+            container.Parent = testCase.Frame;
+
+            insertEvt = testCase.Frame.View.Queue(1);
+            childDef = insertEvt.Data.component.staticChildren(1);
+            testCase.verifyEqual(childDef.id, "container-child1");
+            testCase.verifyEqual(childDef.type, "ic.core.Component");
+        end
+
+        function testDeleteContainerDeregistersStaticChildren(testCase)
+            % Verify deleting container also deregisters static children
+            container = TestStaticContainer("container");
+            container.Parent = testCase.Frame;
+            testCase.assertEqual(testCase.Frame.Registry.numEntries, 3);
+
+            delete(container);
+
+            testCase.verifyEqual(testCase.Frame.Registry.numEntries, 0);
+        end
+    end
 end

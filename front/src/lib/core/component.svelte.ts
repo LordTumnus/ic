@@ -71,6 +71,12 @@ class Component implements Registrable {
    */
   _snippet: Snippet | null = null;
 
+  /**
+   * Flag indicating this is a static child (pre-rendered in Svelte template).
+   * @internal Used by container.ts for static composition
+   */
+  _isStatic: boolean = false;
+
   /** Event subscriptions: event name → set of callbacks. */
   private subscriptions: Map<string, Set<EventCallback>> = new Map();
 

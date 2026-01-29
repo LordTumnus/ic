@@ -61,6 +61,21 @@ classdef Container < handle
     end
 
     methods (Access = protected)
+        function addStaticChild(this, child)
+            % > ADDSTATICCHILD declares a child that is pre-rendered in Svelte
+            arguments
+                this
+                child (1,1) ic.core.Component
+            end
+            % Set parent directly (bypasses setParent which would trigger @insert)
+            child.Parent_ = this;
+            child.Target_ = "static";
+            child.IsStatic_ = true;
+
+            % Add to Children immediately
+            this.Children(end+1) = child;
+        end
+
         function registerSubtree(this, component)
             % > REGISTERSUBTREE registers a component and all its descendants in the Frame registry
             % > note: Finds Frame once and passes it down for efficiency
@@ -71,6 +86,14 @@ classdef Container < handle
             end
             if ~isempty(frame)
                 this.registerSubtreeWithFrame(component, frame);
+                % Also register static children added before attachment
+                if isa(component, "ic.core.Container")
+                    for child = component.Children
+                        if child.IsStatic_
+                            this.registerSubtreeWithFrame(child, frame);
+                        end
+                    end
+                end
             end
         end
 

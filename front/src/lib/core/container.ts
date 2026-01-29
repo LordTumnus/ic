@@ -7,7 +7,14 @@
  */
 
 import { flushSync } from 'svelte';
-import type { InsertEventData, RemoveEventData, ReparentEventData } from '../types';
+import type {
+  ComponentDefinition,
+  InsertEventData,
+  RemoveEventData,
+  ReparentEventData,
+  StaticChild,
+  StaticChildrenMap
+} from '../types';
 import type Component from './component.svelte';
 import Factory from './factory';
 import Registry from './registry';
@@ -31,6 +38,11 @@ export async function handleInsert(
 
   // Set parent reference
   child._parentComponent = parent;
+
+  // Create static children
+  if (definition.staticChildren?.length) {
+    child.svelteProps.staticChildren = await createStaticChildren(child, definition.staticChildren);
+  }
 
   // Create snippet and add to slots
   const snippet = child.createSnippet();
@@ -65,6 +77,9 @@ export async function handleRemove(
 
   const child = parent.children[childIndex];
 
+  // Recursively deregister all descendants (handles nested static children)
+  deregisterTree(child);
+
   // Remove snippet from slots (triggers Svelte cleanup via snippet's destroy)
   for (const slotName of Object.keys(parent._snippets)) {
     const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
@@ -74,11 +89,21 @@ export async function handleRemove(
     }
   }
 
-  // Deregister from global registry
-  Registry.instance.deregister(childId);
-
   // Remove from children array
   parent.children.splice(childIndex, 1);
+
+  flushSync();
+}
+
+/**
+ * Recursively deregister a component and all its descendants.
+ * Handles both dynamic children (in _snippets) and static children (in children array).
+ */
+function deregisterTree(component: Component): void {
+  for (const child of component.children) {
+    deregisterTree(child);
+  }
+  Registry.instance.deregister(component.id);
 }
 
 /**
@@ -134,4 +159,49 @@ export async function handleReparent(
 
   // Add to new parent's children
   newParent.children.push(child);
+}
+
+/**
+ * Create Component instances for static children.
+ *
+ * Static children are declared in MATLAB constructor and included in the
+ * parent's @insert payload. They're full Component instances with snippets,
+ * just rendered in fixed template locations instead of dynamic slots.
+ *
+ * @param parent - Parent component to attach children to
+ * @param defs - Array of static child component definitions
+ * @returns Map keyed by child suffix name (e.g., "search-bar") with snippet and props
+ */
+export async function createStaticChildren(
+  parent: Component,
+  defs: ComponentDefinition[]
+): Promise<StaticChildrenMap> {
+  const result: StaticChildrenMap = new Map();
+
+  for (const def of defs) {
+    const child = await Factory.instance.create(def);
+    child._isStatic = true;
+    child._parentComponent = parent;
+
+    Registry.instance.register(child);
+    const snippet = child.createSnippet();
+    child._snippet = snippet;
+
+    parent.children.push(child);
+
+    // Key by suffix name (e.g., "parent-id-search-bar" → "search-bar")
+    const childName = def.id.replace(parent.id + '-', '');
+    result.set(childName, {
+      snippet,
+      props: child.svelteProps
+    });
+
+    // Recurse for nested static children
+    if (def.staticChildren?.length) {
+      const nested = await createStaticChildren(child, def.staticChildren);
+      nested.forEach((value, key) => result.set(key, value));
+    }
+  }
+
+  return result;
 }

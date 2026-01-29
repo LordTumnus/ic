@@ -5,11 +5,13 @@
 % > superdoc
 classdef Component < ic.core.ComponentBase
 
-    properties (Access = private)
+    properties (Access = ?ic.core.Container, Hidden)
         % > PARENT_: backing property for Parent
         Parent_ = [] % ic.core.Container
         % > TARGET_: backing property for Target
         Target_ string = string.empty()
+        % > ISSTATIC_: true if pre-rendered in Svelte
+        IsStatic_ logical = false
     end
 
     properties (Dependent, AbortSet)
@@ -134,17 +136,7 @@ classdef Component < ic.core.ComponentBase
             % Get component definition via introspection
             definition = this.getComponentDefinition();
 
-            data = struct( ...
-                "component", struct( ...
-                    "type", class(this), ...
-                    "id", this.ID, ...
-                    "props", definition.props, ...
-                    "events", definition.events, ...
-                    "methods", definition.methods), ...
-                "target", resolvedTarget ...
-            );
-            % assign manually cell to struct
-            data.component.targets = definition.targets;
+            data = struct("component", definition, "target", resolvedTarget);
 
             parent.publish("@insert", data);
 

@@ -42,6 +42,8 @@ export interface ComponentDefinition {
   methods: MethodDefinition[];
   /** Target container elements */
   targets?: string[];
+  /** Pre-rendered children declared in MATLAB constructor (recursive) */
+  staticChildren?: ComponentDefinition[];
 }
 
 /** Data for @insert events. Sent by PARENT to create a CHILD. */
@@ -104,6 +106,19 @@ export type EventCallback = (id: string, name: string, data: unknown) => void | 
 
 /** Unsubscribe function returned by subscribe(). */
 export type Unsubscribe = () => void;
+
+/**
+ * Static child -> renderable snippet and its props
+ */
+export interface StaticChild {
+  snippet: Snippet;
+  props: Record<string, unknown>;  // The child's svelteProps
+}
+
+/**
+ * Map of static child IDs to their snippets and props
+ */
+export type StaticChildrenMap = Map<string, StaticChild>;
 
 /**
  * Minimal interface for components that can be registered in the Registry.
