@@ -1,0 +1,247 @@
+<script lang="ts">
+  import type { Resolution, StaticChildrenMap } from '$lib/types';
+
+  let {
+    label = $bindable(''),
+    variant = $bindable('primary'),
+    fill = $bindable('solid'),
+    shape = $bindable('default'),
+    size = $bindable('md'),
+    disabled = $bindable(false),
+    iconPosition = $bindable(''),
+    staticChildren = new Map() as StaticChildrenMap,
+    clicked,
+    focus = $bindable((): Resolution => ({ success: true, data: null })),
+  }: {
+    label?: string;
+    variant?: string;
+    fill?: string;
+    shape?: string;
+    size?: string;
+    disabled?: boolean;
+    iconPosition?: string;
+    staticChildren?: StaticChildrenMap;
+    clicked?: (data?: unknown) => void;
+    focus?: () => Resolution;
+  } = $props();
+
+  let buttonEl: HTMLButtonElement;
+
+  const icon = $derived(staticChildren.get('icon'));
+  const showIcon = $derived(iconPosition === 'left' || iconPosition === 'right');
+  const iconOnly = $derived(showIcon && !label);
+
+  $effect(() => {
+    focus = (): Resolution => {
+      buttonEl?.focus();
+      return { success: true, data: null };
+    };
+  });
+
+  function handleClick() {
+    if (!disabled) {
+      clicked?.({ timestamp: Date.now() });
+    }
+  }
+</script>
+
+<button
+  bind:this={buttonEl}
+  class="ic-btn"
+  class:ic-btn--primary={variant === 'primary'}
+  class:ic-btn--secondary={variant === 'secondary'}
+  class:ic-btn--destructive={variant === 'destructive'}
+  class:ic-btn--solid={fill === 'solid'}
+  class:ic-btn--outline={fill === 'outline'}
+  class:ic-btn--ghost={fill === 'ghost'}
+  class:ic-btn--default={shape === 'default'}
+  class:ic-btn--pill={shape === 'pill'}
+  class:ic-btn--square={shape === 'square'}
+  class:ic-btn--sm={size === 'sm'}
+  class:ic-btn--md={size === 'md'}
+  class:ic-btn--lg={size === 'lg'}
+  class:ic-btn--icon-only={iconOnly}
+  class:ic-btn--disabled={disabled}
+  {disabled}
+  onclick={handleClick}
+>
+  {#if showIcon && iconPosition === 'left' && icon}
+    <span class="ic-btn__icon">
+      {@render icon.snippet()}
+    </span>
+  {/if}
+
+  {#if label}
+    <span class="ic-btn__label">{label}</span>
+  {/if}
+
+  {#if showIcon && iconPosition === 'right' && icon}
+    <span class="ic-btn__icon">
+      {@render icon.snippet()}
+    </span>
+  {/if}
+</button>
+
+<style>
+  .ic-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1.5px solid transparent;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    outline: none;
+    min-width: 0;
+  }
+
+  /* ===== SIZE ===== */
+  .ic-btn--sm {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .ic-btn--md {
+    padding: 0.375rem 0.75rem;
+  }
+
+  .ic-btn--lg {
+    padding: 0.5rem 1rem;
+  }
+
+  .ic-btn--icon-only.ic-btn--sm {
+    padding: 0.375rem;
+  }
+  .ic-btn--icon-only.ic-btn--md {
+    padding: 0.5rem;
+  }
+  .ic-btn--icon-only.ic-btn--lg {
+    padding: 0.625rem;
+  }
+
+  /* ===== SHAPE ===== */
+  .ic-btn--default {
+    border-radius: var(--ic-radius, 0.5rem);
+  }
+
+  .ic-btn--pill {
+    border-radius: 9999px;
+  }
+
+  .ic-btn--square {
+    border-radius: 0;
+  }
+
+  /* ===== PRIMARY ===== */
+  .ic-btn--primary.ic-btn--solid {
+    background-color: var(--ic-primary);
+    color: var(--ic-primary-foreground);
+    border-color: var(--ic-primary);
+  }
+  .ic-btn--primary.ic-btn--solid:hover:not(:disabled) {
+    filter: brightness(0.9);
+  }
+
+  .ic-btn--primary.ic-btn--outline {
+    background-color: transparent;
+    color: var(--ic-primary);
+    border-color: var(--ic-primary);
+  }
+  .ic-btn--primary.ic-btn--outline:hover:not(:disabled) {
+    background-color: var(--ic-primary);
+    color: var(--ic-primary-foreground);
+  }
+
+  .ic-btn--primary.ic-btn--ghost {
+    background-color: transparent;
+    color: var(--ic-primary);
+    border-color: transparent;
+  }
+  .ic-btn--primary.ic-btn--ghost:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ic-primary) 12%, transparent);
+  }
+
+  /* ===== SECONDARY ===== */
+  .ic-btn--secondary.ic-btn--solid {
+    background-color: var(--ic-secondary);
+    color: var(--ic-secondary-foreground);
+    border-color: var(--ic-border);
+  }
+  .ic-btn--secondary.ic-btn--solid:hover:not(:disabled) {
+    background-color: var(--ic-muted);
+    border-color: var(--ic-muted-foreground);
+  }
+
+  .ic-btn--secondary.ic-btn--outline {
+    background-color: transparent;
+    color: var(--ic-secondary-foreground);
+    border-color: var(--ic-border);
+  }
+  .ic-btn--secondary.ic-btn--outline:hover:not(:disabled) {
+    background-color: var(--ic-secondary);
+    border-color: var(--ic-muted-foreground);
+  }
+
+  .ic-btn--secondary.ic-btn--ghost {
+    background-color: transparent;
+    color: var(--ic-secondary-foreground);
+    border-color: transparent;
+  }
+  .ic-btn--secondary.ic-btn--ghost:hover:not(:disabled) {
+    background-color: var(--ic-secondary);
+  }
+
+  /* ===== DESTRUCTIVE ===== */
+  .ic-btn--destructive.ic-btn--solid {
+    background-color: var(--ic-destructive);
+    color: var(--ic-destructive-foreground);
+    border-color: var(--ic-destructive);
+  }
+  .ic-btn--destructive.ic-btn--solid:hover:not(:disabled) {
+    filter: brightness(0.9);
+  }
+
+  .ic-btn--destructive.ic-btn--outline {
+    background-color: transparent;
+    color: var(--ic-destructive);
+    border-color: var(--ic-destructive);
+  }
+  .ic-btn--destructive.ic-btn--outline:hover:not(:disabled) {
+    background-color: var(--ic-destructive);
+    color: var(--ic-destructive-foreground);
+  }
+
+  .ic-btn--destructive.ic-btn--ghost {
+    background-color: transparent;
+    color: var(--ic-destructive);
+    border-color: transparent;
+  }
+  .ic-btn--destructive.ic-btn--ghost:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ic-destructive) 12%, transparent);
+  }
+
+  /* ===== FOCUS ===== */
+  .ic-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--ic-background), 0 0 0 4px var(--ic-ring);
+  }
+
+  /* ===== DISABLED ===== */
+  .ic-btn--disabled,
+  .ic-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ===== CHILDREN ===== */
+  .ic-btn__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .ic-btn__label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>

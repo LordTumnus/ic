@@ -22,6 +22,12 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Test components (for integration testing)
   'ic.test.TestComponent': modules['../components/test/TestComponent.svelte'],
   'ic.test.TestStaticContainer': modules['../components/test/TestStaticContainer.svelte'],
+
+  // Display components
+  'ic.Icon': modules['../components/display/icon/Icon.svelte'],
+
+  // Form components
+  'ic.Button': modules['../components/form/button/Button.svelte'],
 };
 
 export default componentMap;
