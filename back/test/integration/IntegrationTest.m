@@ -248,7 +248,7 @@ classdef IntegrationTest < matlab.uitest.TestCase
             comp.Parent = testCase.Frame;
 
             % Style the component using a CSS variable
-            comp.style(".test-component", "backgroundColor", "var(--primary)");
+            comp.style(".test-component", "backgroundColor", "var(--ic-primary)");
 
             % Query initial style (light mode: primary = #18181b)
             promise1 = comp.queryStyle();

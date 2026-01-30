@@ -997,8 +997,8 @@ describe('Bridge Integration', () => {
         component: 'ic-frame',
         name: '@prop/theme',
         data: {
-          '--test-color': 'rgb(128, 0, 128)',
-          '--test-spacing': '20px'
+          'test-color': 'rgb(128, 0, 128)',
+          'test-spacing': '20px'
         } as ThemeEventData,
         id: uniqueId('evt'),
       });
@@ -1008,9 +1008,9 @@ describe('Bridge Integration', () => {
       // Theme variables are now applied as inline styles on the frame element
       const frame = document.getElementById('ic-frame');
       expect(frame).not.toBeNull();
-      expect(frame!.style.cssText).toContain('--test-color');
+      expect(frame!.style.cssText).toContain('--ic-test-color');
       expect(frame!.style.cssText).toContain('rgb(128, 0, 128)');
-      expect(frame!.style.cssText).toContain('--test-spacing');
+      expect(frame!.style.cssText).toContain('--ic-test-spacing');
       expect(frame!.style.cssText).toContain('20px');
     });
 
@@ -1021,7 +1021,7 @@ describe('Bridge Integration', () => {
       await mock.simulateEvent({
         component: 'ic-frame',
         name: '@prop/theme',
-        data: { '--component-bg': 'rgb(100, 150, 200)' } as ThemeEventData,
+        data: { 'component-bg': 'rgb(100, 150, 200)' } as ThemeEventData,
         id: uniqueId('evt'),
       });
 
@@ -1039,7 +1039,7 @@ describe('Bridge Integration', () => {
 
       // Verify theme variable is in frame's inline style
       const frame = document.getElementById('ic-frame');
-      expect(frame!.style.cssText).toContain('--component-bg');
+      expect(frame!.style.cssText).toContain('--ic-component-bg');
       expect(frame!.style.cssText).toContain('rgb(100, 150, 200)');
 
       // Apply instance style that uses theme variable
@@ -1048,7 +1048,7 @@ describe('Bridge Integration', () => {
         name: '@style',
         data: {
           selector: '[data-testid="test-component"]',
-          styles: { 'background-color': 'var(--component-bg)' }
+          styles: { 'background-color': 'var(--ic-component-bg)' }
         } as StyleEventData,
         id: uniqueId('evt'),
       });

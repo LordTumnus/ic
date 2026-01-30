@@ -25,7 +25,7 @@
         const resolved = Array.isArray(value)
           ? value[colorScheme === 'light' ? 0 : 1]
           : value;
-        return `--${prop}: ${resolved}`;
+        return `--ic-${prop}: ${resolved}`;
       })
     ].join('; ')
   );
