@@ -3,45 +3,47 @@
 classdef Theme < handle
 
     properties (SetAccess = ?ic.Frame)
-        % > BACKGROUND page and component background color
-        Background (1,2) string = ["#ffffff", "#09090b"]
-        % > FOREGROUND default text color
-        Foreground (1,2) string = ["#09090b", "#fafafa"]
+        % Slate-based engineering palette with blue accents
 
-        % > PRIMARY main brand/action color
-        Primary (1,2) string = ["#18181b", "#fafafa"]
+        % > BACKGROUND page and component background color
+        Background (1,2) string = ["#f8fafc", "#0f172a"]
+        % > FOREGROUND default text color
+        Foreground (1,2) string = ["#0f172a", "#f1f5f9"]
+
+        % > PRIMARY main brand/action color (engineering blue)
+        Primary (1,2) string = ["#2563eb", "#3b82f6"]
         % > PRIMARYFOREGROUND text on primary backgrounds
-        PrimaryForeground (1,2) string = ["#fafafa", "#18181b"]
+        PrimaryForeground (1,2) string = ["#ffffff", "#ffffff"]
 
         % > SECONDARY alternative action color
-        Secondary (1,2) string = ["#f4f4f5", "#27272a"]
+        Secondary (1,2) string = ["#e2e8f0", "#1e293b"]
         % > SECONDARYFOREGROUND text on secondary backgrounds
-        SecondaryForeground (1,2) string = ["#18181b", "#fafafa"]
+        SecondaryForeground (1,2) string = ["#0f172a", "#f1f5f9"]
 
         % > MUTED subtle background for less prominent elements
-        Muted (1,2) string = ["#f4f4f5", "#27272a"]
+        Muted (1,2) string = ["#f1f5f9", "#1e293b"]
         % > MUTEDFOREGROUND text on muted backgrounds
-        MutedForeground (1,2) string = ["#71717a", "#a1a1aa"]
+        MutedForeground (1,2) string = ["#64748b", "#94a3b8"]
 
         % > ACCENT highlight/emphasis color
-        Accent (1,2) string = ["#f4f4f5", "#27272a"]
+        Accent (1,2) string = ["#dbeafe", "#1e3a5f"]
         % > ACCENTFOREGROUND text on accent backgrounds
-        AccentForeground (1,2) string = ["#18181b", "#fafafa"]
+        AccentForeground (1,2) string = ["#1e40af", "#93c5fd"]
 
         % > DESTRUCTIVE error/danger color
-        Destructive (1,2) string = ["#ef4444", "#7f1d1d"]
+        Destructive (1,2) string = ["#dc2626", "#ef4444"]
         % > DESTRUCTIVEFOREGROUND text on destructive backgrounds
-        DestructiveForeground (1,2) string = ["#fafafa", "#fef2f2"]
+        DestructiveForeground (1,2) string = ["#ffffff", "#ffffff"]
 
         % > BORDER default border color
-        Border (1,2) string = ["#e4e4e7", "#27272a"]
+        Border (1,2) string = ["#cbd5e1", "#334155"]
         % > INPUT input field border color
-        Input (1,2) string = ["#e4e4e7", "#27272a"]
+        Input (1,2) string = ["#cbd5e1", "#475569"]
         % > RING focus ring color
-        Ring (1,2) string = ["#18181b", "#d4d4d8"]
+        Ring (1,2) string = ["#2563eb", "#3b82f6"]
 
         % > RADIUS default border radius
-        Radius (1,1) string = "0.5rem"
+        Radius (1,1) string = "0.375rem"
     end
 
     properties (GetAccess = public, SetAccess = ?ic.Frame)

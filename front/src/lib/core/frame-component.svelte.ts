@@ -17,24 +17,25 @@ import FrameStyleManager from './frame-style-manager';
 import logger from './logger';
 
 // Default theme values matching MATLAB's ic.style.Theme defaults
+// Slate-based engineering palette with blue accents
 // Color properties are [light, dark] arrays; non-color properties are single values
 const defaultTheme = {
-  background: ['#ffffff', '#09090b'],
-  foreground: ['#09090b', '#fafafa'],
-  primary: ['#18181b', '#fafafa'],
-  'primary-foreground': ['#fafafa', '#18181b'],
-  secondary: ['#f4f4f5', '#27272a'],
-  'secondary-foreground': ['#18181b', '#fafafa'],
-  muted: ['#f4f4f5', '#27272a'],
-  'muted-foreground': ['#71717a', '#a1a1aa'],
-  accent: ['#f4f4f5', '#27272a'],
-  'accent-foreground': ['#18181b', '#fafafa'],
-  destructive: ['#ef4444', '#7f1d1d'],
-  'destructive-foreground': ['#fafafa', '#fef2f2'],
-  border: ['#e4e4e7', '#27272a'],
-  input: ['#e4e4e7', '#27272a'],
-  ring: ['#18181b', '#d4d4d8'],
-  radius: '0.5rem'
+  background: ['#f8fafc', '#0f172a'],
+  foreground: ['#0f172a', '#f1f5f9'],
+  primary: ['#2563eb', '#3b82f6'],
+  'primary-foreground': ['#ffffff', '#ffffff'],
+  secondary: ['#e2e8f0', '#1e293b'],
+  'secondary-foreground': ['#0f172a', '#f1f5f9'],
+  muted: ['#f1f5f9', '#1e293b'],
+  'muted-foreground': ['#64748b', '#94a3b8'],
+  accent: ['#dbeafe', '#1e3a5f'],
+  'accent-foreground': ['#1e40af', '#93c5fd'],
+  destructive: ['#dc2626', '#ef4444'],
+  'destructive-foreground': ['#ffffff', '#ffffff'],
+  border: ['#cbd5e1', '#334155'],
+  input: ['#cbd5e1', '#475569'],
+  ring: ['#2563eb', '#3b82f6'],
+  radius: '0.375rem'
 };
 
 class FrameComponent extends Component {
