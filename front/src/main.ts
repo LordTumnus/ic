@@ -1,3 +1,7 @@
+import '@fontsource/roboto-mono/400.css';
+import '@fontsource/roboto-mono/500.css';
+import '@fontsource/roboto-mono/600.css';
+
 import Bridge from './lib/core/bridge';
 import Registry from './lib/core/registry';
 import FrameComponent from './lib/core/frame-component.svelte';

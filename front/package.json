@@ -25,5 +25,9 @@
   },
   "overrides": {
     "vite": "npm:rolldown-vite@7.2.5"
+  },
+  "dependencies": {
+    "@fontsource/roboto-mono": "^5.2.8",
+    "lucide-static": "^0.563.0"
   }
 }
