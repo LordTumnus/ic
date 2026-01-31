@@ -1,5 +1,7 @@
 <script lang="ts">
   import logger from '$lib/core/logger';
+  import type { CssSize } from '$lib/utils/css';
+  import { toSize, toNumericSize } from '$lib/utils/css';
 
   // Import all icons at build time using Vite's glob import
   const iconModules = import.meta.glob('/static/icons/*.svg', {
@@ -17,19 +19,22 @@
 
   let {
     name = $bindable('Info'),
-    size = $bindable(16),
+    size = $bindable<CssSize>(16),
     color = $bindable(''),
     strokeWidth = $bindable(2),
     pathData = $bindable(''),
     customSvg = $bindable(''),
   }: {
     name?: string;
-    size?: number;
+    size?: CssSize;
     color?: string;
     strokeWidth?: number;
     pathData?: string;
     customSvg?: string;
   } = $props();
+
+  // Get numeric size for SVG attributes (default 24 if string)
+  const svgSize = $derived(toNumericSize(size, 24));
 
   function toKebabCase(str: string): string {
     // Ensure string, extract last part if it's a qualified name like "ic.IconName.File"
@@ -79,11 +84,11 @@
 
     let svg = rawSvg;
 
-    // Set width and height
-    svg = svg.replace(/width="[^"]*"/, `width="${size}"`);
-    svg = svg.replace(/height="[^"]*"/, `height="${size}"`);
-    if (!svg.includes('width=')) svg = svg.replace('<svg', `<svg width="${size}"`);
-    if (!svg.includes('height=')) svg = svg.replace('<svg', `<svg height="${size}"`);
+    // Set width and height (use numeric svgSize for SVG attributes)
+    svg = svg.replace(/width="[^"]*"/, `width="${svgSize}"`);
+    svg = svg.replace(/height="[^"]*"/, `height="${svgSize}"`);
+    if (!svg.includes('width=')) svg = svg.replace('<svg', `<svg width="${svgSize}"`);
+    if (!svg.includes('height=')) svg = svg.replace('<svg', `<svg height="${svgSize}"`);
 
     // Set stroke-width
     svg = svg.replace(/stroke-width="[^"]*"/g, `stroke-width="${strokeWidth}"`);
@@ -100,8 +105,8 @@
 
 <span
   class="ic-icon"
-  style:width="{size}px"
-  style:height="{size}px"
+  style:width={toSize(size)}
+  style:height={toSize(size)}
   style:color={color || null}
 >
   {#if processedSvg}

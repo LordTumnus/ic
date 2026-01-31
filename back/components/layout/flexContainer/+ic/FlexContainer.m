@@ -9,19 +9,24 @@ classdef FlexContainer < ic.core.ComponentContainer
         % > DIRECTION flex-direction: controls the main axis
         Direction string {mustBeMember(Direction, ...
             ["row", "column", "row-reverse", "column-reverse"])} = "row"
+
         % > WRAP flex-wrap: controls whether items wrap to new lines
         Wrap string {mustBeMember(Wrap, ...
             ["nowrap", "wrap", "wrap-reverse"])} = "nowrap"
+
         % > JUSTIFYCONTENT justify-content: alignment along the main axis
         JustifyContent string {mustBeMember(JustifyContent, ...
             ["start", "center", "end", "space-between", "space-around", "space-evenly"])} = "start"
+
         % > ALIGNITEMS align-items: alignment along the cross axis
         AlignItems string {mustBeMember(AlignItems, ...
             ["start", "center", "end", "stretch", "baseline"])} = "stretch"
-        % > GAP spacing between child elements in rem units
-        Gap double {mustBeNonnegative} = 0.5
-        % > PADDING internal padding in rem units
-        Padding double {mustBeNonnegative} = 0
+
+        % > GAP spacing between child elements
+        Gap {ic.check.CssValidators.mustBeGap} = 8
+
+        % > PADDING internal padding
+        Padding {ic.check.CssValidators.mustBeSpacing} = 0
     end
 
     methods

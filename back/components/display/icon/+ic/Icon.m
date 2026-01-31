@@ -7,8 +7,8 @@ classdef Icon < ic.core.Component
     %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > SIZE size in pixels (width = height)
-        Size double = 16
+        % > SIZE size of the icon (width = height)
+        Size {ic.check.CssValidators.mustBeSize} = 16
         % > COLOR color of the icon (CSS color string or empty for currentColor)
         Color string = ""
         % > STROKEWIDTH stroke width for line icons
