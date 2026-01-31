@@ -1,5 +1,5 @@
 classdef Icon < ic.core.Component
-    % ICON Displays an SVG icon.
+    % > ICON Displays an SVG icon.
     %
     % Create icons using static factory methods:
     %   icon = ic.Icon.fromName(ic.IconName.Save)
@@ -7,21 +7,21 @@ classdef Icon < ic.core.Component
     %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % Size in pixels (width = height)
+        % > SIZE size in pixels (width = height)
         Size double = 16
-        % Color of the icon (CSS color string or empty for currentColor)
+        % > COLOR color of the icon (CSS color string or empty for currentColor)
         Color string = ""
-        % Stroke width for line icons
+        % > STROKEWIDTH stroke width for line icons
         StrokeWidth double = 2
     end
 
     properties (SetAccess = private, SetObservable, AbortSet, ...
             Description = "Reactive", Hidden)
-        % Name of the icon from the IconName enum
+        % > NAMEnName of the icon from the IconName enum
         Name ic.IconName = ic.IconName.Info
-        % SVG path data (d attribute)
+        % > PATHDATA svg path data (d attribute)
         PathData string = ""
-        % Base64-encoded SVG content (from file)
+        % > CUSTOMSVG base64-encoded SVG content (from file)
         CustomSvg string = ""
     end
 

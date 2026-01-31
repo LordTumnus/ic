@@ -1,14 +1,25 @@
 classdef Button < ic.core.ComponentContainer
-    % BUTTON Interactive button with optional icon.
+    % > BUTTON Interactive button with optional icon.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
+        % > LABEL text label of the button
         Label string = ""
-        Variant string {mustBeMember(Variant, ["primary", "secondary", "destructive"])} = "primary"
-        Fill string {mustBeMember(Fill, ["solid", "outline", "ghost"])} = "solid"
-        Shape string {mustBeMember(Shape, ["default", "pill", "square"])} = "default"
+        % > VARIANT visual style variant
+        Variant string {mustBeMember(Variant, ...
+            ["primary", "secondary", "destructive"])} = "primary"
+        % > FILL fill style of the button
+        Fill string {mustBeMember(Fill, ...
+            ["solid", "outline", "ghost"])} = "solid"
+        % > SHAPE shape style of the button
+        Shape string {mustBeMember(Shape, ...
+            ["default", "pill", "square"])} = "default"
+        % > SIZE size of the button -> affects padding
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
+        % > DISABLED whether the button is disabled
         Disabled logical = false
-        IconPosition string {mustBeMember(IconPosition, ["left", "right"])} = "left"
+        % > ICONPOSITION position of the icon relative to the label
+        IconPosition string {mustBeMember(IconPosition, ...
+            ["left", "right"])} = "left"
     end
 
     properties (Dependent)
@@ -50,6 +61,7 @@ classdef Button < ic.core.ComponentContainer
 
     methods (Description = "Reactive")
         function out = focus(this)
+            % > FOCUS programmatically focus the button
             out = this.publish("focus", []);
         end
     end
