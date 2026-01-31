@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Resolution, StaticChildrenMap } from '$lib/types';
+  import type { Resolution, Snippets } from '$lib/types';
 
   let {
     label = $bindable(''),
@@ -8,8 +8,8 @@
     shape = $bindable('default'),
     size = $bindable('md'),
     disabled = $bindable(false),
-    iconPosition = $bindable(''),
-    staticChildren = new Map() as StaticChildrenMap,
+    iconPosition = $bindable('left'),
+    snippets = { default: [], icon: [] } as Snippets,
     clicked,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
@@ -20,16 +20,15 @@
     size?: string;
     disabled?: boolean;
     iconPosition?: string;
-    staticChildren?: StaticChildrenMap;
+    snippets?: Snippets;
     clicked?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
   let buttonEl: HTMLButtonElement;
 
-  const icon = $derived(staticChildren.get('icon'));
-  const showIcon = $derived(iconPosition === 'left' || iconPosition === 'right');
-  const iconOnly = $derived(showIcon && !label);
+  const hasIcon = $derived((snippets.icon?.length ?? 0) > 0);
+  const iconOnly = $derived(hasIcon && !label);
 
   $effect(() => {
     focus = (): Resolution => {
@@ -65,9 +64,11 @@
   {disabled}
   onclick={handleClick}
 >
-  {#if showIcon && iconPosition === 'left' && icon}
+  {#if hasIcon && iconPosition === 'left'}
     <span class="ic-btn__icon">
-      {@render icon.snippet()}
+      {#each snippets.icon ?? [] as iconSnippet}
+        {@render iconSnippet()}
+      {/each}
     </span>
   {/if}
 
@@ -75,9 +76,11 @@
     <span class="ic-btn__label">{label}</span>
   {/if}
 
-  {#if showIcon && iconPosition === 'right' && icon}
+  {#if hasIcon && iconPosition === 'right'}
     <span class="ic-btn__icon">
-      {@render icon.snippet()}
+      {#each snippets.icon ?? [] as iconSnippet}
+        {@render iconSnippet()}
+      {/each}
     </span>
   {/if}
 </button>

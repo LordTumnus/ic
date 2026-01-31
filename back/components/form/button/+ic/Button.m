@@ -8,12 +8,11 @@ classdef Button < ic.core.ComponentContainer
         Shape string {mustBeMember(Shape, ["default", "pill", "square"])} = "default"
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
         Disabled logical = false
-        IconPosition string {mustBeMember(IconPosition, ["", "left", "right"])} = ""
+        IconPosition string {mustBeMember(IconPosition, ["left", "right"])} = "left"
     end
 
-    properties (SetAccess = immutable)
-        % Built-in icon (static child)
-        Icon ic.Icon
+    properties (Dependent)
+        Icon
     end
 
     events (Description = "Reactive")
@@ -26,11 +25,26 @@ classdef Button < ic.core.ComponentContainer
                 id (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(id);
+            this.Targets = "icon";
+        end
 
-            % Create static icon child
-            this.Icon = ic.Icon(id + "-icon");
-            this.Icon.Size = 16;
-            this.addStaticChild(this.Icon);
+        function icon = get.Icon(this)
+            for child = this.Children
+                if child.Target == "icon"
+                    icon = child;
+                    return;
+                end
+            end
+            icon = [];
+        end
+
+        function set.Icon(this, icon)
+            % Remove existing icon from slot
+            delete(this.Icon);
+            % Add new icon
+            if ~isempty(icon)
+                icon.setParent(this, "icon");
+            end
         end
     end
 
