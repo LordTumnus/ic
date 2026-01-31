@@ -80,6 +80,7 @@ class FrameComponent extends Component {
       if (enabled) {
         logger.enable((entry) => this.publish('@log', entry));
         logger.info('Logger', 'Debug mode enabled');
+        logger.debug('Logger', `Chrome version: ${navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] ?? 'unknown'}`)
       } else {
         logger.info('Logger', 'Debug mode disabled');
         logger.disable();
