@@ -24,6 +24,8 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         Debug (1,1) logical = false
         % > LOGLEVEL minimum log level to display: "debug" | "info" | "warn" | "error"
         LogLevel (1,1) string {mustBeMember(LogLevel, ["debug", "info", "warn", "error"])} = "debug"
+        % > FILLFIRSTCHILD when true, the first child component fills the entire frame
+        FillFirstChild (1,1) logical = false
     end
 
     properties (Dependent)
