@@ -5,7 +5,7 @@ classdef Icon < ic.core.Component
         % Name of the icon from the IconName enum
         Name ic.IconName = ic.IconName.Info
         % Size in pixels (width = height)
-        Size double = 24
+        Size double = 16
         % Color of the icon (CSS color string or empty for currentColor)
         Color string = ""
         % Stroke width for line icons
