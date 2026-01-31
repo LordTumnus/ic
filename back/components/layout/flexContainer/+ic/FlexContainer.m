@@ -1,0 +1,35 @@
+classdef FlexContainer < ic.core.ComponentContainer
+    % > FLEXCONTAINER Flexbox-based layout container for arranging child components.
+    %
+    % The FlexContainer provides a flexible box layout model for organizing
+    % child components horizontally or vertically with configurable alignment,
+    % spacing, and wrapping behavior.
+
+    properties (SetObservable, AbortSet, Description = "Reactive")
+        % > DIRECTION flex-direction: controls the main axis
+        Direction string {mustBeMember(Direction, ...
+            ["row", "column", "row-reverse", "column-reverse"])} = "row"
+        % > WRAP flex-wrap: controls whether items wrap to new lines
+        Wrap string {mustBeMember(Wrap, ...
+            ["nowrap", "wrap", "wrap-reverse"])} = "nowrap"
+        % > JUSTIFYCONTENT justify-content: alignment along the main axis
+        JustifyContent string {mustBeMember(JustifyContent, ...
+            ["start", "center", "end", "space-between", "space-around", "space-evenly"])} = "start"
+        % > ALIGNITEMS align-items: alignment along the cross axis
+        AlignItems string {mustBeMember(AlignItems, ...
+            ["start", "center", "end", "stretch", "baseline"])} = "stretch"
+        % > GAP spacing between child elements in rem units
+        Gap double {mustBeNonnegative} = 0.5
+        % > PADDING internal padding in rem units
+        Padding double {mustBeNonnegative} = 0
+    end
+
+    methods
+        function this = FlexContainer(id)
+            arguments
+                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+            end
+            this@ic.core.ComponentContainer(id);
+        end
+    end
+end

@@ -28,6 +28,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],
+
+  // Layout components
+  'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
 };
 
 export default componentMap;
