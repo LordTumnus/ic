@@ -17,15 +17,17 @@
 
   let {
     name = $bindable('Info'),
-    size = $bindable(24),
+    size = $bindable(16),
     color = $bindable(''),
     strokeWidth = $bindable(2),
+    pathData = $bindable(''),
     customSvg = $bindable(''),
   }: {
     name?: string;
     size?: number;
     color?: string;
     strokeWidth?: number;
+    pathData?: string;
     customSvg?: string;
   } = $props();
 
@@ -46,11 +48,22 @@
     }
   }
 
-  // Get SVG from bundled icons or custom base64
+  // Create SVG wrapper for path data
+  function createPathSvg(d: string): string {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+  }
+
+  // Get SVG from: customSvg (file) > pathData > name (built-in)
   let rawSvg = $derived.by(() => {
+    // Priority 1: Custom SVG from file (base64)
     if (customSvg) {
       return decodeBase64(customSvg);
     }
+    // Priority 2: SVG path data
+    if (pathData) {
+      return createPathSvg(pathData);
+    }
+    // Priority 3: Built-in icon by name
     const iconKey = toKebabCase(name);
     const svg = iconMap.get(iconKey);
     if (!svg) {

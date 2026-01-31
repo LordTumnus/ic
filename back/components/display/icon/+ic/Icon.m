@@ -1,9 +1,12 @@
 classdef Icon < ic.core.Component
-    % ICON Displays an SVG icon from the built-in set or a custom path.
+    % ICON Displays an SVG icon.
+    %
+    % Create icons using static factory methods:
+    %   icon = ic.Icon.fromName(ic.IconName.Save)
+    %   icon = ic.Icon.fromFile("path/to/icon.svg")
+    %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % Name of the icon from the IconName enum
-        Name ic.IconName = ic.IconName.Info
         % Size in pixels (width = height)
         Size double = 16
         % Color of the icon (CSS color string or empty for currentColor)
@@ -12,14 +15,50 @@ classdef Icon < ic.core.Component
         StrokeWidth double = 2
     end
 
-    properties (SetObservable, AbortSet)
-        % Path to a custom SVG file (overrides Name when set)
-        CustomPath string = ""
+    properties (SetAccess = private, SetObservable, AbortSet, ...
+            Description = "Reactive", Hidden)
+        % Name of the icon from the IconName enum
+        Name ic.IconName = ic.IconName.Info
+        % SVG path data (d attribute)
+        PathData string = ""
+        % Base64-encoded SVG content (from file)
+        CustomSvg string = ""
     end
 
-    properties (SetAccess = private, SetObservable, AbortSet, Description = "Reactive")
-        % Base64-encoded SVG content (auto-populated from CustomPath)
-        CustomSvg string = ""
+    methods (Static)
+        function icon = fromName(name, id)
+            % FROMNAME Create icon from built-in IconName enum
+            arguments
+                name ic.IconName
+                id string = "ic-" + matlab.lang.internal.uuid()
+            end
+            icon = ic.Icon(id);
+            icon.Name = name;
+        end
+
+        function icon = fromFile(path, id)
+            % FROMFILE Create icon from SVG file
+            arguments
+                path string
+                id string = "ic-" + matlab.lang.internal.uuid()
+            end
+            if ~isfile(path)
+                error('ic:Icon:FileNotFound', 'Icon file not found: %s', path);
+            end
+            icon = ic.Icon(id);
+            content = fileread(path);
+            icon.CustomSvg = matlab.net.base64encode(uint8(content));
+        end
+
+        function icon = fromPath(pathData, id)
+            % FROMPATH Create icon from SVG path data (d attribute)
+            arguments
+                pathData string
+                id string = "ic-" + matlab.lang.internal.uuid()
+            end
+            icon = ic.Icon(id);
+            icon.PathData = pathData;
+        end
     end
 
     methods
@@ -28,31 +67,6 @@ classdef Icon < ic.core.Component
                 id (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.Component(id);
-
-            addlistener(this, 'CustomPath', 'PostSet', @(~,~) this.loadCustomIcon());
-        end
-    end
-
-    methods (Access = private)
-        function loadCustomIcon(this)
-            if this.CustomPath == ""
-                this.CustomSvg = "";
-                return;
-            end
-
-            if ~isfile(this.CustomPath)
-                warning('ic:Icon:FileNotFound', 'Icon file not found: %s', this.CustomPath);
-                this.CustomSvg = "";
-                return;
-            end
-
-            try
-                content = fileread(this.CustomPath);
-                this.CustomSvg = matlab.net.base64encode(uint8(content));
-            catch ex
-                warning('ic:Icon:ReadError', 'Failed to read icon file: %s', ex.message);
-                this.CustomSvg = "";
-            end
         end
     end
 end
