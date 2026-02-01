@@ -3,7 +3,7 @@ classdef Button < ic.core.ComponentContainer
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > LABEL text label of the button
-        Label string = ""
+        Label string = "Click me"
         % > VARIANT visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
