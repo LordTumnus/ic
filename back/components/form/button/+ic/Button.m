@@ -54,8 +54,14 @@ classdef Button < ic.core.ComponentContainer
             delete(this.Icon);
             % Add new icon
             if ~isempty(icon)
-                icon.setParent(this, "icon");
+                this.addChild(icon, "icon");
             end
+        end
+
+        function validateTarget(this, target)
+            % > VALIDATETARGET checks that an icon is the selected target
+            assert(target == "icon", "ic:Icon:invalidTarget", ...
+                "Buttons only support children in an 'icon' target");
         end
     end
 

@@ -29,6 +29,15 @@ import { handleInsert, handleRemove, handleReparent } from './container';
 import StyleManager from './style-manager';
 import logger from './logger';
 
+/**
+ * Normalize targets from MATLAB (handles single string vs array).
+ */
+function normalizeTargets(value: unknown): string[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') return [value];
+  return [];
+}
+
 
 /**
  * Component class - base class for all UI components.
@@ -110,7 +119,6 @@ class Component implements Registrable {
     propDefinitions: PropDefinition[] = [],
     eventDefinitions: EventDefinition[] = [],
     methodDefinitions: MethodDefinition[] = [],
-    targetDefinitions: string[] = ["default"],
     svelteComponent: SvelteComponent<any> | null = null
   ) {
     this.id = id;
@@ -163,11 +171,11 @@ class Component implements Registrable {
       });
     }
 
-    // Initialize snippet arrays for each target definition
-    for (const targetName of targetDefinitions) {
-      if (!this._snippets[targetName]) {
-        this._snippets[targetName] = [];
-      }
+    // Initialize snippet arrays from targets prop
+    const targetsProp = propDefinitions.find(p => p.name === 'targets');
+    this._snippets = {} as Snippets;
+    for (const target of normalizeTargets(targetsProp?.value)) {
+      this._snippets[target] = [];
     }
 
     // Expose all snippets as a single 'snippets' prop
@@ -181,6 +189,7 @@ class Component implements Registrable {
 
     // Set up built-in event handlers
     this._setupListeners(propDefinitions.map((p) => p.name), methodDefinitions.map((m) => m.name));
+    this._setupTargetsHandler();
 
     // Set up container handlers (@insert, @remove, @reparent)
     this.subscribe('@insert', (id, name, data) => handleInsert(this, id, name, data));
@@ -202,17 +211,12 @@ class Component implements Registrable {
   }
 
   /**
-   * Set up listeners
-   *
-   * Handles:
-   * - @properties events from MATLAB to update reactive props (MATLAB → Svelte)
-   * - @methods events from MATLAB to invoke component methods (MATLAB → Svelte)
+   * Set up listeners for reactive props and methods.
    */
   private _setupListeners(properties: string[], methods: string[]): void {
     // Handle @prop events from MATLAB
     for (const prop of properties) {
       this.subscribe(`@prop/${prop}`, (_id: string, _name: string, data: unknown) => {
-        // Set flag to prevent echo back to MATLAB
         this._updatingFromMatlab = true;
         this._reactiveState[prop] = data;
         this._updatingFromMatlab = false;
@@ -224,10 +228,33 @@ class Component implements Registrable {
       this.subscribe(method, (id: string, _name: string, data: unknown) => {
         const methodFunc = this._reactiveState[method] as (data?: unknown) => Resolution;
         const result = methodFunc(data);
-        // Publish response back to MATLAB
         this.publish(`@resp/${id}`, result);
       });
     }
+  }
+
+  /**
+   * Set up handler to sync targets prop changes to _snippets structure.
+   */
+  private _setupTargetsHandler(): void {
+    this.subscribe('@prop/targets', (_id, _name, data) => {
+      const newTargets = normalizeTargets(data);
+
+      // Add new target slots
+      for (const target of newTargets) {
+        if (!this._snippets[target]) {
+          this._snippets[target] = [];
+        }
+      }
+
+      // Remove old target slots (Svelte auto-unmounts snippets)
+      const newTargetSet = new Set(newTargets);
+      for (const target of Object.keys(this._snippets)) {
+        if (!newTargetSet.has(target)) {
+          delete this._snippets[target];
+        }
+      }
+    });
   }
 
   /**

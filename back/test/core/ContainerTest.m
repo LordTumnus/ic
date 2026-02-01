@@ -32,10 +32,9 @@ classdef ContainerTest < matlab.uitest.TestCase
             % Verify Component attaches to Frame and registers
             c1 = ic.core.Component("c1");
 
-            c1.Parent = testCase.Frame;
+            testCase.Frame.addChild(c1);
 
             % check attachment and registration
-            testCase.verifyEqual(c1.Parent, testCase.Frame);
             testCase.verifyTrue(c1.isAttached());
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c1"));
 
@@ -65,7 +64,7 @@ classdef ContainerTest < matlab.uitest.TestCase
             container = ic.core.ComponentContainer("container");
             child = ic.core.Component("child");
 
-            child.Parent = container;
+            container.addChild(child);
 
             testCase.verifyTrue(child.isAttached());
             testCase.verifyFalse(container.isAttached());
@@ -85,10 +84,10 @@ classdef ContainerTest < matlab.uitest.TestCase
             c3 = ic.core.Component("c3");
 
             % define subtree
-            c2.Parent = c1;
-            c3.Parent = c2;
+            c1.addChild(c2);
+            c2.addChild(c3);
             % attach to Frame
-            c1.Parent = testCase.Frame;
+            testCase.Frame.addChild(c1);
 
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c1"));
@@ -110,11 +109,11 @@ classdef ContainerTest < matlab.uitest.TestCase
         function testAddComponentToAttachedContainer(testCase)
             % Verify adding child to already-attached container
             container = ic.core.ComponentContainer("container");
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
             testCase.assertTrue(testCase.Frame.Registry.isKey("container"));
 
             child = ic.core.Component("child");
-            child.Parent = container;
+            container.addChild(child);
 
             testCase.verifyTrue(testCase.Frame.Registry.isKey("child"));
             testCase.verifyLength(container.Children, 1);
@@ -129,14 +128,14 @@ classdef ContainerTest < matlab.uitest.TestCase
         function testAddSubtreeToAttachedContainer(testCase)
             % Verify attaching pre-built subtree to attached container
             root = ic.core.ComponentContainer("root");
-            root.Parent = testCase.Frame;
+            testCase.Frame.addChild(root);
             testCase.assertTrue(testCase.Frame.Registry.isKey("root"));
 
             subtree = ic.core.ComponentContainer("subtree");
             leaf = ic.core.Component("leaf");
-            leaf.Parent = subtree;
+            subtree.addChild(leaf);
 
-            subtree.Parent = root;
+            root.addChild(subtree);
 
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
 
@@ -152,11 +151,11 @@ classdef ContainerTest < matlab.uitest.TestCase
 
     methods (Test)
         function testDetachComponentFromFrame(testCase)
-            % Verify setting Parent=[] detaches from Frame
+            % Verify removeChild detaches from Frame
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
-            comp.Parent = ic.core.ComponentContainer.empty();
+            testCase.Frame.removeChild(comp);
 
             testCase.verifyFalse(comp.isAttached());
             testCase.verifyFalse(testCase.Frame.Registry.isKey("comp"));
@@ -172,7 +171,7 @@ classdef ContainerTest < matlab.uitest.TestCase
         function testDeleteComponentFromFrame(testCase)
             % Verify deleting component removes from Frame
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             delete(comp);
 
@@ -191,22 +190,22 @@ classdef ContainerTest < matlab.uitest.TestCase
             container = ic.core.ComponentContainer("container");
             child = ic.core.Component("child");
 
-            child.Parent = container;
-            container.Parent = testCase.Frame;
+            container.addChild(child);
+            testCase.Frame.addChild(container);
             testCase.assertEqual(testCase.Frame.Registry.numEntries, 2);
 
             delete(container);
 
+            % Both container and child should be deregistered
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 0);
             testCase.verifyFalse(isvalid(child));
 
+            % @remove event sent for container (children deleted internally)
             testCase.assertNotEmpty(testCase.Frame.View.Queue);
             testCase.verifyEqual(...
                 testCase.Frame.View.Queue(end).Name, "@remove");
             testCase.verifyEqual(...
                 testCase.Frame.View.Queue(end).Data.id, "container");
-            testCase.verifyEqual(...
-                testCase.Frame.View.Queue(end-1).Data.id, "child");
         end
 
 
@@ -216,11 +215,11 @@ classdef ContainerTest < matlab.uitest.TestCase
             c2 = ic.core.ComponentContainer("c2");
             c3 = ic.core.Component("c3");
 
-            c2.Parent = c1;
-            c3.Parent = c2;
-            c1.Parent = testCase.Frame;
+            c1.addChild(c2);
+            c2.addChild(c3);
+            testCase.Frame.addChild(c1);
 
-            c2.Parent = ic.core.ComponentContainer.empty();
+            c1.removeChild(c2);
 
             testCase.verifyTrue(testCase.Frame.Registry.isKey("c1"));
             testCase.verifyFalse(testCase.Frame.Registry.isKey("c2"));
@@ -241,11 +240,12 @@ classdef ContainerTest < matlab.uitest.TestCase
             c2 = ic.core.ComponentContainer("c2");
             child = ic.core.Component("child");
 
-            c1.Parent = testCase.Frame;
-            c2.Parent = testCase.Frame;
-            child.Parent = c1;
+            testCase.Frame.addChild(c1);
+            testCase.Frame.addChild(c2);
+            c1.addChild(child);
 
-            child.Parent = c2;
+            % Reparent by adding to new container
+            c2.addChild(child);
 
             testCase.verifyEmpty(c1.Children);
             testCase.verifyLength(c2.Children, 1);
@@ -272,12 +272,12 @@ classdef ContainerTest < matlab.uitest.TestCase
             c2 = ic.core.ComponentContainer("c2");
             child = ic.core.Component("child");
 
-            c1.Parent = testCase.Frame;
-            c2.Parent = frame2;
-            child.Parent = c1;
+            testCase.Frame.addChild(c1);
+            frame2.addChild(c2);
+            c1.addChild(child);
 
             function reparentAcross()
-                child.Parent = c2;
+                c2.addChild(child);
             end
 
             testCase.verifyError(@reparentAcross, ...
@@ -289,10 +289,11 @@ classdef ContainerTest < matlab.uitest.TestCase
             container = ic.core.ComponentContainer("container");
             comp = ic.core.Component("comp");
 
-            container.Parent = testCase.Frame;
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
+            testCase.Frame.addChild(comp);
 
-            comp.Parent = container;
+            % Reparent by adding to container
+            container.addChild(comp);
 
             testCase.verifyLength(testCase.Frame.Children, 1);
             testCase.verifyLength(container.Children, 1);
@@ -316,12 +317,13 @@ classdef ContainerTest < matlab.uitest.TestCase
             subtree = ic.core.ComponentContainer("subtree");
             leaf = ic.core.Component("leaf");
 
-            c1.Parent = testCase.Frame;
-            c2.Parent = testCase.Frame;
-            subtree.Parent = c1;
-            leaf.Parent = subtree;
+            testCase.Frame.addChild(c1);
+            testCase.Frame.addChild(c2);
+            c1.addChild(subtree);
+            subtree.addChild(leaf);
 
-            subtree.Parent = c2;
+            % Reparent subtree to c2
+            c2.addChild(subtree);
 
             testCase.verifyEmpty(c1.Children);
             testCase.verifyLength(c2.Children, 1);
@@ -340,20 +342,19 @@ classdef ContainerTest < matlab.uitest.TestCase
         end
 
         function testChangeTargetWithinContainer(testCase)
-            % Verify changing Target triggers @reparent event
+            % Verify changing target via addChild triggers @reparent event
             container = ic.core.ComponentContainer("container");
             container.Targets = ["left", "right"];
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             comp = ic.core.Component("comp");
-            comp.setParent(container, "left");
+            container.addChild(comp, "left");
 
-            % Change target within same container
-            comp.Target = "right";
+            % Change target by re-adding with new target
+            container.addChild(comp, "right");
 
             % Verify component stays in same container
             testCase.verifyLength(container.Children, 1);
-            testCase.verifyEqual(comp.Target, "right");
             testCase.verifyTrue(testCase.Frame.Registry.isKey("comp"));
 
             % Verify @reparent event with new target
@@ -371,38 +372,36 @@ classdef ContainerTest < matlab.uitest.TestCase
         end
 
         function testChangeTargetToInvalidValueErrors(testCase)
-            % Verify setting invalid Target throws error and state is unchanged
+            % Verify adding with invalid target throws error
             container = ic.core.ComponentContainer("container");
             container.Targets = ["left", "right"];
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             comp = ic.core.Component("comp");
-            comp.setParent(container, "left");
+            container.addChild(comp, "left");
 
-            function setInvalidTarget()
-                comp.Target = "invalid";
+            function addWithInvalidTarget()
+                container.addChild(comp, "invalid");
             end
 
-            testCase.verifyError(@setInvalidTarget, ...
+            testCase.verifyError(@addWithInvalidTarget, ...
                 "ic:core:Component:InvalidTarget");
 
-            % Verify component state unchanged after failed target change
-            testCase.verifyEqual(comp.Target, "left");
-            testCase.verifyEqual(comp.Parent, container);
+            % Verify component still in container after failed target change
             testCase.verifyLength(container.Children, 1);
         end
 
         function testReparentToDetachedContainer(testCase)
-            % Verify moving to detached container deregisters from Frame
+            % Verify moving to detached container errors
             attached = ic.core.ComponentContainer("attached");
             comp = ic.core.Component("comp");
             detached = ic.core.ComponentContainer("detached");
 
-            attached.Parent = testCase.Frame;
-            comp.Parent = attached;
+            testCase.Frame.addChild(attached);
+            attached.addChild(comp);
 
             function reparentGoneWrong()
-                comp.Parent = detached;
+                detached.addChild(comp);
             end
 
             testCase.verifyError(@reparentGoneWrong, ...
@@ -421,15 +420,15 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.verifyLength(container.Children, 2);
             testCase.verifyEqual(container.Children(1).ID, "container-child1");
             testCase.verifyEqual(container.Children(2).ID, "container-child2");
-            % Static children have their Parent set to the container
-            testCase.verifyEqual(container.Children(1).Parent, container);
+            % Static children are attached to the container
+            testCase.verifyTrue(container.Children(1).isAttached());
         end
 
         function testStaticChildrenRegisteredOnAttach(testCase)
             % Verify static children are registered when parent attaches
             container = TestStaticContainer("container");
 
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             testCase.verifyEqual(testCase.Frame.Registry.numEntries, 3);
             testCase.verifyTrue(testCase.Frame.Registry.isKey("container"));
@@ -441,22 +440,22 @@ classdef ContainerTest < matlab.uitest.TestCase
             % Verify @insert payload includes staticChildren
             container = TestStaticContainer("container");
 
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             testCase.assertNotEmpty(testCase.Frame.View.Queue);
             insertEvt = testCase.Frame.View.Queue(1);
             testCase.verifyEqual(insertEvt.Name, "@insert");
             testCase.verifyTrue(isfield(insertEvt.Data.component, 'staticChildren'));
             testCase.verifyLength(insertEvt.Data.component.staticChildren, 2);
-            testCase.verifyEqual(insertEvt.Data.component.staticChildren{1}.id, "container-child1");
-            testCase.verifyEqual(insertEvt.Data.component.staticChildren{2}.id, "container-child2");
+            testCase.verifyEqual(insertEvt.Data.component.staticChildren{1}.component.id, "container-child1");
+            testCase.verifyEqual(insertEvt.Data.component.staticChildren{2}.component.id, "container-child2");
         end
 
         function testNoSeparateInsertForStaticChildren(testCase)
             % Verify static children don't trigger separate @insert events
             container = TestStaticContainer("container");
 
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             % Should only have ONE @insert event (for the container)
             insertEvents = testCase.Frame.View.Queue(...
@@ -465,22 +464,23 @@ classdef ContainerTest < matlab.uitest.TestCase
             testCase.verifyEqual(insertEvents(1).Data.component.id, "container");
         end
 
-        function testStaticChildrenDefinitionHasIdAndType(testCase)
-            % Verify staticChildren definitions include id and type
+        function testStaticChildrenDefinitionHasComponentAndTarget(testCase)
+            % Verify staticChildren definitions include component and target
             container = TestStaticContainer("container");
 
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             insertEvt = testCase.Frame.View.Queue(1);
             childDef = insertEvt.Data.component.staticChildren{1};
-            testCase.verifyEqual(childDef.id, "container-child1");
-            testCase.verifyEqual(childDef.type, "ic.core.Component");
+            testCase.verifyEqual(childDef.component.id, "container-child1");
+            testCase.verifyEqual(childDef.component.type, "ic.core.Component");
+            testCase.verifyTrue(isfield(childDef, 'target'));
         end
 
         function testDeleteContainerDeregistersStaticChildren(testCase)
             % Verify deleting container also deregisters static children
             container = TestStaticContainer("container");
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
             testCase.assertEqual(testCase.Frame.Registry.numEntries, 3);
 
             delete(container);

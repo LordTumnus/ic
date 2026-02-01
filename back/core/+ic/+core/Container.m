@@ -35,10 +35,15 @@ classdef Container < handle
 
     methods (Access = public)
 
-        function validateTarget(~, ~)
-            % > VALIDATETARGET hook for subclasses to validate target before insertion
-            % Override in subclasses to restrict allowed targets.
+        function validateTarget(this, target)
+            % > VALIDATETARGET validates target is in this.Targets
+            % Override in subclasses for custom validation.
             % Throw an error to reject the target.
+            if ~ismember(target, this.Targets)
+                error("ic:core:Component:InvalidTarget", ...
+                    "Target '%s' is not valid. Valid targets: %s", ...
+                    target, strjoin(this.Targets, ", "));
+            end
         end
 
         function target = getDefaultTarget(this)
@@ -67,17 +72,38 @@ classdef Container < handle
             this.validateTarget(target);
 
             addlistener(child, "ObjectBeingDestroyed", ...
-                @(~,~) this.removeChild(child));
+                @(~,~) ic.core.Container.safeRemoveChild(this, child));
 
             if ~isempty(child.Parent)
-                data = struct(...
-                    "id", child.ID, "parent", newParent.ID, "target", target);
-                this.publish("@reparent", data); %#ok<MCNPN>
-                mask = [child.Parent.Children.ID] == child.ID;
-                child.Parent.Children(mask) = [];
+                oldParent = child.Parent;
 
+                oldFrame = child.getFrame();
+                if isa(this, "ic.core.Component")
+                    newFrame = this.getFrame();
+                else
+                    newFrame = [];
+                end
+
+                if ~isequal(oldFrame, newFrame)
+                    error("ic:core:Component:ReparentingAcrossFrames", ...
+                        "Cannot reparent component across different Frames");
+                end
+
+                % Old parent publishes reparent event
+                data = struct(...
+                    "id", child.ID, "parent", this.ID, "target", target);
+                oldParent.publish("@reparent", data);
+
+                % Remove from old parent's Children
+                mask = [oldParent.Children.ID] == child.ID;
+                oldParent.Children(mask) = [];
+
+                % Update child's references
                 child.Parent = this;
                 child.Target = target;
+
+                % Add to new parent's Children
+                this.Children(end + 1) = child;
                 return;
             end
 
@@ -121,15 +147,19 @@ classdef Container < handle
     end
 
     methods (Access = protected)
-        function addStaticChild(this, child)
+        function addStaticChild(this, child, target)
             % > ADDSTATICCHILD declares a child that is pre-rendered in Svelte
             arguments
                 this
                 child (1,1) ic.core.Component
+                target string
             end
-            % Set parent directly (bypasses setParent which would trigger @insert)
+
+            addlistener(child, "ObjectBeingDestroyed", ...
+                @(~,~) ic.core.Container.safeRemoveChild(this, child));
+
             child.Parent = this;
-            child.Target = "static";
+            child.Target = target;
             child.IsStatic = true;
 
             % Add to Children immediately
@@ -220,6 +250,14 @@ classdef Container < handle
                 end
             catch
                 % Silently ignore errors during destruction - component already invalid
+            end
+        end
+
+        function safeRemoveChild(container, child)
+            % > SAFEREMOVECHILD safely removes a child, checking container validity first
+            % Used as listener callback to handle cascading deletes gracefully
+            if isvalid(container)
+                container.removeChild(child);
             end
         end
     end

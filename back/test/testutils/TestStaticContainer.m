@@ -13,8 +13,8 @@ classdef TestStaticContainer < ic.core.ComponentContainer
             this@ic.core.ComponentContainer(id);
             this.Child1 = ic.core.Component(id + "-child1");
             this.Child2 = ic.core.Component(id + "-child2");
-            this.addStaticChild(this.Child1);
-            this.addStaticChild(this.Child2);
+            this.addStaticChild(this.Child1, "child1");
+            this.addStaticChild(this.Child2, "child2");
         end
     end
 end

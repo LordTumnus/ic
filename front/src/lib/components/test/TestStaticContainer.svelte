@@ -4,7 +4,7 @@
   This component tests the static composition pattern where a child is
   declared in MATLAB constructor and passed as a pre-built Map.
 
-  Expects a static child with suffix 'child' (a TestComponent).
+  Expects a static child in target 'child' (a TestComponent).
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -36,8 +36,9 @@
     };
   });
 
-  // Access the static child by its suffix name
-  const child = $derived(staticChildren.get('child'));
+  // Access the static children by target name (returns array, take first)
+  const childSlot = $derived(staticChildren.get('child') ?? []);
+  const child = $derived(childSlot[0]);
 
   // FRONTEND-ONLY WIRING: Bidirectional sync between parent and child counter
   // This happens entirely in Svelte - no roundtrip to MATLAB!
@@ -71,11 +72,11 @@
   <div class="child-counter" data-testid="child-counter">Child counter: {childCounter}</div>
 
   <div class="child-slot" data-testid="child-slot">
-    {#if child}
-      {@render child.snippet()}
+    {#each childSlot as staticChild}
+      {@render staticChild.snippet()}
     {:else}
       <span class="empty-slot">No static child</span>
-    {/if}
+    {/each}
   </div>
 
   <div class="dynamic-slot" data-testid="dynamic-slot">

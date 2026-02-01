@@ -28,9 +28,9 @@ classdef TestStaticContainer < ic.core.ComponentContainer
 
             this@ic.core.ComponentContainer(id);
 
-            % Create the static child with suffix "-child"
+            % Create the static child with suffix "-child" at target "child"
             this.Child = ic.test.TestComponent(id + "-child");
-            this.addStaticChild(this.Child);
+            this.addStaticChild(this.Child, "child");
         end
     end
 

@@ -180,16 +180,16 @@ export async function handleReparent(
  *
  * @param parent - Parent component to attach children to
  * @param defs - Array of static child component definitions
- * @returns Map keyed by child suffix name (e.g., "search-bar") with snippet and props
+ * @returns Map keyed by target name, each containing an array of children for that target
  */
 export async function createStaticChildren(
   parent: Component,
-  defs: ComponentDefinition[]
+  defs: InsertEventData[]
 ): Promise<StaticChildrenMap> {
   const result: StaticChildrenMap = new Map();
 
   for (const def of defs) {
-    const child = await Factory.instance.create(def);
+    const child = await Factory.instance.create(def.component);
     child._isStatic = true;
     child._parentComponent = parent;
 
@@ -199,17 +199,25 @@ export async function createStaticChildren(
 
     parent.children.push(child);
 
-    // Key by suffix name (e.g., "parent-id-search-bar" → "search-bar")
-    const childName = def.id.replace(parent.id + '-', '');
-    result.set(childName, {
+    // Push to target array (multiple children can share the same target)
+    if (!result.has(def.target)) {
+      result.set(def.target, []);
+    }
+    result.get(def.target)!.push({
       snippet,
       props: child.svelteProps
     });
 
     // Recurse for nested static children
-    if (def.staticChildren?.length) {
-      const nested = await createStaticChildren(child, def.staticChildren);
-      nested.forEach((value, key) => result.set(key, value));
+    if (def.component.staticChildren?.length) {
+      const nested = await createStaticChildren(child, def.component.staticChildren);
+      // Merge nested results (concatenate arrays for same targets)
+      nested.forEach((children, key) => {
+        if (!result.has(key)) {
+          result.set(key, []);
+        }
+        result.get(key)!.push(...children);
+      });
     }
   }
 

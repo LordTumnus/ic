@@ -19,8 +19,13 @@ classdef ComponentContainer < ic.core.Component & ...
 
             % Collect static children for serialization
             staticKids = this.Children([this.Children.IsStatic]);
+            definition.staticChildren = cell(1, numel(staticKids));
             if ~isempty(staticKids)
-                definition.staticChildren = arrayfun(@getComponentDefinition, staticKids, 'UniformOutput', false);
+                for ii = 1:numel(staticKids)
+                    definition.staticChildren{ii} = struct(...
+                        "component", getComponentDefinition(staticKids(ii)), ...
+                        "target", staticKids(ii).Target);
+                end
             end
         end
     end

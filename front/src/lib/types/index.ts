@@ -34,16 +34,14 @@ export interface ComponentDefinition {
   type: string;
   /** Unique ID for the new component */
   id: string;
-  /** Reactive properties with their current values */
+  /** Reactive properties with their current values (includes 'targets' for containers) */
   props: PropDefinition[];
   /** Reactive events the component can emit to MATLAB */
   events: EventDefinition[];
   /** Reactive methods that MATLAB can invoke on the component */
   methods: MethodDefinition[];
-  /** Target container elements */
-  targets?: string[];
   /** Pre-rendered children declared in MATLAB constructor (recursive) */
-  staticChildren?: ComponentDefinition[];
+  staticChildren?: InsertEventData[];
 }
 
 /** Data for @insert events. Sent by PARENT to create a CHILD. */
@@ -97,9 +95,9 @@ export interface MethodDefinition {
 
 /**
  * Snippets record passed to Svelte components.
- * Always contains a 'default' key, plus any additional targets from MATLAB.
+ * Keys are target names defined in MATLAB's Targets property.
  */
-export type Snippets = { default: Snippet[] } & Record<string, Snippet[]>;
+export type Snippets = Record<string, Snippet[]>;
 
 /** Subscription callback. Receives event name and data. May be async. */
 export type EventCallback = (id: string, name: string, data: unknown) => void | Promise<void>;
@@ -116,9 +114,10 @@ export interface StaticChild {
 }
 
 /**
- * Map of static child IDs to their snippets and props
+ * Map of static child targets to arrays of their snippets and props.
+ * Multiple children can share the same target slot.
  */
-export type StaticChildrenMap = Map<string, StaticChild>;
+export type StaticChildrenMap = Map<string, StaticChild[]>;
 
 /**
  * Minimal interface for components that can be registered in the Registry.

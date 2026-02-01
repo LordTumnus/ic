@@ -83,7 +83,10 @@ function createTestStaticContainerDefinition(
     ],
     targets: ['default'],
     staticChildren: [
-      createTestComponentDefinition(`${id}-child`, childOverrides),
+      {
+        component: createTestComponentDefinition(`${id}-child`, childOverrides),
+        target: 'child',
+      },
     ],
   };
 }
@@ -1058,7 +1061,7 @@ describe('Bridge Integration', () => {
       // Verify instance style references the variable
       const instanceSheet = document.adoptedStyleSheets.find(
         (s: CSSStyleSheet) => s.cssRules.length > 0 &&
-          s.cssRules[0]?.cssText?.includes('var(--component-bg)')
+          s.cssRules[0]?.cssText?.includes('var(--ic-component-bg)')
       );
       expect(instanceSheet).toBeDefined();
     });
