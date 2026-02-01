@@ -52,11 +52,11 @@
       {@render children[0]()}
     </div>
     <!-- Remaining children render normally -->
-    {#each children.slice(1) as child, i (i + 1)}
+    {#each children.slice(1) as child (child)}
       {@render child()}
     {/each}
   {:else}
-    {#each children as child, i (i)}
+    {#each children as child (child)}
       {@render child()}
     {/each}
   {/if}

@@ -11,6 +11,7 @@ import type {
   ComponentDefinition,
   InsertEventData,
   RemoveEventData,
+  ReorderEventData,
   ReparentEventData,
   StaticChild,
   StaticChildrenMap
@@ -132,6 +133,33 @@ export async function handleReparent(
   }
 
   const child = parent.children[childIndex];
+  const targetSlot = target || 'default';
+
+  // Same parent case - check if this is a no-op or a slot change
+  if (newParentId === parent.id) {
+    // Find current slot
+    for (const slotName of Object.keys(parent._snippets)) {
+      const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
+      if (snippetIndex !== -1) {
+        if (slotName === targetSlot) {
+          // Same parent, same slot - nothing to do
+          return;
+        }
+        // Same parent, different slot - move snippet without recreating
+        parent._snippets[slotName].splice(snippetIndex, 1);
+        if (!parent._snippets[targetSlot]) {
+          parent._snippets[targetSlot] = [];
+        }
+        parent._snippets[targetSlot].push(child._snippet!);
+        flushSync();
+        return;
+      }
+    }
+    // Snippet not found in any slot - shouldn't happen, but nothing to do
+    return;
+  }
+
+  // Different parent - full reparenting
 
   // Remove snippet from current parent's slots
   for (const slotName of Object.keys(parent._snippets)) {
@@ -141,6 +169,10 @@ export async function handleReparent(
       break;
     }
   }
+
+  // Flush to ensure old snippet cleanup completes before creating new one
+  // This prevents race conditions with _svelteInstance
+  flushSync();
 
   // Remove from current parent's children
   parent.children.splice(childIndex, 1);
@@ -161,14 +193,57 @@ export async function handleReparent(
   child._parentComponent = newParent;
 
   // Add to new parent's slots
-  const slotName = target || 'default';
-  if (!newParent._snippets[slotName]) {
-    newParent._snippets[slotName] = [];
+  if (!newParent._snippets[targetSlot]) {
+    newParent._snippets[targetSlot] = [];
   }
-  newParent._snippets[slotName].push(newSnippet);
+  newParent._snippets[targetSlot].push(newSnippet);
 
   // Add to new parent's children
   newParent.children.push(child);
+
+  flushSync();
+}
+
+/**
+ * Handle @reorder event - move a child to a new position within its target slot.
+ */
+export async function handleReorder(
+  parent: Component,
+  _id: string,
+  _name: string,
+  data: unknown
+): Promise<void> {
+  const { id: childId, index, target } = data as ReorderEventData;
+
+  // Find the child
+  const child = parent.children.find((c) => c.id === childId);
+  if (!child || !child._snippet) {
+    logger.warn('Container', '@reorder: Child not found', { childId });
+    return;
+  }
+
+  // Get the snippet array for this target
+  const snippets = parent._snippets[target];
+  if (!snippets) {
+    logger.warn('Container', '@reorder: Target not found', { target });
+    return;
+  }
+
+  // Find current position
+  const fromIndex = snippets.indexOf(child._snippet);
+  if (fromIndex === -1 || fromIndex === index) {
+    return; // Not found or already at position
+  }
+
+  logger.debug('Container', '@reorder', { childId, target, from: fromIndex, to: index });
+
+  // Simple array reorder: remove from old position, insert at new position
+  const newArray = [...snippets];
+  const [moved] = newArray.splice(fromIndex, 1);
+  newArray.splice(index, 0, moved);
+  parent._snippets[target] = newArray;
+
+  flushSync();
 }
 
 /**

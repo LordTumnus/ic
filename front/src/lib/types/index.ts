@@ -67,6 +67,16 @@ export interface ReparentEventData {
   target: string;
 }
 
+/** Data for @reorder events. */
+export interface ReorderEventData {
+  /** Component being moved */
+  id: string;
+  /** New index within the target (0-based) */
+  index: number;
+  /** Target container element name */
+  target: string;
+}
+
 /** Data for @prop events. */
 export interface PropDefinition {
   /** Property name */

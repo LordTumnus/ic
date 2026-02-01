@@ -49,7 +49,7 @@
   style:gap={toSpacing(gap)}
   style:padding={toSpacing(padding)}
 >
-  {#each snippets.default ?? [] as child, i (i)}
+  {#each snippets.default ?? [] as child (child)}
     {@render child()}
   {/each}
 </div>

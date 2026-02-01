@@ -25,7 +25,7 @@ import type {
   ClearStyleEventData
 } from '../types';
 import Bridge from './bridge';
-import { handleInsert, handleRemove, handleReparent } from './container';
+import { handleInsert, handleRemove, handleReorder, handleReparent } from './container';
 import StyleManager from './style-manager';
 import logger from './logger';
 
@@ -191,10 +191,11 @@ class Component implements Registrable {
     this._setupListeners(propDefinitions.map((p) => p.name), methodDefinitions.map((m) => m.name));
     this._setupTargetsHandler();
 
-    // Set up container handlers (@insert, @remove, @reparent)
+    // Set up container handlers (@insert, @remove, @reparent, @reorder)
     this.subscribe('@insert', (id, name, data) => handleInsert(this, id, name, data));
     this.subscribe('@remove', (id, name, data) => handleRemove(this, id, name, data));
     this.subscribe('@reparent', (id, name, data) => handleReparent(this, id, name, data));
+    this.subscribe('@reorder', (id, name, data) => handleReorder(this, id, name, data));
 
     // Set up style handlers
     this.subscribe('@style', (_id, _name, data) => {
