@@ -12,14 +12,13 @@ classdef ComponentContainer < ic.core.Component & ...
         end
     end
 
-    methods (Access = protected)
+    methods (Access = ?ic.core.Container)
         function definition = getComponentDefinition(this)
             % > GETCOMPONENTDEFINITION returns the component definition struct for this component container
             definition = getComponentDefinition@ic.core.Component(this);
-            definition.targets = num2cell(["default", this.Targets]);
 
             % Collect static children for serialization
-            staticKids = this.Children([this.Children.IsStatic_]);
+            staticKids = this.Children([this.Children.IsStatic]);
             if ~isempty(staticKids)
                 definition.staticChildren = arrayfun(@getComponentDefinition, staticKids, 'UniformOutput', false);
             end

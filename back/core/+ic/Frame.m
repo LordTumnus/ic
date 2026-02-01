@@ -346,11 +346,15 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             % > DEREGISTERSUBTREE deregisters a component and its subtree (Frame is the registry)
             ic.core.Container.deregisterSubtreeWithFrame(component, this);
         end
+    end
 
-        function definition = getComponentDefinition(this)
-            % > GETCOMPONENTDEFINITION returns the component definition struct for this frame
-            definition = getComponentDefinition@ic.core.ComponentBase(this);
-            definition.targets = num2cell(string.empty());
+    methods (Access = {?ic.Frame, ?ic.core.Component})
+        function sendReactiveProperty(this, propertyName)
+            % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
+            if ~this.isAttached()
+                return;
+            end
+            this.publish("@prop/" + propertyName, this.(propertyName));
         end
     end
 

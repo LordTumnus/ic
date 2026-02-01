@@ -6,12 +6,22 @@ classdef Container < handle
         Children ic.core.Component
     end
 
-    properties
+    properties (SetObservable, AbortSet, Description = "Reactive")
         % > TARGETS the list of possible targets for the container's children
-        Targets string = string.empty()
+        Targets string = "default"
+    end
+
+    properties (Access = private)
+        % > PREVIOUSTARGETS_ tracks previous targets for detecting removals
+        PreviousTargets_ string = "default"
     end
 
     methods
+        function this = Container()
+            % > CONTAINER constructor sets up listeners for target changes
+            addlistener(this, 'Targets', 'PostSet', @this.onTargetsChanged);
+        end
+
         function delete(this)
             % DELETE invalidates the container and also deletes its children
             arguments (Input)
@@ -19,30 +29,73 @@ classdef Container < handle
                 this (1,1) ic.core.Container
             end
 
-            % detach children while parent is still valid
-            children = this.Children;
-            if isa(this, "ic.core.Component")
-                for ii = 1:numel(children)
-                    if isvalid(children(ii))
-                        children(ii).Parent = [];
-                    end
-                end
-            end
-            % and then delete them
-            delete(children);
+            delete(this.Children);
         end
     end
 
-    methods (Access = ?ic.core.Component, Hidden)
+    methods (Access = public)
 
-        function addChild(this, child)
+        function validateTarget(~, ~)
+            % > VALIDATETARGET hook for subclasses to validate target before insertion
+            % Override in subclasses to restrict allowed targets.
+            % Throw an error to reject the target.
+        end
+
+        function target = getDefaultTarget(this)
+            % > GETDEFAULTTARGET returns the target to be used when adding a
+            % child, if no targets are passed
+            if isempty(this.Targets)
+                error("ic:Container:noTargetsAvaliable", ...
+                    "Container does not specify any target for its children");
+            end
+            if isscalar(this.Targets)
+                target = this.Targets;
+            else
+                target = this.Targets(1);
+            end
+        end
+
+        function addChild(this, child, target)
             % > ADDCHILD inserts a new child inside the container. Used by the component whenever its parent property is reassigned
-            this.Children(end + 1) = child;
+            arguments
+                this % ic.core.Container
+                child ic.core.Component
+                target string {mustBeNonempty} = this.getDefaultTarget()
+            end
 
-            % register the child and its subtree in the Frame registry
+            % Allow parent to validate/reject the target before insertion
+            this.validateTarget(target);
+
+            addlistener(child, "ObjectBeingDestroyed", ...
+                @(~,~) this.removeChild(child));
+
+            if ~isempty(child.Parent)
+                data = struct(...
+                    "id", child.ID, "parent", newParent.ID, "target", target);
+                this.publish("@reparent", data); %#ok<MCNPN>
+                mask = [child.Parent.Children.ID] == child.ID;
+                child.Parent.Children(mask) = [];
+
+                child.Parent = this;
+                child.Target = target;
+                return;
+            end
+
+            % Get child definition via introspection
+            definition = child.getComponentDefinition();
+            data = struct("component", definition, "target", target);
+
+            % Publish insert child
+            this.publish("@insert", data); %#ok<MCNPN>
+
+            child.Parent = this;
+            child.Target = target;
+
+            % Store & register child
+            this.Children(end + 1) = child;
             this.registerSubtree(child);
 
-            % flush the queue into the parent
+            % flush the event queue into the parent
             child.flush();
         end
 
@@ -56,7 +109,14 @@ classdef Container < handle
             if any(mask)
                 this.Children(mask) = [];
                 this.deregisterSubtree(child);
+                % parent sends an event requesting for removal of the child
+                data = struct("id", child.ID);
+                this.publish("@remove", data); %#ok<MCNPN>
+
+                child.Parent = [];
+                child.Target = string.empty;
             end
+
         end
     end
 
@@ -68,12 +128,13 @@ classdef Container < handle
                 child (1,1) ic.core.Component
             end
             % Set parent directly (bypasses setParent which would trigger @insert)
-            child.Parent_ = this;
-            child.Target_ = "static";
-            child.IsStatic_ = true;
+            child.Parent = this;
+            child.Target = "static";
+            child.IsStatic = true;
 
             % Add to Children immediately
             this.Children(end+1) = child;
+            child.Parent = this;
         end
 
         function registerSubtree(this, component)
@@ -89,7 +150,7 @@ classdef Container < handle
                 % Also register static children added before attachment
                 if isa(component, "ic.core.Container")
                     for child = component.Children
-                        if child.IsStatic_
+                        if child.IsStatic
                             this.registerSubtreeWithFrame(child, frame);
                         end
                     end
@@ -108,6 +169,28 @@ classdef Container < handle
             if ~isempty(frame)
                 this.deregisterSubtreeWithFrame(component, frame);
             end
+        end
+    end
+
+    methods (Access = private)
+        function onTargetsChanged(this, ~, ~)
+            % > ONTARGETSCHANGED removes children in targets that were removed
+            oldTargets = this.PreviousTargets_;
+            newTargets = this.Targets;
+
+            % Remove children in removed targets (reverse order for safety)
+            removedTargets = setdiff(oldTargets, newTargets);
+            if ~isempty(removedTargets)
+                children = this.Children;
+                for ii = numel(children):-1:1
+                    child = children(ii);
+                    if ~child.IsStatic && ismember(child.Target_, removedTargets)
+                        child.Parent = [];  % Triggers @remove
+                    end
+                end
+            end
+
+            this.PreviousTargets_ = newTargets;
         end
     end
 

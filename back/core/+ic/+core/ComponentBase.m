@@ -298,7 +298,51 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             this.subscribe(camelName, ...
                 @(~,~,data) notify(this, eventName, ic.event.MEvent(data)));
         end
+    end
 
+    methods (Access = {?ic.Frame, ?ic.core.Component})
+        function resolveAndUnsubscribe(this, promise, name, evtData)
+            % > RESOLVEANDUNSUBSCRIBE is the callback executed whenever the view replies to a publish call. Resolves the promise with the new event data and stops listening to that event
+            promise.resolve(ic.async.Resolution(evtData.success, evtData.data));
+            this.Subscriptions(name) = [];
+        end
+
+        function sendReactiveProperty(this, propertyName)
+            % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
+            this.publish("@prop/" + propertyName, this.(propertyName));
+        end
+
+        function subscribeToReactiveProperty(this, propertyName)
+            % > SUBSCRIBETOREACTIVEPROPERTIES subscribes to property changes from the view, and sets the component property when the view notifies the event
+            camelName = ic.utils.toCamelCase("@prop/" + propertyName);
+            this.subscribe(camelName, ...
+                @(~,~,data) setValueSilently(propertyName, data))
+
+            % nested function to avoid echoing the property change back to the view
+            function setValueSilently(propName, value)
+                task = onCleanup(@() reenableListener(propName));
+                this.ReactivePropListeners(propName).Enabled = false;
+                this.(propName) = value;
+                function reenableListener(n)
+                    this.ReactivePropListeners(n).Enabled = true;
+                end
+            end
+        end
+
+        function isReactiveMethod = isReactiveMethod(this, methodName)
+            % > ISREACTIVEMETHOD returns whether the specified method is marked as reactive
+            mc = meta.class.fromName(class(this));
+            metaMethods = mc.MethodList;
+            reactiveMethods = metaMethods(...
+                strcmp({metaMethods.Description}, "Reactive"));
+            % Convert method names to camelCase strings and compare
+            camelNames = arrayfun(@(m) ic.utils.toCamelCase(m.Name), ...
+                reactiveMethods);
+            isReactiveMethod = any(camelNames == methodName);
+        end
+    end
+
+    methods (Access = ?ic.core.Container)
         function definition = getComponentDefinition(this)
             % > GETCOMPONENTDEFINITION returns a struct with all reactive
             % properties, events, and methods for the component.
@@ -350,51 +394,7 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             definition.props = num2cell(props);
             definition.events = num2cell(events);
             definition.methods = num2cell(methods);
-            definition.targets = {"default"};
         end
-    end
-
-    methods (Access = private)
-        function resolveAndUnsubscribe(this, promise, name, evtData)
-            % > RESOLVEANDUNSUBSCRIBE is the callback executed whenever the view replies to a publish call. Resolves the promise with the new event data and stops listening to that event
-            promise.resolve(ic.async.Resolution(evtData.success, evtData.data));
-            this.Subscriptions(name) = [];
-        end
-
-        function sendReactiveProperty(this, propertyName)
-            % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
-            this.publish("@prop/" + propertyName, this.(propertyName));
-        end
-
-        function subscribeToReactiveProperty(this, propertyName)
-            % > SUBSCRIBETOREACTIVEPROPERTIES subscribes to property changes from the view, and sets the component property when the view notifies the event
-            camelName = ic.utils.toCamelCase("@prop/" + propertyName);
-            this.subscribe(camelName, ...
-                @(~,~,data) setValueSilently(propertyName, data))
-
-            % nested function to avoid echoing the property change back to the view
-            function setValueSilently(propName, value)
-                task = onCleanup(@() reenableListener(propName));
-                this.ReactivePropListeners(propName).Enabled = false;
-                this.(propName) = value;
-                function reenableListener(n)
-                    this.ReactivePropListeners(n).Enabled = true;
-                end
-            end
-        end
-
-        function isReactiveMethod = isReactiveMethod(this, methodName)
-            % > ISREACTIVEMETHOD returns whether the specified method is marked as reactive
-            mc = meta.class.fromName(class(this));
-            metaMethods = mc.MethodList;
-            reactiveMethods = metaMethods(...
-                strcmp({metaMethods.Description}, "Reactive"));
-            % Convert method names to camelCase strings and compare
-            camelNames = arrayfun(@(m) ic.utils.toCamelCase(m.Name), ...
-                reactiveMethods);
-            isReactiveMethod = any(camelNames == methodName);
-        end
-
     end
 
 end
