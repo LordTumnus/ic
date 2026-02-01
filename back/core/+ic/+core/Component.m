@@ -74,7 +74,9 @@ classdef Component < ic.core.ComponentBase
             % > ISATTACHED returns a flag indicating whether the component has a valid parent or not
             tf = ~isempty(this.Parent) && isvalid(this.Parent);
         end
+    end
 
+    methods (Access = protected)
         function setParent(this, parent, target)
             % > SETPARENT sets the parent
             arguments (Input)
@@ -94,9 +96,7 @@ classdef Component < ic.core.ComponentBase
                 this.switchParent(parent, target);
             end
         end
-    end
 
-    methods (Access = protected)
         function send(this, evt)
             % > SEND dispatches recursively an event to the parent, until the view is reached. If the component does not have a parent, then it stores the event in the queue until the component is attached
             if ~this.isAttached()
@@ -130,6 +130,10 @@ classdef Component < ic.core.ComponentBase
             % Note: target is already validated by setParent
 
             resolvedTarget = this.resolveAndValidateTarget(target, parent);
+
+            % Allow parent to validate/reject the target before insertion
+            parent.validateTarget(resolvedTarget);
+
             this.Parent_ = parent;
             this.Target_ = resolvedTarget;
 
