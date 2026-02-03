@@ -48,7 +48,6 @@ class FrameComponent extends Component {
         { name: 'colorScheme', value: 'light' },
         { name: 'debug', value: false },
         { name: 'logLevel', value: 'debug' },
-        { name: 'fillFirstChild', value: false },
         { name: 'targets', value: ['default'] }
       ],
       [],

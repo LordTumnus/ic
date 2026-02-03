@@ -1,6 +1,7 @@
 % > COMPONENTBASE is the abstract base class for interactive components.
 % It provides the core event publishing/subscription infrastructure without defining the Parent property, allowing subclasses to define their own parent type.
-classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
+classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
+                                    ic.mixin.Stylable
 
     properties (SetAccess = immutable)
         % > ID unique identifier of the component
@@ -17,11 +18,6 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
     properties (Access = private)
         ReactivePropListeners = ...
             dictionary(string.empty(), event.listener.empty());
-    end
-
-    properties (SetAccess = private)
-        % > STYLES stores dynamic CSS styles per selector (selector → struct of properties)
-        Styles = dictionary(string.empty(), struct.empty());
     end
 
     methods
@@ -140,126 +136,6 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous
             queue = this.Queue;
             this.send(queue);
             this.Queue = ic.event.JsEvent.empty();
-        end
-
-        function style(this, selector, varargin)
-            % > STYLE applies CSS styles to elements matching the selector.
-            % Styles are merged with existing styles for that selector.
-            % To remove a property, set its value to "".
-
-            arguments (Input)
-                % > THIS the component
-                this (1,1) ic.core.ComponentBase
-                % > SELECTOR CSS selector for target elements
-                selector (1,1) string
-            end
-
-            arguments (Input, Repeating)
-                % > VARARGIN name-value pairs or a single struct
-                varargin
-            end
-
-            % Parse input into a struct of new styles
-            if isscalar(varargin) && isstruct(varargin{1})
-                newStyles = varargin{1};
-            else
-                if mod(numel(varargin), 2) ~= 0
-                    error("ic:core:ComponentBase:InvalidStyleArgs", ...
-                          "Style properties must be specified as name-value pairs.");
-                end
-                varargin(1:2:end) = ...
-                  cellfun(@string, varargin(1:2:end), 'UniformOutput', false);
-                newStyles = struct(varargin{:});
-            end
-
-            % Merge with existing styles for this selector
-            if this.Styles.isKey(selector)
-                existingStyles = this.Styles(selector);
-            else
-                existingStyles = struct();
-            end
-
-            % Apply new styles (merge), removing properties set to ""
-            fields = fieldnames(newStyles);
-            for jj = 1:numel(fields)
-                fname = fields{jj};
-                fvalue = newStyles.(fname);
-                if isstring(fvalue) && fvalue == ""
-                    % Remove property
-                    if isfield(existingStyles, fname)
-                        existingStyles = rmfield(existingStyles, fname);
-                    end
-                else
-                    existingStyles.(fname) = fvalue;
-                end
-            end
-
-            % Store merged styles
-            this.Styles(selector) = existingStyles;
-
-            % Convert property names to kebab-case for CSS
-            mergedFields = fieldnames(existingStyles);
-            kebabKeys = cell(1, numel(mergedFields));
-            values = cell(1, numel(mergedFields));
-            for kk = 1:numel(mergedFields)
-                kebabKeys{kk} = char(ic.utils.toKebabCase(mergedFields{kk}));
-                values{kk} = existingStyles.(mergedFields{kk});
-            end
-            cssStyles = containers.Map(kebabKeys, values);
-
-            % Publish the complete styles for this selector
-            this.publish("@style", struct( ...
-                "selector", selector, ...
-                "styles", cssStyles));
-        end
-
-        function styles = getStyle(this, selector)
-            % > GETSTYLE returns the current styles for a selector.
-            % Returns an empty struct if no styles are set for the selector.
-            arguments (Input)
-                % > THIS the component
-                this (1,1) ic.core.ComponentBase
-                % > SELECTOR CSS selector to get styles for
-                selector (1,1) string
-            end
-
-            arguments (Output)
-                % > STYLES struct of current style properties
-                styles (1,1) struct
-            end
-
-            if this.Styles.isKey(selector)
-                styles = this.Styles(selector);
-            else
-                styles = struct();
-            end
-        end
-
-        function clearStyle(this, selector)
-            % > CLEARSTYLE removes all styles for a specific selector.
-            arguments (Input)
-                % > THIS the component
-                this (1,1) ic.core.ComponentBase
-                % > SELECTOR CSS selector to clear styles for
-                selector (1,1) string
-            end
-
-            if this.Styles.isKey(selector)
-                this.Styles(selector) = [];
-            end
-
-            this.publish("@clearStyle", struct("selector", selector));
-        end
-
-        function clearStyles(this)
-            % > CLEARSTYLES removes all dynamic styles for the component.
-            arguments (Input)
-                % > THIS the component
-                this (1,1) ic.core.ComponentBase
-            end
-
-            this.Styles = dictionary(string.empty(), struct.empty());
-            this.publish("@clearStyles", struct());
         end
     end
 

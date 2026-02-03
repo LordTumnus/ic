@@ -12,14 +12,12 @@
     snippets: Snippets;
     theme?: ThemeEventData;
     colorScheme?: 'light' | 'dark';
-    fillFirstChild?: boolean;
   }
 
   let {
     snippets,
     theme = {},
     colorScheme = $bindable('light'),
-    fillFirstChild = $bindable(false),
   }: Props = $props();
 
   // Build inline style string from theme object and color scheme
@@ -35,10 +33,6 @@
       })
     ];
 
-    if (fillFirstChild) {
-      styles.push('display: flex', 'flex-direction: column');
-    }
-
     return styles.join('; ');
   });
 
@@ -46,38 +40,13 @@
 </script>
 
 <div id="ic-frame" class="ic-frame" style={themeStyle}>
-  {#if fillFirstChild && children.length > 0}
-    <!-- First child gets a wrapper to ensure fill behavior -->
-    <div class="ic-frame__fill-wrapper">
-      {@render children[0]()}
-    </div>
-    <!-- Remaining children render normally -->
-    {#each children.slice(1) as child (child)}
-      {@render child()}
-    {/each}
-  {:else}
-    {#each children as child (child)}
-      {@render child()}
-    {/each}
-  {/if}
+  {#each children as child (child)}
+    {@render child()}
+  {/each}
 </div>
 
 <style>
   .ic-frame {
-    width: 100%;
-    height: 100%;
-  }
-
-  .ic-frame__fill-wrapper {
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
-    position: relative;
-  }
-
-  .ic-frame__fill-wrapper > :global(*) > :global(*) {
-    position: absolute;
-    inset: 0;
     width: 100%;
     height: 100%;
   }
