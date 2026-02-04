@@ -34,6 +34,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.GridContainer': modules['../components/layout/gridContainer/GridContainer.svelte'],
 
   // Panel components
+  'ic.Panel': modules['../components/panel/panel/Panel.svelte'],
   'ic.Splitter': modules['../components/panel/splitter/Splitter.svelte'],
 };
 
