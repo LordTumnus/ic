@@ -35,6 +35,21 @@ classdef Theme < handle
         % > DESTRUCTIVEFOREGROUND text on destructive backgrounds
         DestructiveForeground (1,2) string = ["#ffffff", "#ffffff"]
 
+        % > SUCCESS positive/success color
+        Success (1,2) string = ["#16a34a", "#22c55e"]
+        % > SUCCESSFOREGROUND text on success backgrounds
+        SuccessForeground (1,2) string = ["#ffffff", "#ffffff"]
+
+        % > WARNING caution/warning color
+        Warning (1,2) string = ["#d97706", "#f59e0b"]
+        % > WARNINGFOREGROUND text on warning backgrounds
+        WarningForeground (1,2) string = ["#ffffff", "#18181b"]
+
+        % > INFO informational color
+        Info (1,2) string = ["#0284c7", "#38bdf8"]
+        % > INFOFOREGROUND text on info backgrounds
+        InfoForeground (1,2) string = ["#ffffff", "#18181b"]
+
         % > BORDER default border color
         Border (1,2) string = ["#cbd5e1", "#334155"]
         % > INPUT input field border color
@@ -64,6 +79,9 @@ classdef Theme < handle
                           "Muted", "MutedForeground", ...
                           "Accent", "AccentForeground", ...
                           "Destructive", "DestructiveForeground", ...
+                          "Success", "SuccessForeground", ...
+                          "Warning", "WarningForeground", ...
+                          "Info", "InfoForeground", ...
                           "Border", "Input", "Ring"];
 
             keys = cell(1, numel(colorProps) + 1);
