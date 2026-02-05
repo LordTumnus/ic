@@ -97,14 +97,7 @@ classdef Splitter < ic.core.ComponentContainer
                     index, numel(this.Sizes));
             end
 
-            % Check if pane is already occupied
-            target = sprintf("pane-%d", index - 1);  % 0-indexed for frontend
-            existing = this.getChildrenInTarget(target);
-            if ~isempty(existing)
-                error('ic:Splitter:PaneOccupied', ...
-                    'Pane %d is already occupied.', index);
-            end
-
+            target = sprintf("pane-%d", index - 1);
             this.addChild(component, target);
         end
     end
@@ -131,25 +124,27 @@ classdef Splitter < ic.core.ComponentContainer
     end
 
     methods (Access = public)
-        function validateTarget(this, target)
-            % > VALIDATETARGET rejects "default" and validates pane-N format
-            if target == "default"
-                error('ic:Splitter:InvalidTarget', ...
-                    'Splitter does not support the default target. Use addPaneAt(component, index).');
+        function validateChild(this, child, target)
+            % > VALIDATECHILD checks that pane is not already occupied
+            existing = this.getChildrenInTarget(target);
+            if ~isempty(existing)
+                error('ic:Splitter:PaneOccupied', ...
+                    'Pane %d is already occupied.', index);
             end
 
             % Delegate to base class for target membership check
-            validateTarget@ic.core.Container(this, target);
+            validateChild@ic.core.Container(this, child, target);
         end
     end
 
     methods (Access = private)
         function targets = generatePaneTargets(~, numPanes)
-            % Generate target names: pane-0, pane-1, ..., pane-(n-1)
+            % GENERATETARGETPANES creates target names in range
             targets = "pane-" + string(0:numPanes-1);
         end
 
         function validateSizesSum(~, ~, evt)
+            % VALIDATESIZESSUM checks sizes add to 100%
             newSizes = evt.AffectedObject.(evt.Source.Name);
             total = sum(newSizes);
             if abs(total - 100) > 1
@@ -159,13 +154,12 @@ classdef Splitter < ic.core.ComponentContainer
         end
 
         function onSizesChanged(this, ~, ~)
-            % Update Targets when Sizes changes
-            % The Container.onTargetsChanged will handle removing children
-            % from removed targets automatically
+            % ONSIZESCHANGED updates Targets when Sizes changes
             this.Targets = this.generatePaneTargets(numel(this.Sizes));
         end
 
         function validateSizeArray(this, ~, evt)
+            % VALIDATESIZEARRAY checks min/max size matches Sizes dimensions
             newValue = evt.AffectedObject.(evt.Source.Name);
             numPanes = numel(this.Sizes);
             if numel(newValue) > numPanes

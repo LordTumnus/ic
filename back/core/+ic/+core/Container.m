@@ -35,10 +35,10 @@ classdef Container < handle
 
     methods (Access = public)
 
-        function validateTarget(this, target)
-            % > VALIDATETARGET validates target is in this.Targets
+        function validateChild(this, child, target)
+            % > VALIDATECHILD validates the child and its target
             % Override in subclasses for custom validation.
-            % Throw an error to reject the target.
+            % Throw an error to reject the child or target.
             if ~ismember(target, this.Targets)
                 error("ic:core:Component:InvalidTarget", ...
                     "Target '%s' is not valid. Valid targets: %s", ...
@@ -68,8 +68,8 @@ classdef Container < handle
                 target string {mustBeNonempty} = this.getDefaultTarget()
             end
 
-            % Allow parent to validate/reject the target before insertion
-            this.validateTarget(target);
+            % Allow parent to validate/reject the child before insertion
+            this.validateChild(child, target);
 
             if ~isempty(child.Parent)
                 oldParent = child.Parent;
