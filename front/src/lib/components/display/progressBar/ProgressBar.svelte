@@ -135,8 +135,9 @@
 
   .ic-progress__track {
     flex: 1;
-    background-color: var(--ic-muted);
-    border-radius: var(--ic-radius, 0.375rem);
+    background-color: var(--ic-secondary);
+    border-radius: 2px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
     overflow: hidden;
     position: relative;
   }
@@ -157,8 +158,10 @@
   /* Progress bar fill */
   .ic-progress__bar {
     height: 100%;
-    border-radius: inherit;
-    transition: width 0.3s ease;
+    border-radius: 2px;
+    transition: width 0.15s ease;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    opacity: 0.85;
   }
 
   /* Color variants using theme variables */

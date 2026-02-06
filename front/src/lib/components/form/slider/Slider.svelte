@@ -12,6 +12,9 @@
     labelPosition = $bindable('top'),
     size = $bindable('md'),
     variant = $bindable('primary'),
+    thumb = $bindable('fader'),
+    showTicks = $bindable(false),
+    tickInterval = $bindable(0),
     valueChanging,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
@@ -25,6 +28,9 @@
     labelPosition?: string;
     size?: string;
     variant?: string;
+    thumb?: string;
+    showTicks?: boolean;
+    tickInterval?: number;
     valueChanging?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
@@ -46,11 +52,24 @@
 
   // Compute fixed label width from the widest possible value string
   const labelWidth = $derived.by(() => {
-    const decimals = step % 1 === 0 ? 0 : (step.toString().split('.')[1]?.length ?? 0);
+    const dec = step % 1 === 0 ? 0 : (step.toString().split('.')[1]?.length ?? 0);
     const longest = [min, max].reduce((a, b) =>
-      b.toFixed(decimals).length > a.toFixed(decimals).length ? b : a
+      b.toFixed(dec).length > a.toFixed(dec).length ? b : a
     );
-    return longest.toFixed(decimals).length;
+    return longest.toFixed(dec).length;
+  });
+
+  // Compute tick mark positions as percentages
+  const ticks = $derived.by(() => {
+    if (!showTicks) return [];
+    const interval = tickInterval > 0 ? tickInterval : step;
+    const count = Math.round((max - min) / interval);
+    if (count > 200 || count < 1) return [];
+    const result: number[] = [];
+    for (let i = 0; i <= count; i++) {
+      result.push(((i * interval) / (max - min)) * 100);
+    }
+    return result;
   });
 
   function snapToStep(raw: number): number {
@@ -161,6 +180,10 @@
   class:ic-slider--success={variant === 'success'}
   class:ic-slider--warning={variant === 'warning'}
   class:ic-slider--destructive={variant === 'destructive'}
+  class:ic-slider--ticks={showTicks && ticks.length > 0}
+  class:ic-slider--thumb-fader={thumb === 'fader'}
+  class:ic-slider--thumb-circle={thumb === 'circle'}
+  class:ic-slider--thumb-square={thumb === 'square'}
 >
   {#if showValue && labelPosition === 'left'}
     <span class="ic-slider__label ic-slider__label--side" style="width: {labelWidth}ch">{displayValue}</span>
@@ -184,6 +207,7 @@
       onkeydown={handleKeyDown}
       style={isVertical ? `bottom: ${percentage}%` : `left: ${percentage}%`}
     >
+      <span class="ic-slider__grip"></span>
       {#if showValue && !isSideLabel}
         <span
           class="ic-slider__label ic-slider__label--floating"
@@ -191,6 +215,17 @@
         >{displayValue}</span>
       {/if}
     </div>
+
+    {#if showTicks && ticks.length > 0}
+      <div class="ic-slider__ticks">
+        {#each ticks as pct (pct)}
+          <div
+            class="ic-slider__tick"
+            style={isVertical ? `bottom: ${pct}%` : `left: ${pct}%`}
+          ></div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   {#if showValue && labelPosition === 'right'}
@@ -225,8 +260,9 @@
   .ic-slider__track {
     position: relative;
     flex: 1;
-    border-radius: 999px;
+    border-radius: 2px;
     background-color: var(--ic-secondary);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
     cursor: pointer;
   }
 
@@ -243,9 +279,10 @@
   /* ── Fill ──────────────────────────────── */
   .ic-slider__fill {
     position: absolute;
-    border-radius: 999px;
+    border-radius: 2px;
     background-color: var(--slider-accent);
     pointer-events: none;
+    opacity: 0.85;
   }
 
   .ic-slider:not(.ic-slider--vertical) .ic-slider__fill {
@@ -260,19 +297,22 @@
     width: 100%;
   }
 
-  /* ── Thumb ─────────────────────────────── */
+  /* ── Thumb (fader-style) ───────────────── */
   .ic-slider__thumb {
     position: absolute;
-    width: var(--slider-thumb);
-    height: var(--slider-thumb);
-    border-radius: var(--slider-thumb-radius);
+    width: var(--slider-thumb-w);
+    height: var(--slider-thumb-h);
+    border-radius: 2px;
     background-color: var(--slider-accent);
     border: none;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
     outline: none;
-    transition:
-      transform 0.1s ease,
-      box-shadow 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.1s ease;
   }
 
   .ic-slider:not(.ic-slider--vertical) .ic-slider__thumb {
@@ -286,29 +326,88 @@
   }
 
   .ic-slider:not(.ic-slider--disabled) .ic-slider__thumb:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  }
-
-  .ic-slider:not(.ic-slider--vertical):not(.ic-slider--disabled) .ic-slider__thumb:hover {
-    transform: translate(-50%, -50%) scale(1.12);
-  }
-
-  .ic-slider--vertical:not(.ic-slider--disabled) .ic-slider__thumb:hover {
-    transform: translate(-50%, 50%) scale(1.12);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   .ic-slider__thumb:focus-visible {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
-  .ic-slider--dragging:not(.ic-slider--vertical) .ic-slider__thumb {
-    transform: translate(-50%, -50%) scale(1.05);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  .ic-slider--dragging .ic-slider__thumb {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
-  .ic-slider--dragging.ic-slider--vertical .ic-slider__thumb {
-    transform: translate(-50%, 50%) scale(1.05);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  /* ── Grip lines (center grooves) ──────── */
+  .ic-slider__grip {
+    display: block;
+    pointer-events: none;
+  }
+
+  .ic-slider:not(.ic-slider--vertical) .ic-slider__grip {
+    width: 60%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 0 rgba(255, 255, 255, 0.3), 0 -2px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .ic-slider--vertical .ic-slider__grip {
+    height: 60%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    box-shadow: 2px 0 0 rgba(255, 255, 255, 0.3), -2px 0 0 rgba(255, 255, 255, 0.3);
+  }
+
+  /* ── Tick marks ────────────────────────── */
+  .ic-slider__ticks {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .ic-slider:not(.ic-slider--vertical) .ic-slider__ticks {
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    height: var(--slider-tick-h);
+  }
+
+  .ic-slider--vertical .ic-slider__ticks {
+    left: calc(100% + 3px);
+    top: 0;
+    bottom: 0;
+    width: var(--slider-tick-h);
+  }
+
+  .ic-slider__tick {
+    position: absolute;
+    background: var(--ic-muted-foreground);
+    opacity: 0.35;
+  }
+
+  .ic-slider:not(.ic-slider--vertical) .ic-slider__tick {
+    width: 1px;
+    height: 100%;
+    transform: translateX(-50%);
+  }
+
+  .ic-slider--vertical .ic-slider__tick {
+    height: 1px;
+    width: 100%;
+    transform: translateY(50%);
+  }
+
+  /* Reserve space below track when ticks are shown */
+  .ic-slider--ticks:not(.ic-slider--vertical) {
+    padding-bottom: calc(var(--slider-tick-h) + 4px);
+  }
+
+  .ic-slider--ticks.ic-slider--vertical {
+    padding-right: calc(var(--slider-tick-h) + 4px);
   }
 
   /* ── Labels ────────────────────────────── */
@@ -332,7 +431,7 @@
     left: 50%;
     transform: translateX(-50%);
     padding: 2px 6px;
-    border-radius: var(--ic-radius, 0.5rem);
+    border-radius: 2px;
     background-color: var(--ic-foreground);
     color: var(--ic-background);
     font-size: 0.7rem;
@@ -366,9 +465,53 @@
   }
 
   /* ── Size variants ─────────────────────── */
-  .ic-slider--sm { --slider-track: 4px; --slider-thumb: 12px; --slider-thumb-radius: 3px; }
-  .ic-slider--md { --slider-track: 6px; --slider-thumb: 16px; --slider-thumb-radius: 4px; }
-  .ic-slider--lg { --slider-track: 8px; --slider-thumb: 20px; --slider-thumb-radius: 5px; }
+  .ic-slider--sm {
+    --slider-track: 4px;
+    --slider-thumb-w: 8px;
+    --slider-thumb-h: 18px;
+    --slider-thumb-size: 14px;
+    --slider-thumb-radius: 3px;
+    --slider-tick-h: 5px;
+  }
+  .ic-slider--md {
+    --slider-track: 5px;
+    --slider-thumb-w: 10px;
+    --slider-thumb-h: 22px;
+    --slider-thumb-size: 16px;
+    --slider-thumb-radius: 4px;
+    --slider-tick-h: 6px;
+  }
+  .ic-slider--lg {
+    --slider-track: 6px;
+    --slider-thumb-w: 12px;
+    --slider-thumb-h: 26px;
+    --slider-thumb-size: 20px;
+    --slider-thumb-radius: 5px;
+    --slider-tick-h: 8px;
+  }
+
+  /* Vertical fader: swap thumb dimensions */
+  .ic-slider--vertical.ic-slider--thumb-fader.ic-slider--sm { --slider-thumb-w: 18px; --slider-thumb-h: 8px; }
+  .ic-slider--vertical.ic-slider--thumb-fader.ic-slider--md { --slider-thumb-w: 22px; --slider-thumb-h: 10px; }
+  .ic-slider--vertical.ic-slider--thumb-fader.ic-slider--lg { --slider-thumb-w: 26px; --slider-thumb-h: 12px; }
+
+  /* ── Thumb style: circle ───────────────── */
+  .ic-slider--thumb-circle .ic-slider__thumb {
+    width: var(--slider-thumb-size);
+    height: var(--slider-thumb-size);
+    border-radius: 50%;
+  }
+
+  .ic-slider--thumb-circle .ic-slider__grip { display: none; }
+
+  /* ── Thumb style: square ───────────────── */
+  .ic-slider--thumb-square .ic-slider__thumb {
+    width: var(--slider-thumb-size);
+    height: var(--slider-thumb-size);
+    border-radius: var(--slider-thumb-radius);
+  }
+
+  .ic-slider--thumb-square .ic-slider__grip { display: none; }
 
   /* ── Disabled ──────────────────────────── */
   .ic-slider--disabled {

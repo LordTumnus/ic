@@ -25,6 +25,13 @@ classdef Slider < ic.core.Component
         % > VARIANT color variant of the slider
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "success", "warning", "destructive"])} = "primary"
+        % > THUMB style of the slider thumb
+        Thumb string {mustBeMember(Thumb, ...
+            ["fader", "circle", "square"])} = "fader"
+        % > SHOWTICKS whether to display graduation tick marks
+        ShowTicks logical = false
+        % > TICKINTERVAL spacing between tick marks (0 = auto from Step)
+        TickInterval double {mustBeNonnegative(TickInterval)} = 0
     end
 
     events (Description = "Reactive")
