@@ -213,7 +213,7 @@
   class:ic-range-slider--thumb-square={thumb === 'square'}
 >
   {#if showValue && isSideLabel}
-    <span class="ic-range-slider__label ic-range-slider__label--side" style="width: {labelWidth}ch">{displayLow}</span>
+    <span class="ic-range-slider__label ic-range-slider__label--side" style="width: {labelWidth}ch">{isVertical ? displayHigh : displayLow}</span>
   {/if}
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -281,7 +281,7 @@
   </div>
 
   {#if showValue && isSideLabel}
-    <span class="ic-range-slider__label ic-range-slider__label--side" style="width: {labelWidth}ch">{displayHigh}</span>
+    <span class="ic-range-slider__label ic-range-slider__label--side" style="width: {labelWidth}ch">{isVertical ? displayLow : displayHigh}</span>
   {/if}
 </div>
 

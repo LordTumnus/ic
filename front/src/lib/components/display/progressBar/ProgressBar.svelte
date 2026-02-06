@@ -20,6 +20,7 @@
     gradient = $bindable(defaultGradient),
     showLabel = $bindable(false),
     labelPosition = $bindable('right'),
+    orientation = $bindable('horizontal'),
   }: {
     value?: number;
     indeterminate?: boolean;
@@ -30,7 +31,10 @@
     gradient?: ColorStop[];
     showLabel?: boolean;
     labelPosition?: string;
+    orientation?: string;
   } = $props();
+
+  const isVertical = $derived(orientation === 'vertical');
 
   // Clamp value between 0 and 100
   const percentage = $derived(Math.min(100, Math.max(0, value)));
@@ -91,6 +95,7 @@
 
 <div
   class="ic-progress"
+  class:ic-progress--vertical={isVertical}
   class:ic-progress--sm={size === 'sm'}
   class:ic-progress--md={size === 'md'}
   class:ic-progress--lg={size === 'lg'}
@@ -115,7 +120,8 @@
       class:ic-progress__bar--striped={striped}
       class:ic-progress__bar--animated={striped && animated}
       class:ic-progress__bar--indeterminate={indeterminate}
-      style:width={indeterminate ? undefined : `${percentage}%`}
+      style:width={indeterminate || isVertical ? undefined : `${percentage}%`}
+      style:height={indeterminate || !isVertical ? undefined : `${percentage}%`}
       style:background-color={gradientColor}
     ></div>
   </div>
@@ -131,6 +137,12 @@
     align-items: center;
     gap: 0.75rem;
     width: 100%;
+  }
+
+  .ic-progress--vertical {
+    flex-direction: column;
+    width: auto;
+    height: 100%;
   }
 
   .ic-progress__track {
@@ -155,13 +167,46 @@
     height: 1rem;
   }
 
+  /* Vertical track: swap width/height */
+  .ic-progress--vertical .ic-progress__track {
+    width: auto;
+    height: 100%;
+  }
+
+  .ic-progress--vertical.ic-progress--sm .ic-progress__track {
+    width: 0.375rem;
+    height: 100%;
+  }
+
+  .ic-progress--vertical.ic-progress--md .ic-progress__track {
+    width: 0.625rem;
+    height: 100%;
+  }
+
+  .ic-progress--vertical.ic-progress--lg .ic-progress__track {
+    width: 1rem;
+    height: 100%;
+  }
+
   /* Progress bar fill */
   .ic-progress__bar {
     height: 100%;
     border-radius: 2px;
-    transition: width 0.15s ease;
+    transition: width 0.15s ease, height 0.15s ease;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
     opacity: 0.85;
+  }
+
+  .ic-progress--vertical .ic-progress__bar {
+    width: 100%;
+    height: 0%;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+  }
+
+  .ic-progress--vertical .ic-progress__track {
+    position: relative;
   }
 
   /* Color variants using theme variables */
@@ -220,12 +265,27 @@
     animation: ic-progress-indeterminate 1.5s linear infinite;
   }
 
+  .ic-progress--vertical .ic-progress__bar--indeterminate {
+    width: 100% !important;
+    height: 40% !important;
+    animation: ic-progress-indeterminate-vertical 1.5s linear infinite;
+  }
+
   @keyframes ic-progress-indeterminate {
     0% {
       transform: translateX(-100%);
     }
     100% {
       transform: translateX(250%);
+    }
+  }
+
+  @keyframes ic-progress-indeterminate-vertical {
+    0% {
+      transform: translateY(100%);
+    }
+    100% {
+      transform: translateY(-250%);
     }
   }
 

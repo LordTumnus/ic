@@ -1,9 +1,10 @@
 classdef ProgressBar < ic.core.Component
     % > PROGRESSBAR Linear progress indicator with determinate and indeterminate modes.
     %
-    % The ProgressBar component displays progress as a horizontal bar that fills
-    % from left to right. It supports both determinate (known progress) and
-    % indeterminate (unknown duration) modes, with optional striped patterns.
+    % The ProgressBar component displays progress as a bar that fills from
+    % left to right (horizontal) or bottom to top (vertical). It supports both
+    % determinate (known progress) and indeterminate (unknown duration) modes,
+    % with optional striped patterns.
     %
     % Example:
     %   pb = ic.ProgressBar();
@@ -40,6 +41,9 @@ classdef ProgressBar < ic.core.Component
         ShowLabel logical = false
         % > LABELPOSITION position of the label relative to the progress bar
         LabelPosition string {mustBeMember(LabelPosition, ["left", "right"])} = "right"
+        % > ORIENTATION layout direction of the progress bar
+        Orientation string {mustBeMember(Orientation, ...
+            ["horizontal", "vertical"])} = "horizontal"
     end
 
     methods
