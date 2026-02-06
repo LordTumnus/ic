@@ -183,3 +183,22 @@ export interface ClearGlobalStylesEventData {
 
 /** Data for @theme events. CSS variables as kebab-case keys with values ready for CSS. */
 export type ThemeEventData = Record<string, string>;
+
+// ============================================================================
+// Effect Event Data
+// ============================================================================
+
+/** Event data for creating a JS effect. */
+export interface JsEffectEventData {
+  /** Unique effect ID (for removal) */
+  id: string;
+  /** Map of alias name → component ID */
+  components: Record<string, string>;
+  /** JavaScript expression to evaluate reactively */
+  expression: string;
+}
+
+/** Event data for removing a JS effect. */
+export interface JsEffectRemoveEventData {
+  id: string;
+}

@@ -306,6 +306,88 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
             % > LOGS returns the Logger instance for log inspection
             logger = this.Logger;
         end
+
+        function effect = jsEffect(this, varargin)
+            % > JSEFFECT creates a reactive expression that runs on the frontend.
+            %
+            % effect = frame.jsEffect(c1, c2, ..., expression)
+            %
+            % Components are exposed in the expression using their variable
+            % names from the caller's workspace. If a component is not passed
+            % as a simple variable (e.g., array indexing), a default alias
+            % c1, c2, ... is used instead.
+            %
+            % Each component proxy in the expression provides:
+            %   .props    - Reactive properties (reads tracked, writes sync)
+            %   .methods  - Callable methods (untracked, returns Resolution)
+            %   .el       - Root DOM element (live getter)
+            %   .id       - Component unique ID
+            %   .type     - MATLAB class type
+            %
+            % Property writes inside the expression update the UI instantly
+            % AND sync back to MATLAB asynchronously.
+            %
+            % Examples:
+            %   % Bind slider to progress bar
+            %   e = f.jsEffect(slider, progress, ...
+            %       "progress.props.value = slider.props.value");
+            %
+            %   % Call methods
+            %   e = f.jsEffect(checkbox, splitter, ...
+            %       "if (checkbox.props.checked) splitter.methods.collapse(0)");
+            %
+            %   % DOM styling
+            %   e = f.jsEffect(slider, ...
+            %       "slider.el.style.opacity = slider.props.value / 100");
+            %
+            %   % Remove the effect
+            %   e.remove();
+
+            arguments (Input)
+                this (1,1) ic.Frame
+            end
+            arguments (Input, Repeating)
+                varargin
+            end
+
+            assert(numel(varargin) >= 1, ...
+                "ic:Frame:jsEffect", "jsEffect requires at least an expression");
+
+            expression = string(varargin{end});
+            components = varargin(1:end-1);
+
+            % Build component map: alias → component ID
+            componentMap = struct();
+            for ii = 1:numel(components)
+                comp = components{ii};
+
+                % Validate component type
+                assert(isa(comp, 'ic.core.ComponentBase'), ...
+                    "All arguments except the last must be components");
+
+                % Validate component is attached to this frame
+                assert(this.Registry.isKey(comp.ID), ...
+                    "Component '%s' is not attached to this frame", comp.ID);
+
+                % Get alias from caller's variable name
+                varName = inputname(ii + 1);  % +1 for 'this'
+                if isempty(varName)
+                    varName = sprintf("c%d", ii);
+                end
+
+                componentMap.(varName) = comp.ID;
+            end
+
+            % Generate unique ID and create handle
+            effectId = string(matlab.lang.internal.uuid());
+            effect = ic.effect.JsEffect(effectId, this);
+
+            % Send to frontend
+            this.publish("@jsEffect", struct(...
+                "id", effectId, ...
+                "components", componentMap, ...
+                "expression", expression));
+        end
     end
 
     methods (Access = private)

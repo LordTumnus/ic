@@ -96,10 +96,20 @@ class Component implements Registrable {
   /** The Svelte component class to use for mounting. */
   private _svelteComponent: SvelteComponent<Record<string, unknown>> | null = null;
 
-  /**
-   * Internal reactive storage for reactive properties and methods.
-   */
-  private _reactiveState: Record<string, unknown>;
+  /** Reactive storage for data properties only. */
+  private _dataState: Record<string, unknown>;
+
+  /** Reactive storage for method implementations only. */
+  private _methodState: Record<string, unknown>;
+
+  /** Data property names (camelCase). */
+  readonly propNames: string[];
+
+  /** Method names (camelCase). */
+  readonly methodNames: string[];
+
+  /** Event names (camelCase). */
+  readonly eventNames: string[];
 
   /** Flag to prevent echo when receiving updates from MATLAB. */
   private _updatingFromMatlab = false;
@@ -123,19 +133,25 @@ class Component implements Registrable {
   ) {
     this.id = id;
     this.type = type;
-    this._reactiveState = $state({});
+    this._dataState = $state({});
+    this._methodState = $state({});
     this._svelteComponent = svelteComponent;
+
+    // Store name lists for external consumers (e.g. EffectManager)
+    this.propNames = propDefinitions.map(p => p.name);
+    this.methodNames = methodDefinitions.map(m => m.name);
+    this.eventNames = eventDefinitions.map(e => e.name);
 
     // Create state object with getters/setters pointing to $state
     // This enables reactivity in the direction Svelte -> MATLAB
     const stateObj: Record<string, unknown> = {};
     for (const { name, value } of propDefinitions) {
-      this._reactiveState[name] = value;
+      this._dataState[name] = value;
 
       Object.defineProperty(stateObj, name, {
-        get: () => this._reactiveState[name],
+        get: () => this._dataState[name],
         set: (value: unknown) => {
-          this._reactiveState[name] = value;
+          this._dataState[name] = value;
           // Publish to MATLAB unless this update came from MATLAB
           if (!this._updatingFromMatlab) {
             this.publish(`@prop/${name}`, value );
@@ -148,23 +164,22 @@ class Component implements Registrable {
 
     // Wire up event handlers (non-reactive props that publish to MATLAB)
     for (const eventDef of eventDefinitions) {
-      const propName = eventDef.name;
-      stateObj[propName] = (eventData?: unknown) => {
+      stateObj[eventDef.name] = (eventData?: unknown) => {
         this.publish(`@event/${eventDef.name}`, eventData);
       };
     }
 
-    // Wire up method handlers (non-reactive props that invoke Svelte methods)
+    // Wire up method handlers (reactive storage so Svelte components can re-assign)
     for (const methodDef of methodDefinitions) {
       const methodName = methodDef.name;
-      this._reactiveState[methodName] = (data: unknown): Resolution => {
+      this._methodState[methodName] = (data: unknown): Resolution => {
         return { success: true, data: null };
       }
 
       Object.defineProperty(stateObj, methodName, {
-        get: () => this._reactiveState[methodName],
+        get: () => this._methodState[methodName],
         set: (value: (data?: unknown) => Resolution) => {
-          this._reactiveState[methodName] = value;
+          this._methodState[methodName] = value;
         },
         enumerable: true,
         configurable: true
@@ -219,7 +234,7 @@ class Component implements Registrable {
     for (const prop of properties) {
       this.subscribe(`@prop/${prop}`, (_id: string, _name: string, data: unknown) => {
         this._updatingFromMatlab = true;
-        this._reactiveState[prop] = data;
+        this._dataState[prop] = data;
         this._updatingFromMatlab = false;
       });
     }
@@ -227,7 +242,7 @@ class Component implements Registrable {
     // Handle @method events from MATLAB
     for (const method of methods) {
       this.subscribe(method, (id: string, _name: string, data: unknown) => {
-        const methodFunc = this._reactiveState[method] as (data?: unknown) => Resolution;
+        const methodFunc = this._methodState[method] as (data?: unknown) => Resolution;
         const result = methodFunc(data);
         this.publish(`@resp/${id}`, result);
       });
