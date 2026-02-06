@@ -38,13 +38,11 @@
   let trackEl: HTMLDivElement;
   let thumbEl: HTMLDivElement;
   let isDragging = $state(false);
-  let dragValue = $state(0);
 
-  const rawDisplayValue = $derived(isDragging ? dragValue : value);
   const decimals = $derived(step % 1 === 0 ? 0 : (step.toString().split('.')[1]?.length ?? 0));
-  const displayValue = $derived(rawDisplayValue.toFixed(decimals));
+  const displayValue = $derived(value.toFixed(decimals));
   const percentage = $derived(
-    max !== min ? ((rawDisplayValue - min) / (max - min)) * 100 : 0
+    max !== min ? ((value - min) / (max - min)) * 100 : 0
   );
 
   const isVertical = $derived(orientation === 'vertical');
@@ -94,11 +92,10 @@
     if (disabled) return;
     e.preventDefault();
     isDragging = true;
-    dragValue = value;
     const newVal = getValueFromPointer(e.clientX, e.clientY);
-    if (newVal !== dragValue) {
-      dragValue = newVal;
-      valueChanging?.({ value: dragValue });
+    if (newVal !== value) {
+      value = newVal;
+      valueChanging?.({ value });
     }
     thumbEl?.focus();
     document.addEventListener('pointermove', handlePointerMove);
@@ -108,16 +105,15 @@
 
   function handlePointerMove(e: PointerEvent) {
     const newVal = getValueFromPointer(e.clientX, e.clientY);
-    if (newVal !== dragValue) {
-      dragValue = newVal;
-      valueChanging?.({ value: dragValue });
+    if (newVal !== value) {
+      value = newVal;
+      valueChanging?.({ value });
     }
   }
 
   function handlePointerUp() {
     if (!isDragging) return;
     isDragging = false;
-    value = dragValue;
     document.removeEventListener('pointermove', handlePointerMove);
     document.removeEventListener('pointerup', handlePointerUp);
     document.documentElement.removeEventListener('pointerleave', handlePointerUp);

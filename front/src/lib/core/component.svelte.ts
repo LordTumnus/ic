@@ -114,6 +114,12 @@ class Component implements Registrable {
   /** Flag to prevent echo when receiving updates from MATLAB. */
   private _updatingFromMatlab = false;
 
+  /** Per-property debounce timers for throttling MATLAB sync. */
+  private _propDebounceTimers: Map<string, number> = new Map();
+
+  /** Debounce delay (ms) for prop → MATLAB publishing. */
+  private static readonly PROP_DEBOUNCE_MS = 50;
+
   /**
    * Create a new Component.
    *
@@ -152,9 +158,16 @@ class Component implements Registrable {
         get: () => this._dataState[name],
         set: (value: unknown) => {
           this._dataState[name] = value;
-          // Publish to MATLAB unless this update came from MATLAB
+          // Debounced publish to MATLAB (unless this update came from MATLAB)
           if (!this._updatingFromMatlab) {
-            this.publish(`@prop/${name}`, value );
+            const existing = this._propDebounceTimers.get(name);
+            if (existing !== undefined) clearTimeout(existing);
+            this._propDebounceTimers.set(name,
+              window.setTimeout(() => {
+                this._propDebounceTimers.delete(name);
+                this.publish(`@prop/${name}`, this._dataState[name]);
+              }, Component.PROP_DEBOUNCE_MS)
+            );
           }
         },
         enumerable: true,

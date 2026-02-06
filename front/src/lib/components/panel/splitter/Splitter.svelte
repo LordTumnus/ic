@@ -48,11 +48,6 @@
 	let dragGutterIndex = -1;
 	let dragStartPos = 0;
 	let dragStartSizes: number[] = [];
-	// Local sizes during drag - avoids flooding MATLAB with updates
-	let localSizes = $state<number[] | null>(null);
-
-	// Effective sizes: use localSizes during drag, otherwise actual sizes
-	const effectiveSizes = $derived(localSizes ?? sizes);
 
 	// Get snippet for a pane by index (using indexed target)
 	function getPaneSnippet(index: number): Snippet | undefined {
@@ -106,8 +101,6 @@
 		dragGutterIndex = gutterIndex;
 		dragStartPos = direction === 'horizontal' ? e.clientX : e.clientY;
 		dragStartSizes = [...sizes];
-		// Initialize local sizes for drag (avoids syncing to MATLAB on every move)
-		localSizes = [...sizes];
 
 		logger.debug('Splitter', 'Drag started', {
 			gutterIndex,
@@ -181,43 +174,35 @@
 		newSizes[leftIndex] = newLeftSize;
 		newSizes[rightIndex] = newRightSize;
 
-		// Update local sizes only (no MATLAB sync during drag)
-		localSizes = newSizes;
+		sizes = newSizes;
 	}
 
 	// Handle mouse up - end drag
 	function handleMouseUp() {
 		if (!isDragging) return;
 
-		// Commit local sizes to actual sizes (single sync to MATLAB)
-		const finalSizes = localSizes ?? sizes;
-
 		logger.debug('Splitter', 'Drag ended', {
-			sizes: `[${finalSizes.map((s) => s.toFixed(1)).join(', ')}]`
+			sizes: `[${sizes.map((s) => s.toFixed(1)).join(', ')}]`
 		});
-
-		// Update the bindable prop (syncs to MATLAB once)
-		sizes = finalSizes;
-		localSizes = null;
 
 		isDragging = false;
 		dragGutterIndex = -1;
 
 		// Notify MATLAB of size change via event
-		sizesChanged?.({ sizes: finalSizes });
+		sizesChanged?.({ sizes });
 
 		// Remove document-level listeners
 		document.removeEventListener('mousemove', handleMouseMove);
 		document.removeEventListener('mouseup', handleMouseUp);
 	}
 
-	// Derived pane styles - reactive to effectiveSizes, containerReady, direction, gutterSize
+	// Derived pane styles - reactive to sizes, containerReady, direction, gutterSize
 	const paneStyles = $derived.by(() => {
 		const available = containerReady ? getAvailableSize() : 0;
-		const gutterCount = effectiveSizes.length - 1;
+		const gutterCount = sizes.length - 1;
 		const gutterTotal = gutterCount * gutterSize;
 
-		return effectiveSizes.map((size) => {
+		return sizes.map((size) => {
 			// Before container is measured, use percentage-based sizing with calc()
 			if (available <= 0) {
 				const calcExpr = `calc((100% - ${gutterTotal}px) * ${size} / 100)`;
@@ -242,14 +227,14 @@
 	$effect(() => {
 		collapse = (index: number): Resolution => {
 			// Validate index (0-based from MATLAB)
-			if (index < 0 || index >= effectiveSizes.length) {
+			if (index < 0 || index >= sizes.length) {
 				logger.error('Splitter', 'Collapse index out of bounds', {
 					index,
-					numPanes: effectiveSizes.length
+					numPanes: sizes.length
 				});
 				return {
 					success: false,
-					data: `Collapse index ${index} out of bounds (0-${effectiveSizes.length - 1})`
+					data: `Collapse index ${index} out of bounds (0-${sizes.length - 1})`
 				};
 			}
 
@@ -257,7 +242,7 @@
 			const availableSize = getAvailableSize();
 			const minPct = (getMinSize(index) / availableSize) * 100;
 
-			const newSizes = [...effectiveSizes];
+			const newSizes = [...sizes];
 			const currentSize = newSizes[index];
 			const delta = currentSize - minPct;
 
@@ -285,7 +270,7 @@
 	class:ic-splitter-dragging={isDragging}
 	bind:this={containerEl}
 >
-	{#each effectiveSizes as _, i (i)}
+	{#each sizes as _, i (i)}
 		{@const paneSnippet = getPaneSnippet(i)}
 		<!-- Pane (renders child if available, otherwise empty) -->
 		<div class="ic-splitter-pane" style={paneStyles[i]}>
@@ -294,7 +279,7 @@
 			{/if}
 		</div>
 		<!-- Gutter (between panes, not after last) -->
-		{#if i < effectiveSizes.length - 1}
+		{#if i < sizes.length - 1}
 			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 			<div
 				class="ic-splitter-gutter"
@@ -307,7 +292,7 @@
 				onmousedown={(e) => handleGutterMouseDown(e, i)}
 				role="separator"
 				aria-orientation={direction}
-				aria-valuenow={effectiveSizes[i]}
+				aria-valuenow={sizes[i]}
 			></div>
 		{/if}
 	{/each}
