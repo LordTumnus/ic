@@ -125,11 +125,11 @@
 
   /* ===== SHAPE ===== */
   .ic-btn--default {
-    border-radius: var(--ic-radius, 0.5rem);
+    border-radius: 2px;
   }
 
   .ic-btn--pill {
-    border-radius: 9999px;
+    border-radius: 3px;
   }
 
   .ic-btn--square {
@@ -140,10 +140,15 @@
   .ic-btn--primary.ic-btn--solid {
     background-color: var(--ic-primary);
     color: var(--ic-primary-foreground);
-    border-color: var(--ic-primary);
+    border-color: transparent;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
   .ic-btn--primary.ic-btn--solid:hover:not(:disabled) {
-    filter: brightness(0.9);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   .ic-btn--primary.ic-btn--outline {
@@ -154,6 +159,9 @@
   .ic-btn--primary.ic-btn--outline:hover:not(:disabled) {
     background-color: var(--ic-primary);
     color: var(--ic-primary-foreground);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   .ic-btn--primary.ic-btn--ghost {
@@ -162,18 +170,23 @@
     border-color: transparent;
   }
   .ic-btn--primary.ic-btn--ghost:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ic-primary) 12%, transparent);
+    background-color: var(--ic-muted);
   }
 
   /* ===== SECONDARY ===== */
   .ic-btn--secondary.ic-btn--solid {
     background-color: var(--ic-secondary);
     color: var(--ic-secondary-foreground);
-    border-color: var(--ic-border);
+    border-color: transparent;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
   .ic-btn--secondary.ic-btn--solid:hover:not(:disabled) {
     background-color: var(--ic-muted);
-    border-color: var(--ic-muted-foreground);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
   .ic-btn--secondary.ic-btn--outline {
@@ -199,10 +212,15 @@
   .ic-btn--destructive.ic-btn--solid {
     background-color: var(--ic-destructive);
     color: var(--ic-destructive-foreground);
-    border-color: var(--ic-destructive);
+    border-color: transparent;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
   .ic-btn--destructive.ic-btn--solid:hover:not(:disabled) {
-    filter: brightness(0.9);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   .ic-btn--destructive.ic-btn--outline {
@@ -213,6 +231,9 @@
   .ic-btn--destructive.ic-btn--outline:hover:not(:disabled) {
     background-color: var(--ic-destructive);
     color: var(--ic-destructive-foreground);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   .ic-btn--destructive.ic-btn--ghost {
@@ -221,12 +242,14 @@
     border-color: transparent;
   }
   .ic-btn--destructive.ic-btn--ghost:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ic-destructive) 12%, transparent);
+    background-color: var(--ic-muted);
   }
 
   /* ===== FOCUS ===== */
   .ic-btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--ic-background), 0 0 0 4px var(--ic-ring);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
 
   /* ===== DISABLED ===== */

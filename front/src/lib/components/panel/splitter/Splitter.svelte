@@ -327,55 +327,63 @@
 		min-height: 0;
 	}
 
+	/* Recessed channel */
 	.ic-splitter-gutter {
 		flex-grow: 0;
 		flex-shrink: 0;
-		background-color: var(--ic-border);
-		transition: background-color 0.15s ease;
+		background-color: var(--ic-secondary);
+		box-shadow:
+			inset 0 1px 2px rgba(0, 0, 0, 0.12),
+			inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+		transition: box-shadow 0.15s ease;
 		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
 
-	/* Dot pattern indicator */
+	/* Knurl grip pattern */
 	.ic-splitter-gutter::before {
 		content: '';
 		position: absolute;
-		border-radius: 1px;
-		background-color: var(--ic-muted-foreground);
-		opacity: 0.5;
+		opacity: 0.4;
 		transition: opacity 0.15s ease;
 	}
 
-	/* Horizontal gutter: vertical dots */
+	/* Horizontal gutter: horizontal knurl lines (width scales with gutterSize) */
 	.ic-splitter-gutter-horizontal::before {
-		width: 3px;
-		height: 20px;
-		background-image: radial-gradient(
-			circle,
+		width: 60%;
+		height: 24px;
+		background-image: repeating-linear-gradient(
+			to bottom,
+			var(--ic-muted-foreground) 0px,
 			var(--ic-muted-foreground) 1px,
-			transparent 1px
+			transparent 1px,
+			transparent 4px
 		);
-		background-size: 3px 4px;
-		background-position: center;
 	}
 
-	/* Vertical gutter: horizontal dots */
+	/* Vertical gutter: vertical knurl lines (height scales with gutterSize) */
 	.ic-splitter-gutter-vertical::before {
-		width: 20px;
-		height: 3px;
-		background-image: radial-gradient(
-			circle,
+		width: 24px;
+		height: 60%;
+		background-image: repeating-linear-gradient(
+			to right,
+			var(--ic-muted-foreground) 0px,
 			var(--ic-muted-foreground) 1px,
-			transparent 1px
+			transparent 1px,
+			transparent 4px
 		);
-		background-size: 4px 3px;
-		background-position: center;
+	}
+
+	.ic-splitter-gutter:hover:not(.ic-splitter-gutter-disabled) {
+		box-shadow:
+			inset 0 1px 3px rgba(0, 0, 0, 0.2),
+			inset 0 -1px 0 rgba(255, 255, 255, 0.08);
 	}
 
 	.ic-splitter-gutter:hover:not(.ic-splitter-gutter-disabled)::before {
-		opacity: 1;
+		opacity: 0.6;
 	}
 
 	.ic-splitter-gutter-horizontal {
@@ -392,6 +400,6 @@
 	}
 
 	.ic-splitter-gutter-disabled::before {
-		opacity: 0.2;
+		opacity: 0.15;
 	}
 </style>
