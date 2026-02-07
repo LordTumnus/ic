@@ -42,9 +42,6 @@ classdef CircularProgressBar < ic.core.Component
         ShowLabel logical = false
         % > LABELFORMAT sprintf-style format for the center label
         %   Supports %d (integer), %f (float), %.Nf (N decimals), %% (literal %)
-        %   Examples: "%d%%"  -> "75%"
-        %             "%.1f%%" -> "75.0%"
-        %             "%d°"   -> "75°"
         LabelFormat string = "%d%%"
         % > STROKEWIDTH thickness of the progress arc (SVG units)
         StrokeWidth double {mustBePositive(StrokeWidth)} = 4

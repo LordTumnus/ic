@@ -39,6 +39,9 @@ classdef ProgressBar < ic.core.Component
         Gradient struct = struct('color', {'#ef4444', '#f59e0b', '#22c55e'}, 'stop', {0, 50, 100})
         % > SHOWLABEL whether to display progress percentage
         ShowLabel logical = false
+        % > LABELFORMAT sprintf-style format for the label
+        %   Supports %d (integer), %f (float), %.Nf (N decimals), %% (literal %)
+        LabelFormat string = "%d%%"
         % > LABELPOSITION position of the label relative to the progress bar
         LabelPosition string {mustBeMember(LabelPosition, ["left", "right"])} = "right"
         % > ORIENTATION layout direction of the progress bar

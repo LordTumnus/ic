@@ -19,6 +19,7 @@
     variant = $bindable('primary'),
     gradient = $bindable(defaultGradient),
     showLabel = $bindable(false),
+    labelFormat = $bindable('%d%%'),
     labelPosition = $bindable('right'),
     orientation = $bindable('horizontal'),
   }: {
@@ -30,6 +31,7 @@
     variant?: string;
     gradient?: ColorStop[];
     showLabel?: boolean;
+    labelFormat?: string;
     labelPosition?: string;
     orientation?: string;
   } = $props();
@@ -38,6 +40,19 @@
 
   // Clamp value between 0 and 100
   const percentage = $derived(Math.min(100, Math.max(0, value)));
+
+  // --- Label (sprintf-style: %d, %f, %.Nf, %%) ---
+  function formatLabel(fmt: string, val: number): string {
+    return fmt.replace(/%(\.\d+)?[df]|%%/g, (match) => {
+      if (match === '%%') return '%';
+      const precisionMatch = match.match(/^%\.(\d+)f$/);
+      if (precisionMatch) return val.toFixed(Number(precisionMatch[1]));
+      if (match === '%f') return val.toFixed(1);
+      return String(Math.round(val)); // %d
+    });
+  }
+
+  const labelText = $derived(formatLabel(labelFormat, percentage));
 
   // Parse hex color to RGB
   function hexToRgb(hex: string): [number, number, number] {
@@ -106,7 +121,7 @@
   aria-valuemax={100}
 >
   {#if showLabel && !indeterminate && labelPosition === 'left'}
-    <span class="ic-progress__label">{Math.round(percentage)}%</span>
+    <span class="ic-progress__label">{labelText}</span>
   {/if}
 
   <div class="ic-progress__track">
@@ -127,7 +142,7 @@
   </div>
 
   {#if showLabel && !indeterminate && labelPosition === 'right'}
-    <span class="ic-progress__label">{Math.round(percentage)}%</span>
+    <span class="ic-progress__label">{labelText}</span>
   {/if}
 </div>
 
