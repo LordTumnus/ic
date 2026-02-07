@@ -12,6 +12,8 @@
 
   let {
     value = $bindable(0),
+    min = $bindable(0),
+    max = $bindable(100),
     indeterminate = $bindable(false),
     striped = $bindable(false),
     animated = $bindable(false),
@@ -24,6 +26,8 @@
     orientation = $bindable('horizontal'),
   }: {
     value?: number;
+    min?: number;
+    max?: number;
     indeterminate?: boolean;
     striped?: boolean;
     animated?: boolean;
@@ -38,8 +42,10 @@
 
   const isVertical = $derived(orientation === 'vertical');
 
-  // Clamp value between 0 and 100
-  const percentage = $derived(Math.min(100, Math.max(0, value)));
+  // Derive fill percentage from value within [min, max]
+  const percentage = $derived(
+    max === min ? 0 : Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+  );
 
   // --- Label (sprintf-style: %d, %f, %.Nf, %%) ---
   function formatLabel(fmt: string, val: number): string {
@@ -52,7 +58,10 @@
     });
   }
 
-  const labelText = $derived(formatLabel(labelFormat, percentage));
+  // Clamp value to [min, max] for display
+  const displayValue = $derived(Math.min(max, Math.max(min, value)));
+
+  const labelText = $derived(formatLabel(labelFormat, displayValue));
 
   // Parse hex color to RGB
   function hexToRgb(hex: string): [number, number, number] {
@@ -116,9 +125,9 @@
   class:ic-progress--lg={size === 'lg'}
   class:ic-progress--indeterminate={indeterminate}
   role="progressbar"
-  aria-valuenow={indeterminate ? undefined : value}
-  aria-valuemin={0}
-  aria-valuemax={100}
+  aria-valuenow={indeterminate ? undefined : displayValue}
+  aria-valuemin={min}
+  aria-valuemax={max}
 >
   {#if showLabel && !indeterminate && labelPosition === 'left'}
     <span class="ic-progress__label">{labelText}</span>

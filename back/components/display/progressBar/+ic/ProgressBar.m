@@ -22,8 +22,12 @@ classdef ProgressBar < ic.core.Component
     %   pb.styleBar("backgroundColor", "#4caf50");
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current progress percentage (0 to 100)
-        Value double {mustBeInRange(Value, 0, 100)} = 0
+        % > VALUE current value (between Min and Max)
+        Value double = 0
+        % > MIN minimum value of the range (0% fill)
+        Min double = 0
+        % > MAX maximum value of the range (100% fill)
+        Max double = 100
         % > INDETERMINATE whether progress is indeterminate (unknown duration)
         Indeterminate logical = false
         % > STRIPED whether to show diagonal stripes pattern

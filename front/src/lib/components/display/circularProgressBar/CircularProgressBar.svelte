@@ -12,6 +12,8 @@
 
   let {
     value = $bindable(0),
+    min = $bindable(0),
+    max = $bindable(100),
     indeterminate = $bindable(false),
     size = $bindable('md'),
     variant = $bindable('primary'),
@@ -26,6 +28,8 @@
     sweepAngle = $bindable(360),
   }: {
     value?: number;
+    min?: number;
+    max?: number;
     indeterminate?: boolean;
     size?: string;
     variant?: string;
@@ -55,7 +59,10 @@
   // With SVG rotated -90deg, path position 0 = visual top (our 0°)
   const arcStartOffset = $derived(-(startAngle / 360) * circumference);
 
-  const percentage = $derived(Math.min(100, Math.max(0, value)));
+  // Derive fill percentage from value within [min, max]
+  const percentage = $derived(
+    max === min ? 0 : Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
+  );
   const fillLength = $derived(arcLength * (percentage / 100));
 
   // --- Sizing ---
@@ -73,7 +80,10 @@
     });
   }
 
-  const labelText = $derived(formatLabel(labelFormat, percentage));
+  // Clamp value to [min, max] for display
+  const displayValue = $derived(Math.min(max, Math.max(min, value)));
+
+  const labelText = $derived(formatLabel(labelFormat, displayValue));
   const fontSize = $derived(
     size === 'sm' ? '0.625rem' : size === 'lg' ? '1.125rem' : '0.8125rem'
   );
@@ -203,9 +213,9 @@
 <div
   class="ic-circular-progress"
   role="progressbar"
-  aria-valuenow={indeterminate ? undefined : percentage}
-  aria-valuemin={0}
-  aria-valuemax={100}
+  aria-valuenow={indeterminate ? undefined : displayValue}
+  aria-valuemin={min}
+  aria-valuemax={max}
   style:width="{pixelSize}px"
   style:height="{pixelSize}px"
 >
