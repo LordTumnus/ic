@@ -29,6 +29,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],
+  'ic.ToggleButton': modules['../components/form/toggleButton/ToggleButton.svelte'],
   'ic.Slider': modules['../components/form/slider/Slider.svelte'],
   'ic.RangeSlider': modules['../components/form/rangeSlider/RangeSlider.svelte'],
 
