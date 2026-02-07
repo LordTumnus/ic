@@ -22,6 +22,11 @@ classdef CircularProgressBar < ic.core.Component
     %   cpb.LabelFormat = "%.1f%%";  % "75.0%"
     %   cpb.LabelFormat = "%d°";     % "75°"
     %
+    %   % Gauge-style partial arc (240° from -30° to 210°)
+    %   cpb.StartAngle = -30;
+    %   cpb.SweepAngle = 240;
+    %   cpb.LineCap = "round";
+    %
     %   % Instrument-style with tick marks
     %   cpb.ShowTicks = true;
     %   cpb.TickCount = 12;
@@ -51,6 +56,10 @@ classdef CircularProgressBar < ic.core.Component
         ShowTicks logical = false
         % > TICKCOUNT number of tick marks around the ring (max 60)
         TickCount double {mustBePositive(TickCount), mustBeInteger(TickCount)} = 12
+        % > STARTANGLE where the arc begins (degrees, clockwise from top, 0 = 12 o'clock)
+        StartAngle double = 0
+        % > SWEEPANGLE how many degrees the arc spans (1 to 360)
+        SweepAngle double {mustBeInRange(SweepAngle, 1, 360)} = 360
     end
 
     methods
