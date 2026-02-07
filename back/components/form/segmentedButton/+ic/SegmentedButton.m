@@ -36,6 +36,13 @@ classdef SegmentedButton < ic.core.ComponentContainer
         end
 
         function set.Items(this, val)
+            % Delete icons in targets that are being removed
+            removed = setdiff(this.Items, val);
+            for child = this.Children
+                if ismember(child.Target, removed)
+                    delete(child);
+                end
+            end
             this.Items = val;
             this.Targets = val;
         end
@@ -52,7 +59,7 @@ classdef SegmentedButton < ic.core.ComponentContainer
 
         function setIcon(this, item, icon)
             % > SETICON Set or replace the icon for a segment.
-            %   sb.setIcon("Bold", ic.Icon.fromName(ic.IconName.Bold))
+            %   sb.setIcon("Bold", ic.Icon.fromName("bold"))
             %   sb.setIcon("Bold", [])  % removes the icon
             arguments
                 this

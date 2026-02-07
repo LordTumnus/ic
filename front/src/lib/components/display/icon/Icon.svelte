@@ -3,22 +3,31 @@
   import type { CssSize } from '$lib/utils/css';
   import { toSize, toNumericSize } from '$lib/utils/css';
 
-  // Import all icons at build time using Vite's glob import
-  const iconModules = import.meta.glob('/static/icons/*.svg', {
-    query: '?raw',
-    import: 'default',
-    eager: true
-  }) as Record<string, string>;
+  // Import all Lucide icons from npm package at build time
+  const lucideModules = import.meta.glob(
+    '/node_modules/lucide-static/icons/*.svg',
+    { query: '?raw', import: 'default', eager: true }
+  ) as Record<string, string>;
 
-  // Build lookup map: "info" -> svg content
+  // Import custom icons (overrides Lucide if same name)
+  const customModules = import.meta.glob(
+    '/static/icons/*.svg',
+    { query: '?raw', import: 'default', eager: true }
+  ) as Record<string, string>;
+
+  // Build lookup map: "info" -> svg content (custom overrides lucide)
   const iconMap = new Map<string, string>();
-  for (const [path, content] of Object.entries(iconModules)) {
+  for (const [path, content] of Object.entries(lucideModules)) {
+    const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
+    iconMap.set(filename, content);
+  }
+  for (const [path, content] of Object.entries(customModules)) {
     const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
     iconMap.set(filename, content);
   }
 
   let {
-    name = $bindable('Info'),
+    name = $bindable('info'),
     size = $bindable<CssSize>(16),
     color = $bindable(''),
     strokeWidth = $bindable(2),
@@ -36,12 +45,15 @@
   // Get numeric size for SVG attributes (default 24 if string)
   const svgSize = $derived(toNumericSize(size, 24));
 
-  function toKebabCase(str: string): string {
-    // Ensure string, extract last part if it's a qualified name like "ic.IconName.File"
-    const s = String(str);
-    const parts = s.split('.');
-    const iconName = parts[parts.length - 1];
-    return iconName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+  function resolveIconName(str: string): string {
+    // Direct kebab-case lookup (primary path: "chevron-down")
+    const key = String(str);
+    if (iconMap.has(key)) return key;
+    // Lowercase fallback ("Info" → "info")
+    const lower = key.toLowerCase();
+    if (iconMap.has(lower)) return lower;
+    // Not found
+    return key;
   }
 
   function decodeBase64(base64: string): string {
@@ -69,10 +81,10 @@
       return createPathSvg(pathData);
     }
     // Priority 3: Built-in icon by name
-    const iconKey = toKebabCase(name);
+    const iconKey = resolveIconName(name);
     const svg = iconMap.get(iconKey);
     if (!svg) {
-      logger.error('Icon', `Icon not found: ${iconKey}`);
+      logger.error('Icon', `Icon not found: "${name}". Browse https://lucide.dev/icons`);
       return '';
     }
     return svg;

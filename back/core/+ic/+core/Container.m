@@ -425,7 +425,7 @@ classdef Container < handle
                 children = this.Children;
                 for ii = numel(children):-1:1
                     child = children(ii);
-                    if ~child.IsStatic && ismember(child.Target_, removedTargets)
+                    if ~child.IsStatic && ismember(child.Target, removedTargets)
                         child.Parent = [];  % Triggers @remove
                     end
                 end
