@@ -15,6 +15,9 @@ export default defineConfig({
     // Ensure browser conditions are used for Svelte in tests
     conditions: ['browser'],
   },
+  build: {
+    chunkSizeWarningLimit: 2000,
+  },
   test: {
     globals: true,
     environment: 'jsdom',
