@@ -220,6 +220,25 @@
   style:height="{pixelSize}px"
 >
   <svg viewBox="0 0 {viewBox} {viewBox}" class="ic-circular-progress__svg">
+    <defs>
+      <!-- Inset shadow: simulates recessed channel (matches linear ProgressBar's inset box-shadow) -->
+      <filter id="ic-cpb-inset" x="-50%" y="-50%" width="200%" height="200%">
+        <feFlood flood-color="rgba(0,0,0,0.12)" />
+        <feComposite in2="SourceGraphic" operator="in" />
+        <feGaussianBlur stdDeviation="0.6" />
+        <feOffset dx="0" dy="0.5" />
+        <feComposite in2="SourceGraphic" operator="atop" />
+      </filter>
+      <!-- Top-edge highlight: simulates light catch (matches linear bar's inset highlight) -->
+      <filter id="ic-cpb-highlight" x="-50%" y="-50%" width="200%" height="200%">
+        <feFlood flood-color="rgba(255,255,255,0.15)" />
+        <feComposite in2="SourceGraphic" operator="in" />
+        <feGaussianBlur stdDeviation="0.3" />
+        <feOffset dx="0" dy="-0.4" />
+        <feComposite in2="SourceGraphic" operator="atop" />
+      </filter>
+    </defs>
+
     {#if showTicks}
       {#each Array(clampedTickCount) as _, i (i)}
         {@const pos = tickPosition(i, clampedTickCount)}
@@ -283,12 +302,13 @@
 
   .ic-circular-progress__track {
     stroke: var(--ic-secondary);
-    filter: drop-shadow(0px 0.5px 0.5px rgba(0, 0, 0, 0.1));
+    filter: url(#ic-cpb-inset);
   }
 
   .ic-circular-progress__bar {
     transition: stroke-dasharray 0.15s ease;
     opacity: 0.85;
+    filter: url(#ic-cpb-highlight);
   }
 
   /* Disable transition during JS-driven indeterminate animation */
