@@ -33,6 +33,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Slider': modules['../components/form/slider/Slider.svelte'],
   'ic.RangeSlider': modules['../components/form/rangeSlider/RangeSlider.svelte'],
   'ic.Switch': modules['../components/form/switch/Switch.svelte'],
+  'ic.SegmentedButton': modules['../components/form/segmentedButton/SegmentedButton.svelte'],
 
   // Layout components
   'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
