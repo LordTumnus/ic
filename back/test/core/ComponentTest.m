@@ -32,7 +32,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testSubscribeAndReceive(testCase)
             % Verify subscribe registers callback that fires on receive
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             received = [];
             function receiveData(name, data)
@@ -50,7 +50,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testUnsubscribeRemovesCallback(testCase)
             % Verify unsubscribe stops callback from firing
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             callCount = 0;
             comp.subscribe("testEvent", @(~,~,~) evalin('caller', 'callCount = callCount + 1'));
@@ -77,7 +77,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testPublishSendsEventWhenAttached(testCase)
             % Verify publish sends event through parent when attached
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             comp.publish("@customEvent", struct("payload", "test"));
 
@@ -95,12 +95,12 @@ classdef ComponentTest < matlab.uitest.TestCase
             child = ic.core.Component("child");
 
             % Build subtree while detached
-            child.Parent = container;
+            container.addChild(child);
             child.publish("@event1", struct("n", 1));
             child.publish("@event2", struct("n", 2));
 
             % Attach - flush should happen automatically
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             % Verify events reached the Frame's view queue
             names = [testCase.Frame.View.Queue.Name];
@@ -111,7 +111,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testPublishReturnsPromise(testCase)
             % Verify publish returns a promise when output requested
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             promise = comp.publish("@fetchData", struct());
 
@@ -122,7 +122,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testPublishPromiseResolvesOnResponse(testCase)
             % Verify promise resolves when view responds
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             promise = comp.publish("@fetchData", struct());
 
@@ -144,7 +144,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testReactivePropertySendsEvent(testCase)
             % Verify changing reactive property sends @prop event
             comp = TestReactiveComponent("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             % Clear queue to isolate property change
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
@@ -161,7 +161,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testReactivePropertyReceivesUpdate(testCase)
             % Verify receiving @prop event updates property without echo
             comp = TestReactiveComponent("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             % Simulate view updating the property
             comp.receive("@prop/value", 99);
@@ -179,7 +179,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testReactiveEventForwarding(testCase)
             % Verify JS events are forwarded as MATLAB events
             comp = TestReactiveComponent("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             eventData = [];
             function setEventData(evt)
@@ -210,7 +210,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testPublishPongErrors(testCase)
             % Verify publishing Pong errors (not a reactive method)
             comp = TestReactiveComponent("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             testCase.verifyError(@() comp.publish("pong", struct("value", 1)), ...
                 "ic:core:ComponentBase:PublishReactiveMethod");
@@ -247,7 +247,7 @@ classdef ComponentTest < matlab.uitest.TestCase
             % Verify ComponentContainer definition includes custom targets
             container = ic.core.ComponentContainer("container");
             container.Targets = ["left", "right"];
-            container.Parent = testCase.Frame;
+            testCase.Frame.addChild(container);
 
             % Check the @insert event data
             insertEvents = testCase.Frame.View.Queue(...
@@ -285,7 +285,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testReceiveUnsubscribedEventNoError(testCase)
             % Verify receiving event with no subscriber doesn't error
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             % Should not throw
             comp.receive("unknownEvent", struct());
@@ -312,7 +312,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testStyleSendsEvent(testCase)
             % Verify style() publishes @style event with CSS properties
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
             comp.style(":host", "backgroundColor", "#ff0000", "padding", "10px");
@@ -327,7 +327,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testGetStyleReturnsStoredStyles(testCase)
             % Verify getStyle() returns previously set styles
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
 
             comp.style(":host", "color", "blue");
             styles = comp.getStyle(":host");
@@ -338,7 +338,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testClearStyleSendsEvent(testCase)
             % Verify clearStyle() publishes @clearStyle event
             comp = ic.core.Component("comp");
-            comp.Parent = testCase.Frame;
+            testCase.Frame.addChild(comp);
             comp.style(":host", "color", "red");
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
