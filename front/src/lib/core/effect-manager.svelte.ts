@@ -9,7 +9,7 @@
 
 import { untrack } from 'svelte';
 import type { Resolution, JsEffectEventData } from '../types';
-import Component from './component.svelte';
+import type Component from './component.svelte';
 import Registry from './registry';
 import logger from './logger';
 
@@ -39,23 +39,56 @@ class EffectManager {
       this.removeEffect(id);
     }
 
-    // Build scope: alias → ComponentProxy
-    const scope: Record<string, unknown> = {};
-    for (const [alias, componentId] of Object.entries(components)) {
-      const component = Registry.instance.get(componentId) as Component | undefined;
-      if (!component) {
-        logger.error('EffectManager', 'Component not found', {
-          effectId: id, alias, componentId
+    // Parse parameter names from the arrow function
+    const paramMatch = expression.match(/^\s*\(([^)]*)\)\s*=>/);
+    if (!paramMatch) {
+      logger.error('EffectManager', 'Expression must be an arrow function', {
+        effectId: id, expression
+      });
+      return;
+    }
+    const params = paramMatch[1].split(',').map(p => p.trim()).filter(Boolean);
+
+    // Build proxies in parameter order
+    const proxies: unknown[] = [];
+    for (const param of params) {
+      const idOrIds = components[param];
+      if (idOrIds === undefined) {
+        logger.error('EffectManager', `No component mapped to parameter "${param}"`, {
+          effectId: id, components
         });
         return;
       }
-      scope[alias] = this.createComponentProxy(component);
+
+      if (Array.isArray(idOrIds)) {
+        const arr: unknown[] = [];
+        for (const cid of idOrIds) {
+          const component = Registry.instance.get(cid) as Component | undefined;
+          if (!component) {
+            logger.error('EffectManager', 'Component not found', {
+              effectId: id, param, componentId: cid
+            });
+            return;
+          }
+          arr.push(this.createComponentProxy(component));
+        }
+        proxies.push(arr);
+      } else {
+        const component = Registry.instance.get(idOrIds) as Component | undefined;
+        if (!component) {
+          logger.error('EffectManager', 'Component not found', {
+            effectId: id, param, componentId: idOrIds
+          });
+          return;
+        }
+        proxies.push(this.createComponentProxy(component));
+      }
     }
 
-    // Compile the expression once (outside the effect)
+    // Compile the arrow function
     let fn: Function;
     try {
-      fn = new Function(...Object.keys(scope), expression);
+      fn = new Function('return ' + expression)();
     } catch (error) {
       logger.error('EffectManager', 'Expression compilation failed', {
         effectId: id, expression,
@@ -65,7 +98,6 @@ class EffectManager {
     }
 
     // Create reactive effect
-    const scopeValues = Object.values(scope);
     const cleanup = $effect.root(() => {
       $effect(() => {
         // Guard against self-referential cycles
@@ -76,7 +108,7 @@ class EffectManager {
 
         this.executingEffects.add(id);
         try {
-          fn(...scopeValues);
+          fn(...proxies);
         } catch (error) {
           logger.error('EffectManager', 'Effect execution failed', {
             effectId: id, expression,

@@ -9,13 +9,10 @@ import type { Component as SvelteComponent } from 'svelte';
 import type {
   GlobalStyleEventData,
   ClearGlobalStyleEventData,
-  ClearGlobalStylesEventData,
-  JsEffectEventData,
-  JsEffectRemoveEventData
+  ClearGlobalStylesEventData
 } from '../types';
 import type { LogLevel } from './logger';
 import Component from './component.svelte';
-import EffectManager from './effect-manager.svelte';
 import FrameStyleManager from './frame-style-manager';
 import logger from './logger';
 
@@ -80,14 +77,6 @@ class FrameComponent extends Component {
     });
     this.subscribe('@clearAllGlobalStyles', () => {
       FrameStyleManager.instance.clearAllGlobalStyles();
-    });
-
-    // JS effects
-    this.subscribe('@jsEffect', (_id, _name, data) => {
-      EffectManager.instance.createEffect(data as JsEffectEventData);
-    });
-    this.subscribe('@jsEffectRemove', (_id, _name, data) => {
-      EffectManager.instance.removeEffect((data as JsEffectRemoveEventData).id);
     });
 
     // Logger integration

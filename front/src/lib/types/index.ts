@@ -192,9 +192,9 @@ export type ThemeEventData = Record<string, string>;
 export interface JsEffectEventData {
   /** Unique effect ID (for removal) */
   id: string;
-  /** Map of alias name → component ID */
-  components: Record<string, string>;
-  /** JavaScript expression to evaluate reactively */
+  /** Map of parameter name → component ID (single) or component IDs (array) */
+  components: Record<string, string | string[]>;
+  /** Arrow function expression: (p1, p2) => { ... } */
   expression: string;
 }
 

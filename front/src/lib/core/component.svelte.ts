@@ -22,10 +22,13 @@ import type {
   Resolution,
   Snippets,
   StyleEventData,
-  ClearStyleEventData
+  ClearStyleEventData,
+  JsEffectEventData,
+  JsEffectRemoveEventData
 } from '../types';
 import Bridge from './bridge';
 import { handleInsert, handleRemove, handleReorder, handleReparent } from './container';
+import EffectManager from './effect-manager.svelte';
 import StyleManager from './style-manager';
 import logger from './logger';
 
@@ -236,6 +239,14 @@ class Component implements Registrable {
     });
     this.subscribe('@clearStyles', () => {
       StyleManager.instance.clearStyles(this.id);
+    });
+
+    // JS effects
+    this.subscribe('@jsEffect', (_id, _name, data) => {
+      EffectManager.instance.createEffect(data as JsEffectEventData);
+    });
+    this.subscribe('@jsEffectRemove', (_id, _name, data) => {
+      EffectManager.instance.removeEffect((data as JsEffectRemoveEventData).id);
     });
   }
 

@@ -1,27 +1,27 @@
 classdef JsEffect < handle
     % > JSEFFECT handle to a frontend reactive effect.
-    % Returned by Frame.jsEffect(). Call remove() to clean up.
+    % Returned by ComponentBase.jsEffect(). Call remove() to clean up.
 
     properties (SetAccess = private)
         ID string
-        Frame ic.Frame
+        Owner ic.core.ComponentBase
         IsRemoved logical = false
     end
 
     methods
-        function this = JsEffect(id, frame)
+        function this = JsEffect(id, owner)
             arguments
                 id (1,1) string
-                frame (1,1) ic.Frame
+                owner (1,1) ic.core.ComponentBase
             end
             this.ID = id;
-            this.Frame = frame;
+            this.Owner = owner;
         end
 
         function remove(this)
             % > REMOVE stops and removes this effect from the frontend
-            if ~this.IsRemoved && isvalid(this.Frame)
-                this.Frame.publish("@jsEffectRemove", struct("id", this.ID));
+            if ~this.IsRemoved && isvalid(this.Owner)
+                this.Owner.publish("@jsEffectRemove", struct("id", this.ID));
                 this.IsRemoved = true;
             end
         end
@@ -31,7 +31,7 @@ classdef JsEffect < handle
             try
                 this.remove();
             catch
-                % Silently ignore — Frame may already be destroyed
+                % Silently ignore — Owner may already be destroyed
             end
         end
     end
