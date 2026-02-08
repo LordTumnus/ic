@@ -28,6 +28,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Label': modules['../components/display/label/Label.svelte'],
   'ic.ProgressBar': modules['../components/display/progressBar/ProgressBar.svelte'],
   'ic.CircularProgressBar': modules['../components/display/circularProgressBar/CircularProgressBar.svelte'],
+  'ic.Spinner': modules['../components/display/spinner/Spinner.svelte'],
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],
