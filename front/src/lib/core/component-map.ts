@@ -41,6 +41,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.TextArea': modules['../components/form/textarea/TextArea.svelte'],
   'ic.Checkbox': modules['../components/form/checkbox/Checkbox.svelte'],
   'ic.Password': modules['../components/form/password/Password.svelte'],
+  'ic.Knob': modules['../components/form/knob/Knob.svelte'],
 
   // Layout components
   'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
