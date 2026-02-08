@@ -40,6 +40,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.InputText': modules['../components/form/inputText/InputText.svelte'],
   'ic.TextArea': modules['../components/form/textarea/TextArea.svelte'],
   'ic.Checkbox': modules['../components/form/checkbox/Checkbox.svelte'],
+  'ic.Password': modules['../components/form/password/Password.svelte'],
 
   // Layout components
   'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
