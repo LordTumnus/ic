@@ -350,4 +350,74 @@ classdef ComponentTest < matlab.uitest.TestCase
             testCase.verifyEqual(clearEvents(end).Data.selector, ":host");
         end
     end
+
+    methods (Test)
+        function testAddListenerPublishesListenEvent(testCase)
+            % Verify addlistener on a reactive event publishes @listenEvent
+            comp = TestReactiveComponent("comp");
+            testCase.Frame.addChild(comp);
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            addlistener(comp, 'ButtonClicked', @(~,~) []);
+
+            listenEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@listenEvent");
+            testCase.verifyNotEmpty(listenEvents);
+            testCase.verifyEqual(listenEvents(end).Data, "buttonClicked");
+        end
+
+        function testSecondListenerDoesNotRepublish(testCase)
+            % Verify adding a second listener for the same event does not
+            % publish another @listenEvent
+            comp = TestReactiveComponent("comp");
+            testCase.Frame.addChild(comp);
+            addlistener(comp, 'ButtonClicked', @(~,~) []);
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            addlistener(comp, 'ButtonClicked', @(~,~) []);
+
+            testCase.verifyEmpty(testCase.Frame.View.Queue);
+        end
+
+        function testDeleteLastListenerPublishesUnlistenEvent(testCase)
+            % Verify deleting the last listener publishes @unlistenEvent
+            comp = TestReactiveComponent("comp");
+            testCase.Frame.addChild(comp);
+            l = addlistener(comp, 'ButtonClicked', @(~,~) []);
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            delete(l);
+
+            unlistenEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@unlistenEvent");
+            testCase.verifyNotEmpty(unlistenEvents);
+            testCase.verifyEqual(unlistenEvents(end).Data, "buttonClicked");
+        end
+
+        function testDeleteOneOfTwoListenersDoesNotUnlisten(testCase)
+            % Verify deleting one of two listeners does not publish
+            % @unlistenEvent
+            comp = TestReactiveComponent("comp");
+            testCase.Frame.addChild(comp);
+            l1 = addlistener(comp, 'ButtonClicked', @(~,~) []);
+            l2 = addlistener(comp, 'ButtonClicked', @(~,~) []); %#ok<NASGU>
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            delete(l1);
+
+            testCase.verifyEmpty(testCase.Frame.View.Queue);
+        end
+
+        function testAddListenerOnNonReactiveEventNoListenEvent(testCase)
+            % Verify addlistener on a non-reactive event does not publish
+            % @listenEvent (e.g. ObjectBeingDestroyed)
+            comp = TestReactiveComponent("comp");
+            testCase.Frame.addChild(comp);
+            testCase.Frame.View.Queue = ic.event.JsEvent.empty();
+
+            addlistener(comp, 'ObjectBeingDestroyed', @(~,~) []);
+
+            testCase.verifyEmpty(testCase.Frame.View.Queue);
+        end
+    end
 end

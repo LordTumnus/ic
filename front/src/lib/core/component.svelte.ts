@@ -105,6 +105,9 @@ class Component implements Registrable {
   /** Reactive storage for method implementations only. */
   private _methodState: Record<string, unknown>;
 
+  /** Reactive storage for event handlers (enabled/disabled by MATLAB listeners). */
+  private _eventState: Record<string, unknown>;
+
   /** Data property names (camelCase). */
   readonly propNames: string[];
 
@@ -144,6 +147,7 @@ class Component implements Registrable {
     this.type = type;
     this._dataState = $state({});
     this._methodState = $state({});
+    this._eventState = $state({});
     this._svelteComponent = svelteComponent;
 
     // Store name lists for external consumers (e.g. EffectManager)
@@ -178,11 +182,17 @@ class Component implements Registrable {
       });
     }
 
-    // Wire up event handlers (non-reactive props that publish to MATLAB)
+    // Wire up event handlers: initially disabled (enabled when MATLAB adds a listener)
     for (const eventDef of eventDefinitions) {
-      stateObj[eventDef.name] = (eventData?: unknown) => {
-        this.publish(`@event/${eventDef.name}`, eventData);
-      };
+      this._eventState[eventDef.name] = undefined;
+      Object.defineProperty(stateObj, eventDef.name, {
+        get: () => this._eventState[eventDef.name],
+        set: (value: unknown) => {
+          this._eventState[eventDef.name] = value;
+        },
+        enumerable: true,
+        configurable: true
+      });
     }
 
     // Wire up method handlers (reactive storage so Svelte components can re-assign)
@@ -221,6 +231,18 @@ class Component implements Registrable {
     // Set up built-in event handlers
     this._setupListeners(propDefinitions.map((p) => p.name), methodDefinitions.map((m) => m.name));
     this._setupTargetsHandler();
+
+    // Enable/disable event handlers based on MATLAB listener presence
+    this.subscribe('@listenEvent', (_id, _name, data) => {
+      const eventName = data as string;
+      this._eventState[eventName] = (eventData?: unknown) => {
+        this.publish(`@event/${eventName}`, eventData);
+      };
+    });
+    this.subscribe('@unlistenEvent', (_id, _name, data) => {
+      const eventName = data as string;
+      this._eventState[eventName] = undefined;
+    });
 
     // Set up container handlers (@insert, @remove, @reparent, @reorder)
     this.subscribe('@insert', (id, name, data) => handleInsert(this, id, name, data));

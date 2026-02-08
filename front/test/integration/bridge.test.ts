@@ -402,7 +402,16 @@ describe('Bridge Integration', () => {
       });
 
       await flushAsync();
-      mock.sentHistory = []; // Clear history from setup
+
+      // Enable valueChanged event (events only fire when MATLAB has a listener)
+      await mock.simulateEvent({
+        component: id,
+        name: '@listenEvent',
+        data: 'valueChanged',
+        id: uniqueId('evt'),
+      });
+      await flushAsync();
+      mock.sentHistory = [];
 
       // Simulate user typing in the input field
       const input = document.querySelector('[data-testid="label-input"]') as HTMLInputElement;
@@ -436,7 +445,16 @@ describe('Bridge Integration', () => {
       });
 
       await flushAsync();
-      mock.sentHistory = []; // Clear history
+
+      // Enable clicked event (events only fire when MATLAB has a listener)
+      await mock.simulateEvent({
+        component: id,
+        name: '@listenEvent',
+        data: 'clicked',
+        id: uniqueId('evt'),
+      });
+      await flushAsync();
+      mock.sentHistory = [];
 
       // Click the button
       const button = document.querySelector('[data-testid="click-btn"]') as HTMLButtonElement;
@@ -466,6 +484,15 @@ describe('Bridge Integration', () => {
       });
 
       await flushAsync();
+
+      // Enable valueChanged event (events only fire when MATLAB has a listener)
+      await mock.simulateEvent({
+        component: id,
+        name: '@listenEvent',
+        data: 'valueChanged',
+        id: uniqueId('evt'),
+      });
+      await flushAsync();
       mock.sentHistory = [];
 
       // Click increment button
@@ -480,6 +507,122 @@ describe('Bridge Integration', () => {
       );
       expect(valueChangedEvent).toBeDefined();
       expect(valueChangedEvent?.data).toEqual({ field: 'counter', value: 1 });
+    });
+  });
+
+  describe('Event Listener Gating', () => {
+    it('should not send events when no @listenEvent has been received', async () => {
+      const id = uniqueId('gateTest');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+      mock.sentHistory = [];
+
+      // Click the button — no @listenEvent was sent, so event should be suppressed
+      const button = document.querySelector('[data-testid="click-btn"]') as HTMLButtonElement;
+      button.click();
+
+      await flushAsync();
+
+      const sentEvents = mock.sentHistory.flat();
+      const clickEvent = sentEvents.find(
+        (e) => e.component === id && e.name === '@event/clicked'
+      );
+      expect(clickEvent).toBeUndefined();
+    });
+
+    it('should send events after @listenEvent is received', async () => {
+      const id = uniqueId('listenTest');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Enable the clicked event
+      await mock.simulateEvent({
+        component: id,
+        name: '@listenEvent',
+        data: 'clicked',
+        id: uniqueId('evt'),
+      });
+      await flushAsync();
+      mock.sentHistory = [];
+
+      // Click the button — event should now be sent
+      const button = document.querySelector('[data-testid="click-btn"]') as HTMLButtonElement;
+      button.click();
+
+      await flushAsync();
+
+      const sentEvents = mock.sentHistory.flat();
+      const clickEvent = sentEvents.find(
+        (e) => e.component === id && e.name === '@event/clicked'
+      );
+      expect(clickEvent).toBeDefined();
+      expect(clickEvent?.data).toHaveProperty('timestamp');
+    });
+
+    it('should stop sending events after @unlistenEvent is received', async () => {
+      const id = uniqueId('unlistenTest');
+
+      await mock.simulateEvent({
+        component: 'ic-frame',
+        name: '@insert',
+        data: {
+          component: createTestComponentDefinition(id),
+          target: 'default',
+        } as InsertEventData,
+        id: uniqueId('evt'),
+      });
+
+      await flushAsync();
+
+      // Enable then disable the clicked event
+      await mock.simulateEvent({
+        component: id,
+        name: '@listenEvent',
+        data: 'clicked',
+        id: uniqueId('evt'),
+      });
+      await flushAsync();
+
+      await mock.simulateEvent({
+        component: id,
+        name: '@unlistenEvent',
+        data: 'clicked',
+        id: uniqueId('evt'),
+      });
+      await flushAsync();
+      mock.sentHistory = [];
+
+      // Click the button — event should be suppressed again
+      const button = document.querySelector('[data-testid="click-btn"]') as HTMLButtonElement;
+      button.click();
+
+      await flushAsync();
+
+      const sentEvents = mock.sentHistory.flat();
+      const clickEvent = sentEvents.find(
+        (e) => e.component === id && e.name === '@event/clicked'
+      );
+      expect(clickEvent).toBeUndefined();
     });
   });
 

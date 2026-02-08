@@ -18,6 +18,11 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
     properties (Access = private)
         ReactivePropListeners = ...
             dictionary(string.empty(), event.listener.empty());
+        % > REACTIVEEVENTLISTENERCOUNT tracks how many MATLAB listeners
+        % exist per reactive event, so the view is only notified when the
+        % first listener is added or the last one is removed.
+        ReactiveEventListenerCount = ...
+            dictionary(string.empty(), double.empty());
     end
 
     methods
@@ -53,6 +58,42 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
             for jj = 1:numel(reactiveEvents)
                 this.addEventReactivity(reactiveEvents(jj).Name);
             end
+        end
+
+        function l = addlistener(this, varargin)
+            % > ADDLISTENER adds a listener. When the first listener for a
+            % reactive event is added, the view is notified so it starts
+            % publishing that event. When the last listener is removed, the
+            % view stops publishing.
+            l = addlistener@handle(this, varargin{:});
+
+            % Only handle scalar source, simple event form (eventName + callback)
+            if ~isscalar(this) || numel(varargin) ~= 2
+                return
+            end
+
+            eventName = string(varargin{1});
+            if ~this.isReactiveEvent(eventName)
+                return
+            end
+
+            % Increment listener count
+            if this.ReactiveEventListenerCount.isKey(eventName)
+                count = this.ReactiveEventListenerCount(eventName);
+            else
+                count = 0;
+            end
+            this.ReactiveEventListenerCount(eventName) = count + 1;
+
+            % Notify view on first listener
+            if count == 0
+                this.publish("@listenEvent", ...
+                    ic.utils.toCamelCase(eventName));
+            end
+
+            % When this listener is destroyed, decrement and notify
+            addlistener(l, 'ObjectBeingDestroyed', ...
+                @(~,~) this.onReactiveListenerRemoved(eventName));
         end
     end
 
@@ -312,6 +353,35 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
             camelNames = arrayfun(@(m) ic.utils.toCamelCase(m.Name), ...
                 reactiveMethods);
             isReactiveMethod = any(camelNames == methodName);
+        end
+    end
+
+    methods (Access = private)
+        function onReactiveListenerRemoved(this, eventName)
+            % > ONREACTIVELISTENERREMOVED decrements the listener count for
+            % the given event and notifies the view when the last listener
+            % is removed.
+            if ~isvalid(this)
+                return
+            end
+
+            count = this.ReactiveEventListenerCount(eventName) - 1;
+            this.ReactiveEventListenerCount(eventName) = count;
+
+            if count == 0
+                this.publish("@unlistenEvent", ...
+                    ic.utils.toCamelCase(eventName));
+            end
+        end
+
+        function tf = isReactiveEvent(this, eventName)
+            % > ISREACTIVEEVENT returns whether the specified event is
+            % marked as reactive.
+            mc = meta.class.fromName(class(this));
+            metaEvents = mc.EventList;
+            reactiveEvents = metaEvents(...
+                strcmp({metaEvents.Description}, "Reactive"));
+            tf = any(strcmp({reactiveEvents.Name}, eventName));
         end
     end
 
