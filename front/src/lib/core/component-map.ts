@@ -43,6 +43,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Checkbox': modules['../components/form/checkbox/Checkbox.svelte'],
   'ic.Password': modules['../components/form/password/Password.svelte'],
   'ic.Knob': modules['../components/form/knob/Knob.svelte'],
+  'ic.RadioButton': modules['../components/form/radioButton/RadioButton.svelte'],
 
   // Layout components
   'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
