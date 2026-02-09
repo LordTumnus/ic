@@ -58,12 +58,13 @@ classdef Button < ic.core.ComponentContainer
             end
         end
 
-        function validateChild(this, child, target)
-            % > VALIDATECHILD checks target is "icon" and child is ic.Icon
+        function validateChild(~, child, target)
+            % > VALIDATECHILD checks target is "icon" and child is ic.Icon or ic.Image
             assert(target == "icon", "ic:Button:InvalidTarget", ...
                 "Buttons only support children in an 'icon' target");
-            assert(isa(child, "ic.Icon"), "ic:Button:InvalidChild", ...
-                "Button 'icon' target only accepts ic.Icon components");
+            assert(isa(child, "ic.Icon") || isa(child, "ic.Image"), ...
+                "ic:Button:InvalidChild", ...
+                "Button 'icon' target only accepts ic.Icon or ic.Image components");
         end
     end
 
