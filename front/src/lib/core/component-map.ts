@@ -47,6 +47,8 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.ColorPicker': modules['../components/form/colorPicker/ColorPicker.svelte'],
   'ic.SplitButton': modules['../components/form/splitButton/SplitButton.svelte'],
   'ic.Select': modules['../components/form/select/Select.svelte'],
+  'ic.MultiSelect': modules['../components/form/multiSelect/MultiSelect.svelte'],
+  'ic.SearchBar': modules['../components/form/searchBar/SearchBar.svelte'],
 
   // Layout components
   'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
