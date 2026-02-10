@@ -179,7 +179,6 @@
     >
       <svg
         class="ic-split-btn__chevron"
-        class:ic-split-btn__chevron--open={isOpen}
         width={chevronSize}
         height={chevronSize}
         viewBox="0 0 24 24"
@@ -253,7 +252,7 @@
   .ic-split-btn__main {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.375rem;
     border: none;
     background: transparent;
@@ -298,9 +297,9 @@
   }
 
   /* ===== SIZE: main button padding ===== */
-  .ic-split-btn__body--sm .ic-split-btn__main { padding: 0.25rem 0.5rem; }
-  .ic-split-btn__body--md .ic-split-btn__main { padding: 0.375rem 0.75rem; }
-  .ic-split-btn__body--lg .ic-split-btn__main { padding: 0.5rem 1rem; }
+  .ic-split-btn__body--sm .ic-split-btn__main { padding: 0.25rem 0.5rem 0.25rem 0.35rem; }
+  .ic-split-btn__body--md .ic-split-btn__main { padding: 0.375rem 0.75rem 0.375rem 0.5rem; }
+  .ic-split-btn__body--lg .ic-split-btn__main { padding: 0.5rem 1rem 0.5rem 0.65rem; }
 
   /* ===== SIZE: trigger padding (right) ===== */
   .ic-split-btn--right .ic-split-btn__body--sm .ic-split-btn__trigger { padding: 0.25rem 0.3rem; }
@@ -314,15 +313,6 @@
   .ic-split-btn__body--sm .ic-split-btn__label { font-size: 0.75rem; }
   .ic-split-btn__body--md .ic-split-btn__label { font-size: 0.8125rem; }
   .ic-split-btn__body--lg .ic-split-btn__label { font-size: 0.875rem; }
-
-  /* ===== CHEVRON ===== */
-  .ic-split-btn__chevron {
-    transition: transform 0.15s ease;
-  }
-
-  .ic-split-btn__chevron--open {
-    transform: rotate(180deg);
-  }
 
   /* ===== PRIMARY + SOLID ===== */
   .ic-split-btn__body--primary.ic-split-btn__body--solid {
@@ -400,6 +390,16 @@
   .ic-split-btn__body--destructive.ic-split-btn__body--ghost {
     background-color: transparent;
     color: var(--ic-destructive);
+  }
+
+  /* ===== OPEN STATE (trigger pressed-in) ===== */
+  .ic-split-btn--open .ic-split-btn__body--solid .ic-split-btn__trigger {
+    background-color: rgba(0, 0, 0, 0.12);
+  }
+
+  .ic-split-btn--open .ic-split-btn__body--outline .ic-split-btn__trigger,
+  .ic-split-btn--open .ic-split-btn__body--ghost .ic-split-btn__trigger {
+    background-color: rgba(0, 0, 0, 0.06);
   }
 
   /* ===== HOVER ===== */

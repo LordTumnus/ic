@@ -57,17 +57,19 @@ classdef SegmentedButton < ic.core.ComponentContainer
             this.Value = val;
         end
 
-        function setIcon(this, item, icon)
-            % > SETICON Set or replace the icon for a segment.
-            %   sb.setIcon("Bold", ic.Icon.fromName("bold"))
-            %   sb.setIcon("Bold", [])  % removes the icon
+        function setIcon(this, idx, icon)
+            % > SETICON Set or replace the icon for a segment by index.
+            %   sb.setIcon(1, ic.Icon.fromName("bold"))
+            %   sb.setIcon(2, ic.Icon.fromName("italic"))
+            %   sb.setIcon(1, [])  % removes the icon
             arguments
                 this
-                item (1,1) string
+                idx (1,1) double {mustBePositive, mustBeInteger}
                 icon
             end
-            assert(ismember(item, this.Items), "ic:SegmentedButton:InvalidItem", ...
-                "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
+            assert(idx <= numel(this.Items), "ic:SegmentedButton:InvalidIndex", ...
+                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
+            item = this.Items(idx);
 
             % Remove existing icon in this slot
             for child = this.Children
@@ -82,12 +84,15 @@ classdef SegmentedButton < ic.core.ComponentContainer
             end
         end
 
-        function icon = getIcon(this, item)
-            % > GETICON Get the icon for a segment, or [] if none.
+        function icon = getIcon(this, idx)
+            % > GETICON Get the icon for a segment by index, or [] if none.
             arguments
                 this
-                item (1,1) string
+                idx (1,1) double {mustBePositive, mustBeInteger}
             end
+            assert(idx <= numel(this.Items), "ic:SegmentedButton:InvalidIndex", ...
+                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
+            item = this.Items(idx);
             for child = this.Children
                 if child.Target == item
                     icon = child;

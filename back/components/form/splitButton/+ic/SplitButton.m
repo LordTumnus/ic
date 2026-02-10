@@ -12,9 +12,9 @@ classdef SplitButton < ic.core.ComponentContainer
     %       sb = ic.SplitButton();
     %       sb.Items = ["Run", "Debug", "Profile"];
     %       sb.ItemDescriptions = ["Execute script", "Debug mode", "Run profiler"];
-    %       sb.setIcon("Run", ic.Icon.fromName("play"));
-    %       sb.setIcon("Debug", ic.Icon.fromName("bug"));
-    %       sb.setIcon("Profile", ic.Icon.fromName("activity"));
+    %       sb.setIcon(1, ic.Icon.fromName("play"));
+    %       sb.setIcon(2, ic.Icon.fromName("bug"));
+    %       sb.setIcon(3, ic.Icon.fromName("activity"));
     %
     %   Listen to events:
     %       addlistener(sb, 'ItemSelected', @(~,e) disp(e.Data));
@@ -91,19 +91,20 @@ classdef SplitButton < ic.core.ComponentContainer
             this.Targets = ["icon", val];
         end
 
-        % --- Per-item icon management (like RadioButton) ---
-        function setIcon(this, item, icon)
-            % > SETICON Set or replace the icon/image for a dropdown item.
-            %   sb.setIcon("Run", ic.Icon.fromName("play"))
-            %   sb.setIcon("Run", ic.Image())
-            %   sb.setIcon("Run", [])  % removes the icon
+        % --- Per-item icon management (index-based) ---
+        function setIcon(this, idx, icon)
+            % > SETICON Set or replace the icon/image for a dropdown item by index.
+            %   sb.setIcon(1, ic.Icon.fromName("play"))
+            %   sb.setIcon(2, ic.Image())
+            %   sb.setIcon(1, [])  % removes the icon
             arguments
                 this
-                item (1,1) string
+                idx (1,1) double {mustBePositive, mustBeInteger}
                 icon
             end
-            assert(ismember(item, this.Items), "ic:SplitButton:InvalidItem", ...
-                "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
+            assert(idx <= numel(this.Items), "ic:SplitButton:InvalidIndex", ...
+                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
+            item = this.Items(idx);
             for child = this.Children
                 if child.Target == item
                     delete(child);
@@ -114,12 +115,15 @@ classdef SplitButton < ic.core.ComponentContainer
             end
         end
 
-        function icon = getIcon(this, item)
-            % > GETICON Get the icon/image for a dropdown item, or [] if none.
+        function icon = getIcon(this, idx)
+            % > GETICON Get the icon/image for a dropdown item by index, or [] if none.
             arguments
                 this
-                item (1,1) string
+                idx (1,1) double {mustBePositive, mustBeInteger}
             end
+            assert(idx <= numel(this.Items), "ic:SplitButton:InvalidIndex", ...
+                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
+            item = this.Items(idx);
             for child = this.Children
                 if child.Target == item
                     icon = child;
