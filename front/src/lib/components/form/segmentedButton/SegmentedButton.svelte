@@ -131,7 +131,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    border: none;
+    border: 1.5px solid transparent;
     border-radius: 1px;
     background-color: transparent;
     color: var(--ic-muted-foreground);
@@ -168,24 +168,24 @@
 
   /* ===== SIZES ===== */
   .ic-seg-btn--sm .ic-seg-btn__item {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
   }
 
   .ic-seg-btn--md .ic-seg-btn__item {
-    padding: 0.3rem 0.75rem;
-    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
   }
 
   .ic-seg-btn--lg .ic-seg-btn__item {
-    padding: 0.4rem 1rem;
-    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
   }
 
   /* Icon-only: square padding */
-  .ic-seg-btn--sm .ic-seg-btn__item--icon-only { padding: 0.3rem; }
-  .ic-seg-btn--md .ic-seg-btn__item--icon-only { padding: 0.4rem; }
-  .ic-seg-btn--lg .ic-seg-btn__item--icon-only { padding: 0.5rem; }
+  .ic-seg-btn--sm .ic-seg-btn__item--icon-only { padding: 0.375rem; }
+  .ic-seg-btn--md .ic-seg-btn__item--icon-only { padding: 0.5rem; }
+  .ic-seg-btn--lg .ic-seg-btn__item--icon-only { padding: 0.625rem; }
 
   /* ===== HOVER (unselected) ===== */
   .ic-seg-btn__item:hover:not(:disabled):not(.ic-seg-btn__item--selected) {

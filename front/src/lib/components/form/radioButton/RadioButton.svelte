@@ -159,7 +159,7 @@
 
   .ic-radio--sm .ic-radio__group-label { font-size: 0.75rem; }
   .ic-radio--md .ic-radio__group-label { font-size: 0.8125rem; }
-  .ic-radio--lg .ic-radio__group-label { font-size: 0.9375rem; }
+  .ic-radio--lg .ic-radio__group-label { font-size: 0.875rem; }
 
   /* ===== ITEM (label wrapper) ===== */
   .ic-radio__item {
@@ -190,7 +190,7 @@
 
   .ic-radio--sm .ic-radio__label { font-size: 0.75rem; }
   .ic-radio--md .ic-radio__label { font-size: 0.8125rem; }
-  .ic-radio--lg .ic-radio__label { font-size: 0.9375rem; }
+  .ic-radio--lg .ic-radio__label { font-size: 0.875rem; }
 
   /* ===== ICON ===== */
   .ic-radio__icon {

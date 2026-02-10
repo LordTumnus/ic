@@ -77,9 +77,9 @@
   }
 
   /* ===== SIZE ===== */
-  .ic-toggle-btn--sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
-  .ic-toggle-btn--md { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
-  .ic-toggle-btn--lg { padding: 0.5rem 1rem; font-size: 1rem; }
+  .ic-toggle-btn--sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+  .ic-toggle-btn--md { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+  .ic-toggle-btn--lg { padding: 0.5rem 1rem; font-size: 0.875rem; }
 
   /* ===== INDICATOR (lit dot) ===== */
   .ic-toggle-btn__indicator {
