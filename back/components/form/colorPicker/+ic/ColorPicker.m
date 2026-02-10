@@ -27,6 +27,9 @@ classdef ColorPicker < ic.core.Component
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
         % > PRESETS array of preset color strings
         Presets string = string.empty
+        % > POPUPPOSITION where the popup opens relative to the swatch
+        PopupPosition string {mustBeMember(PopupPosition, ...
+            ["bottom", "top", "left", "right", "best"])} = "best"
     end
 
     events (Description = "Reactive")

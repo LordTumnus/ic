@@ -16,6 +16,7 @@
     disabled = $bindable(false),
     size = $bindable('md'),
     presets = $bindable([]),
+    popupPosition = $bindable('best'),
     valueChanging,
     opened,
     closed,
@@ -28,6 +29,7 @@
     disabled?: boolean;
     size?: string;
     presets?: string | string[];
+    popupPosition?: string;
     valueChanging?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
@@ -82,6 +84,41 @@
   );
 
   const hasPresets = $derived(presetList.length > 0);
+
+  // --- Popup positioning ---
+  let rootEl: HTMLDivElement;
+  let resolvedPosition = $state('bottom');
+
+  function computeBestPosition(): string {
+    if (!rootEl) return 'bottom';
+    const rect = rootEl.getBoundingClientRect();
+    const gap = 4;
+    const popupW = 220;
+    const popupH = 300;
+
+    const below = window.innerHeight - rect.bottom - gap;
+    const above = rect.top - gap;
+    const right = window.innerWidth - rect.right - gap;
+    const left = rect.left - gap;
+
+    // Priority: bottom > top > right > left
+    if (below >= popupH) return 'bottom';
+    if (above >= popupH) return 'top';
+    if (right >= popupW) return 'right';
+    if (left >= popupW) return 'left';
+
+    return below >= above ? 'bottom' : 'top';
+  }
+
+  const popupStyle = $derived.by(() => {
+    const pos = popupPosition === 'best' ? resolvedPosition : popupPosition;
+    switch (pos) {
+      case 'top': return 'bottom: calc(100% + 4px); left: 0;';
+      case 'right': return 'top: 0; left: calc(100% + 4px);';
+      case 'left': return 'top: 0; right: calc(100% + 4px);';
+      default: return 'top: calc(100% + 4px); left: 0;';
+    }
+  });
 
   // --- Emit formatted value ---
   function emitValue() {
@@ -158,6 +195,9 @@
     if (disabled) return;
     isOpen = !isOpen;
     if (isOpen) {
+      if (popupPosition === 'best') {
+        resolvedPosition = computeBestPosition();
+      }
       opened?.();
       requestAnimationFrame(() => {
         document.addEventListener('pointerdown', handleClickOutside);
@@ -202,6 +242,7 @@
 </script>
 
 <div
+  bind:this={rootEl}
   class="ic-color-picker"
   class:ic-color-picker--sm={size === 'sm'}
   class:ic-color-picker--md={size === 'md'}
@@ -248,7 +289,7 @@
 
   <!-- Popup -->
   {#if isOpen}
-    <div bind:this={popupEl} class="ic-color-picker__popup">
+    <div bind:this={popupEl} class="ic-color-picker__popup" style={popupStyle}>
       <SaturationValuePad
         hue={internalHue}
         bind:saturation={internalSatV}
@@ -358,8 +399,6 @@
   /* ── Popup ─────────────────────────────── */
   .ic-color-picker__popup {
     position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
     z-index: 50;
     display: flex;
     flex-direction: column;
