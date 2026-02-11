@@ -67,11 +67,12 @@ classdef CircularProgressBar < ic.core.Component
     end
 
     methods
-        function this = CircularProgressBar(id)
+        function this = CircularProgressBar(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.CircularProgressBar
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
 
         function this = styleTrack(this, varargin)

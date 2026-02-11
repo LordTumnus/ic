@@ -6,11 +6,12 @@ classdef Panel < ic.core.ComponentContainer
     % Created with display:block, by default fills the width of its container
 
     methods
-        function this = Panel(id)
+        function this = Panel(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Panel
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
         end
     end
 end

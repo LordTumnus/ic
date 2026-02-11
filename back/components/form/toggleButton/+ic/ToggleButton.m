@@ -16,11 +16,12 @@ classdef ToggleButton < ic.core.Component
     end
 
     methods
-        function this = ToggleButton(id)
+        function this = ToggleButton(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.ToggleButton
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 

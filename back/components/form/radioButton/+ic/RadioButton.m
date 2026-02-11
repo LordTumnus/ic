@@ -39,11 +39,12 @@ classdef RadioButton < ic.core.ComponentContainer
     end
 
     methods
-        function this = RadioButton(id)
+        function this = RadioButton(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.RadioButton
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
             this.Targets = this.Items;
         end
 

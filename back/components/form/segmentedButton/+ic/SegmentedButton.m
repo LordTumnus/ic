@@ -23,11 +23,12 @@ classdef SegmentedButton < ic.core.ComponentContainer
     end
 
     methods
-        function this = SegmentedButton(id)
+        function this = SegmentedButton(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.SegmentedButton
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
             this.Targets = this.Items;
 
             % When Multiselect is turned off, truncate existing Value

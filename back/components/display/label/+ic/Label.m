@@ -26,11 +26,12 @@ classdef Label < ic.core.Component
     end
 
     methods
-        function this = Label(id)
+        function this = Label(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Label
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 end

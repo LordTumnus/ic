@@ -53,11 +53,12 @@ classdef SplitButton < ic.core.ComponentContainer
     end
 
     methods
-        function this = SplitButton(id)
+        function this = SplitButton(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.SplitButton
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
             this.Targets = ["icon", this.Items];
         end
 

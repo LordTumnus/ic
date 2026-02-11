@@ -30,11 +30,12 @@ classdef FlexContainer < ic.core.ComponentContainer
     end
 
     methods
-        function this = FlexContainer(id)
+        function this = FlexContainer(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.FlexContainer
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
         end
     end
 end

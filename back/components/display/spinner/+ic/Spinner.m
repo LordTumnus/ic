@@ -28,11 +28,12 @@ classdef Spinner < ic.core.Component
     end
 
     methods
-        function this = Spinner(id)
+        function this = Spinner(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Spinner
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 end

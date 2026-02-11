@@ -42,11 +42,12 @@ classdef ColorPicker < ic.core.Component
     end
 
     methods
-        function this = ColorPicker(id)
+        function this = ColorPicker(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.ColorPicker
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 

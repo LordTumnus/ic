@@ -3,7 +3,7 @@
 % - Publish events to the view
 % - Subscribe to events from the view
 % > superdoc
-classdef Component < ic.core.ComponentBase
+classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames
 
     properties (Access = ?ic.core.Container, Hidden)
         % > PARENT: backing property for Parent
@@ -16,18 +16,27 @@ classdef Component < ic.core.ComponentBase
 
 
     methods
-        function this = Component(id)
-            arguments (Input)
-                % > ID unique identifier for the component
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid();
+        function this = Component(props)
+            % > COMPONENT constructor accepts a struct of name-value pairs.
+            % Subclasses use `props.?ic.Subclass` in their arguments block
+            % and pass the resulting struct here.
+            arguments
+                props struct = struct()
             end
 
-            arguments (Output)
-                % > THIS the component
-                this (1,1) ic.core.Component
+            if isfield(props, 'ID')
+                id = props.ID;
+                props = rmfield(props, 'ID');
+            else
+                id = "ic-" + matlab.lang.internal.uuid();
             end
 
             this@ic.core.ComponentBase(id);
+
+            if ~isempty(fieldnames(props))
+                nvPairs = namedargs2cell(props);
+                set(this, nvPairs{:});
+            end
         end
 
 

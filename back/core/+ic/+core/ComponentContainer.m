@@ -5,6 +5,13 @@ classdef ComponentContainer < ic.core.Component & ...
                               ic.core.Container
 
     methods
+        function this = ComponentContainer(props)
+            arguments
+                props struct = struct()
+            end
+            this@ic.core.Component(props);
+        end
+
         function delete(this)
             % DELETE invalidates the component container and also deletes its children
             delete@ic.core.Container(this);

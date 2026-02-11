@@ -41,11 +41,12 @@ classdef Checkbox < ic.core.ComponentContainer
     end
 
     methods
-        function this = Checkbox(id)
+        function this = Checkbox(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Checkbox
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
             this.Targets = "icon";
         end
 

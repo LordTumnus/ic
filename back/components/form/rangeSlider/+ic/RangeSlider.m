@@ -42,11 +42,12 @@ classdef RangeSlider < ic.core.Component
     end
 
     methods
-        function this = RangeSlider(id)
+        function this = RangeSlider(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.RangeSlider
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 

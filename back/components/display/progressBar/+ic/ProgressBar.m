@@ -54,11 +54,12 @@ classdef ProgressBar < ic.core.Component
     end
 
     methods
-        function this = ProgressBar(id)
+        function this = ProgressBar(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.ProgressBar
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
 
         function this = styleTrack(this, varargin)

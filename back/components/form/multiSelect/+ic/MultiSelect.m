@@ -41,11 +41,12 @@ classdef MultiSelect < ic.core.Component
     end
 
     methods
-        function this = MultiSelect(id)
+        function this = MultiSelect(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.MultiSelect
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
 
         function set.Value(this, val)

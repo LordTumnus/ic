@@ -51,11 +51,12 @@ classdef Splitter < ic.core.ComponentContainer
     end
 
     methods
-        function this = Splitter(id)
+        function this = Splitter(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Splitter
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.ComponentContainer(id);
+            this@ic.core.ComponentContainer(props);
 
             % Initialize targets based on default Sizes
             this.Targets = this.generatePaneTargets(numel(this.Sizes));

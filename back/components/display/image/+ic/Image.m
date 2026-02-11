@@ -98,11 +98,12 @@ classdef Image < ic.core.Component
     end
 
     methods (Access = private)
-        function this = Image(id)
+        function this = Image(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Image
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 end

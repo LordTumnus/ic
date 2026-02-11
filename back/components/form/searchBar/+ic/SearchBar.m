@@ -41,11 +41,12 @@ classdef SearchBar < ic.core.Component
     end
 
     methods
-        function this = SearchBar(id)
+        function this = SearchBar(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.SearchBar
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
             this.IconTriggers = containers.Map();
         end
 

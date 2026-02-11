@@ -36,11 +36,12 @@ classdef Knob < ic.core.Component
     end
 
     methods
-        function this = Knob(id)
+        function this = Knob(props)
             arguments
-                id (1,1) string = "ic-" + matlab.lang.internal.uuid()
+                props.?ic.Knob
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(id);
+            this@ic.core.Component(props);
         end
     end
 
