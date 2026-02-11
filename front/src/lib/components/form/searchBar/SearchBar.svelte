@@ -12,7 +12,6 @@
     separator = $bindable(','),
     iconTriggers = $bindable<Record<string, string> | null>(null),
     // Events
-    valueChanged,
     submitted,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
@@ -26,7 +25,6 @@
     variant?: string;
     separator?: string;
     iconTriggers?: Record<string, string> | null;
-    valueChanged?: (data?: unknown) => void;
     submitted?: (data?: unknown) => void;
     focus?: () => Resolution;
     clear?: () => Resolution;
@@ -39,6 +37,7 @@
   let isFocused = $state(false);
   let focusedTagIndex = $state(-1);
   let inputText = $state('');
+  let removingIndex = $state(-1);
 
   // --- Derived ---
   const valueList = $derived.by((): string[] => {
@@ -87,19 +86,28 @@
     const text = rawText.trim();
     if (!text) return;
     // Store the full text (with trigger prefix) so icon can be re-derived
-    const previousValue = valueList.slice();
     const newValue = [...valueList, text];
     value = newValue;
     inputText = '';
-    valueChanged?.({ value: newValue, previousValue, added: text });
   }
 
   // --- Tag management ---
   function removeTag(tag: string) {
-    const previousValue = valueList.slice();
     const newValue = valueList.filter((t) => t !== tag);
     value = newValue.length > 0 ? newValue : null;
-    valueChanged?.({ value: value, previousValue, removed: tag });
+  }
+
+  function handleTagRemoved(tag: string) {
+    removeTag(tag);
+    if (removingIndex >= 0) {
+      removingIndex = -1;
+      if (valueList.length === 0) {
+        focusedTagIndex = -1;
+        inputEl?.focus();
+      } else if (focusedTagIndex >= valueList.length) {
+        focusedTagIndex = valueList.length - 1;
+      }
+    }
   }
 
   function swapTags(fromIdx: number, toIdx: number) {
@@ -110,15 +118,12 @@
     arr[toIdx] = temp;
     value = arr;
     focusedTagIndex = toIdx;
-    valueChanged?.({ value: arr, previousValue: valueList });
   }
 
   function handleClearAll(e: Event) {
     e.stopPropagation();
-    const previousValue = valueList.slice();
     value = null;
     inputText = '';
-    valueChanged?.({ value: null, previousValue, cleared: true });
     inputEl?.focus();
   }
 
@@ -133,9 +138,7 @@
       // Batch: collect all new tags, apply in one update
       const newTags = parts.slice(0, -1).map((p) => p.trim()).filter(Boolean);
       if (newTags.length > 0) {
-        const previousValue = valueList.slice();
         value = [...valueList, ...newTags];
-        valueChanged?.({ value: value, previousValue, added: newTags });
       }
       inputText = parts[parts.length - 1];
     } else {
@@ -198,14 +201,8 @@
       case 'Delete':
       case 'Backspace': {
         e.preventDefault();
-        const removed = valueList[focusedTagIndex];
-        removeTag(removed);
-        if (valueList.length <= 1) {
-          focusedTagIndex = -1;
-          inputEl?.focus();
-        } else if (focusedTagIndex >= valueList.length - 1) {
-          focusedTagIndex = Math.max(0, valueList.length - 2);
-        }
+        if (removingIndex >= 0) break;
+        removingIndex = focusedTagIndex;
         break;
       }
       case 'Escape':
@@ -236,10 +233,8 @@
     };
 
     clear = (): Resolution => {
-      const previousValue = valueList.slice();
       value = null;
       inputText = '';
-      valueChanged?.({ value: null, previousValue, cleared: true });
       return { success: true, data: null };
     };
   });
@@ -279,7 +274,8 @@
           {size}
           {disabled}
           active={focusedTagIndex === i}
-          onremove={() => removeTag(tag)}
+          removing={removingIndex === i}
+          onremove={() => handleTagRemoved(tag)}
         />
       {/each}
 

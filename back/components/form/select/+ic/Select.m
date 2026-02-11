@@ -41,8 +41,6 @@ classdef Select < ic.core.Component
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the selected value changes
-        ValueChanged
         % > OPENED fires when the dropdown opens
         Opened
         % > CLOSED fires when the dropdown closes

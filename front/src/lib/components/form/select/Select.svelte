@@ -15,7 +15,6 @@
     variant = $bindable('primary'),
     maxPopupHeight = $bindable(200),
     // Events
-    valueChanged,
     opened,
     closed,
     // Methods
@@ -36,7 +35,6 @@
     size?: string;
     variant?: string;
     maxPopupHeight?: number;
-    valueChanged?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -118,18 +116,14 @@
 
   // --- Selection ---
   function selectItem(item: string) {
-    const previousValue = value;
     value = item;
-    valueChanged?.({ value: item, previousValue });
     closeDropdown();
     fieldEl?.focus();
   }
 
   function handleClear(e: Event) {
     e.stopPropagation();
-    const previousValue = value;
     value = null;
-    valueChanged?.({ value: null, previousValue });
     fieldEl?.focus();
   }
 
@@ -271,9 +265,7 @@
     };
 
     clear = (): Resolution => {
-      const previousValue = value;
       value = null;
-      valueChanged?.({ value: null, previousValue });
       return { success: true, data: null };
     };
 

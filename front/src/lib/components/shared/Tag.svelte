@@ -29,6 +29,7 @@
     size = 'md',
     disabled = false,
     active = false,
+    removing = false,
     onremove,
   }: {
     label: string;
@@ -36,6 +37,7 @@
     size?: string;
     disabled?: boolean;
     active?: boolean;
+    removing?: boolean;
     onremove?: () => void;
   } = $props();
 
@@ -56,6 +58,10 @@
     e.preventDefault();
     if (!disabled) onremove?.();
   }
+
+  function handleAnimationEnd() {
+    if (removing) onremove?.();
+  }
 </script>
 
 <span
@@ -65,6 +71,8 @@
   class:ic-tag--lg={size === 'lg'}
   class:ic-tag--active={active}
   class:ic-tag--disabled={disabled}
+  class:ic-tag--removing={removing}
+  onanimationend={handleAnimationEnd}
 >
   {#if iconSvg}
     <span class="ic-tag__icon">{@html iconSvg}</span>
@@ -163,5 +171,18 @@
     opacity: 1;
     background-color: rgba(220, 50, 50, 0.15);
     color: var(--ic-destructive);
+  }
+
+  /* Remove animation */
+  @keyframes ic-tag-remove {
+    to {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+  }
+  .ic-tag--removing {
+    transform-origin: left center;
+    animation: ic-tag-remove 100ms ease-out forwards;
+    pointer-events: none;
   }
 </style>

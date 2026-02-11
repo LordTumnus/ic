@@ -13,7 +13,6 @@
     maxPopupHeight = $bindable(200),
     maxSelectedItems = $bindable<number | null>(null),
     // Events
-    valueChanged,
     opened,
     closed,
     // Methods
@@ -31,7 +30,6 @@
     variant?: string;
     maxPopupHeight?: number;
     maxSelectedItems?: number | null;
-    valueChanged?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -42,6 +40,7 @@
 
   // --- Refs ---
   let rootEl: HTMLDivElement;
+  let fieldEl: HTMLDivElement;
   let searchInputEl: HTMLInputElement;
   let optionEls: HTMLDivElement[] = [];
 
@@ -54,6 +53,7 @@
   let searchQuery = $state('');
   let focusedOptionIndex = $state(-1);
   let focusedTagIndex = $state(-1);
+  let removingIndex = $state(-1);
 
   // --- Derived ---
   const itemList = $derived(
@@ -115,7 +115,6 @@
 
   // --- Selection ---
   function toggleItem(item: string) {
-    const previousValue = valueList.slice();
     let newValue: string[];
 
     if (isSelected(item)) {
@@ -126,25 +125,33 @@
     }
 
     value = newValue.length > 0 ? newValue : null;
-    valueChanged?.({ value: value, previousValue });
 
     // Keep dropdown open, refocus search
     requestAnimationFrame(() => searchInputEl?.focus());
   }
 
   function removeTag(item: string) {
-    const previousValue = valueList.slice();
     const newValue = valueList.filter((v) => v !== item);
     value = newValue.length > 0 ? newValue : null;
-    valueChanged?.({ value: value, previousValue });
+  }
+
+  function handleTagRemoved(item: string) {
+    removeTag(item);
+    if (removingIndex >= 0) {
+      removingIndex = -1;
+      if (valueList.length === 0) {
+        focusedTagIndex = -1;
+        searchInputEl?.focus();
+      } else if (focusedTagIndex >= valueList.length) {
+        focusedTagIndex = valueList.length - 1;
+      }
+    }
   }
 
   function handleClearAll(e: Event) {
     e.stopPropagation();
-    const previousValue = valueList.slice();
     value = null;
     searchQuery = '';
-    valueChanged?.({ value: null, previousValue });
     searchInputEl?.focus();
   }
 
@@ -157,7 +164,6 @@
     arr[toIdx] = temp;
     value = arr;
     focusedTagIndex = toIdx;
-    valueChanged?.({ value: arr, previousValue: valueList });
   }
 
   // --- Keyboard: search input ---
@@ -251,15 +257,8 @@
       case 'Delete':
       case 'Backspace': {
         e.preventDefault();
-        const removedItem = valueList[focusedTagIndex];
-        removeTag(removedItem);
-        // Adjust focus
-        if (valueList.length <= 1) {
-          focusedTagIndex = -1;
-          searchInputEl?.focus();
-        } else if (focusedTagIndex >= valueList.length - 1) {
-          focusedTagIndex = Math.max(0, valueList.length - 2);
-        }
+        if (removingIndex >= 0) break;
+        removingIndex = focusedTagIndex;
         break;
       }
       case 'Escape':
@@ -319,10 +318,8 @@
     };
 
     clear = (): Resolution => {
-      const previousValue = valueList.slice();
       value = null;
       searchQuery = '';
-      valueChanged?.({ value: null, previousValue });
       return { success: true, data: null };
     };
 
@@ -372,7 +369,8 @@
           {size}
           {disabled}
           active={focusedTagIndex === i}
-          onremove={() => removeTag(item)}
+          removing={removingIndex === i}
+          onremove={() => handleTagRemoved(item)}
         />
       {/each}
 

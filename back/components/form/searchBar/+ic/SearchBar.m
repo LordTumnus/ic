@@ -36,8 +36,6 @@ classdef SearchBar < ic.core.Component
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when tags are added, removed, or reordered
-        ValueChanged
         % > SUBMITTED fires when Enter is pressed
         Submitted
     end
