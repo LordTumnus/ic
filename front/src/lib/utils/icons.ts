@@ -27,3 +27,33 @@ export function resolveIcon(name: string | undefined, size: number): string {
   svg = svg.replace(/height="[^"]*"/, `height="${size}"`);
   return svg;
 }
+
+/** Structured icon descriptor from ic.IconType serialization. */
+export interface IconTypeData {
+  type: 'lucide' | 'path' | 'file' | 'raster';
+  value: string;
+}
+
+/** Resolve a string icon name OR an IconTypeData object to its SVG/HTML string. */
+export function resolveIconType(
+  icon: string | IconTypeData | null | undefined,
+  size: number
+): string {
+  if (!icon) return '';
+  if (typeof icon === 'string') return resolveIcon(icon, size);
+  switch (icon.type) {
+    case 'lucide': return resolveIcon(icon.value, size);
+    case 'path':
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icon.value}"/></svg>`;
+    case 'file':
+      try {
+        let svg = atob(icon.value);
+        svg = svg.replace(/width="[^"]*"/, `width="${size}"`);
+        svg = svg.replace(/height="[^"]*"/, `height="${size}"`);
+        return svg;
+      } catch { return ''; }
+    case 'raster':
+      return `<img src="${icon.value}" width="${size}" height="${size}" style="display:block" alt="" />`;
+    default: return '';
+  }
+}

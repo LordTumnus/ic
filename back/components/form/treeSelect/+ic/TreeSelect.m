@@ -3,27 +3,22 @@ classdef TreeSelect < ic.core.Component
     %
     %   Displays selected items as closable tags inside the input field.
     %   Opens cascading sub-menus for hierarchical item selection.
-    %   Each node (parent or leaf) is independently selectable.
-    %   Items are structs with 'key', 'name', 'icon', and 'children' fields.
+    %   Items are ic.tree.Node objects; selection is done via Node handles.
     %
     %   Example:
     %       ts = ic.TreeSelect();
-    %       ts.Items = [
-    %           struct('key', 'fruits', 'name', 'Fruits', 'icon', 'apple', 'children', [
-    %               struct('key', 'apple',  'name', 'Apple',  'icon', '', 'children', [])
-    %               struct('key', 'citrus', 'name', 'Citrus', 'icon', '', 'children', [
-    %                   struct('key', 'orange', 'name', 'Orange', 'icon', '', 'children', [])
-    %                   struct('key', 'lemon',  'name', 'Lemon',  'icon', '', 'children', [])
-    %               ])
-    %           ])
-    %       ];
-    %       ts.Clearable = true;
-    %       ts.Value = ["apple", "lemon"];
+    %       fruits = ic.tree.Node("Fruits", Icon=ic.IconType.lucide("apple"));
+    %       apple  = fruits.add("Apple");
+    %       citrus = fruits.add("Citrus");
+    %       orange = citrus.add("Orange");
+    %       lemon  = citrus.add("Lemon");
+    %       ts.Items = fruits;
+    %       ts.Selection = [apple, lemon];
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS hierarchical tree structure (array of structs with 'key', 'name', 'icon', 'children')
-        Items struct = struct('key', {}, 'name', {}, 'icon', {}, 'children', {})
-        % > VALUE currently selected node keys (string.empty = no selection)
+        % > ITEMS tree nodes
+        Items ic.tree.Node = ic.tree.Node.empty
+        % > VALUE positional key strings (Svelte bridge — hidden from user)
         Value string = string.empty
         % > PLACEHOLDER text shown when no items are selected
         Placeholder string = "Select..."
@@ -46,11 +41,21 @@ classdef TreeSelect < ic.core.Component
         OpenOnHover logical = false
     end
 
+    properties (Dependent)
+        % > SELECTION currently selected nodes (user-facing API)
+        Selection
+    end
+
     events (Description = "Reactive")
         % > OPENED fires when the dropdown opens
         Opened
         % > CLOSED fires when the dropdown closes
         Closed
+    end
+
+    events
+        % > SELECTIONCHANGED fires when the selection changes
+        SelectionChanged
     end
 
     methods
@@ -60,6 +65,7 @@ classdef TreeSelect < ic.core.Component
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.Component(props);
+            addlistener(this, 'Value', 'PostSet', @(~,~) notify(this, 'SelectionChanged'));
         end
 
         function set.Value(this, val)
@@ -67,41 +73,42 @@ classdef TreeSelect < ic.core.Component
             if isscalar(val) && val == ""
                 val = string.empty;
             end
-            % Validate: every selected key must exist in the tree
+            % Validate: every positional key must resolve in the tree
             if ~isempty(val) && ~isempty(this.Items) %#ok<MCSUP>
-                allKeys = getAllKeys(this.Items); %#ok<MCSUP>
                 for i = 1:numel(val)
-                    assert(ismember(val(i), allKeys), ...
-                        "ic:TreeSelect:InvalidValue", ...
-                        "Value '%s' is not a key in Items.", val(i));
+                    this.Items.resolve(val(i)); %#ok<MCSUP>
                 end
             end
             this.Value = val;
         end
 
         function set.Items(this, val)
-            % Validate key uniqueness
-            if ~isempty(val)
-                allKeys = getAllKeys(val);
-                assert(numel(unique(allKeys)) == numel(allKeys), ...
-                    "ic:TreeSelect:DuplicateKey", ...
-                    "All node keys must be unique across the tree.");
-            end
-            % Remove any selected keys that are no longer in the new tree
-            if ~isempty(this.Value) %#ok<MCSUP>
-                if isempty(val)
-                    this.Value = string.empty; %#ok<MCSUP>
-                else
-                    allKeys = getAllKeys(val);
-                    keep = ismember(this.Value, allKeys); %#ok<MCSUP>
-                    if any(keep)
-                        this.Value = this.Value(keep); %#ok<MCSUP>
-                    else
-                        this.Value = string.empty; %#ok<MCSUP>
-                    end
-                end
-            end
+            this.Value = string.empty; %#ok<MCSUP>
             this.Items = val;
+        end
+
+        function nodes = get.Selection(this)
+            % Resolve positional key strings → Node handles
+            nodes = ic.tree.Node.empty;
+            for i = 1:numel(this.Value)
+                nodes(i) = this.Items.resolve(this.Value(i));
+            end
+        end
+
+        function set.Selection(this, val)
+            % Convert Node handles → positional key strings via keyOf
+            if isempty(val)
+                this.Value = string.empty;
+                return;
+            end
+            keys = strings(1, numel(val));
+            for i = 1:numel(val)
+                k = this.Items.keyOf(val(i));
+                assert(k ~= "", "ic:TreeSelect:NodeNotInTree", ...
+                    "Node '%s' is not in the Items tree.", val(i).Label);
+                keys(i) = k;
+            end
+            this.Value = keys;
         end
     end
 
@@ -125,16 +132,90 @@ classdef TreeSelect < ic.core.Component
             % > CLOSE programmatically close the dropdown
             out = this.publish("close", []);
         end
-    end
-end
 
-function keys = getAllKeys(nodes)
-    %GETALLKEYS Recursively collect all 'key' values from a tree of structs.
-    keys = string.empty;
-    for i = 1:numel(nodes)
-        keys(end+1) = string(nodes(i).key); %#ok<AGROW>
-        if ~isempty(nodes(i).children)
-            keys = [keys, getAllKeys(nodes(i).children)]; %#ok<AGROW>
+        function out = addNode(this, parentKey, label, opts)
+            % > ADDNODE Add a child node to the tree incrementally.
+            %   ts.addNode("", "Root")         % add root node
+            %   ts.addNode("1-2", "Grape")     % add under node 1-2
+            arguments
+                this
+                parentKey (1,1) string
+                label (1,1) string
+                opts.Icon = ic.IconType.empty
+                opts.Data struct = struct.empty
+            end
+            child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);
+            if parentKey == ""
+                % Root-level: must go through setter. Use setValueSilently
+                % to suppress the framework notification to Svelte.
+                % Pre-clear Value so set.Items' this.Value=string.empty
+                % is a no-op (AbortSet sees same value).
+                savedValue = this.Value;
+                this.setValueSilently('Value', string.empty);
+                this.setValueSilently('Items', [this.Items, child]);
+                if ~isempty(savedValue)
+                    this.setValueSilently('Value', savedValue);
+                end
+            else
+                parent = this.Items.resolve(parentKey);
+                parent.Children(end+1) = child;
+            end
+            if isempty(opts.Icon)
+                icon = [];
+            else
+                icon = struct('type', opts.Icon.Type, 'value', opts.Icon.Value);
+            end
+            out = this.publish("addNode", struct( ...
+                'parentKey', char(parentKey), ...
+                'label', char(label), ...
+                'icon', icon));
+        end
+
+        function out = removeNode(this, key)
+            % > REMOVENODE Remove a node from the tree incrementally.
+            %   ts.removeNode("1-2-1")
+            arguments, this, key (1,1) string, end
+            parts = sscanf(key, '%d-');
+            if isscalar(parts)
+                % Root-level: keys shift after removal, so clear Value
+                % and let Svelte send back remapped values via publish().
+                this.setValueSilently('Value', string.empty);
+                items = this.Items;
+                items(parts(1)) = [];
+                this.setValueSilently('Items', items);
+            else
+                % Nested: handle mutation, no Items setter triggered.
+                this.Items.remove(key);
+                % Drop removed key + descendants from Value silently.
+                if ~isempty(this.Value)
+                    keep = ~(this.Value == key | startsWith(this.Value, key + "-"));
+                    this.setValueSilently('Value', this.Value(keep));
+                end
+            end
+            out = this.publish("removeNode", struct('key', char(key)));
+        end
+
+        function out = updateNode(this, key, opts)
+            % > UPDATENODE Update a node's label or icon incrementally.
+            %   ts.updateNode("1-1", Label="Green Apple")
+            arguments
+                this
+                key (1,1) string
+                opts.Label (1,1) string = ""
+                opts.Icon = []
+                opts.Data struct = struct.empty
+            end
+            node = this.Items.resolve(key);
+            if opts.Label ~= "", node.Label = opts.Label; end
+            if ~isempty(opts.Icon), node.Icon = opts.Icon; end
+            if ~isempty(opts.Data), node.Data = opts.Data; end
+            if isempty(node.Icon), icon = [];
+            else, icon = struct('type', node.Icon.Type, 'value', node.Icon.Value);
+            end
+            out = this.publish("updateNode", struct( ...
+                'key', char(key), ...
+                'label', char(node.Label), ...
+                'icon', icon));
         end
     end
 end

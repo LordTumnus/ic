@@ -2,29 +2,27 @@
   import type { Resolution } from '$lib/types';
   import Tag from '$lib/components/shared/Tag.svelte';
   import TreePanel from './TreePanel.svelte';
+  import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
 
   // --- Types ---
   interface TreeNode {
     key: string;
     name: string;
-    icon?: string;
+    icon?: string | IconTypeData;
     children: TreeNode[];
   }
 
   interface FlatNode {
     key: string;
     name: string;
-    icon?: string;
+    icon?: string | IconTypeData;
     path: string[];
   }
 
-  // --- Icon resolution (shared module) ---
-  import { resolveIcon as _resolveIcon } from '$lib/utils/icons';
-
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
 
-  function resolveIcon(name: string | undefined, sz: string): string {
-    return _resolveIcon(name, ICON_SIZES[sz] ?? 12);
+  function resolveIcon(icon: string | IconTypeData | undefined, sz: string): string {
+    return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
   }
 
   // --- Props ---
@@ -48,6 +46,9 @@
     clear = $bindable((): Resolution => ({ success: true, data: null })),
     open = $bindable((): Resolution => ({ success: true, data: null })),
     close = $bindable((): Resolution => ({ success: true, data: null })),
+    addNode = $bindable((_data: { parentKey: string; label: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
+    removeNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
+    updateNode = $bindable((_data: { key: string; label?: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
   }: {
     items?: TreeNode[] | TreeNode | null;
     value?: string[] | string | null;
@@ -66,6 +67,9 @@
     clear?: () => Resolution;
     open?: () => Resolution;
     close?: () => Resolution;
+    addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
+    removeNode?: (data: { key: string }) => Resolution;
+    updateNode?: (data: { key: string; label?: string; icon?: unknown }) => Resolution;
   } = $props();
 
   // --- Refs ---
@@ -81,21 +85,32 @@
   let removingIndex = $state(-1);
   let searchFocusedIndex = $state(-1);
 
-  // --- Normalize MATLAB struct serialization ---
-  function normalizeNodes(raw: unknown): TreeNode[] {
+  // --- Normalize ic.tree.Node serialization (positional keys) ---
+  function normalizeNodes(raw: unknown, prefix = ''): TreeNode[] {
     if (raw == null) return [];
     if (!Array.isArray(raw)) raw = [raw];
-    return (raw as Record<string, unknown>[]).map((n) => ({
-      key: String(n.key ?? ''),
-      name: String(n.name ?? ''),
-      icon: n.icon ? String(n.icon) : undefined,
-      children: normalizeNodes(n.children),
-    }));
+    return (raw as Record<string, unknown>[]).map((n, i) => {
+      const key = prefix ? `${prefix}-${i + 1}` : `${i + 1}`;
+      return {
+        key,
+        name: String(n.label ?? ''),
+        icon: normalizeIcon(n.icon),
+        children: normalizeNodes(n.children, key),
+      };
+    });
+  }
+
+  function normalizeIcon(raw: unknown): string | IconTypeData | undefined {
+    if (raw == null) return undefined;
+    if (typeof raw === 'string') return raw || undefined;
+    if (typeof raw === 'object' && 'type' in (raw as object))
+      return raw as IconTypeData;
+    return undefined;
   }
 
   // --- Tree helpers ---
-  function buildKeyMap(nodes: TreeNode[]): Map<string, { name: string; icon?: string }> {
-    const map = new Map<string, { name: string; icon?: string }>();
+  function buildKeyMap(nodes: TreeNode[]): Map<string, { name: string; icon?: string | IconTypeData }> {
+    const map = new Map<string, { name: string; icon?: string | IconTypeData }>();
     function walk(list: TreeNode[]) {
       for (const n of list) {
         map.set(n.key, { name: n.name, icon: n.icon });
@@ -121,9 +136,11 @@
     return out;
   }
 
-  // --- Derived ---
-  const itemsNorm = $derived(normalizeNodes(items));
-  const keyMap = $derived(buildKeyMap(itemsNorm));
+  // --- Mutable tree state (reset on full items change, mutated by ops) ---
+  let treeState = $state<TreeNode[]>([]);
+  $effect(() => { treeState = normalizeNodes(items); });
+
+  const keyMap = $derived(buildKeyMap(treeState));
 
   const valueList = $derived.by((): string[] => {
     if (value == null) return [];
@@ -139,7 +156,7 @@
   );
   const isSearchMode = $derived(searchQuery.length > 0);
 
-  const allLeaves = $derived(flattenLeaves(itemsNorm));
+  const allLeaves = $derived(flattenLeaves(treeState));
   const filteredFlat = $derived.by(() => {
     if (!searchQuery) return [];
     const q = searchQuery.toLowerCase();
@@ -379,6 +396,95 @@
     inputEl?.focus();
   }
 
+  // --- Tree op helpers ---
+  function findNodeByKey(nodes: TreeNode[], key: string): TreeNode | null {
+    for (const n of nodes) {
+      if (n.key === key) return n;
+      const found = findNodeByKey(n.children, key);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function collectAllKeys(node: TreeNode): string[] {
+    const keys = [node.key];
+    for (const c of node.children) keys.push(...collectAllKeys(c));
+    return keys;
+  }
+
+  function reindexSubtree(node: TreeNode, newKey: string): TreeNode {
+    return {
+      ...node,
+      key: newKey,
+      children: node.children.map((c, i) =>
+        reindexSubtree(c, `${newKey}-${i + 1}`)
+      ),
+    };
+  }
+
+  function removeAndReindex(
+    nodes: TreeNode[],
+    key: string
+  ): { updated: TreeNode[]; removedKeys: Set<string>; keyMapping: Map<string, string> } {
+    const parts = key.split('-');
+    const removedKeys = new Set<string>();
+    const keyMapping = new Map<string, string>();
+
+    function recurse(list: TreeNode[], depth: number, prefix: string): TreeNode[] {
+      const targetIdx = parseInt(parts[depth], 10) - 1;
+      if (depth === parts.length - 1) {
+        // This is the level where the node lives
+        const removed = list[targetIdx];
+        if (removed) {
+          for (const k of collectAllKeys(removed)) removedKeys.add(k);
+        }
+        const after = [...list.slice(0, targetIdx), ...list.slice(targetIdx + 1)];
+        // Reindex siblings after the removed index
+        return after.map((n, i) => {
+          const newKey = prefix ? `${prefix}-${i + 1}` : `${i + 1}`;
+          if (n.key !== newKey) {
+            const old = n.key;
+            const reindexed = reindexSubtree(n, newKey);
+            // Map old keys to new keys for the shifted siblings
+            mapShiftedKeys(n, reindexed, keyMapping);
+            return reindexed;
+          }
+          return n;
+        });
+      }
+      // Recurse into the correct child
+      return list.map((n, i) => {
+        if (i === targetIdx) {
+          return {
+            ...n,
+            children: recurse(n.children, depth + 1, n.key),
+          };
+        }
+        return n;
+      });
+    }
+
+    const updated = recurse(nodes, 0, '');
+    return { updated, removedKeys, keyMapping };
+  }
+
+  function mapShiftedKeys(oldNode: TreeNode, newNode: TreeNode, mapping: Map<string, string>) {
+    if (oldNode.key !== newNode.key) mapping.set(oldNode.key, newNode.key);
+    for (let i = 0; i < oldNode.children.length; i++) {
+      mapShiftedKeys(oldNode.children[i], newNode.children[i], mapping);
+    }
+  }
+
+  function remapValues(
+    vals: string[],
+    removedKeys: Set<string>,
+    keyMapping: Map<string, string>
+  ): string[] {
+    return vals
+      .filter((v) => !removedKeys.has(v))
+      .map((v) => keyMapping.get(v) ?? v);
+  }
+
   // --- Methods ---
   $effect(() => {
     focus = (): Resolution => {
@@ -396,6 +502,37 @@
     };
     close = (): Resolution => {
       closeDropdown();
+      return { success: true, data: null };
+    };
+    addNode = (data: { parentKey: string; label: string; icon?: unknown }): Resolution => {
+      const parentKey = data.parentKey || '';
+      const icon = normalizeIcon(data.icon);
+      if (parentKey === '') {
+        const key = `${treeState.length + 1}`;
+        treeState = [...treeState, { key, name: data.label, icon, children: [] }];
+      } else {
+        const parent = findNodeByKey(treeState, parentKey);
+        if (!parent) return { success: false, data: `Parent "${parentKey}" not found` };
+        const key = `${parentKey}-${parent.children.length + 1}`;
+        parent.children = [...parent.children, { key, name: data.label, icon, children: [] }];
+        treeState = [...treeState]; // trigger reactivity
+      }
+      return { success: true, data: null };
+    };
+    removeNode = (data: { key: string }): Resolution => {
+      const { updated, removedKeys, keyMapping } = removeAndReindex(treeState, data.key);
+      treeState = updated;
+      // Remap selected values
+      const remapped = remapValues(valueList, removedKeys, keyMapping);
+      value = remapped.length > 0 ? remapped : null;
+      return { success: true, data: null };
+    };
+    updateNode = (data: { key: string; label?: string; icon?: unknown }): Resolution => {
+      const node = findNodeByKey(treeState, data.key);
+      if (!node) return { success: false, data: `Node "${data.key}" not found` };
+      if (data.label != null) node.name = data.label;
+      if (data.icon !== undefined) node.icon = normalizeIcon(data.icon);
+      treeState = [...treeState]; // trigger reactivity
       return { success: true, data: null };
     };
   });
@@ -528,7 +665,7 @@
       <!-- Cascading tree panels (flex row, scrolls horizontally) -->
       <div class="ic-ts__cascade">
         <TreePanel
-          nodes={itemsNorm}
+          nodes={treeState}
           {size}
           maxHeight={maxPopupHeight}
           {maxPanelWidth}

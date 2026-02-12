@@ -1,20 +1,19 @@
 <script lang="ts">
   import TreePanel from './TreePanel.svelte';
 
+  import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
+
   interface TreeNodeData {
     key: string;
     name: string;
-    icon?: string;
+    icon?: string | IconTypeData;
     children: TreeNodeData[];
   }
 
-  // --- Icon resolution (shared module) ---
-  import { resolveIcon as _resolveIcon } from '$lib/utils/icons';
-
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
 
-  function resolveIcon(name: string | undefined, sz: string): string {
-    return _resolveIcon(name, ICON_SIZES[sz] ?? 12);
+  function resolveIcon(icon: string | IconTypeData | undefined, sz: string): string {
+    return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
   }
 
   // --- Module-level helper ---
