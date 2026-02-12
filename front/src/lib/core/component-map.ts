@@ -53,10 +53,12 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Layout components
   'ic.FlexContainer': modules['../components/layout/flexContainer/FlexContainer.svelte'],
   'ic.GridContainer': modules['../components/layout/gridContainer/GridContainer.svelte'],
+  'ic.Splitter': modules['../components/layout/splitter/Splitter.svelte'],
+  'ic.SplitterPane': modules['../components/layout/splitter/SplitterPane.svelte'],
 
   // Panel components
   'ic.Panel': modules['../components/panel/panel/Panel.svelte'],
-  'ic.Splitter': modules['../components/panel/splitter/Splitter.svelte'],
+
 };
 
 export default componentMap;
