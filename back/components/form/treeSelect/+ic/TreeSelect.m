@@ -18,8 +18,6 @@ classdef TreeSelect < ic.core.Component
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > ITEMS tree nodes
         Items ic.tree.Node = ic.tree.Node.empty
-        % > VALUE positional key strings (Svelte bridge — hidden from user)
-        Value string = string.empty
         % > PLACEHOLDER text shown when no items are selected
         Placeholder string = "Select..."
         % > DISABLED whether the control is disabled
@@ -39,6 +37,12 @@ classdef TreeSelect < ic.core.Component
         MaxPanelWidth double {mustBePositive} = 240
         % > OPENONHOVER whether hovering a folder row auto-opens its sub-panel
         OpenOnHover logical = false
+    end
+
+    properties (SetObservable, AbortSet, Description = "Reactive", ...
+            Access = ?ic.core.ComponentBase, Hidden)
+        % > VALUE positional key strings (Svelte bridge — hidden from user)
+        Value string = string.empty
     end
 
     properties (Dependent)
