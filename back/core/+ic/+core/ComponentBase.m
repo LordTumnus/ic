@@ -312,6 +312,16 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
             this.subscribe(camelName, ...
                 @(~,~,data) notify(this, eventName, ic.event.MEvent(data)));
         end
+
+        function setValueSilently(this, propName, value)
+            % > SETVALUESILENTLY sets a reactive property without notifying the view.
+            task = onCleanup(@() reenableListener(this, propName));
+            this.ReactivePropListeners(propName).Enabled = false;
+            this.(propName) = value;
+            function reenableListener(obj, n)
+                obj.ReactivePropListeners(n).Enabled = true;
+            end
+        end
     end
 
     methods (Access = {?ic.Frame, ?ic.core.Component})
@@ -330,17 +340,7 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
             % > SUBSCRIBETOREACTIVEPROPERTIES subscribes to property changes from the view, and sets the component property when the view notifies the event
             camelName = ic.utils.toCamelCase("@prop/" + propertyName);
             this.subscribe(camelName, ...
-                @(~,~,data) setValueSilently(propertyName, data))
-
-            % nested function to avoid echoing the property change back to the view
-            function setValueSilently(propName, value)
-                task = onCleanup(@() reenableListener(propName));
-                this.ReactivePropListeners(propName).Enabled = false;
-                this.(propName) = value;
-                function reenableListener(n)
-                    this.ReactivePropListeners(n).Enabled = true;
-                end
-            end
+                @(~,~,data) this.setValueSilently(propertyName, data))
         end
 
         function isReactiveMethod = isReactiveMethod(this, methodName)
