@@ -37,7 +37,8 @@ classdef Checkbox < ic.core.ComponentContainer
     end
 
     events (Description = "Reactive")
-        Changed
+        % > VALUECHANGED fires when the user toggles the checkbox
+        ValueChanged
     end
 
     methods

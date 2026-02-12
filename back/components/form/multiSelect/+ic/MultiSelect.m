@@ -34,6 +34,8 @@ classdef MultiSelect < ic.core.Component
     end
 
     events (Description = "Reactive")
+        % > VALUECHANGED fires when the user changes the selection
+        ValueChanged
         % > OPENED fires when the dropdown opens
         Opened
         % > CLOSED fires when the dropdown closes

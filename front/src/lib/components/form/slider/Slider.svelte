@@ -16,6 +16,7 @@
     showTicks = $bindable(false),
     tickInterval = $bindable(0),
     valueChanging,
+    valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     value?: number;
@@ -32,6 +33,7 @@
     showTicks?: boolean;
     tickInterval?: number;
     valueChanging?: (data?: unknown) => void;
+    valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
@@ -114,6 +116,7 @@
   function handlePointerUp() {
     if (!isDragging) return;
     isDragging = false;
+    valueChanged?.({ value });
     document.removeEventListener('pointermove', handlePointerMove);
     document.removeEventListener('pointerup', handlePointerUp);
     document.documentElement.removeEventListener('pointerleave', handlePointerUp);
@@ -152,6 +155,7 @@
     e.preventDefault();
     if (newValue !== value) {
       value = newValue;
+      valueChanged?.({ value });
     }
   }
 

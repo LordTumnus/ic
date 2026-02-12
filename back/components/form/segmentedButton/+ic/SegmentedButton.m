@@ -22,6 +22,11 @@ classdef SegmentedButton < ic.core.ComponentContainer
             ["left", "right"])} = "left"
     end
 
+    events (Description = "Reactive")
+        % > VALUECHANGED fires when the user selects or deselects a segment
+        ValueChanged
+    end
+
     methods
         function this = SegmentedButton(props)
             arguments

@@ -12,7 +12,7 @@
     labelPosition = $bindable('right'),
     orientation = $bindable('vertical'),
     snippets = { default: [] } as Snippets,
-    changed,
+    valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     items?: string[] | string;
@@ -24,7 +24,7 @@
     labelPosition?: string;
     orientation?: string;
     snippets?: Snippets;
-    changed?: (data?: unknown) => void;
+    valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
@@ -51,7 +51,7 @@
   function handleSelect(item: string) {
     if (disabled) return;
     value = item;
-    changed?.({ value });
+    valueChanged?.({ value });
     logger.debug('RadioButton', `selected '${item}'`);
   }
 </script>

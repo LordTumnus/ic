@@ -12,6 +12,7 @@
     disabled = $bindable(false),
     iconPosition = $bindable('left'),
     snippets = { default: [] } as Snippets,
+    valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     items?: string[] | string;
@@ -23,6 +24,7 @@
     disabled?: boolean;
     iconPosition?: string;
     snippets?: Snippets;
+    valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
@@ -66,6 +68,7 @@
       value = item;
     }
 
+    valueChanged?.({ value });
     logger.debug('SegmentedButton', `toggled '${item}'`);
   }
 </script>

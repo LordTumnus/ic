@@ -36,6 +36,8 @@ classdef SearchBar < ic.core.Component
     end
 
     events (Description = "Reactive")
+        % > VALUECHANGED fires when the tag list changes
+        ValueChanged
         % > SUBMITTED fires when Enter is pressed
         Submitted
     end

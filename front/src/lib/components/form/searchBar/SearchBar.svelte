@@ -12,6 +12,7 @@
     separator = $bindable(','),
     iconTriggers = $bindable<Record<string, string> | null>(null),
     // Events
+    valueChanged,
     submitted,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
@@ -25,6 +26,7 @@
     variant?: string;
     separator?: string;
     iconTriggers?: Record<string, string> | null;
+    valueChanged?: (data?: unknown) => void;
     submitted?: (data?: unknown) => void;
     focus?: () => Resolution;
     clear?: () => Resolution;
@@ -88,6 +90,7 @@
     // Store the full text (with trigger prefix) so icon can be re-derived
     const newValue = [...valueList, text];
     value = newValue;
+    valueChanged?.({ value });
     inputText = '';
   }
 
@@ -99,6 +102,7 @@
 
   function handleTagRemoved(tag: string) {
     removeTag(tag);
+    valueChanged?.({ value });
     if (removingIndex >= 0) {
       removingIndex = -1;
       if (valueList.length === 0) {
@@ -123,6 +127,7 @@
   function handleClearAll(e: Event) {
     e.stopPropagation();
     value = null;
+    valueChanged?.({ value: null });
     inputText = '';
     inputEl?.focus();
   }
@@ -139,6 +144,7 @@
       const newTags = parts.slice(0, -1).map((p) => p.trim()).filter(Boolean);
       if (newTags.length > 0) {
         value = [...valueList, ...newTags];
+        valueChanged?.({ value });
       }
       inputText = parts[parts.length - 1];
     } else {
@@ -234,6 +240,7 @@
 
     clear = (): Resolution => {
       value = null;
+      valueChanged?.({ value: null });
       inputText = '';
       return { success: true, data: null };
     };

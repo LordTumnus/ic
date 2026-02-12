@@ -9,6 +9,7 @@
     size = $bindable('md'),
     showLabel = $bindable(false),
     disabled = $bindable(false),
+    valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     value?: string;
@@ -17,6 +18,7 @@
     size?: string;
     showLabel?: boolean;
     disabled?: boolean;
+    valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
@@ -34,6 +36,7 @@
   function handleClick() {
     if (!disabled) {
       value = isOn ? 'off' : 'on';
+      valueChanged?.({ value });
       logger.debug('Switch', 'toggled', { value });
     }
   }

@@ -35,7 +35,8 @@ classdef RadioButton < ic.core.ComponentContainer
     end
 
     events (Description = "Reactive")
-        Changed
+        % > VALUECHANGED fires when the user selects a different option
+        ValueChanged
     end
 
     methods

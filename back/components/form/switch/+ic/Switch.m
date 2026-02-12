@@ -17,6 +17,11 @@ classdef Switch < ic.core.Component
         Disabled logical = false
     end
 
+    events (Description = "Reactive")
+        % > VALUECHANGED fires when the user toggles the switch
+        ValueChanged
+    end
+
     methods
         function this = Switch(props)
             arguments

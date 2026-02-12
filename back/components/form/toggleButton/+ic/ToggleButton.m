@@ -15,6 +15,11 @@ classdef ToggleButton < ic.core.Component
         Disabled logical = false
     end
 
+    events (Description = "Reactive")
+        % > VALUECHANGED fires when the user toggles the button
+        ValueChanged
+    end
+
     methods
         function this = ToggleButton(props)
             arguments

@@ -39,6 +39,7 @@
     maxPanelWidth = $bindable(240),
     openOnHover = $bindable(false),
     // Events
+    valueChanged,
     opened,
     closed,
     // Methods
@@ -61,6 +62,7 @@
     maxSelectedItems?: number | null;
     maxPanelWidth?: number;
     openOnHover?: boolean;
+    valueChanged?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -205,6 +207,7 @@
       next = [...valueList, key];
     }
     value = next.length > 0 ? next : null;
+    valueChanged?.({ value });
     requestAnimationFrame(() => inputEl?.focus());
   }
 
@@ -225,6 +228,7 @@
       }
     }
     value = next.length > 0 ? next : null;
+    valueChanged?.({ value });
     requestAnimationFrame(() => inputEl?.focus());
   }
 
@@ -232,6 +236,7 @@
   function handleTagRemoved(key: string) {
     const next = valueList.filter((v) => v !== key);
     value = next.length > 0 ? next : null;
+    valueChanged?.({ value });
     if (removingIndex >= 0) {
       removingIndex = -1;
       if (valueList.length === 0) {
@@ -246,6 +251,7 @@
   function handleClearAll(e: Event) {
     e.stopPropagation();
     value = null;
+    valueChanged?.({ value: null });
     searchQuery = '';
     inputEl?.focus();
   }
@@ -493,6 +499,7 @@
     };
     clear = (): Resolution => {
       value = null;
+      valueChanged?.({ value: null });
       searchQuery = '';
       return { success: true, data: null };
     };

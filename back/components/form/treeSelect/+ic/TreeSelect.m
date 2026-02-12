@@ -51,6 +51,8 @@ classdef TreeSelect < ic.core.Component
     end
 
     events (Description = "Reactive")
+        % > VALUECHANGED fires when the user changes the selection
+        ValueChanged
         % > OPENED fires when the dropdown opens
         Opened
         % > CLOSED fires when the dropdown closes
@@ -58,7 +60,7 @@ classdef TreeSelect < ic.core.Component
     end
 
     events
-        % > SELECTIONCHANGED fires when the selection changes
+        % > SELECTIONCHANGED fires when the user changes the selection (convenience: carries Selection)
         SelectionChanged
     end
 
@@ -69,7 +71,10 @@ classdef TreeSelect < ic.core.Component
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.Component(props);
-            addlistener(this, 'Value', 'PostSet', @(~,~) notify(this, 'SelectionChanged'));
+            addlistener(this, 'Value', 'PostSet', @(src, ~) notify(...
+                this, ...
+                'SelectionChanged', ...
+                ic.event.MEvent(struct('Selection', src.Selection))));
         end
 
         function set.Value(this, val)
@@ -220,6 +225,25 @@ classdef TreeSelect < ic.core.Component
                 'key', char(key), ...
                 'label', char(node.Label), ...
                 'icon', icon));
+        end
+    end
+
+    methods (Access = private)
+        function onValueChanged(this, evt)
+            % > ONVALUECHANGED resolve event keys → Node handles, fire SelectionChanged
+            %   Props are debounced so we must resolve from event data, not this.Value
+            keys = evt.Data.value;
+            if isempty(keys)
+                sel = ic.tree.Node.empty;
+            else
+                keys = string(keys);
+                sel = ic.tree.Node.empty;
+                for i = 1:numel(keys)
+                    sel(i) = this.Items.resolve(keys(i));
+                end
+            end
+            notify(this, 'SelectionChanged', ...
+                ic.event.MEvent(struct('Selection', sel)));
         end
     end
 end

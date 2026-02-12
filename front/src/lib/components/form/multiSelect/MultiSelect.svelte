@@ -13,6 +13,7 @@
     maxPopupHeight = $bindable(200),
     maxSelectedItems = $bindable<number | null>(null),
     // Events
+    valueChanged,
     opened,
     closed,
     // Methods
@@ -30,6 +31,7 @@
     variant?: string;
     maxPopupHeight?: number;
     maxSelectedItems?: number | null;
+    valueChanged?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -125,6 +127,7 @@
     }
 
     value = newValue.length > 0 ? newValue : null;
+    valueChanged?.({ value });
 
     // Keep dropdown open, refocus search
     requestAnimationFrame(() => searchInputEl?.focus());
@@ -137,6 +140,7 @@
 
   function handleTagRemoved(item: string) {
     removeTag(item);
+    valueChanged?.({ value });
     if (removingIndex >= 0) {
       removingIndex = -1;
       if (valueList.length === 0) {
@@ -151,6 +155,7 @@
   function handleClearAll(e: Event) {
     e.stopPropagation();
     value = null;
+    valueChanged?.({ value: null });
     searchQuery = '';
     searchInputEl?.focus();
   }
@@ -319,6 +324,7 @@
 
     clear = (): Resolution => {
       value = null;
+      valueChanged?.({ value: null });
       searchQuery = '';
       return { success: true, data: null };
     };

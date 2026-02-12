@@ -10,7 +10,7 @@
     indeterminate = $bindable(false),
     labelPosition = $bindable('right'),
     snippets = { default: [], icon: [] } as Snippets,
-    changed,
+    valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     value?: string;
@@ -21,7 +21,7 @@
     indeterminate?: boolean;
     labelPosition?: string;
     snippets?: Snippets;
-    changed?: (data?: unknown) => void;
+    valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
@@ -48,7 +48,7 @@
     if (disabled) return;
     indeterminate = false;
     value = isOn ? 'off' : 'on';
-    changed?.({ value });
+    valueChanged?.({ value });
   }
 </script>
 

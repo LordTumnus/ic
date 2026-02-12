@@ -8,6 +8,7 @@
     variant = $bindable('primary'),
     size = $bindable('md'),
     disabled = $bindable(false),
+    valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     label?: string;
@@ -15,6 +16,7 @@
     variant?: string;
     size?: string;
     disabled?: boolean;
+    valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
 
@@ -30,6 +32,7 @@
   function handleClick() {
     if (!disabled) {
       value = !value;
+      valueChanged?.({ value });
       logger.debug('ToggleButton', 'toggled', { value });
     }
   }
