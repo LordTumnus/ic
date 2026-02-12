@@ -48,6 +48,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.SplitButton': modules['../components/form/splitButton/SplitButton.svelte'],
   'ic.Select': modules['../components/form/select/Select.svelte'],
   'ic.MultiSelect': modules['../components/form/multiSelect/MultiSelect.svelte'],
+  'ic.TreeSelect': modules['../components/form/treeSelect/TreeSelect.svelte'],
   'ic.SearchBar': modules['../components/form/searchBar/SearchBar.svelte'],
 
   // Layout components
