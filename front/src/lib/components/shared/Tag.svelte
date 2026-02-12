@@ -1,26 +1,6 @@
 <script lang="ts">
-  // Lucide icon map (same pattern as Icon.svelte)
-  const lucideModules = import.meta.glob(
-    '/node_modules/lucide-static/icons/*.svg',
-    { query: '?raw', import: 'default', eager: true }
-  ) as Record<string, string>;
+  import { resolveIcon } from '$lib/utils/icons';
 
-  const customModules = import.meta.glob(
-    '/static/icons/*.svg',
-    { query: '?raw', import: 'default', eager: true }
-  ) as Record<string, string>;
-
-  const iconMap = new Map<string, string>();
-  for (const [path, content] of Object.entries(lucideModules)) {
-    const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
-    iconMap.set(filename, content);
-  }
-  for (const [path, content] of Object.entries(customModules)) {
-    const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
-    iconMap.set(filename, content);
-  }
-
-  // Icon sizes per tag size
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
 
   let {
@@ -42,16 +22,7 @@
   } = $props();
 
   // Resolve icon SVG
-  const iconSvg = $derived.by(() => {
-    if (!icon) return '';
-    const key = icon.toLowerCase();
-    let svg = iconMap.get(key) ?? iconMap.get(icon) ?? '';
-    if (!svg) return '';
-    const s = ICON_SIZES[size] ?? 12;
-    svg = svg.replace(/width="[^"]*"/, `width="${s}"`);
-    svg = svg.replace(/height="[^"]*"/, `height="${s}"`);
-    return svg;
-  });
+  const iconSvg = $derived(resolveIcon(icon, ICON_SIZES[size] ?? 12));
 
   function handleRemoveClick(e: MouseEvent) {
     e.stopPropagation();

@@ -2,29 +2,7 @@
   import logger from '$lib/core/logger';
   import type { CssSize } from '$lib/utils/css';
   import { toSize, toNumericSize } from '$lib/utils/css';
-
-  // Import all Lucide icons from npm package at build time
-  const lucideModules = import.meta.glob(
-    '/node_modules/lucide-static/icons/*.svg',
-    { query: '?raw', import: 'default', eager: true }
-  ) as Record<string, string>;
-
-  // Import custom icons (overrides Lucide if same name)
-  const customModules = import.meta.glob(
-    '/static/icons/*.svg',
-    { query: '?raw', import: 'default', eager: true }
-  ) as Record<string, string>;
-
-  // Build lookup map: "info" -> svg content (custom overrides lucide)
-  const iconMap = new Map<string, string>();
-  for (const [path, content] of Object.entries(lucideModules)) {
-    const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
-    iconMap.set(filename, content);
-  }
-  for (const [path, content] of Object.entries(customModules)) {
-    const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
-    iconMap.set(filename, content);
-  }
+  import { iconMap } from '$lib/utils/icons';
 
   let {
     name = $bindable('info'),
