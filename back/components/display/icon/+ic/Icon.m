@@ -1,15 +1,18 @@
 classdef Icon < ic.core.Component
     % > ICON Displays an SVG icon.
     %
-    % Create icons using static factory methods:
+    % Create icons using static factory methods or the constructor:
     %   icon = ic.Icon.fromName("chevron-down")
     %   icon = ic.Icon.fromFile("path/to/icon.svg")
     %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
+    %   icon = ic.Icon(IconType=ic.IconType.lucide("apple"))
     %
     % Icon names are Lucide filenames without .svg extension.
     % Browse: https://lucide.dev/icons
 
     properties (SetObservable, AbortSet, Description = "Reactive")
+        % > ICONTYPE icon descriptor (ic.IconType)
+        IconType ic.IconType = ic.IconType.lucide("info")
         % > SIZE size of the icon (width = height)
         Size {ic.check.CssValidators.mustBeSize} = 16
         % > COLOR color of the icon (CSS color string or empty for currentColor)
@@ -18,51 +21,48 @@ classdef Icon < ic.core.Component
         StrokeWidth double = 2
     end
 
-    properties (SetAccess = private, SetObservable, AbortSet, ...
-            Description = "Reactive", Hidden)
-        % > NAME Lucide icon name (kebab-case filename without .svg)
-        Name string = "info"
-        % > PATHDATA svg path data (d attribute)
-        PathData string = ""
-        % > CUSTOMSVG base64-encoded SVG content (from file)
-        CustomSvg string = ""
+    methods
+        function set.IconType(this, val)
+            assert(val.Type ~= "raster", "ic:Icon:RasterNotSupported", ...
+                "ic.Icon does not support raster images. " + ...
+                "Use ic.Image instead.");
+            this.IconType = val;
+        end
     end
 
     methods (Static)
         function icon = fromName(name, id)
-            % FROMNAME Create icon from Lucide icon name
+            % > FROMNAME Create icon from Lucide icon name.
             %   icon = ic.Icon.fromName("check")
             %   icon = ic.Icon.fromName("chevron-down")
             arguments
                 name (1,1) string
                 id string = "ic-" + matlab.lang.internal.uuid()
             end
-            icon = ic.Icon(id);
-            icon.Name = name;
+            icon = ic.Icon(ID=id, IconType=ic.IconType.lucide(name));
         end
 
         function icon = fromFile(path, id)
-            % FROMFILE Create icon from SVG file
+            % > FROMFILE Create icon from SVG file.
+            %   icon = ic.Icon.fromFile("path/to/icon.svg")
+            %
+            % Only SVG files are supported. For raster images, use
+            % ic.Image instead.
             arguments
-                path string
+                path (1,1) string
                 id string = "ic-" + matlab.lang.internal.uuid()
             end
-            if ~isfile(path)
-                error('ic:Icon:FileNotFound', 'Icon file not found: %s', path);
-            end
-            icon = ic.Icon(id);
-            content = fileread(path);
-            icon.CustomSvg = matlab.net.base64encode(uint8(content));
+            icon = ic.Icon(ID=id, IconType=ic.IconType.filePath(path));
         end
 
         function icon = fromPath(pathData, id)
-            % FROMPATH Create icon from SVG path data (d attribute)
+            % > FROMPATH Create icon from SVG path data (d attribute).
+            %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
             arguments
-                pathData string
+                pathData (1,1) string
                 id string = "ic-" + matlab.lang.internal.uuid()
             end
-            icon = ic.Icon(id);
-            icon.PathData = pathData;
+            icon = ic.Icon(ID=id, IconType=ic.IconType.svgPath(pathData));
         end
 
         function names = list()

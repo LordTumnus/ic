@@ -4,68 +4,53 @@
   import { toSize, toNumericSize } from '$lib/utils/css';
   import { iconMap } from '$lib/utils/icons';
 
+  interface IconTypeData {
+    type: 'lucide' | 'path' | 'file';
+    value: string;
+  }
+
   let {
-    name = $bindable('info'),
+    iconType = $bindable<IconTypeData | null>(null),
     size = $bindable<CssSize>(16),
     color = $bindable(''),
     strokeWidth = $bindable(2),
-    pathData = $bindable(''),
-    customSvg = $bindable(''),
   }: {
-    name?: string;
+    iconType?: IconTypeData | null;
     size?: CssSize;
     color?: string;
     strokeWidth?: number;
-    pathData?: string;
-    customSvg?: string;
   } = $props();
 
   // Get numeric size for SVG attributes (default 24 if string)
   const svgSize = $derived(toNumericSize(size, 24));
 
-  function resolveIconName(str: string): string {
-    // Direct kebab-case lookup (primary path: "chevron-down")
-    const key = String(str);
-    if (iconMap.has(key)) return key;
-    // Lowercase fallback ("Info" → "info")
-    const lower = key.toLowerCase();
-    if (iconMap.has(lower)) return lower;
-    // Not found
-    return key;
-  }
-
-  function decodeBase64(base64: string): string {
-    try {
-      return atob(base64);
-    } catch (e) {
-      logger.error('Icon', `Failed to decode base64 SVG: ${e}`);
-      return '';
-    }
-  }
-
-  // Create SVG wrapper for path data
-  function createPathSvg(d: string): string {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
-  }
-
-  // Get SVG from: customSvg (file) > pathData > name (built-in)
+  // Resolve raw SVG string from iconType descriptor
   let rawSvg = $derived.by(() => {
-    // Priority 1: Custom SVG from file (base64)
-    if (customSvg) {
-      return decodeBase64(customSvg);
+    if (!iconType) return '';
+
+    switch (iconType.type) {
+      case 'lucide': {
+        const key = iconType.value;
+        const svg = iconMap.get(key) ?? iconMap.get(key.toLowerCase());
+        if (!svg) {
+          logger.error('Icon', `Icon not found: "${key}". Browse https://lucide.dev/icons`);
+          return '';
+        }
+        return svg;
+      }
+      case 'file': {
+        try {
+          return atob(iconType.value);
+        } catch (e) {
+          logger.error('Icon', `Failed to decode base64 SVG: ${e}`);
+          return '';
+        }
+      }
+      case 'path':
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${iconType.value}"/></svg>`;
+      default:
+        return '';
     }
-    // Priority 2: SVG path data
-    if (pathData) {
-      return createPathSvg(pathData);
-    }
-    // Priority 3: Built-in icon by name
-    const iconKey = resolveIconName(name);
-    const svg = iconMap.get(iconKey);
-    if (!svg) {
-      logger.error('Icon', `Icon not found: "${name}". Browse https://lucide.dev/icons`);
-      return '';
-    }
-    return svg;
   });
 
   // Process SVG to apply size, color, and strokeWidth
