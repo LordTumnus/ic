@@ -179,6 +179,21 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
             this.Queue = ic.event.JsEvent.empty();
         end
 
+        function onRequest(this, name, callback)
+            % > ONREQUEST registers a handler for frontend requests.
+            arguments (Input)
+                this (1,1) ic.core.ComponentBase
+                % > NAME the request name (PascalCase, e.g. "LoadChunk")
+                name (1,1) string
+                % > CALLBACK function that processes the request: result = callback(comp, data)
+                callback (1,1) function_handle
+            end
+
+            camelName = "@request/" + ic.utils.toCamelCase(name);
+            this.subscribe(camelName, @(comp, ~, payload) ...
+                comp.handleFrontendRequest(payload, callback));
+        end
+
         function effect = jsEffect(this, varargin)
             % > JSEFFECT creates a reactive expression that runs on the frontend.
             %
@@ -357,6 +372,21 @@ classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
     end
 
     methods (Access = private)
+        function handleFrontendRequest(this, payload, callback)
+            % > HANDLEFRONTENDREQUEST processes an incoming request from
+            % the Svelte frontend and sends back a response.
+            try
+                result = callback(this, payload.data);
+                response = struct('success', true, 'data', []);
+                response.data = result;
+            catch ex
+                response = struct('success', false, 'data', ex.message);
+            end
+            evt = ic.event.JsEvent(this.ID, ...
+                "@resp/" + string(payload.id), response);
+            this.send(evt);
+        end
+
         function onReactiveListenerRemoved(this, eventName)
             % > ONREACTIVELISTENERREMOVED decrements the listener count for
             % the given event and notifies the view when the last listener

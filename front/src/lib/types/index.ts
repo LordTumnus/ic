@@ -28,6 +28,23 @@ export interface Resolution {
   data: unknown;
 }
 
+/** Payload for frontend → MATLAB request/response. */
+export interface RequestPayload {
+  /** Unique request ID for response correlation */
+  id: string;
+  /** Request data */
+  data: unknown;
+}
+
+/** Publish an event to MATLAB. */
+export type PublishFn = (name: string, data?: unknown) => void;
+
+/** Subscribe to events from MATLAB. Returns an unsubscribe function. */
+export type SubscribeFn = (name: string, callback: EventCallback) => Unsubscribe;
+
+/** Send a request to MATLAB and await the response. */
+export type RequestFn = (name: string, data?: unknown) => Promise<Resolution>;
+
 /** Component definition sent within @insert events. */
 export interface ComponentDefinition {
   /** MATLAB class name (e.g., "ic.components.Button") */

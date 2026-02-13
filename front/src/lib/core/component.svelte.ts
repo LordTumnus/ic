@@ -20,6 +20,7 @@ import type {
   EventDefinition,
   MethodDefinition,
   Resolution,
+  RequestPayload,
   Snippets,
   StyleEventData,
   ClearStyleEventData,
@@ -226,6 +227,25 @@ class Component implements Registrable {
       configurable: true
     });
 
+    // Expose communication primitives for advanced Svelte component usage
+    Object.defineProperty(stateObj, 'publish', {
+      value: (name: string, data?: unknown) => this.publish(name, data),
+      enumerable: true,
+      configurable: true
+    });
+
+    Object.defineProperty(stateObj, 'subscribe', {
+      value: (name: string, callback: EventCallback) => this.subscribe(name, callback),
+      enumerable: true,
+      configurable: true
+    });
+
+    Object.defineProperty(stateObj, 'request', {
+      value: (name: string, data?: unknown) => this.request(name, data),
+      enumerable: true,
+      configurable: true
+    });
+
     this.svelteProps = stateObj;
 
     // Set up built-in event handlers
@@ -370,7 +390,7 @@ class Component implements Registrable {
    * @param name - Event name (e.g., "click", "@prop/Label")
    * @param data - Event payload
    */
-  publish(name: string, data: unknown): void {
+  publish(name: string, data?: unknown): void {
     Bridge.instance.send([
       {
         component: this.id,
@@ -379,6 +399,39 @@ class Component implements Registrable {
         id: crypto.randomUUID()
       }
     ]);
+  }
+
+  /**
+   * Send a request to MATLAB and await the response.
+   *
+   * This mirrors MATLAB's `publish` → `Promise` pattern but in reverse:
+   * the frontend sends `@request/{name}` with a unique ID, and MATLAB
+   * responds with `@resp/{id}` containing a Resolution.
+   *
+   * @param name - Request name (camelCase, e.g., "loadChunk")
+   * @param data - Request payload
+   * @returns Promise that resolves with MATLAB's response
+   */
+  request(name: string, data?: unknown): Promise<Resolution> {
+    const requestId = crypto.randomUUID();
+
+    return new Promise<Resolution>((resolve) => {
+      // Listen for MATLAB's response on @resp/{requestId}
+      const unsub = this.subscribe(`@resp/${requestId}`, (_id, _name, responseData) => {
+        unsub();
+        resolve(responseData as Resolution);
+      });
+
+      // Send the request to MATLAB
+      Bridge.instance.send([
+        {
+          component: this.id,
+          name: `@request/${name}`,
+          data: { id: requestId, data } satisfies RequestPayload,
+          id: requestId
+        }
+      ]);
+    });
   }
 
   /**
