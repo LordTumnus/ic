@@ -30,6 +30,8 @@ classdef Tree < ic.tree.TreeBase
         Height {ic.check.CssValidators.mustBeSize(Height)} = 400
         % > SHOWLINE whether to display tree connector lines between nodes
         ShowLine logical = true
+        % > LAZYLOAD when true, child nodes are only rendered when their parent is expanded; when false, all nodes are pre-rendered in the DOM
+        LazyLoad logical = true
     end
 
     methods

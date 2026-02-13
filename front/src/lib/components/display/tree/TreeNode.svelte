@@ -19,6 +19,7 @@
     selectable = true,
     disabled = false,
     showLine = false,
+    lazyLoad = true,
     isLast = false,
     parentLines = [] as boolean[],
     expandedKeys,
@@ -33,6 +34,7 @@
     selectable?: boolean;
     disabled?: boolean;
     showLine?: boolean;
+    lazyLoad?: boolean;
     isLast?: boolean;
     parentLines?: boolean[];
     expandedKeys: Set<string>;
@@ -125,25 +127,28 @@
     </span>
   </div>
 
-  <!-- Children (recursive, if expanded) -->
-  {#if isFolder && isExpanded}
-    {#each node.children as child, ci (child.key)}
-      <TreeNode
-        node={child}
-        depth={depth + 1}
-        {size}
-        {selectable}
-        {disabled}
-        {showLine}
-        isLast={ci === node.children.length - 1}
-        parentLines={showLine ? [...parentLines, !isLast] : []}
-        {expandedKeys}
-        {isItemSelected}
-        {atMaxSelections}
-        {ontoggle}
-        {onexpandchange}
-      />
-    {/each}
+  <!-- Children (lazy: mount only when expanded; eager: always in DOM, hidden when collapsed) -->
+  {#if isFolder && (!lazyLoad || isExpanded)}
+    <div class="ic-tn__children" style:display={isExpanded ? null : 'none'}>
+      {#each node.children as child, ci (child.key)}
+        <TreeNode
+          node={child}
+          depth={depth + 1}
+          {size}
+          {selectable}
+          {disabled}
+          {showLine}
+          {lazyLoad}
+          isLast={ci === node.children.length - 1}
+          parentLines={showLine ? [...parentLines, !isLast] : []}
+          {expandedKeys}
+          {isItemSelected}
+          {atMaxSelections}
+          {ontoggle}
+          {onexpandchange}
+        />
+      {/each}
+    </div>
   {/if}
 </div>
 

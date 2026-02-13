@@ -61,11 +61,6 @@ classdef TreeSelect < ic.tree.TreeBase
             out = this.publish("focus", []);
         end
 
-        function out = clear(this)
-            % > CLEAR programmatically clear all selected values
-            out = this.publish("clear", []);
-        end
-
         function out = open(this)
             % > OPEN programmatically open the dropdown
             out = this.publish("open", []);

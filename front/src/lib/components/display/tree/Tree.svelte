@@ -23,6 +23,7 @@
     maxSelectedItems = $bindable<number | null>(null),
     height = $bindable<number | string>(400),
     showLine = $bindable(true),
+    lazyLoad = $bindable(true),
     // Events
     valueChanged,
     // Methods
@@ -30,6 +31,7 @@
     addNode = $bindable((_data: { parentKey: string; label: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
     removeNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     updateNode = $bindable((_data: { key: string; label?: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
+    clearSelection = $bindable((): Resolution => ({ success: true, data: null })),
     expandNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     collapseNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     expandAll = $bindable((): Resolution => ({ success: true, data: null })),
@@ -43,11 +45,13 @@
     maxSelectedItems?: number | null;
     height?: number | string;
     showLine?: boolean;
+    lazyLoad?: boolean;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
     addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
     removeNode?: (data: { key: string }) => Resolution;
     updateNode?: (data: { key: string; label?: string; icon?: unknown }) => Resolution;
+    clearSelection?: () => Resolution;
     expandNode?: (data: { key: string }) => Resolution;
     collapseNode?: (data: { key: string }) => Resolution;
     expandAll?: () => Resolution;
@@ -122,6 +126,11 @@
   $effect(() => {
     focus = (): Resolution => {
       containerEl?.focus();
+      return { success: true, data: null };
+    };
+    clearSelection = (): Resolution => {
+      value = null;
+      valueChanged?.({ value: null });
       return { success: true, data: null };
     };
     addNode = (data: { parentKey: string; label: string; icon?: unknown }): Resolution => {
@@ -202,6 +211,7 @@
         {selectable}
         {disabled}
         {showLine}
+        {lazyLoad}
         isLast={i === treeState.length - 1}
         parentLines={[]}
         {expandedKeys}

@@ -176,6 +176,12 @@ classdef (Abstract) TreeBase < ic.core.Component
                 'icon', icon));
         end
 
+        function out = clearSelection(this)
+            % > CLEARSELECTION Clear all selected items.
+            this.Value = string.empty;
+            out = this.publish("clearSelection", []);
+        end
+
         function out = expandNode(this, node)
             % > EXPANDNODE Programmatically expand a folder node.
             %   t.expandNode(citrus)

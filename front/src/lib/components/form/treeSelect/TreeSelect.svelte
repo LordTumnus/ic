@@ -45,12 +45,12 @@
     closed,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
-    clear = $bindable((): Resolution => ({ success: true, data: null })),
     open = $bindable((): Resolution => ({ success: true, data: null })),
     close = $bindable((): Resolution => ({ success: true, data: null })),
     addNode = $bindable((_data: { parentKey: string; label: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
     removeNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     updateNode = $bindable((_data: { key: string; label?: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
+    clearSelection = $bindable((): Resolution => ({ success: true, data: null })),
     expandNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     collapseNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     expandAll = $bindable((): Resolution => ({ success: true, data: null })),
@@ -71,12 +71,12 @@
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
     focus?: () => Resolution;
-    clear?: () => Resolution;
     open?: () => Resolution;
     close?: () => Resolution;
     addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
     removeNode?: (data: { key: string }) => Resolution;
     updateNode?: (data: { key: string; label?: string; icon?: unknown }) => Resolution;
+    clearSelection?: () => Resolution;
     expandNode?: (data: { key: string }) => Resolution;
     collapseNode?: (data: { key: string }) => Resolution;
     expandAll?: () => Resolution;
@@ -396,18 +396,17 @@
       inputEl?.focus();
       return { success: true, data: null };
     };
-    clear = (): Resolution => {
-      value = null;
-      valueChanged?.({ value: null });
-      searchQuery = '';
-      return { success: true, data: null };
-    };
     open = (): Resolution => {
       openDropdown();
       return { success: true, data: null };
     };
     close = (): Resolution => {
       closeDropdown();
+      return { success: true, data: null };
+    };
+    clearSelection = (): Resolution => {
+      value = null;
+      valueChanged?.({ value: null });
       return { success: true, data: null };
     };
     addNode = (data: { parentKey: string; label: string; icon?: unknown }): Resolution => {
