@@ -14,6 +14,11 @@ classdef TreeSelect < ic.core.Component
     %       lemon  = citrus.add("Lemon");
     %       ts.Items = fruits;
     %       ts.Selection = [apple, lemon];
+    %
+    %       % Incremental operations:
+    %       ts.addNode(citrus, "Grape");
+    %       ts.removeNode(orange);
+    %       ts.updateNode(apple, Label="Green Apple");
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > ITEMS tree nodes
@@ -113,7 +118,7 @@ classdef TreeSelect < ic.core.Component
             keys = strings(1, numel(val));
             for i = 1:numel(val)
                 k = this.Items.keyOf(val(i));
-                assert(k ~= "", "ic:TreeSelect:NodeNotInTree", ...
+                assert(~isempty(k), "ic:TreeSelect:NodeNotInTree", ...
                     "Node '%s' is not in the Items tree.", val(i).Label);
                 keys(i) = k;
             end
@@ -142,23 +147,24 @@ classdef TreeSelect < ic.core.Component
             out = this.publish("close", []);
         end
 
-        function out = addNode(this, parentKey, label, opts)
+        function [child, out] = addNode(this, parent, label, opts)
             % > ADDNODE Add a child node to the tree incrementally.
-            %   ts.addNode("", "Root")         % add root node
-            %   ts.addNode("1-2", "Grape")     % add under node 1-2
+            %   ts.addNode(ic.tree.Node.empty, "Root")   % add root node
+            %   ts.addNode(citrus, "Grape")               % add under citrus
             arguments
                 this
-                parentKey (1,1) string
+                parent ic.tree.Node
                 label (1,1) string
                 opts.Icon = ic.IconType.empty
                 opts.Data struct = struct.empty
             end
             child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);
-            if parentKey == ""
+            if isempty(parent)
                 % Root-level: must go through setter. Use setValueSilently
                 % to suppress the framework notification to Svelte.
                 % Pre-clear Value so set.Items' this.Value=string.empty
                 % is a no-op (AbortSet sees same value).
+                parentKey = "";
                 savedValue = this.Value;
                 this.setValueSilently('Value', string.empty);
                 this.setValueSilently('Items', [this.Items, child]);
@@ -166,7 +172,9 @@ classdef TreeSelect < ic.core.Component
                     this.setValueSilently('Value', savedValue);
                 end
             else
-                parent = this.Items.resolve(parentKey);
+                parentKey = this.Items.keyOf(parent);
+                assert(~isempty(parentKey), "ic:TreeSelect:NodeNotInTree", ...
+                    "Parent node '%s' is not in the Items tree.", parent.Label);
                 parent.Children(end+1) = child;
             end
             if isempty(opts.Icon)
@@ -180,10 +188,13 @@ classdef TreeSelect < ic.core.Component
                 'icon', icon));
         end
 
-        function out = removeNode(this, key)
+        function out = removeNode(this, node)
             % > REMOVENODE Remove a node from the tree incrementally.
-            %   ts.removeNode("1-2-1")
-            arguments, this, key (1,1) string, end
+            %   ts.removeNode(orange)
+            arguments, this, node (1,1) ic.tree.Node, end
+            key = this.Items.keyOf(node);
+            assert(~isempty(key), "ic:TreeSelect:NodeNotInTree", ...
+                "Node '%s' is not in the Items tree.", node.Label);
             parts = sscanf(key, '%d-');
             if isscalar(parts)
                 % Root-level: keys shift after removal, so clear Value
@@ -204,17 +215,19 @@ classdef TreeSelect < ic.core.Component
             out = this.publish("removeNode", struct('key', char(key)));
         end
 
-        function out = updateNode(this, key, opts)
+        function out = updateNode(this, node, opts)
             % > UPDATENODE Update a node's label or icon incrementally.
-            %   ts.updateNode("1-1", Label="Green Apple")
+            %   ts.updateNode(apple, Label="Green Apple")
             arguments
                 this
-                key (1,1) string
+                node (1,1) ic.tree.Node
                 opts.Label (1,1) string = ""
                 opts.Icon = []
                 opts.Data struct = struct.empty
             end
-            node = this.Items.resolve(key);
+            key = this.Items.keyOf(node);
+            assert(~isempty(key), "ic:TreeSelect:NodeNotInTree", ...
+                "Node '%s' is not in the Items tree.", node.Label);
             if opts.Label ~= "", node.Label = opts.Label; end
             if ~isempty(opts.Icon), node.Icon = opts.Icon; end
             if ~isempty(opts.Data), node.Data = opts.Data; end
