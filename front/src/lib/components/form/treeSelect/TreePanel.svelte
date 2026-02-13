@@ -2,24 +2,13 @@
   import TreePanel from './TreePanel.svelte';
 
   import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
-
-  interface TreeNodeData {
-    key: string;
-    name: string;
-    icon?: string | IconTypeData;
-    children: TreeNodeData[];
-  }
+  import { toSize } from '$lib/utils/css';
+  import { type TreeNode as TreeNodeData, getAllLeaves } from '$lib/utils/tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
 
   function resolveIcon(icon: string | IconTypeData | undefined, sz: string): string {
     return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
-  }
-
-  // --- Module-level helper ---
-  function getAllLeaves(node: TreeNodeData): string[] {
-    if (!node.children?.length) return [node.key];
-    return node.children.flatMap((c) => getAllLeaves(c));
   }
 
   // --- Props ---
@@ -33,24 +22,30 @@
     atMaxSelections = false,
     ontoggle,
     ontogglefolder,
+    expandedKeys = new Set<string>(),
+    onexpandchange,
   }: {
     nodes: TreeNodeData[];
     size?: string;
-    maxHeight?: number;
-    maxPanelWidth?: number;
+    maxHeight?: number | string;
+    maxPanelWidth?: number | string;
     openOnHover?: boolean;
     isItemSelected: (key: string) => boolean;
     atMaxSelections?: boolean;
     ontoggle: (key: string) => void;
     ontogglefolder: (leafKeys: string[]) => void;
+    expandedKeys?: Set<string>;
+    onexpandchange?: (key: string, expanded: boolean) => void;
   } = $props();
 
   // --- Refs & State ---
   let panelRef: HTMLDivElement;
   let rowEls: HTMLDivElement[] = [];
-  let expandedIndex = $state(-1);
   let subTop = $state(0);
   let timer: ReturnType<typeof setTimeout> | null = null;
+
+  // Derive expandedIndex from the external expandedKeys set
+  const expandedIndex = $derived(nodes.findIndex((n) => expandedKeys.has(n.key)));
 
   // --- Check state for any node ---
   function getCheckState(node: TreeNodeData): 'checked' | 'indeterminate' | 'unchecked' {
@@ -90,14 +85,22 @@
     });
   }
 
+  function setExpanded(index: number, expanded: boolean) {
+    const key = nodes[index]?.key;
+    if (!key) return;
+    onexpandchange?.(key, expanded);
+    if (expanded) positionSub(index);
+  }
+
   function handleRowEnter(index: number) {
     clearTimer();
     if (!openOnHover) return;
     const node = nodes[index];
     if (node?.children?.length > 0 && index !== expandedIndex) {
       timer = setTimeout(() => {
-        expandedIndex = index;
-        positionSub(index);
+        // Collapse current sibling first
+        if (expandedIndex >= 0) setExpanded(expandedIndex, false);
+        setExpanded(index, true);
       }, 150);
     }
   }
@@ -106,10 +109,10 @@
     e.stopPropagation();
     clearTimer();
     if (expandedIndex === index) {
-      expandedIndex = -1;
+      setExpanded(index, false);
     } else {
-      expandedIndex = index;
-      positionSub(index);
+      if (expandedIndex >= 0) setExpanded(expandedIndex, false);
+      setExpanded(index, true);
     }
   }
 
@@ -126,9 +129,9 @@
     class:ic-tp__panel--sm={size === 'sm'}
     class:ic-tp__panel--md={size === 'md'}
     class:ic-tp__panel--lg={size === 'lg'}
-    style:max-width="{maxPanelWidth}px"
+    style:max-width={toSize(maxPanelWidth)}
   >
-    <div class="ic-tp__list" style:max-height="{maxHeight}px">
+    <div class="ic-tp__list" style:max-height={toSize(maxHeight)}>
       {#each nodes as node, i (node.key)}
         {@const state = getCheckState(node)}
         {@const isFolder = (node.children?.length ?? 0) > 0}
@@ -211,6 +214,8 @@
         {atMaxSelections}
         {ontoggle}
         {ontogglefolder}
+        {expandedKeys}
+        {onexpandchange}
       />
     </div>
   {/if}

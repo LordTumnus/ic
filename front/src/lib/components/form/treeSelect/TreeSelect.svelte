@@ -1,27 +1,28 @@
 <script lang="ts">
   import type { Resolution } from '$lib/types';
+  import { toSize } from '$lib/utils/css';
   import Tag from '$lib/components/shared/Tag.svelte';
   import TreePanel from './TreePanel.svelte';
-  import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
-
-  // --- Types ---
-  interface TreeNode {
-    key: string;
-    name: string;
-    icon?: string | IconTypeData;
-    children: TreeNode[];
-  }
-
-  interface FlatNode {
-    key: string;
-    name: string;
-    icon?: string | IconTypeData;
-    path: string[];
-  }
+  import { resolveIconType } from '$lib/utils/icons';
+  import {
+    type TreeNode,
+    type FlatNode,
+    normalizeNodes,
+    normalizeIcon,
+    buildKeyMap,
+    flattenLeaves,
+    findNodeByKey,
+    collectAllKeys,
+    collectAllFolderKeys,
+    reindexSubtree,
+    removeAndReindex,
+    mapShiftedKeys,
+    remapValues,
+  } from '$lib/utils/tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
 
-  function resolveIcon(icon: string | IconTypeData | undefined, sz: string): string {
+  function resolveIcon(icon: string | import('$lib/utils/icons').IconTypeData | undefined, sz: string): string {
     return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
   }
 
@@ -34,9 +35,9 @@
     clearable = $bindable(false),
     size = $bindable('md'),
     variant = $bindable('primary'),
-    maxPopupHeight = $bindable(200),
+    maxPopupHeight = $bindable<number | string>(200),
     maxSelectedItems = $bindable<number | null>(null),
-    maxPanelWidth = $bindable(240),
+    maxPanelWidth = $bindable<number | string>(240),
     openOnHover = $bindable(false),
     // Events
     valueChanged,
@@ -50,6 +51,10 @@
     addNode = $bindable((_data: { parentKey: string; label: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
     removeNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
     updateNode = $bindable((_data: { key: string; label?: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
+    expandNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
+    collapseNode = $bindable((_data: { key: string }): Resolution => ({ success: true, data: null })),
+    expandAll = $bindable((): Resolution => ({ success: true, data: null })),
+    collapseAll = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     items?: TreeNode[] | TreeNode | null;
     value?: string[] | string | null;
@@ -58,9 +63,9 @@
     clearable?: boolean;
     size?: string;
     variant?: string;
-    maxPopupHeight?: number;
+    maxPopupHeight?: number | string;
     maxSelectedItems?: number | null;
-    maxPanelWidth?: number;
+    maxPanelWidth?: number | string;
     openOnHover?: boolean;
     valueChanged?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
@@ -72,6 +77,10 @@
     addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
     removeNode?: (data: { key: string }) => Resolution;
     updateNode?: (data: { key: string; label?: string; icon?: unknown }) => Resolution;
+    expandNode?: (data: { key: string }) => Resolution;
+    collapseNode?: (data: { key: string }) => Resolution;
+    expandAll?: () => Resolution;
+    collapseAll?: () => Resolution;
   } = $props();
 
   // --- Refs ---
@@ -86,57 +95,10 @@
   let focusedTagIndex = $state(-1);
   let removingIndex = $state(-1);
   let searchFocusedIndex = $state(-1);
+  let expandedKeys = $state(new Set<string>());
 
-  // --- Normalize ic.tree.Node serialization (positional keys) ---
-  function normalizeNodes(raw: unknown, prefix = ''): TreeNode[] {
-    if (raw == null) return [];
-    if (!Array.isArray(raw)) raw = [raw];
-    return (raw as Record<string, unknown>[]).map((n, i) => {
-      const key = prefix ? `${prefix}-${i + 1}` : `${i + 1}`;
-      return {
-        key,
-        name: String(n.label ?? ''),
-        icon: normalizeIcon(n.icon),
-        children: normalizeNodes(n.children, key),
-      };
-    });
-  }
-
-  function normalizeIcon(raw: unknown): string | IconTypeData | undefined {
-    if (raw == null) return undefined;
-    if (typeof raw === 'string') return raw || undefined;
-    if (typeof raw === 'object' && 'type' in (raw as object))
-      return raw as IconTypeData;
-    return undefined;
-  }
-
-  // --- Tree helpers ---
-  function buildKeyMap(nodes: TreeNode[]): Map<string, { name: string; icon?: string | IconTypeData }> {
-    const map = new Map<string, { name: string; icon?: string | IconTypeData }>();
-    function walk(list: TreeNode[]) {
-      for (const n of list) {
-        map.set(n.key, { name: n.name, icon: n.icon });
-        if (n.children.length > 0) walk(n.children);
-      }
-    }
-    walk(nodes);
-    return map;
-  }
-
-  /** Flatten tree to leaf nodes only (folders excluded from search) */
-  function flattenLeaves(nodes: TreeNode[], path: string[] = []): FlatNode[] {
-    const out: FlatNode[] = [];
-    for (const n of nodes) {
-      if (n.children.length > 0) {
-        // Folder: recurse into children, adding this node's name to the path
-        out.push(...flattenLeaves(n.children, [...path, n.name]));
-      } else {
-        // Leaf: include in results
-        out.push({ key: n.key, name: n.name, icon: n.icon, path });
-      }
-    }
-    return out;
-  }
+  // normalizeNodes, normalizeIcon, buildKeyMap, flattenLeaves
+  // imported from $lib/utils/tree-utils
 
   // --- Mutable tree state (reset on full items change, mutated by ops) ---
   let treeState = $state<TreeNode[]>([]);
@@ -402,93 +364,30 @@
     inputEl?.focus();
   }
 
-  // --- Tree op helpers ---
-  function findNodeByKey(nodes: TreeNode[], key: string): TreeNode | null {
-    for (const n of nodes) {
-      if (n.key === key) return n;
-      const found = findNodeByKey(n.children, key);
-      if (found) return found;
-    }
-    return null;
-  }
+  // findNodeByKey, collectAllKeys, reindexSubtree, removeAndReindex,
+  // mapShiftedKeys, remapValues imported from $lib/utils/tree-utils
 
-  function collectAllKeys(node: TreeNode): string[] {
-    const keys = [node.key];
-    for (const c of node.children) keys.push(...collectAllKeys(c));
-    return keys;
-  }
-
-  function reindexSubtree(node: TreeNode, newKey: string): TreeNode {
-    return {
-      ...node,
-      key: newKey,
-      children: node.children.map((c, i) =>
-        reindexSubtree(c, `${newKey}-${i + 1}`)
-      ),
-    };
-  }
-
-  function removeAndReindex(
-    nodes: TreeNode[],
-    key: string
-  ): { updated: TreeNode[]; removedKeys: Set<string>; keyMapping: Map<string, string> } {
+  /** Compute all ancestor keys leading to `key` (exclusive). E.g. "1-2-3" → ["1", "1-2"] */
+  function ancestorKeys(key: string): string[] {
     const parts = key.split('-');
-    const removedKeys = new Set<string>();
-    const keyMapping = new Map<string, string>();
+    const ancestors: string[] = [];
+    for (let i = 1; i < parts.length; i++) {
+      ancestors.push(parts.slice(0, i).join('-'));
+    }
+    return ancestors;
+  }
 
-    function recurse(list: TreeNode[], depth: number, prefix: string): TreeNode[] {
-      const targetIdx = parseInt(parts[depth], 10) - 1;
-      if (depth === parts.length - 1) {
-        // This is the level where the node lives
-        const removed = list[targetIdx];
-        if (removed) {
-          for (const k of collectAllKeys(removed)) removedKeys.add(k);
-        }
-        const after = [...list.slice(0, targetIdx), ...list.slice(targetIdx + 1)];
-        // Reindex siblings after the removed index
-        return after.map((n, i) => {
-          const newKey = prefix ? `${prefix}-${i + 1}` : `${i + 1}`;
-          if (n.key !== newKey) {
-            const old = n.key;
-            const reindexed = reindexSubtree(n, newKey);
-            // Map old keys to new keys for the shifted siblings
-            mapShiftedKeys(n, reindexed, keyMapping);
-            return reindexed;
-          }
-          return n;
-        });
+  function handleExpandChange(key: string, expanded: boolean) {
+    const next = new Set(expandedKeys);
+    if (expanded) {
+      next.add(key);
+    } else {
+      // Remove key and all descendant keys
+      for (const k of next) {
+        if (k === key || k.startsWith(key + '-')) next.delete(k);
       }
-      // Recurse into the correct child
-      return list.map((n, i) => {
-        if (i === targetIdx) {
-          return {
-            ...n,
-            children: recurse(n.children, depth + 1, n.key),
-          };
-        }
-        return n;
-      });
     }
-
-    const updated = recurse(nodes, 0, '');
-    return { updated, removedKeys, keyMapping };
-  }
-
-  function mapShiftedKeys(oldNode: TreeNode, newNode: TreeNode, mapping: Map<string, string>) {
-    if (oldNode.key !== newNode.key) mapping.set(oldNode.key, newNode.key);
-    for (let i = 0; i < oldNode.children.length; i++) {
-      mapShiftedKeys(oldNode.children[i], newNode.children[i], mapping);
-    }
-  }
-
-  function remapValues(
-    vals: string[],
-    removedKeys: Set<string>,
-    keyMapping: Map<string, string>
-  ): string[] {
-    return vals
-      .filter((v) => !removedKeys.has(v))
-      .map((v) => keyMapping.get(v) ?? v);
+    expandedKeys = next;
   }
 
   // --- Methods ---
@@ -540,6 +439,33 @@
       if (data.label != null) node.name = data.label;
       if (data.icon !== undefined) node.icon = normalizeIcon(data.icon);
       treeState = [...treeState]; // trigger reactivity
+      return { success: true, data: null };
+    };
+    expandNode = (data: { key: string }): Resolution => {
+      const node = findNodeByKey(treeState, data.key);
+      if (!node) return { success: false, data: `Node "${data.key}" not found` };
+      const next = new Set(expandedKeys);
+      // Expand all ancestors leading to this node
+      for (const ak of ancestorKeys(data.key)) next.add(ak);
+      // Expand the node itself (if it's a folder)
+      if (node.children.length > 0) next.add(data.key);
+      expandedKeys = next;
+      return { success: true, data: null };
+    };
+    collapseNode = (data: { key: string }): Resolution => {
+      const next = new Set(expandedKeys);
+      for (const k of next) {
+        if (k === data.key || k.startsWith(data.key + '-')) next.delete(k);
+      }
+      expandedKeys = next;
+      return { success: true, data: null };
+    };
+    expandAll = (): Resolution => {
+      expandedKeys = new Set(collectAllFolderKeys(treeState));
+      return { success: true, data: null };
+    };
+    collapseAll = (): Resolution => {
+      expandedKeys = new Set();
       return { success: true, data: null };
     };
   });
@@ -626,7 +552,7 @@
     {#if isSearchMode}
       <!-- Flat search results (leaves only) -->
       <div class="ic-ts__dropdown">
-        <div class="ic-ts__search-list" style="max-height: {maxPopupHeight}px;">
+        <div class="ic-ts__search-list" style="max-height: {toSize(maxPopupHeight)};">
           {#each filteredFlat as node, i (node.key)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
@@ -681,6 +607,8 @@
           {atMaxSelections}
           ontoggle={toggleItem}
           ontogglefolder={toggleLeaves}
+          {expandedKeys}
+          onexpandchange={handleExpandChange}
         />
       </div>
     {/if}

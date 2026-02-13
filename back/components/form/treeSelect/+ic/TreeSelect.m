@@ -1,4 +1,4 @@
-classdef TreeSelect < ic.core.Component
+classdef TreeSelect < ic.tree.TreeBase
     % > TREESELECT Hierarchical multi-value selector with cascading menus.
     %
     %   Displays selected items as closable tags inside the input field.
@@ -21,12 +21,8 @@ classdef TreeSelect < ic.core.Component
     %       ts.updateNode(apple, Label="Green Apple");
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS tree nodes
-        Items ic.tree.Node = ic.tree.Node.empty
         % > PLACEHOLDER text shown when no items are selected
         Placeholder string = "Select..."
-        % > DISABLED whether the control is disabled
-        Disabled logical = false
         % > CLEARABLE whether all selections can be cleared via an X button
         Clearable logical = false
         % > SIZE size of the control
@@ -34,39 +30,19 @@ classdef TreeSelect < ic.core.Component
         % > VARIANT visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary"])} = "primary"
-        % > MAXPOPUPHEIGHT maximum height in pixels of the dropdown list
-        MaxPopupHeight double = 200
-        % > MAXSELECTEDITEMS maximum number of selectable items (Inf = unlimited)
-        MaxSelectedItems double {mustBePositive} = Inf
-        % > MAXPANELWIDTH maximum width in pixels of each cascade panel
-        MaxPanelWidth double {mustBePositive} = 240
+        % > MAXPOPUPHEIGHT maximum height of the dropdown (number for px, or CSS string)
+        MaxPopupHeight {ic.check.CssValidators.mustBeSize(MaxPopupHeight)} = 200
+        % > MAXPANELWIDTH maximum width of each cascade panel (number for px, or CSS string)
+        MaxPanelWidth {ic.check.CssValidators.mustBeSize(MaxPanelWidth)} = 240
         % > OPENONHOVER whether hovering a folder row auto-opens its sub-panel
         OpenOnHover logical = false
     end
 
-    properties (SetObservable, AbortSet, Description = "Reactive", ...
-            Access = ?ic.core.ComponentBase, Hidden)
-        % > VALUE positional key strings (Svelte bridge — hidden from user)
-        Value string = string.empty
-    end
-
-    properties (Dependent)
-        % > SELECTION currently selected nodes (user-facing API)
-        Selection
-    end
-
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
-        ValueChanged
         % > OPENED fires when the dropdown opens
         Opened
         % > CLOSED fires when the dropdown closes
         Closed
-    end
-
-    events
-        % > SELECTIONCHANGED fires when the user changes the selection (convenience: carries Selection)
-        SelectionChanged
     end
 
     methods
@@ -75,54 +51,7 @@ classdef TreeSelect < ic.core.Component
                 props.?ic.TreeSelect
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.core.Component(props);
-            addlistener(this, 'Value', 'PostSet', @(~, ~) notify(...
-                this, ...
-                'SelectionChanged', ...
-                ic.event.MEvent(struct('Selection', this.Selection))));
-        end
-
-        function set.Value(this, val)
-            % Normalize "" to string.empty (canonical "no selection")
-            if isscalar(val) && val == ""
-                val = string.empty;
-            end
-            % Validate: every positional key must resolve in the tree
-            if ~isempty(val) && ~isempty(this.Items) %#ok<MCSUP>
-                for i = 1:numel(val)
-                    this.Items.resolve(val(i)); %#ok<MCSUP>
-                end
-            end
-            this.Value = val;
-        end
-
-        function set.Items(this, val)
-            this.Value = string.empty; %#ok<MCSUP>
-            this.Items = val;
-        end
-
-        function nodes = get.Selection(this)
-            % Resolve positional key strings → Node handles
-            nodes = ic.tree.Node.empty;
-            for i = 1:numel(this.Value)
-                nodes(i) = this.Items.resolve(this.Value(i));
-            end
-        end
-
-        function set.Selection(this, val)
-            % Convert Node handles → positional key strings via keyOf
-            if isempty(val)
-                this.Value = string.empty;
-                return;
-            end
-            keys = strings(1, numel(val));
-            for i = 1:numel(val)
-                k = this.Items.keyOf(val(i));
-                assert(~isempty(k), "ic:TreeSelect:NodeNotInTree", ...
-                    "Node '%s' is not in the Items tree.", val(i).Label);
-                keys(i) = k;
-            end
-            this.Value = keys;
+            this@ic.tree.TreeBase(props);
         end
     end
 
@@ -145,118 +74,6 @@ classdef TreeSelect < ic.core.Component
         function out = close(this)
             % > CLOSE programmatically close the dropdown
             out = this.publish("close", []);
-        end
-
-        function [child, out] = addNode(this, parent, label, opts)
-            % > ADDNODE Add a child node to the tree incrementally.
-            %   ts.addNode(ic.tree.Node.empty, "Root")   % add root node
-            %   ts.addNode(citrus, "Grape")               % add under citrus
-            arguments
-                this
-                parent ic.tree.Node
-                label (1,1) string
-                opts.Icon = ic.IconType.empty
-                opts.Data struct = struct.empty
-            end
-            child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);
-            if isempty(parent)
-                % Root-level: must go through setter. Use setValueSilently
-                % to suppress the framework notification to Svelte.
-                % Pre-clear Value so set.Items' this.Value=string.empty
-                % is a no-op (AbortSet sees same value).
-                parentKey = "";
-                savedValue = this.Value;
-                this.setValueSilently('Value', string.empty);
-                this.setValueSilently('Items', [this.Items, child]);
-                if ~isempty(savedValue)
-                    this.setValueSilently('Value', savedValue);
-                end
-            else
-                parentKey = this.Items.keyOf(parent);
-                assert(~isempty(parentKey), "ic:TreeSelect:NodeNotInTree", ...
-                    "Parent node '%s' is not in the Items tree.", parent.Label);
-                parent.Children(end+1) = child;
-            end
-            if isempty(opts.Icon)
-                icon = [];
-            else
-                icon = struct('type', opts.Icon.Type, 'value', opts.Icon.Value);
-            end
-            out = this.publish("addNode", struct( ...
-                'parentKey', char(parentKey), ...
-                'label', char(label), ...
-                'icon', icon));
-        end
-
-        function out = removeNode(this, node)
-            % > REMOVENODE Remove a node from the tree incrementally.
-            %   ts.removeNode(orange)
-            arguments, this, node (1,1) ic.tree.Node, end
-            key = this.Items.keyOf(node);
-            assert(~isempty(key), "ic:TreeSelect:NodeNotInTree", ...
-                "Node '%s' is not in the Items tree.", node.Label);
-            parts = sscanf(key, '%d-');
-            if isscalar(parts)
-                % Root-level: keys shift after removal, so clear Value
-                % and let Svelte send back remapped values via publish().
-                this.setValueSilently('Value', string.empty);
-                items = this.Items;
-                items(parts(1)) = [];
-                this.setValueSilently('Items', items);
-            else
-                % Nested: handle mutation, no Items setter triggered.
-                this.Items.remove(key);
-                % Drop removed key + descendants from Value silently.
-                if ~isempty(this.Value)
-                    keep = ~(this.Value == key | startsWith(this.Value, key + "-"));
-                    this.setValueSilently('Value', this.Value(keep));
-                end
-            end
-            out = this.publish("removeNode", struct('key', char(key)));
-        end
-
-        function out = updateNode(this, node, opts)
-            % > UPDATENODE Update a node's label or icon incrementally.
-            %   ts.updateNode(apple, Label="Green Apple")
-            arguments
-                this
-                node (1,1) ic.tree.Node
-                opts.Label (1,1) string = ""
-                opts.Icon = []
-                opts.Data struct = struct.empty
-            end
-            key = this.Items.keyOf(node);
-            assert(~isempty(key), "ic:TreeSelect:NodeNotInTree", ...
-                "Node '%s' is not in the Items tree.", node.Label);
-            if opts.Label ~= "", node.Label = opts.Label; end
-            if ~isempty(opts.Icon), node.Icon = opts.Icon; end
-            if ~isempty(opts.Data), node.Data = opts.Data; end
-            if isempty(node.Icon), icon = [];
-            else, icon = struct('type', node.Icon.Type, 'value', node.Icon.Value);
-            end
-            out = this.publish("updateNode", struct( ...
-                'key', char(key), ...
-                'label', char(node.Label), ...
-                'icon', icon));
-        end
-    end
-
-    methods (Access = private)
-        function onValueChanged(this, evt)
-            % > ONVALUECHANGED resolve event keys → Node handles, fire SelectionChanged
-            %   Props are debounced so we must resolve from event data, not this.Value
-            keys = evt.Data.value;
-            if isempty(keys)
-                sel = ic.tree.Node.empty;
-            else
-                keys = string(keys);
-                sel = ic.tree.Node.empty;
-                for i = 1:numel(keys)
-                    sel(i) = this.Items.resolve(keys(i));
-                end
-            end
-            notify(this, 'SelectionChanged', ...
-                ic.event.MEvent(struct('Selection', sel)));
         end
     end
 end
