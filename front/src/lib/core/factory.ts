@@ -56,11 +56,11 @@ class Factory {
    * @throws Error if the MATLAB type is not registered in component-map.ts
    */
   async create(definition: ComponentDefinition): Promise<Component> {
-    const { type, id, props, events, methods } = definition;
+    const { type, id, props, events, methods, mixins } = definition;
 
     const svelteComp = await this.loadSvelteComponent(type);
 
-    return new Component(id, type, props, events, methods, svelteComp);
+    return new Component(id, type, props, events, methods, svelteComp, mixins);
   }
 
   /**

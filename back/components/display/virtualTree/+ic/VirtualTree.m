@@ -1,4 +1,4 @@
-classdef VirtualTree < ic.core.Component
+classdef VirtualTree < ic.core.Component & ic.mixin.Requestable
     % > VIRTUALTREE Virtual-scrolling tree for massive datasets.
     %
     %   Renders a tree view with virtual scrolling and on-demand data
@@ -31,7 +31,7 @@ classdef VirtualTree < ic.core.Component
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
-            Access = ?ic.core.ComponentBase, Hidden)
+            Access = ?ic.mixin.Reactive, Hidden)
         % > VALUE positional key strings (Svelte bridge — hidden from user)
         Value string = string.empty
     end

@@ -3,9 +3,11 @@
 % - Publish events to the view
 % - Subscribe to events from the view
 % > superdoc
-classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames
+classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames & ...
+                     ic.mixin.Stylable & ...
+                     ic.mixin.Effectable
 
-    properties (Access = ?ic.core.Container, Hidden)
+    properties (Access = {?ic.core.Container, ?ic.mixin.Registrable}, Hidden)
         % > PARENT: backing property for Parent
         Parent = [] % ic.core.Container
         % > TARGET: backing property for Target
@@ -63,7 +65,7 @@ classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames
     end
 
 
-    methods (Access = {?ic.Frame, ?ic.core.Component})
+    methods (Access = protected)
         function sendReactiveProperty(this, propertyName)
             % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
             if ~this.isAttached()
@@ -73,7 +75,7 @@ classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames
         end
     end
 
-    methods (Access = ?ic.core.Container, Hidden)
+    methods (Access = {?ic.core.Container, ?ic.mixin.Registrable}, Hidden)
         function frame = getFrame(this)
             % > GETFRAME walks up the parent chain to find the Frame
             frame = [];

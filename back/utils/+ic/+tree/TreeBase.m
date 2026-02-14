@@ -17,7 +17,7 @@ classdef (Abstract) TreeBase < ic.core.Component
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
-            Access = ?ic.core.ComponentBase, Hidden)
+            Access = ?ic.mixin.Reactive, Hidden)
         % > VALUE positional key strings (Svelte bridge — hidden from user)
         Value string = string.empty
     end

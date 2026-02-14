@@ -1,5 +1,5 @@
 % > CONTAINER base class for component containers
-classdef Container < handle
+classdef Container < handle & ic.mixin.Registrable
 
     properties (SetAccess = private)
         % > Children list of components that are held by the container
@@ -378,39 +378,6 @@ classdef Container < handle
             child.Parent = this;
         end
 
-        function registerSubtree(this, component)
-            % > REGISTERSUBTREE registers a component and all its descendants in the Frame registry
-            % > note: Finds Frame once and passes it down for efficiency
-            if isa(this, "ic.core.Component")
-                frame = this.getFrame(); %#ok<MCNPN>
-            else
-                frame = [];
-            end
-            if ~isempty(frame)
-                this.registerSubtreeWithFrame(component, frame);
-                % Also register static children added before attachment
-                if isa(component, "ic.core.Container")
-                    for child = component.Children
-                        if child.IsStatic
-                            this.registerSubtreeWithFrame(child, frame);
-                        end
-                    end
-                end
-            end
-        end
-
-        function deregisterSubtree(this, component)
-            % > DEREGISTERSUBTREE removes a component and all its descendants from the Frame registry
-            % > note: Finds Frame once and passes it down for efficiency
-            if isa(this, "ic.core.Component")
-                frame = this.getFrame(); %#ok<MCNPN>
-            else
-                frame = [];
-            end
-            if ~isempty(frame)
-                this.deregisterSubtreeWithFrame(component, frame);
-            end
-        end
     end
 
     methods (Access = private)
@@ -436,34 +403,6 @@ classdef Container < handle
     end
 
     methods (Access = protected, Static)
-        function registerSubtreeWithFrame(component, frame)
-            % > REGISTERSUBTREEWITHFRAME registers a component and its descendants using the given Frame
-            frame.registerDescendant(component);
-            if isa(component, "ic.core.Container")
-                for ii = 1:numel(component.Children)
-                    ic.core.Container.registerSubtreeWithFrame(...
-                        component.Children(ii), frame);
-                end
-            end
-        end
-
-        function deregisterSubtreeWithFrame(component, frame)
-            % > DEREGISTERSUBTREEWITHFRAME deregisters a component and its descendants using the given Frame
-            % Note: try-catch handles edge cases during cascading deletes where
-            % components may become invalid before deregistration completes
-            try
-                frame.deregisterDescendant(component.ID);
-                if isa(component, "ic.core.Container")
-                    for ii = 1:numel(component.Children)
-                        ic.core.Container.deregisterSubtreeWithFrame(...
-                            component.Children(ii), frame);
-                    end
-                end
-            catch
-                % Silently ignore errors during destruction - component already invalid
-            end
-        end
-
         function safeRemoveChild(container, child)
             % > SAFEREMOVECHILD safely removes a child, checking container validity first
             % Used as listener callback to handle cascading deletes gracefully

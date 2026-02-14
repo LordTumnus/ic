@@ -57,6 +57,8 @@ export interface ComponentDefinition {
   events: EventDefinition[];
   /** Reactive methods that MATLAB can invoke on the component */
   methods: MethodDefinition[];
+  /** Mixin capabilities present on this component (e.g. "stylable", "effectable") */
+  mixins: string[];
   /** Pre-rendered children declared in MATLAB constructor (recursive) */
   staticChildren?: InsertEventData[];
 }

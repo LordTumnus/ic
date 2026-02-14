@@ -1,5 +1,5 @@
 % > FRAME is the root component that holds other interactive components and bridges them to the HTML view
-classdef Frame < ic.core.ComponentBase & ic.core.Container
+classdef Frame < ic.core.ComponentBase & ic.core.Container & ic.mixin.Stylable
 
     properties (SetAccess = private)
         % > VIEW the view bridge that handles HTML communication
@@ -322,7 +322,7 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         end
     end
 
-    methods (Access = {?ic.core.Container, ?ic.core.Component}, Hidden)
+    methods (Access = {?ic.core.Container, ?ic.core.Component, ?ic.mixin.Registrable}, Hidden)
         function frame = getFrame(this)
             % > GETFRAME returns self since Frame is the root
             frame = this;
@@ -337,16 +337,16 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
 
         function registerSubtree(this, component)
             % > REGISTERSUBTREE registers a component and its subtree (Frame is the registry)
-            ic.core.Container.registerSubtreeWithFrame(component, this);
+            ic.mixin.Registrable.registerSubtreeWithFrame(component, this);
         end
 
         function deregisterSubtree(this, component)
             % > DEREGISTERSUBTREE deregisters a component and its subtree (Frame is the registry)
-            ic.core.Container.deregisterSubtreeWithFrame(component, this);
+            ic.mixin.Registrable.deregisterSubtreeWithFrame(component, this);
         end
     end
 
-    methods (Access = {?ic.Frame, ?ic.core.Component})
+    methods (Access = protected)
         function sendReactiveProperty(this, propertyName)
             % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
             if ~this.isAttached()
@@ -356,7 +356,7 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container
         end
     end
 
-    methods (Access = {?ic.core.Container})
+    methods (Access = {?ic.core.Container, ?ic.mixin.Registrable})
         function registerDescendant(this, component)
             % > REGISTERDESCENDANT adds a component to the registry for O(1) event dispatch
             this.Registry(component.ID) = component;

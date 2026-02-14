@@ -118,6 +118,9 @@ class Component implements Registrable {
   /** Event names (camelCase). */
   readonly eventNames: string[];
 
+  /** Mixin capabilities present on this component (e.g. "stylable", "effectable"). */
+  readonly mixins: string[];
+
   /** Flag to prevent echo when receiving updates from MATLAB. */
   private _updatingFromMatlab = false;
 
@@ -142,7 +145,8 @@ class Component implements Registrable {
     propDefinitions: PropDefinition[] = [],
     eventDefinitions: EventDefinition[] = [],
     methodDefinitions: MethodDefinition[] = [],
-    svelteComponent: SvelteComponent<any> | null = null
+    svelteComponent: SvelteComponent<any> | null = null,
+    mixins: string[] = []
   ) {
     this.id = id;
     this.type = type;
@@ -150,6 +154,7 @@ class Component implements Registrable {
     this._methodState = $state({});
     this._eventState = $state({});
     this._svelteComponent = svelteComponent;
+    this.mixins = mixins;
 
     // Store name lists for external consumers (e.g. EffectManager)
     this.propNames = propDefinitions.map(p => p.name);
@@ -270,26 +275,30 @@ class Component implements Registrable {
     this.subscribe('@reparent', (id, name, data) => handleReparent(this, id, name, data));
     this.subscribe('@reorder', (id, name, data) => handleReorder(this, id, name, data));
 
-    // Set up style handlers
-    this.subscribe('@style', (_id, _name, data) => {
-      const { selector, styles } = data as StyleEventData;
-      StyleManager.instance.setStyles(this.id, selector, styles);
-    });
-    this.subscribe('@clearStyle', (_id, _name, data) => {
-      const { selector } = data as ClearStyleEventData;
-      StyleManager.instance.clearStyle(this.id, selector);
-    });
-    this.subscribe('@clearStyles', () => {
-      StyleManager.instance.clearStyles(this.id);
-    });
+    // Set up style handlers (only if component has Stylable mixin)
+    if (this.mixins.includes('stylable')) {
+      this.subscribe('@style', (_id, _name, data) => {
+        const { selector, styles } = data as StyleEventData;
+        StyleManager.instance.setStyles(this.id, selector, styles);
+      });
+      this.subscribe('@clearStyle', (_id, _name, data) => {
+        const { selector } = data as ClearStyleEventData;
+        StyleManager.instance.clearStyle(this.id, selector);
+      });
+      this.subscribe('@clearStyles', () => {
+        StyleManager.instance.clearStyles(this.id);
+      });
+    }
 
-    // JS effects
-    this.subscribe('@jsEffect', (_id, _name, data) => {
-      EffectManager.instance.createEffect(data as JsEffectEventData);
-    });
-    this.subscribe('@jsEffectRemove', (_id, _name, data) => {
-      EffectManager.instance.removeEffect((data as JsEffectRemoveEventData).id);
-    });
+    // JS effects (only if component has Effectable mixin)
+    if (this.mixins.includes('effectable')) {
+      this.subscribe('@jsEffect', (_id, _name, data) => {
+        EffectManager.instance.createEffect(data as JsEffectEventData);
+      });
+      this.subscribe('@jsEffectRemove', (_id, _name, data) => {
+        EffectManager.instance.removeEffect((data as JsEffectRemoveEventData).id);
+      });
+    }
   }
 
   /**
