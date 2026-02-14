@@ -23,6 +23,9 @@
     showLine = $bindable(true),
     maxSelectedItems = $bindable<number | null>(null),
     placeholder = $bindable('Loading...'),
+    // Filter support (passed through from VirtualFilterTree)
+    highlightRegex = $bindable(null as RegExp | null),
+    initialExpandedKeys = undefined as Set<string> | undefined,
     // Events
     valueChanged,
     // Methods
@@ -43,6 +46,8 @@
     showLine?: boolean;
     maxSelectedItems?: number | null;
     placeholder?: string;
+    highlightRegex?: RegExp | null;
+    initialExpandedKeys?: Set<string>;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
     clearSelection?: () => Resolution;
@@ -153,6 +158,8 @@
         if (k === key || k.startsWith(key + '-')) next.delete(k);
       }
       expandedKeys = next;
+      // Collapsing shifts the viewport — new placeholders may now be visible
+      setTimeout(viewportPrefetch, 50);
     }
   }
 
@@ -217,7 +224,14 @@
       checked.add(parentKey);
       if (!expandedKeys.has(parentKey)) continue;
       const cache = childCaches.get(parentKey);
-      if (!cache || cache.loaded >= cache.total) continue;
+      // No cache at all → expanded folder whose children were never fetched
+      if (!cache) {
+        if (row.isPlaceholder) {
+          ensureChildrenLoaded(parentKey, 0, prefetchBuffer);
+        }
+        continue;
+      }
+      if (cache.loaded >= cache.total) continue;
       // Child index from key suffix
       const childIdx = parseInt(row.node.key.substring(lastDash + 1), 10);
       if (childIdx >= cache.loaded - prefetchBuffer) {
@@ -230,11 +244,32 @@
   // --- Viewport prefetch (scroll-stop debounce) ---
   function viewportPrefetch() {
     let prefetchCount = 0;
+    const checkedParents = new Set<string>();
+
     for (const row of visibleRows) {
+      // Placeholder rows → their parent folder is expanded but children
+      // haven't been fetched yet. Load that parent's children.
+      if (row.isPlaceholder) {
+        const lastDash = row.node.key.lastIndexOf('-');
+        if (lastDash === -1) continue;
+        const parentKey = row.node.key.substring(0, lastDash);
+        if (checkedParents.has(parentKey)) continue;
+        checkedParents.add(parentKey);
+        if (!childCaches.has(parentKey)) {
+          prefetchCount++;
+          ensureChildrenLoaded(parentKey, 0, prefetchBuffer).then(() => {
+            // Cascade: newly loaded children may themselves be expanded
+            // folders with placeholders now visible in the viewport.
+            setTimeout(viewportPrefetch, 50);
+          });
+        }
+        continue;
+      }
+
+      // Collapsed folders → pre-cache children for instant open on click
       if (!row.node.isFolder) continue;
       if (expandedKeys.has(row.node.key)) continue;
       if (childCaches.has(row.node.key)) continue;
-      if (row.isPlaceholder) continue;
       prefetchCount++;
       ensureChildrenLoaded(row.node.key, 0, prefetchBuffer);
     }
@@ -260,6 +295,9 @@
       logger.info('VirtualTree', 'getRoots response', { success: res.success, data: res.data });
       if (res.success) {
         roots = normalizeVirtualNodes(res.data);
+        if (initialExpandedKeys && initialExpandedKeys.size > 0) {
+          expandedKeys = new Set(initialExpandedKeys);
+        }
         logger.info('VirtualTree', 'Roots loaded', { count: roots.length, roots });
         setTimeout(viewportPrefetch, 100);
       } else {
@@ -346,6 +384,7 @@
             {loadingKeys}
             isItemSelected={isSelected}
             {atMaxSelections}
+            {highlightRegex}
             ontoggle={toggleItem}
             onexpandchange={handleExpandChange}
           />
@@ -439,8 +478,7 @@
     height: 100%;
   }
 
-  .ic-vt :global(.ic-tn__row:hover),
-  .ic-vt :global(.ic-tn__row--expanded) {
+  .ic-vt :global(.ic-tn__row:hover) {
     background: var(--ic-secondary);
   }
 
@@ -565,5 +603,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* ===== HIGHLIGHT (filter match) ===== */
+  .ic-vt :global(.ic-tn__highlight) {
+    background: rgba(234, 179, 8, 0.25);
+    color: inherit;
+    border-radius: 1px;
+    padding: 0 1px;
   }
 </style>

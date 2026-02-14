@@ -25,15 +25,17 @@ export interface FlatNode {
 
 // --- Normalization ---
 
-/** Normalize raw MATLAB ic.tree.Node serialization into TreeNode[] with positional keys. */
+/** Normalize raw MATLAB ic.tree.Node serialization into TreeNode[] with positional keys.
+ *  If nodes already carry a `key` property (e.g. from filterTree), it is preserved. */
 export function normalizeNodes(raw: unknown, prefix = ''): TreeNode[] {
   if (raw == null) return [];
   if (!Array.isArray(raw)) raw = [raw];
   return (raw as Record<string, unknown>[]).map((n, i) => {
-    const key = prefix ? `${prefix}-${i + 1}` : `${i + 1}`;
+    const hasKey = n.key != null && n.key !== '';
+    const key = hasKey ? String(n.key) : (prefix ? `${prefix}-${i + 1}` : `${i + 1}`);
     return {
       key,
-      name: String(n.label ?? ''),
+      name: String(n.label ?? n.name ?? ''),
       icon: normalizeIcon(n.icon),
       children: normalizeNodes(n.children, key),
     };

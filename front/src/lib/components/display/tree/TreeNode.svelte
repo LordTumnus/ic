@@ -2,6 +2,7 @@
   import TreeNode from './TreeNode.svelte';
   import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
   import { type TreeNode as TreeNodeData } from '$lib/utils/tree-utils';
+  import { highlightLabel } from '$lib/utils/filter-tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
@@ -25,6 +26,7 @@
     expandedKeys,
     isItemSelected,
     atMaxSelections = false,
+    highlightRegex = null as RegExp | null,
     ontoggle,
     onexpandchange,
   }: {
@@ -40,9 +42,14 @@
     expandedKeys: Set<string>;
     isItemSelected: (key: string) => boolean;
     atMaxSelections?: boolean;
+    highlightRegex?: RegExp | null;
     ontoggle: (key: string) => void;
     onexpandchange: (key: string, expanded: boolean) => void;
   } = $props();
+
+  const labelSegments = $derived(
+    highlightRegex ? highlightLabel(node.name, highlightRegex) : null
+  );
 
   const isFolder = $derived((node.children?.length ?? 0) > 0);
   const isExpanded = $derived(expandedKeys.has(node.key));
@@ -123,7 +130,7 @@
           <span class="ic-tn__icon">{@html svg}</span>
         {/if}
       {/if}
-      <span class="ic-tn__label">{node.name}</span>
+      <span class="ic-tn__label">{#if labelSegments}{#each labelSegments as seg, si (si)}{#if seg.highlight}<mark class="ic-tn__highlight">{seg.text}</mark>{:else}{seg.text}{/if}{/each}{:else}{node.name}{/if}</span>
     </span>
   </div>
 
@@ -144,6 +151,7 @@
           {expandedKeys}
           {isItemSelected}
           {atMaxSelections}
+          {highlightRegex}
           {ontoggle}
           {onexpandchange}
         />
@@ -165,8 +173,7 @@
     transition: background-color 0.1s ease;
   }
 
-  .ic-tn__row:hover,
-  .ic-tn__row--expanded {
+  .ic-tn__row:hover {
     background: var(--ic-secondary);
   }
 
@@ -297,5 +304,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* ===== HIGHLIGHT (filter match) ===== */
+  .ic-tn__highlight {
+    background: rgba(234, 179, 8, 0.25);
+    color: inherit;
+    border-radius: 1px;
+    padding: 0 1px;
   }
 </style>

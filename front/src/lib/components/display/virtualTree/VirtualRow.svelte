@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
   import type { FlatRow } from '$lib/utils/virtual-tree';
+  import { highlightLabel } from '$lib/utils/filter-tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
@@ -21,6 +22,7 @@
     loadingKeys,
     isItemSelected,
     atMaxSelections = false,
+    highlightRegex = null as RegExp | null,
     ontoggle,
     onexpandchange,
   }: {
@@ -33,6 +35,7 @@
     loadingKeys: Set<string>;
     isItemSelected: (key: string) => boolean;
     atMaxSelections?: boolean;
+    highlightRegex?: RegExp | null;
     ontoggle: (key: string) => void;
     onexpandchange: (key: string, expanded: boolean) => void;
   } = $props();
@@ -41,6 +44,11 @@
   const isFolder = $derived(node.isFolder);
   const isExpanded = $derived(expandedKeys.has(node.key));
   const isLoading = $derived(loadingKeys.has(node.key));
+
+  // Highlight segments
+  const labelSegments = $derived(
+    highlightRegex ? highlightLabel(node.name, highlightRegex) : null
+  );
 
   // Folder icons
   const folderSvg = $derived(resolveIconType('folder', FOLDER_SIZES[size] ?? 14));
@@ -147,7 +155,7 @@
           <span class="ic-tn__icon">{@html svg}</span>
         {/if}
       {/if}
-      <span class="ic-tn__label">{node.name}</span>
+      <span class="ic-tn__label">{#if labelSegments}{#each labelSegments as seg, si (si)}{#if seg.highlight}<mark class="ic-tn__highlight">{seg.text}</mark>{:else}{seg.text}{/if}{/each}{:else}{node.name}{/if}</span>
     </span>
   </div>
 {/if}
