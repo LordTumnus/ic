@@ -12,8 +12,12 @@ classdef TestReactiveComponent < ic.core.Component
     end
 
     methods
-        function this = TestReactiveComponent(id)
-            this@ic.core.Component(id);
+        function this = TestReactiveComponent(props)
+            arguments
+                props.?TestReactiveComponent
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
+            end
+            this@ic.core.Component(props);
         end
 
         function definition = getDefinitionForTest(this)

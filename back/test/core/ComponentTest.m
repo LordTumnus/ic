@@ -31,7 +31,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testSubscribeAndReceive(testCase)
             % Verify subscribe registers callback that fires on receive
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             received = [];
@@ -49,7 +49,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testUnsubscribeRemovesCallback(testCase)
             % Verify unsubscribe stops callback from firing
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             callCount = 0;
@@ -64,7 +64,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testPublishQueuesEventWhenDetached(testCase)
             % Verify publish stores events in queue when not attached
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
 
             comp.publish("@myEvent", struct("x", 1));
             comp.publish("@myEvent", struct("x", 2));
@@ -76,7 +76,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testPublishSendsEventWhenAttached(testCase)
             % Verify publish sends event through parent when attached
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             comp.publish("@customEvent", struct("payload", "test"));
@@ -91,8 +91,8 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testFlushSendsQueuedEvents(testCase)
             % Verify flush sends all queued events when attached
-            container = ic.core.ComponentContainer("container");
-            child = ic.core.Component("child");
+            container = ic.core.ComponentContainer(struct('ID', 'container'));
+            child = ic.core.Component(struct('ID', 'child'));
 
             % Build subtree while detached
             container.addChild(child);
@@ -110,7 +110,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testPublishReturnsPromise(testCase)
             % Verify publish returns a promise when output requested
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             promise = comp.publish("@fetchData", struct());
@@ -121,7 +121,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testPublishPromiseResolvesOnResponse(testCase)
             % Verify promise resolves when view responds
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             promise = comp.publish("@fetchData", struct());
@@ -143,7 +143,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testReactivePropertySendsEvent(testCase)
             % Verify changing reactive property sends @prop event
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
 
             % Clear queue to isolate property change
@@ -160,7 +160,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testReactivePropertyReceivesUpdate(testCase)
             % Verify receiving @prop event updates property without echo
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
 
             % Simulate view updating the property
@@ -178,7 +178,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testReactiveEventForwarding(testCase)
             % Verify JS events are forwarded as MATLAB events
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
 
             eventData = [];
@@ -199,7 +199,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testReactiveMethodPingCall(testCase)
             % Verify reactive method can be called from MATLAB
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
 
             out = comp.ping(123);
 
@@ -209,7 +209,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testPublishPongErrors(testCase)
             % Verify publishing Pong errors (not a reactive method)
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
 
             testCase.verifyError(@() comp.publish("pong", struct("value", 1)), ...
@@ -217,36 +217,46 @@ classdef ComponentTest < matlab.uitest.TestCase
         end
 
         function testGetComponentDefinitionReturnsSchema(testCase)
-            % Verify getComponentDefinition returns complete schema
-            comp = TestReactiveComponent("comp");
+            % Verify component definition includes props, events, methods, mixins
+            comp = TestReactiveComponent(ID = "comp");
+            testCase.Frame.addChild(comp);
 
-            % Access protected method via subclass exposure
-            definition = comp.getDefinitionForTest();
+            % Extract definition from the @insert event
+            insertEvents = testCase.Frame.View.Queue(...
+                [testCase.Frame.View.Queue.Name] == "@insert");
+            compInsert = insertEvents(...
+                [insertEvents.Data.component.id] == "comp");
+            definition = compInsert.Data.component;
 
-            % Check reactive properties
+            % Check reactive properties (cell array of structs)
             testCase.verifyNotEmpty(definition.props);
-            propNames = [definition.props.name];
-            disp(propNames)
-            testCase.verifyTrue(any(strcmp(propNames, "value")));
+            allProps = [definition.props{:}];
+            propNames = string({allProps.name});
+            testCase.verifyTrue(any(propNames == "value"));
 
             % Check reactive events
             testCase.verifyNotEmpty(definition.events);
-            eventNames = [definition.events.name];
-            testCase.verifyTrue(any(strcmp(eventNames, "buttonClicked")));
+            allEvents = [definition.events{:}];
+            eventNames = string({allEvents.name});
+            testCase.verifyTrue(any(eventNames == "buttonClicked"));
 
             % Check reactive methods
             testCase.verifyNotEmpty(definition.methods);
-            methodNames = [definition.methods.name];
-            testCase.verifyTrue(any(strcmp(methodNames, "ping")));
+            allMethods = [definition.methods{:}];
+            methodNames = string({allMethods.name});
+            testCase.verifyTrue(any(methodNames == "ping"));
 
-            % Check default targets
-            testCase.verifyEqual(definition.targets, {"default"});
+            % Check mixins include expected capabilities
+            testCase.verifyTrue(any(definition.mixins == "publishable"));
+            testCase.verifyTrue(any(definition.mixins == "reactive"));
+            testCase.verifyTrue(any(definition.mixins == "stylable"));
+            testCase.verifyTrue(any(definition.mixins == "effectable"));
         end
 
         function testComponentContainerDefinitionIncludesTargets(testCase)
             % Verify ComponentContainer definition includes custom targets
-            container = ic.core.ComponentContainer("container");
-            container.Targets = ["left", "right"];
+            container = ic.core.ComponentContainer(struct('ID', 'container'));
+            container.Targets = ["default", "left", "right"];
             testCase.Frame.addChild(container);
 
             % Check the @insert event data
@@ -255,7 +265,11 @@ classdef ComponentTest < matlab.uitest.TestCase
             containerInsert = insertEvents(...
                 [insertEvents.Data.component.id] == "container");
 
-            targets = [containerInsert.Data.component.targets{:}];
+            % Targets is a reactive prop inside the props cell array
+            allProps = [containerInsert.Data.component.props{:}];
+            targetsProp = allProps(string({allProps.name}) == "targets");
+            testCase.verifyNotEmpty(targetsProp);
+            targets = targetsProp.value;
             testCase.verifyTrue(any(targets == "default"));
             testCase.verifyTrue(any(targets == "left"));
             testCase.verifyTrue(any(targets == "right"));
@@ -275,7 +289,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testComponentUsesProvidedID(testCase)
             % Verify component uses provided ID
-            comp = ic.core.Component("myCustomID");
+            comp = ic.core.Component(struct('ID', 'myCustomID'));
 
             testCase.verifyEqual(comp.ID, "myCustomID");
         end
@@ -284,7 +298,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testReceiveUnsubscribedEventNoError(testCase)
             % Verify receiving event with no subscriber doesn't error
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             % Should not throw
@@ -297,13 +311,13 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testValidCssIdent(testCase)
             % Verify component accepts valid CSS identifier
-            comp = ic.core.Component("my-component_123");
+            comp = ic.core.Component(struct('ID', 'my-component_123'));
             testCase.verifyEqual(comp.ID, "my-component_123");
         end
 
         function testInvalidCssIdent(testCase)
             % Verify component rejects invalid CSS identifier (starts with digit)
-            testCase.verifyError(@() ic.core.Component("123invalid"), ...
+            testCase.verifyError(@() ic.core.Component(struct('ID', '123invalid')), ...
                 "ic:core:ComponentBase:InvalidId");
         end
     end
@@ -311,7 +325,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testStyleSendsEvent(testCase)
             % Verify style() publishes @style event with CSS properties
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
@@ -326,7 +340,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testGetStyleReturnsStoredStyles(testCase)
             % Verify getStyle() returns previously set styles
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
             comp.style(":host", "color", "blue");
@@ -337,7 +351,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testClearStyleSendsEvent(testCase)
             % Verify clearStyle() publishes @clearStyle event
-            comp = ic.core.Component("comp");
+            comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
             comp.style(":host", "color", "red");
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
@@ -354,7 +368,7 @@ classdef ComponentTest < matlab.uitest.TestCase
     methods (Test)
         function testAddListenerPublishesListenEvent(testCase)
             % Verify addlistener on a reactive event publishes @listenEvent
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
@@ -369,7 +383,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testSecondListenerDoesNotRepublish(testCase)
             % Verify adding a second listener for the same event does not
             % publish another @listenEvent
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
             addlistener(comp, 'ButtonClicked', @(~,~) []);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
@@ -381,7 +395,7 @@ classdef ComponentTest < matlab.uitest.TestCase
 
         function testDeleteLastListenerPublishesUnlistenEvent(testCase)
             % Verify deleting the last listener publishes @unlistenEvent
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
             l = addlistener(comp, 'ButtonClicked', @(~,~) []);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
@@ -397,7 +411,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testDeleteOneOfTwoListenersDoesNotUnlisten(testCase)
             % Verify deleting one of two listeners does not publish
             % @unlistenEvent
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
             l1 = addlistener(comp, 'ButtonClicked', @(~,~) []);
             l2 = addlistener(comp, 'ButtonClicked', @(~,~) []); %#ok<NASGU>
@@ -411,7 +425,7 @@ classdef ComponentTest < matlab.uitest.TestCase
         function testAddListenerOnNonReactiveEventNoListenEvent(testCase)
             % Verify addlistener on a non-reactive event does not publish
             % @listenEvent (e.g. ObjectBeingDestroyed)
-            comp = TestReactiveComponent("comp");
+            comp = TestReactiveComponent(ID = "comp");
             testCase.Frame.addChild(comp);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
