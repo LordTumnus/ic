@@ -219,6 +219,7 @@
   }
 
   function handleFilterChange(field: string, val: unknown) {
+    logger.debug('Table', 'Filter change', { field, value: val });
     if (val == null) {
       const { [field]: _, ...rest } = filters;
       filters = rest;
@@ -229,7 +230,7 @@
   }
 
   function handleRowClick(rowIndex: number, rowData: TRow) {
-    // Clicking a row body clears all selection types
+    logger.debug('Table', 'Row click', { rowIndex });
     if (selectable) {
       activeColumns = [];
       activeCells = [];
@@ -242,8 +243,8 @@
   }
 
   function handleCellClick(field: string, rowIndex: number, val: unknown, rowData: TRow, shiftKey: boolean) {
+    logger.debug('Table', 'Cell click', { field, rowIndex, shiftKey });
     if (selectable) {
-      // Clear other selection types
       activeColumns = [];
       if (value != null) {
         value = null;
@@ -251,27 +252,27 @@
       }
       const exists = activeCells.some(c => c.field === field && c.rowIndex === rowIndex);
       if (shiftKey) {
-        // Shift+Enter: toggle in multi-selection
         if (exists) {
           activeCells = activeCells.filter(c => !(c.field === field && c.rowIndex === rowIndex));
         } else {
           activeCells = [...activeCells, { field, rowIndex }];
         }
       } else {
-        // Enter: single toggle — deselect if same cell, select otherwise
         activeCells = exists ? [] : [{ field, rowIndex }];
       }
+      logger.debug('Table', 'Active cells', { count: activeCells.length, cells: activeCells });
     }
     cellClicked?.({ field, rowIndex, value: val, rowData });
   }
 
   function handleCellAction(field: string, rowIndex: number, val: unknown, rowData: TRow) {
+    logger.debug('Table', 'Cell action', { field, rowIndex });
     cellAction?.({ field, rowIndex, value: val, rowData });
   }
 
   function handleColumnClick(field: string, shiftKey: boolean) {
+    logger.debug('Table', 'Column click', { field, shiftKey });
     if (selectable) {
-      // Clear other selection types
       activeCells = [];
       if (value != null) {
         value = null;
@@ -279,14 +280,13 @@
       }
       const exists = activeColumns.includes(field);
       if (shiftKey) {
-        // Shift+Enter: toggle in multi-selection
         activeColumns = exists
           ? activeColumns.filter(f => f !== field)
           : [...activeColumns, field];
       } else {
-        // Enter: single toggle
         activeColumns = exists ? [] : [field];
       }
+      logger.debug('Table', 'Active columns', { columns: activeColumns });
     }
     const col = columns.find(c => c.field === field);
     columnClicked?.({ field, column: col });
@@ -294,7 +294,7 @@
 
   function handleRowNumClick(rowIndex: number, shiftKey: boolean) {
     if (!selectable) return;
-    logger.debug('Table', 'Select row', { rowIndex, shiftKey });
+    logger.debug('Table', 'Row num click', { rowIndex, shiftKey });
     activeColumns = [];
     activeCells = [];
 
@@ -309,13 +309,14 @@
       newValue = selectedSet.has(rowIndex) ? [] : [rowIndex];
     }
     value = newValue.length > 0 ? newValue : null;
+    logger.debug('Table', 'Selection', { value });
     valueChanged?.({ value });
   }
 
   // ── Container keydown — entry/exit the grid ──────────
   function handleContainerKeydown(e: KeyboardEvent) {
-    // Escape from anywhere inside the grid → clear selections + focus container
     if (e.key === 'Escape' && e.target !== containerEl) {
+      logger.debug('Table', 'Escape → exit grid, clear selection');
       e.preventDefault();
       activeColumns = [];
       activeCells = [];
@@ -326,9 +327,9 @@
       containerEl.focus();
       return;
     }
-    // Only handle entry keys when the container itself is focused
     if (e.target !== containerEl) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'Enter') {
+      logger.debug('Table', 'Enter grid', { key: e.key });
       e.preventDefault();
       const firstHeader = containerEl.querySelector('.ic-tbl__hcell:not(.ic-tbl__hcell--rownum)') as HTMLElement | null;
       firstHeader?.focus();
