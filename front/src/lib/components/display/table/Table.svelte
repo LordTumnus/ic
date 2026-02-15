@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Resolution } from '$lib/types';
-  import type { TableColumn, TableRow as TRow, FilterState } from '$lib/utils/table-utils';
+  import type { TableColumn, TableRow as TRow, FilterState, IndexedRow } from '$lib/utils/table-utils';
   import type { PinnedInfo } from '$lib/utils/table-utils';
   import {
     normalizeTableData,
@@ -81,10 +81,15 @@
     return r;
   });
 
-  // Client-side sort
-  const sortedRows = $derived(sortRows(rows, sortField, sortDirection));
+  // Wrap rows with original indices so selection survives sort/filter
+  const indexedRows: IndexedRow[] = $derived(
+    rows.map((data, i) => ({ data, originalIndex: i }))
+  );
 
-  // Client-side filter
+  // Client-side sort (preserves original indices)
+  const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection));
+
+  // Client-side filter (preserves original indices)
   const filteredRows = $derived(filterRows(sortedRows, filters, columns));
 
   // Dynamic row number width based on total rows (not filtered — avoids layout shift)
@@ -244,14 +249,17 @@
         value = null;
         valueChanged?.({ value: null });
       }
+      const exists = activeCells.some(c => c.field === field && c.rowIndex === rowIndex);
       if (shiftKey) {
-        // Shift+Click: add to selection (don't toggle off)
-        const exists = activeCells.some(c => c.field === field && c.rowIndex === rowIndex);
-        if (!exists) {
+        // Shift+Enter: toggle in multi-selection
+        if (exists) {
+          activeCells = activeCells.filter(c => !(c.field === field && c.rowIndex === rowIndex));
+        } else {
           activeCells = [...activeCells, { field, rowIndex }];
         }
       } else {
-        activeCells = [{ field, rowIndex }];
+        // Enter: single toggle — deselect if same cell, select otherwise
+        activeCells = exists ? [] : [{ field, rowIndex }];
       }
     }
     cellClicked?.({ field, rowIndex, value: val, rowData });
@@ -269,14 +277,15 @@
         value = null;
         valueChanged?.({ value: null });
       }
+      const exists = activeColumns.includes(field);
       if (shiftKey) {
-        if (activeColumns.includes(field)) {
-          activeColumns = activeColumns.filter(f => f !== field);
-        } else {
-          activeColumns = [...activeColumns, field];
-        }
+        // Shift+Enter: toggle in multi-selection
+        activeColumns = exists
+          ? activeColumns.filter(f => f !== field)
+          : [...activeColumns, field];
       } else {
-        activeColumns = activeColumns.length === 1 && activeColumns[0] === field ? [] : [field];
+        // Enter: single toggle
+        activeColumns = exists ? [] : [field];
       }
     }
     const col = columns.find(c => c.field === field);
@@ -301,6 +310,29 @@
     }
     value = newValue.length > 0 ? newValue : null;
     valueChanged?.({ value });
+  }
+
+  // ── Container keydown — entry/exit the grid ──────────
+  function handleContainerKeydown(e: KeyboardEvent) {
+    // Escape from anywhere inside the grid → clear selections + focus container
+    if (e.key === 'Escape' && e.target !== containerEl) {
+      e.preventDefault();
+      activeColumns = [];
+      activeCells = [];
+      if (value != null) {
+        value = null;
+        valueChanged?.({ value: null });
+      }
+      containerEl.focus();
+      return;
+    }
+    // Only handle entry keys when the container itself is focused
+    if (e.target !== containerEl) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'Enter') {
+      e.preventDefault();
+      const firstHeader = containerEl.querySelector('.ic-tbl__hcell:not(.ic-tbl__hcell--rownum)') as HTMLElement | null;
+      firstHeader?.focus();
+    }
   }
 
   // ── Methods ───────────────────────────────────────────
@@ -337,6 +369,7 @@
   class:ic-tbl--disabled={disabled}
   style:height={heightStyle}
   onscroll={handleScroll}
+  onkeydown={handleContainerKeydown}
   tabindex={0}
   role="grid"
 >
@@ -361,13 +394,13 @@
     />
 
     <div class="ic-tbl__body">
-      {#each filteredRows as row, i (i)}
+      {#each filteredRows as irow, i (irow.originalIndex)}
         <TableRowComp
           {columns}
           {columnWidths}
-          rowData={row}
-          rowIndex={i}
-          selected={selectedSet.has(i)}
+          rowData={irow.data}
+          rowIndex={irow.originalIndex}
+          selected={selectedSet.has(irow.originalIndex)}
           {disabled}
           {selectable}
           showRowNumber={showRowNumbers}
@@ -384,7 +417,7 @@
           onrownumclick={handleRowNumClick}
         />
       {:else}
-        <div class="ic-tbl__empty">No data</div>
+        <div class="ic-tbl__empty">{rows.length > 0 ? 'No matching rows' : 'No data'}</div>
       {/each}
     </div>
   </div>

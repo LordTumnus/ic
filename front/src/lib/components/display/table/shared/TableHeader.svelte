@@ -74,9 +74,65 @@
   }
 
   function handleHeaderKeydown(e: KeyboardEvent, col: TableColumn) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      oncolumnclick?.(col.field, e.shiftKey);
+    // Safety net — popover's own onkeydown stops propagation, but guard just in case
+    if ((e.target as Element).closest?.('.ic-tbl-filter')) return;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowRight': {
+        e.preventDefault();
+        const headerEl = (e.currentTarget as HTMLElement).parentElement;
+        if (!headerEl) break;
+        const cells = [...headerEl.querySelectorAll<HTMLElement>('.ic-tbl__hcell:not(.ic-tbl__hcell--rownum)')];
+        const idx = cells.indexOf(e.currentTarget as HTMLElement);
+        if (e.key === 'ArrowLeft') {
+          if (idx > 0) {
+            cells[idx - 1]?.focus();
+          } else if (showRowNumber) {
+            // First header → go to row-number header
+            const rn = headerEl.querySelector('.ic-tbl__hcell--rownum') as HTMLElement | null;
+            rn?.focus();
+          }
+        } else {
+          cells[idx + 1]?.focus();
+        }
+        break;
+      }
+      case 'ArrowDown': {
+        e.preventDefault();
+        const table = (e.currentTarget as HTMLElement).closest('.ic-tbl');
+        const firstRow = table?.querySelector('.ic-tbl__body .ic-tbl__row');
+        if (firstRow) {
+          // Focus the data cell at the same column index
+          const hcells = [...(e.currentTarget as HTMLElement).parentElement!.querySelectorAll<HTMLElement>('.ic-tbl__hcell:not(.ic-tbl__hcell--rownum)')];
+          const colIdx = hcells.indexOf(e.currentTarget as HTMLElement);
+          const cell = firstRow.querySelectorAll<HTMLElement>(':scope > .ic-tbl__cell:not(.ic-tbl__cell--rownum)')[colIdx];
+          cell?.focus();
+        }
+        break;
+      }
+      case 'Enter': {
+        e.preventDefault();
+        if (selectable) oncolumnclick?.(col.field, e.shiftKey);
+        break;
+      }
+      case 's':
+      case 'S': {
+        if (col.sortable) {
+          e.preventDefault();
+          const newDir = col.field === sortField ? cycleSortDirection(sortDirection) : 'asc';
+          onsort?.(col.field, newDir);
+        }
+        break;
+      }
+      case 'f':
+      case 'F': {
+        if (col.filterable) {
+          e.preventDefault();
+          openFilterField = openFilterField === col.field ? null : col.field;
+        }
+        break;
+      }
     }
   }
 
@@ -85,24 +141,47 @@
     const newWidth = Math.max(MIN_RESIZE_WIDTH, current + delta);
     columnWidths[index] = newWidth;
   }
+
+  function handleRowNumHeaderKeydown(e: KeyboardEvent) {
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault();
+        const table = (e.currentTarget as HTMLElement).closest('.ic-tbl');
+        const firstRowNum = table?.querySelector('.ic-tbl__body .ic-tbl__row .ic-tbl__cell--rownum') as HTMLElement | null;
+        firstRowNum?.focus();
+        break;
+      }
+      case 'ArrowRight': {
+        e.preventDefault();
+        const header = (e.currentTarget as HTMLElement).parentElement;
+        const firstHcell = header?.querySelector('.ic-tbl__hcell:not(.ic-tbl__hcell--rownum)') as HTMLElement | null;
+        firstHcell?.focus();
+        break;
+      }
+    }
+  }
 </script>
 
 <div class="ic-tbl__header" class:ic-tbl__header--disabled={disabled}>
   {#if showRowNumber}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
       class="ic-tbl__hcell ic-tbl__hcell--rownum"
-      class:ic-tbl__hcell--pinned={stickingFields.has('__rownum__')}
+      class:ic-tbl__hcell--sticking={stickingFields.has('__rownum__')}
       style:flex="0 0 {rowNumWidth}px"
       style:width="{rowNumWidth}px"
       style:position="sticky"
       style:left="0px"
       style:z-index={5}
+      role="columnheader"
+      tabindex={-1}
+      onkeydown={handleRowNumHeaderKeydown}
     >
       #
     </div>
   {/if}
 
-  {#each columns as col, i (col.field)}
+  {#each columns as col, i (i)}
     {@const isSorted = sortField === col.field && sortDirection !== 'none'}
     {@const align = resolveAlign(col)}
     {@const hasActiveFilter = filters[col.field] != null}
@@ -113,8 +192,9 @@
       class:ic-tbl__hcell--sorted={isSorted}
       class:ic-tbl__hcell--active={isActive}
       class:ic-tbl__hcell--selectable={selectable}
-      class:ic-tbl__hcell--pinned={pinInfo != null && stickingFields.has(col.field)}
-      class:ic-tbl__hcell--pinned-right={pinInfo?.side === 'right' && stickingFields.has(col.field)}
+      class:ic-tbl__hcell--pinned={pinInfo != null}
+      class:ic-tbl__hcell--pinned-right={pinInfo?.side === 'right'}
+      class:ic-tbl__hcell--sticking={pinInfo != null && stickingFields.has(col.field)}
       class:ic-tbl__hcell--left={align === 'left'}
       class:ic-tbl__hcell--center={align === 'center'}
       class:ic-tbl__hcell--right={align === 'right'}
@@ -126,7 +206,7 @@
       style:right={pinInfo?.side === 'right' ? pinInfo.offset + 'px' : undefined}
       style:z-index={pinInfo ? 5 : undefined}
       role="columnheader"
-      tabindex={0}
+      tabindex={-1}
       onclick={(e: MouseEvent) => handleHeaderClick(e, col)}
       onkeydown={(e: KeyboardEvent) => handleHeaderKeydown(e, col)}
     >
@@ -139,6 +219,7 @@
               class="ic-tbl__sort-btn"
               class:ic-tbl__sort-btn--active={isSorted}
               onclick={(e: MouseEvent) => handleSortClick(e, col)}
+              tabindex={-1}
               aria-label="Sort {col.header}"
             >
               {#if isSorted && sortDirection === 'desc'}
@@ -154,6 +235,7 @@
               class:ic-tbl__filter-btn--active={hasActiveFilter}
               class:ic-tbl__filter-btn--open={openFilterField === col.field}
               onclick={(e: MouseEvent) => handleFilterClick(e, col.field)}
+              tabindex={-1}
               aria-label="Filter {col.header}"
             >
               {@html FILTER_ICON}
@@ -208,13 +290,20 @@
     border: 1px solid transparent;
     transition: border-color 0.12s ease;
   }
-  /* Pinned header cell — opaque so scrolling content doesn't bleed through */
+  /* Pinned header cell — always opaque so scrolling content doesn't bleed through */
   .ic-tbl__hcell--pinned {
     background: var(--ic-secondary);
+  }
+  /* Sticking — directional shadow when sticky position is active */
+  .ic-tbl__hcell--sticking {
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
   }
-  .ic-tbl__hcell--pinned-right {
+  .ic-tbl__hcell--sticking.ic-tbl__hcell--pinned-right {
     box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06);
+  }
+  .ic-tbl__hcell:focus {
+    outline: none;
+    border-color: var(--ic-primary);
   }
   .ic-tbl__hcell--selectable {
     cursor: pointer;
@@ -226,11 +315,13 @@
     background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), var(--ic-secondary);
   }
   .ic-tbl__hcell--active {
+    background: var(--ic-primary);
+    color: var(--ic-primary-foreground);
     border-color: var(--ic-primary);
-    background: rgba(59, 130, 246, 0.06);
+    box-shadow: none;
   }
   .ic-tbl__hcell--pinned.ic-tbl__hcell--active {
-    background: linear-gradient(rgba(59, 130, 246, 0.06), rgba(59, 130, 246, 0.06)), var(--ic-secondary);
+    background: var(--ic-primary);
   }
 
   .ic-tbl__hcell--left { justify-content: flex-start; }
@@ -281,6 +372,16 @@
     opacity: 1;
     color: var(--ic-primary);
   }
+  /* When header is selected, make icons visible on primary bg */
+  .ic-tbl__hcell--active .ic-tbl__sort-btn,
+  .ic-tbl__hcell--active .ic-tbl__filter-btn {
+    color: var(--ic-primary-foreground);
+    opacity: 0.7;
+  }
+  .ic-tbl__hcell--active .ic-tbl__sort-btn--active,
+  .ic-tbl__hcell--active .ic-tbl__filter-btn--active {
+    opacity: 1;
+  }
 
   /* Filter button */
   .ic-tbl__filter-btn {
@@ -327,5 +428,10 @@
     border-right: 2px solid var(--ic-border);
     box-shadow: inset -3px 0 6px rgba(0, 0, 0, 0.08);
     cursor: default;
+  }
+  .ic-tbl__hcell--rownum:focus {
+    outline: none;
+    border-color: var(--ic-primary);
+    box-shadow: inset 0 0 0 1px var(--ic-primary);
   }
 </style>

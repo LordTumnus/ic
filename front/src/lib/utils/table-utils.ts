@@ -43,6 +43,12 @@ export interface NumberFilterValue {
   max?: number;
 }
 
+/** A row paired with its original index in the unsorted/unfiltered data. */
+export interface IndexedRow {
+  data: TableRow;
+  originalIndex: number;
+}
+
 /** Row size dimensions. */
 export const ROW_HEIGHTS = {
   sm: 24,
@@ -221,19 +227,19 @@ export function computePinnedOffsets(
 // ============================================================================
 
 /**
- * Sort rows client-side by a column field.
+ * Sort indexed rows client-side by a column field.
  * Returns a NEW sorted array (does not mutate input).
  */
 export function sortRows(
-  rows: TableRow[],
+  rows: IndexedRow[],
   field: string,
   direction: 'asc' | 'desc' | 'none',
-): TableRow[] {
+): IndexedRow[] {
   if (!field || direction === 'none') return rows;
 
   return [...rows].sort((a, b) => {
-    const va = a[field];
-    const vb = b[field];
+    const va = a.data[field];
+    const vb = b.data[field];
 
     // Handle nulls/undefined — push to end
     if (va == null && vb == null) return 0;
@@ -258,14 +264,14 @@ export function sortRows(
 // ============================================================================
 
 /**
- * Filter rows client-side by active filters.
+ * Filter indexed rows client-side by active filters.
  * Returns a NEW filtered array.
  */
 export function filterRows(
-  rows: TableRow[],
+  rows: IndexedRow[],
   filters: FilterState,
   columns: TableColumn[],
-): TableRow[] {
+): IndexedRow[] {
   const activeFields = Object.keys(filters).filter(f => {
     const v = filters[f];
     return v != null && v !== '' && !(typeof v === 'object' && 'min' in (v as NumberFilterValue) && (v as NumberFilterValue).min == null && (v as NumberFilterValue).max == null);
@@ -276,7 +282,8 @@ export function filterRows(
   const colMap = new Map<string, TableColumn>();
   for (const col of columns) colMap.set(col.field, col);
 
-  return rows.filter(row => {
+  return rows.filter(irow => {
+    const row = irow.data;
     for (const field of activeFields) {
       const filterVal = filters[field];
       const cellVal = row[field];

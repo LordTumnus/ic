@@ -51,8 +51,34 @@
     onchange?.(column.field, null);
   }
 
-  function handleKeydown(e: KeyboardEvent) {
+  // Window-level fallback: close on Escape even when focus is outside the popover
+  function handleWindowEscape(e: KeyboardEvent) {
     if (e.key === 'Escape') onclose?.();
+  }
+
+  // Popover-level: stop ALL key events from reaching the header cell
+  function handlePopoverKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      const headerCell = popoverEl?.closest('.ic-tbl__hcell') as HTMLElement | null;
+      onclose?.();
+      headerCell?.focus();
+      e.stopPropagation();
+      return;
+    }
+    // Enter on a checkbox label should toggle it (native checkboxes only respond to Space)
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      const checkLabel = target.closest('.ic-tbl-filter__check');
+      if (checkLabel) {
+        const checkbox = checkLabel.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        if (checkbox) {
+          checkbox.click();
+          e.preventDefault();
+        }
+      }
+    }
+    // Stop all key events from bubbling to the header cell
+    e.stopPropagation();
   }
 
   function toggleBadge(val: string) {
@@ -71,6 +97,12 @@
     emitChange();
   }
 
+  // Auto-focus the first input when the popover opens
+  $effect(() => {
+    const input = popoverEl?.querySelector('input, button.ic-tbl-filter__bool') as HTMLElement | null;
+    input?.focus();
+  });
+
   // Close on outside click — capture phase so stopPropagation can't block it
   $effect(() => {
     function handleOutside(e: PointerEvent) {
@@ -86,10 +118,10 @@
   });
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleWindowEscape} />
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="ic-tbl-filter" bind:this={popoverEl} role="dialog" tabindex={-1} onclick={(e: MouseEvent) => e.stopPropagation()}>
+<div class="ic-tbl-filter" bind:this={popoverEl} role="dialog" tabindex={-1} onclick={(e: MouseEvent) => e.stopPropagation()} onkeydown={handlePopoverKeydown}>
   <div class="ic-tbl-filter__header">
     <span class="ic-tbl-filter__title">Filter: {column.header}</span>
     <button class="ic-tbl-filter__clear" onclick={handleClear}>Clear</button>
