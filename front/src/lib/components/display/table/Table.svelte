@@ -111,6 +111,37 @@
     computePinnedOffsets(columns, columnWidths, showRowNumbers ? rowNumWidth : 0)
   );
 
+  // Track horizontal scroll — each pinned column activates its visual treatment
+  // only when content is actually scrolling behind it (i.e. it has reached its
+  // sticky position). Row number gutter uses the sentinel key '__rownum__'.
+  let scrollLeft = $state(0);
+  function handleScroll() {
+    scrollLeft = containerEl.scrollLeft;
+  }
+  const stickingFields = $derived.by(() => {
+    const result = new Set<string>();
+    if (scrollLeft <= 0) return result;
+
+    // Row number gutter: sticky left=0, sticks immediately
+    if (showRowNumbers) result.add('__rownum__');
+
+    // Data columns: sticks when scrollLeft > naturalLeft - stickyOffset
+    let naturalLeft = showRowNumbers ? rowNumWidth : 0;
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i];
+      const w = columnWidths[i] ?? 0;
+      const pinInfo = pinnedOffsets.get(col.field);
+
+      if (pinInfo?.side === 'left' && scrollLeft > naturalLeft - pinInfo.offset) {
+        result.add(col.field);
+      }
+      // TODO: right-pinned columns would need maxScrollLeft
+
+      naturalLeft += w;
+    }
+    return result;
+  });
+
   // Selection
   const selectedSet = $derived(new Set(value ?? []));
 
@@ -273,6 +304,7 @@
   class:ic-tbl--lg={size === 'lg'}
   class:ic-tbl--disabled={disabled}
   style:height={heightStyle}
+  onscroll={handleScroll}
   tabindex={0}
   role="grid"
 >
@@ -286,6 +318,7 @@
       showRowNumber={showRowNumbers}
       {rowNumWidth}
       {pinnedOffsets}
+      {stickingFields}
       {selectable}
       {activeColumns}
       {disabled}
@@ -308,6 +341,7 @@
           showRowNumber={showRowNumbers}
           {rowNumWidth}
           {pinnedOffsets}
+          {stickingFields}
           {striped}
           even={i % 2 === 1}
           {activeColumns}

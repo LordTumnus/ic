@@ -18,6 +18,7 @@
     activeColumns = [] as string[],
     activeCells = [] as { field: string; rowIndex: number }[],
     pinnedOffsets = new Map() as Map<string, PinnedInfo>,
+    stickingFields = new Set<string>(),
     onclick,
     oncellclick,
     oncellaction,
@@ -37,6 +38,7 @@
     activeColumns?: string[];
     activeCells?: { field: string; rowIndex: number }[];
     pinnedOffsets?: Map<string, PinnedInfo>;
+    stickingFields?: Set<string>;
     onclick?: (rowIndex: number, rowData: TRow) => void;
     oncellclick?: (field: string, rowIndex: number, value: unknown, rowData: TRow, shiftKey: boolean) => void;
     oncellaction?: (field: string, rowIndex: number, value: unknown, rowData: TRow) => void;
@@ -78,7 +80,8 @@
 >
   {#if showRowNumber}
     <div
-      class="ic-tbl__cell ic-tbl__cell--rownum ic-tbl__cell--pinned"
+      class="ic-tbl__cell ic-tbl__cell--rownum"
+      class:ic-tbl__cell--pinned={stickingFields.has('__rownum__')}
       class:ic-tbl__cell--rownum-selected={selected}
       class:ic-tbl__cell--rownum-selectable={selectable}
       style:flex="0 0 {rowNumWidth}px"
@@ -104,7 +107,7 @@
       class="ic-tbl__cell"
       class:ic-tbl__cell--active={isCellActive}
       class:ic-tbl__cell--col-active={isColActive}
-      class:ic-tbl__cell--pinned={pinInfo != null}
+      class:ic-tbl__cell--pinned={pinInfo != null && stickingFields.has(col.field)}
       class:ic-tbl__cell--left={align === 'left'}
       class:ic-tbl__cell--center={align === 'center'}
       class:ic-tbl__cell--right={align === 'right'}

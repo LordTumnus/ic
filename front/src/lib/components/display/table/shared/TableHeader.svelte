@@ -13,6 +13,7 @@
     showRowNumber = false,
     rowNumWidth = 24,
     pinnedOffsets = new Map() as Map<string, PinnedInfo>,
+    stickingFields = new Set<string>(),
     selectable = false,
     activeColumns = [] as string[],
     disabled = false,
@@ -29,6 +30,7 @@
     showRowNumber?: boolean;
     rowNumWidth?: number;
     pinnedOffsets?: Map<string, PinnedInfo>;
+    stickingFields?: Set<string>;
     selectable?: boolean;
     activeColumns?: string[];
     disabled?: boolean;
@@ -88,7 +90,8 @@
 <div class="ic-tbl__header" class:ic-tbl__header--disabled={disabled}>
   {#if showRowNumber}
     <div
-      class="ic-tbl__hcell ic-tbl__hcell--rownum ic-tbl__hcell--pinned"
+      class="ic-tbl__hcell ic-tbl__hcell--rownum"
+      class:ic-tbl__hcell--pinned={stickingFields.has('__rownum__')}
       style:flex="0 0 {rowNumWidth}px"
       style:width="{rowNumWidth}px"
       style:position="sticky"
@@ -110,7 +113,7 @@
       class:ic-tbl__hcell--sorted={isSorted}
       class:ic-tbl__hcell--active={isActive}
       class:ic-tbl__hcell--selectable={selectable}
-      class:ic-tbl__hcell--pinned={pinInfo != null}
+      class:ic-tbl__hcell--pinned={pinInfo != null && stickingFields.has(col.field)}
       class:ic-tbl__hcell--left={align === 'left'}
       class:ic-tbl__hcell--center={align === 'center'}
       class:ic-tbl__hcell--right={align === 'right'}
@@ -215,9 +218,15 @@
   .ic-tbl__hcell--selectable:hover {
     background: rgba(0, 0, 0, 0.05);
   }
+  .ic-tbl__hcell--pinned.ic-tbl__hcell--selectable:hover {
+    background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), var(--ic-secondary);
+  }
   .ic-tbl__hcell--active {
     border-color: var(--ic-primary);
     background: rgba(59, 130, 246, 0.06);
+  }
+  .ic-tbl__hcell--pinned.ic-tbl__hcell--active {
+    background: linear-gradient(rgba(59, 130, 246, 0.06), rgba(59, 130, 246, 0.06)), var(--ic-secondary);
   }
 
   .ic-tbl__hcell--left { justify-content: flex-start; }
