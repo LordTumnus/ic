@@ -114,6 +114,7 @@
       class:ic-tbl__hcell--active={isActive}
       class:ic-tbl__hcell--selectable={selectable}
       class:ic-tbl__hcell--pinned={pinInfo != null && stickingFields.has(col.field)}
+      class:ic-tbl__hcell--pinned-right={pinInfo?.side === 'right' && stickingFields.has(col.field)}
       class:ic-tbl__hcell--left={align === 'left'}
       class:ic-tbl__hcell--center={align === 'center'}
       class:ic-tbl__hcell--right={align === 'right'}
@@ -211,6 +212,9 @@
   .ic-tbl__hcell--pinned {
     background: var(--ic-secondary);
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+  }
+  .ic-tbl__hcell--pinned-right {
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06);
   }
   .ic-tbl__hcell--selectable {
     cursor: pointer;

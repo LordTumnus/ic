@@ -67,6 +67,8 @@
     padding: 0 6px;
     overflow: hidden;
     box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
   }
   .ic-tbl__cell--left { justify-content: flex-start; }
   .ic-tbl__cell--center { justify-content: center; }

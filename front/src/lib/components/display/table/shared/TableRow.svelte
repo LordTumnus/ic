@@ -108,6 +108,7 @@
       class:ic-tbl__cell--active={isCellActive}
       class:ic-tbl__cell--col-active={isColActive}
       class:ic-tbl__cell--pinned={pinInfo != null && stickingFields.has(col.field)}
+      class:ic-tbl__cell--pinned-right={pinInfo?.side === 'right' && stickingFields.has(col.field)}
       class:ic-tbl__cell--left={align === 'left'}
       class:ic-tbl__cell--center={align === 'center'}
       class:ic-tbl__cell--right={align === 'right'}
@@ -230,6 +231,9 @@
   .ic-tbl__cell--pinned {
     background: var(--ic-background);
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+  }
+  .ic-tbl__cell--pinned-right {
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06);
   }
   .ic-tbl__cell--pinned.ic-tbl__cell--rownum-selected {
     background: var(--ic-primary);

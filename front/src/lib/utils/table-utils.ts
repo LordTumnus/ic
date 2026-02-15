@@ -133,16 +133,33 @@ export function computeColumnWidths(
   containerWidth: number,
 ): number[] {
   const widths: number[] = [];
+  let fixedTotal = 0;
+  let autoCount = 0;
 
   for (const col of columns) {
     if (typeof col.width === 'number' && col.width > 0) {
       widths.push(col.width);
+      fixedTotal += col.width;
     } else if (typeof col.width === 'string' && col.width.endsWith('%')) {
       const pct = parseFloat(col.width) / 100;
       const w = Math.max(containerWidth * pct, col.minWidth || MIN_RESIZE_WIDTH);
       widths.push(w);
+      fixedTotal += w;
     } else {
-      widths.push(0); // auto — will use flex: 1
+      widths.push(0); // auto — resolved below for pinned columns
+      autoCount++;
+    }
+  }
+
+  // Pinned auto-width columns need a concrete pixel width for sticky offsets.
+  // Give them equal share of remaining space; unpinned auto columns stay 0 (flex).
+  if (autoCount > 0) {
+    const remaining = Math.max(0, containerWidth - fixedTotal);
+    const autoWidth = Math.max(remaining / autoCount, MIN_RESIZE_WIDTH);
+    for (let i = 0; i < widths.length; i++) {
+      if (widths[i] === 0 && columns[i].pinned) {
+        widths[i] = autoWidth;
+      }
     }
   }
 
@@ -162,7 +179,7 @@ export interface PinnedInfo {
 /**
  * Compute sticky offsets for pinned columns.
  * Returns a map from column field → PinnedInfo.
- * Only columns with pinned != "none" AND a fixed width (> 0) are included.
+ * Only columns with pinned != "none" are included.
  *
  * @param baseLeftOffset - extra left offset before the first pinned column
  *   (e.g. row number gutter width)
@@ -179,7 +196,7 @@ export function computePinnedOffsets(
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
     const w = columnWidths[i] ?? 0;
-    if (col.pinned === 'left' && w > 0) {
+    if (col.pinned === 'left') {
       result.set(col.field, { side: 'left', offset: leftOffset });
       leftOffset += w;
     }
@@ -190,7 +207,7 @@ export function computePinnedOffsets(
   for (let i = columns.length - 1; i >= 0; i--) {
     const col = columns[i];
     const w = columnWidths[i] ?? 0;
-    if (col.pinned === 'right' && w > 0) {
+    if (col.pinned === 'right') {
       result.set(col.field, { side: 'right', offset: rightOffset });
       rightOffset += w;
     }

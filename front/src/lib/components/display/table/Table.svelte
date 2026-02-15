@@ -114,18 +114,31 @@
   // Track horizontal scroll — each pinned column activates its visual treatment
   // only when content is actually scrolling behind it (i.e. it has reached its
   // sticky position). Row number gutter uses the sentinel key '__rownum__'.
+  // Both scrollLeft and maxScroll are tracked as reactive state so the derived
+  // always uses fresh values (DOM properties aren't reactive on their own).
   let scrollLeft = $state(0);
+  let maxScroll = $state(0);
   function handleScroll() {
     scrollLeft = containerEl.scrollLeft;
+    maxScroll = containerEl.scrollWidth - containerEl.clientWidth;
   }
+  // Also seed maxScroll once layout is known (before any scroll happens)
+  $effect(() => {
+    if (containerEl && columns.length > 0 && columnWidths.length > 0) {
+      maxScroll = containerEl.scrollWidth - containerEl.clientWidth;
+    }
+  });
+
   const stickingFields = $derived.by(() => {
     const result = new Set<string>();
-    if (scrollLeft <= 0) return result;
 
-    // Row number gutter: sticky left=0, sticks immediately
-    if (showRowNumbers) result.add('__rownum__');
+    // Nothing is scrollable — no pinned visuals needed
+    if (maxScroll <= 0) return result;
 
-    // Data columns: sticks when scrollLeft > naturalLeft - stickyOffset
+    // Row number gutter: sticky left=0, sticks immediately on any scroll
+    if (showRowNumbers && scrollLeft > 0) result.add('__rownum__');
+
+    // Left-pinned: sticks when scrollLeft > naturalLeft - stickyOffset
     let naturalLeft = showRowNumbers ? rowNumWidth : 0;
     for (let i = 0; i < columns.length; i++) {
       const col = columns[i];
@@ -135,10 +148,29 @@
       if (pinInfo?.side === 'left' && scrollLeft > naturalLeft - pinInfo.offset) {
         result.add(col.field);
       }
-      // TODO: right-pinned columns would need maxScrollLeft
 
       naturalLeft += w;
     }
+
+    // Right-pinned: sticks when scroll hasn't reached the far right
+    if (scrollLeft < maxScroll) {
+      let naturalRight = 0;
+      for (let i = columns.length - 1; i >= 0; i--) {
+        const col = columns[i];
+        const w = columnWidths[i] ?? 0;
+        const pinInfo = pinnedOffsets.get(col.field);
+
+        if (pinInfo?.side === 'right') {
+          const scrollFromRight = maxScroll - scrollLeft;
+          if (scrollFromRight > naturalRight - pinInfo.offset) {
+            result.add(col.field);
+          }
+        }
+
+        naturalRight += w;
+      }
+    }
+
     return result;
   });
 
