@@ -1,17 +1,18 @@
-classdef Column
+classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
     % > COLUMN Definition of a single table column.
     %
     %   Specifies how a column of data is displayed, including its
     %   header text, cell renderer type, width, sort/filter behavior,
     %   alignment, and type-specific configuration.
     %
-    %   Example:
-    %       c = ic.table.Column("Name", Width=200, Sortable=true)
-    %       c = ic.table.Column("Age", Type="number", Align="right")
+    %   For type-safe column definitions, use typed subclasses:
+    %       c = ic.table.TextColumn("Name", Sortable=true)
+    %       c = ic.table.NumberColumn("Age", Align="right", Format="%.0f")
+    %       c = ic.table.BadgeColumn("Status", ColorMap=struct('Active','success'))
+    %
+    %   The base Column class remains usable for backward compatibility:
     %       c = ic.table.Column("Status", Type="badge", Filterable=true, ...
     %           Config=struct('colorMap', struct('Active','success')))
-    %       c = ic.table.Column("Trend", Type="sparkline", ...
-    %           Config=struct('type',"line",'color',"primary",'height',20))
 
     properties
         % > FIELD data field name (table variable or struct field)
@@ -54,7 +55,7 @@ classdef Column
         % > FORMAT printf format string for number display (e.g. "$%.2f")
         Format (1,1) string = ""
 
-        % > CONFIG type-specific configuration struct
+        % > CONFIG type-specific configuration struct (use typed subclasses instead)
         %   badge:     colorMap (struct: value → variant name)
         %   sparkline: type ("line"|"bar"), color (variant), height (px)
         %   progress:  variant (color variant name)
@@ -69,44 +70,49 @@ classdef Column
             %   c = ic.table.Column("name")
             %   c = ic.table.Column("age", Type="number", Sortable=true)
             arguments
-                field (1,1) string
+                field (1,1) string = ""
                 opts.?ic.table.Column
             end
             this.Field = field;
-            flds = fieldnames(opts);
-            for i = 1:numel(flds)
-                this.(flds{i}) = opts.(flds{i});
+            if ~isempty(fieldnames(opts))
+                set(this, opts);
             end
             if this.Header == ""
                 this.Header = field;
             end
         end
+    end
 
+    methods (Sealed)
         function s = toStruct(this)
             % > TOSTRUCT Convert column array to struct array for JSON.
             n = numel(this);
             if n == 0
-                s = struct('field', {}, 'header', {}, 'type', {}, ...
-                    'width', {}, 'minWidth', {}, 'sortable', {}, ...
-                    'filterable', {}, 'resizable', {}, 'align', {}, ...
-                    'pinned', {}, 'format', {}, 'config', {});
+                s = struct('field',{},'header',{},'type',{}, ...
+                    'width',{},'minWidth',{},'sortable',{}, ...
+                    'filterable',{},'resizable',{},'align',{}, ...
+                    'pinned',{},'format',{},'config',{});
                 return;
             end
-            s = repmat(struct(), 1, n);
+            e = cell(1, n);
+            s = struct('field',e,'header',e,'type',e, ...
+                'width',e,'minWidth',e,'sortable',e, ...
+                'filterable',e,'resizable',e,'align',e, ...
+                'pinned',e,'format',e,'config',e);
             for i = 1:n
                 c = this(i);
-                s(i).field = c.Field;
-                s(i).header = c.Header;
-                s(i).type = c.Type;
-                s(i).width = c.Width;
-                s(i).minWidth = c.MinWidth;
-                s(i).sortable = c.Sortable;
+                s(i).field      = c.Field;
+                s(i).header     = c.Header;
+                s(i).type       = c.Type;
+                s(i).width      = c.Width;
+                s(i).minWidth   = c.MinWidth;
+                s(i).sortable   = c.Sortable;
                 s(i).filterable = c.Filterable;
-                s(i).resizable = c.Resizable;
-                s(i).align = c.Align;
-                s(i).pinned = c.Pinned;
-                s(i).format = c.Format;
-                s(i).config = c.Config;
+                s(i).resizable  = c.Resizable;
+                s(i).align      = c.Align;
+                s(i).pinned     = c.Pinned;
+                s(i).format     = c.Format;
+                s(i).config     = c.buildConfig();
             end
         end
 
@@ -116,28 +122,61 @@ classdef Column
         end
     end
 
+    methods (Access = protected)
+        function initFromOpts(this, type, opts)
+            % > INITFROMOPTS Set common + type-specific properties, lock Type.
+            %   Filters out Type and Config (managed internally by subclasses),
+            %   then applies all remaining name-value pairs via set().
+            opts = rmfield(opts, intersect(fieldnames(opts), {'Type','Config'}));
+            if ~isempty(fieldnames(opts))
+                set(this, opts);
+            end
+            this.Type = type;
+            if this.Header == ""
+                this.Header = this.Field;
+            end
+        end
+
+        function cfg = buildConfig(this)
+            % > BUILDCONFIG Return type-specific config struct for JSON.
+            %   Base class returns raw Config property (backward compat).
+            %   Subclasses override to construct config from named properties.
+            cfg = this.Config;
+        end
+    end
+
+    methods (Static, Sealed, Access = protected)
+        function obj = getDefaultScalarElement()
+            obj = ic.table.Column();
+        end
+    end
+
     methods (Static)
         function cols = fromTable(t)
-            % > FROMTABLE Auto-infer columns from a MATLAB table.
+            % > FROMTABLE Auto-infer typed columns from a MATLAB table.
             %   cols = ic.table.Column.fromTable(myTable)
             arguments
                 t table
             end
             varNames = t.Properties.VariableNames;
             n = numel(varNames);
-            cols = ic.table.Column.empty(0, n);
+            if n == 0
+                cols = ic.table.Column.empty;
+                return;
+            end
+            colCell = cell(1, n);
             for i = 1:n
                 vn = string(varNames{i});
                 col = t.(varNames{i});
                 if isnumeric(col)
-                    tp = "number";
+                    colCell{i} = ic.table.NumberColumn(vn);
                 elseif islogical(col)
-                    tp = "boolean";
+                    colCell{i} = ic.table.BooleanColumn(vn);
                 else
-                    tp = "text";
+                    colCell{i} = ic.table.TextColumn(vn);
                 end
-                cols(i) = ic.table.Column(vn, Type=tp);
             end
+            cols = [colCell{:}];
         end
 
         function cols = fromStruct(s)
@@ -148,10 +187,15 @@ classdef Column
             end
             fields = fieldnames(s);
             n = numel(fields);
-            cols = ic.table.Column.empty(0, n);
-            for i = 1:n
-                cols(i) = ic.table.Column(string(fields{i}));
+            if n == 0
+                cols = ic.table.Column.empty;
+                return;
             end
+            colCell = cell(1, n);
+            for i = 1:n
+                colCell{i} = ic.table.TextColumn(string(fields{i}));
+            end
+            cols = [colCell{:}];
         end
     end
 end
