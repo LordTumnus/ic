@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { TableColumn, FilterState, NumberFilterValue } from '$lib/utils/table-utils';
+  import type { TableColumn, NumberFilterValue } from '$lib/utils/table-utils';
+  import Select from '$lib/components/form/select/Select.svelte';
 
   let {
     column,
@@ -18,16 +19,63 @@
 
   let popoverEl: HTMLDivElement;
 
+  type FilterMode = 'default' | 'isEmpty' | 'isNotEmpty';
+
+  function detectMode(val: unknown): FilterMode {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const obj = val as Record<string, unknown>;
+      if ('isEmpty' in obj) return 'isEmpty';
+      if ('isNotEmpty' in obj) return 'isNotEmpty';
+    }
+    return 'default';
+  }
+
   // Seed local state from prop — one-time capture is correct since
   // the popover is destroyed/recreated each time it opens
   const init = untrack(() => filterValue);
-  let textValue = $state((init as string) ?? '');
-  let numMin = $state((init as NumberFilterValue)?.min ?? null);
-  let numMax = $state((init as NumberFilterValue)?.max ?? null);
+  const initMode = detectMode(init);
+
+  let filterMode = $state<FilterMode>(initMode);
+  let textValue = $state(initMode === 'default' ? ((init as string) ?? '') : '');
+  let numMin = $state(initMode === 'default' ? ((init as NumberFilterValue)?.min ?? null) : null);
+  let numMax = $state(initMode === 'default' ? ((init as NumberFilterValue)?.max ?? null) : null);
   let badgeSelected = $state<string[]>(Array.isArray(init) ? init : []);
   let boolValue = $state<boolean | null>(init as boolean | null);
 
+  // Flip state for overflow positioning
+  let flipX = $state(false);
+  let flipY = $state(false);
+
+  // Mode label mapping for the Select component
+  const modeItems = $derived(column.type === 'number'
+    ? ['Range', 'Is empty', 'Is not empty']
+    : ['Contains', 'Is empty', 'Is not empty']);
+
+  function modeToLabel(mode: FilterMode): string {
+    if (mode === 'isEmpty') return 'Is empty';
+    if (mode === 'isNotEmpty') return 'Is not empty';
+    return column.type === 'number' ? 'Range' : 'Contains';
+  }
+
+  function labelToMode(label: string | null): FilterMode {
+    if (label === 'Is empty') return 'isEmpty';
+    if (label === 'Is not empty') return 'isNotEmpty';
+    return 'default';
+  }
+
+  const modeLabel = $derived(modeToLabel(filterMode));
+
   function emitChange() {
+    // isEmpty / isNotEmpty modes (text + number types)
+    if (filterMode === 'isEmpty') {
+      onchange?.(column.field, { isEmpty: true });
+      return;
+    }
+    if (filterMode === 'isNotEmpty') {
+      onchange?.(column.field, { isNotEmpty: true });
+      return;
+    }
+
     if (column.type === 'number') {
       const range: NumberFilterValue = {};
       if (numMin != null) range.min = numMin;
@@ -43,6 +91,7 @@
   }
 
   function handleClear() {
+    filterMode = 'default';
     textValue = '';
     numMin = null;
     numMax = null;
@@ -59,6 +108,12 @@
   // Popover-level: stop ALL key events from reaching the header cell
   function handlePopoverKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
+      // If a nested Select dropdown is open, let it close first
+      const openSelect = popoverEl?.querySelector('.ic-select--open');
+      if (openSelect) {
+        e.stopPropagation();
+        return;
+      }
       const headerCell = popoverEl?.closest('.ic-tbl__hcell') as HTMLElement | null;
       onclose?.();
       headerCell?.focus();
@@ -97,10 +152,40 @@
     emitChange();
   }
 
-  // Auto-focus the first input when the popover opens
+  // Auto-focus the best interactive element when the popover opens or mode changes
   $effect(() => {
-    const input = popoverEl?.querySelector('input, button.ic-tbl-filter__bool') as HTMLElement | null;
-    input?.focus();
+    if (!popoverEl) return;
+    const _mode = filterMode; // track mode changes to re-focus
+    const body = popoverEl.querySelector('.ic-tbl-filter__body');
+    if (!body) return;
+    // Priority: text/number input > checkbox > Select combobox > boolean button
+    const input = body.querySelector('input') as HTMLElement | null;
+    const sel = body.querySelector('[role="combobox"]') as HTMLElement | null;
+    const btn = body.querySelector('button.ic-tbl-filter__bool') as HTMLElement | null;
+    (input || sel || btn)?.focus();
+  });
+
+  // Flip logic: reposition if popup overflows the table container
+  $effect(() => {
+    if (!popoverEl) return;
+    const table = popoverEl.closest('.ic-tbl') as HTMLElement;
+    if (!table) return;
+    const cell = popoverEl.offsetParent as HTMLElement;
+    if (!cell) return;
+
+    const cellRect = cell.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    const popRect = popoverEl.getBoundingClientRect();
+
+    // Vertical: flip above if not enough space below and more space above
+    const spaceBelow = tableRect.bottom - cellRect.bottom - 2;
+    const spaceAbove = cellRect.top - tableRect.top - 2;
+    flipY = popRect.height > spaceBelow && spaceAbove > spaceBelow;
+
+    // Horizontal: flip to left-aligned if right-aligned would overflow past table left
+    const rightAlignSpace = cellRect.right - tableRect.left;
+    const leftAlignSpace = tableRect.right - cellRect.left;
+    flipX = popRect.width > rightAlignSpace && leftAlignSpace > rightAlignSpace;
   });
 
   // Close on outside click — capture phase so stopPropagation can't block it
@@ -121,7 +206,7 @@
 <svelte:window onkeydown={handleWindowEscape} />
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="ic-tbl-filter" bind:this={popoverEl} role="dialog" tabindex={-1} onclick={(e: MouseEvent) => e.stopPropagation()} onkeydown={handlePopoverKeydown}>
+<div class="ic-tbl-filter" class:ic-tbl-filter--flip-x={flipX} class:ic-tbl-filter--flip-y={flipY} bind:this={popoverEl} role="dialog" tabindex={-1} onclick={(e: MouseEvent) => e.stopPropagation()} onkeydown={handlePopoverKeydown}>
   <div class="ic-tbl-filter__header">
     <span class="ic-tbl-filter__title">Filter: {column.header}</span>
     <button class="ic-tbl-filter__clear" onclick={handleClear}>Clear</button>
@@ -129,28 +214,41 @@
 
   <div class="ic-tbl-filter__body">
     {#if column.type === 'number'}
-      <div class="ic-tbl-filter__range">
-        <label>
-          Min
-          <input
-            type="number"
-            class="ic-tbl-filter__input"
-            bind:value={numMin}
-            oninput={emitChange}
-            placeholder="—"
-          />
-        </label>
-        <label>
-          Max
-          <input
-            type="number"
-            class="ic-tbl-filter__input"
-            bind:value={numMax}
-            oninput={emitChange}
-            placeholder="—"
-          />
-        </label>
-      </div>
+      <Select
+        items={modeItems}
+        value={modeLabel}
+        size="sm"
+        variant="secondary"
+        maxPopupHeight={120}
+        valueChanged={(data) => {
+          filterMode = labelToMode((data as {value: string | null})?.value ?? null);
+          emitChange();
+        }}
+      />
+      {#if filterMode === 'default'}
+        <div class="ic-tbl-filter__range">
+          <label>
+            Min
+            <input
+              type="number"
+              class="ic-tbl-filter__input"
+              bind:value={numMin}
+              oninput={emitChange}
+              placeholder="—"
+            />
+          </label>
+          <label>
+            Max
+            <input
+              type="number"
+              class="ic-tbl-filter__input"
+              bind:value={numMax}
+              oninput={emitChange}
+              placeholder="—"
+            />
+          </label>
+        </div>
+      {/if}
     {:else if column.type === 'badge'}
       <div class="ic-tbl-filter__badges">
         {#each uniqueValues as val}
@@ -172,13 +270,26 @@
         {boolValue === null ? 'All' : boolValue ? 'True' : 'False'}
       </button>
     {:else}
-      <input
-        type="text"
-        class="ic-tbl-filter__input ic-tbl-filter__input--full"
-        bind:value={textValue}
-        oninput={emitChange}
-        placeholder="Search..."
+      <Select
+        items={modeItems}
+        value={modeLabel}
+        size="sm"
+        variant="secondary"
+        maxPopupHeight={120}
+        valueChanged={(data) => {
+          filterMode = labelToMode((data as {value: string | null})?.value ?? null);
+          emitChange();
+        }}
       />
+      {#if filterMode === 'default'}
+        <input
+          type="text"
+          class="ic-tbl-filter__input ic-tbl-filter__input--full"
+          bind:value={textValue}
+          oninput={emitChange}
+          placeholder="Search..."
+        />
+      {/if}
     {/if}
   </div>
 </div>
@@ -196,6 +307,14 @@
     border-radius: 3px;
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.12);
     font-size: 0.8rem;
+  }
+  .ic-tbl-filter--flip-y {
+    top: auto;
+    bottom: calc(100% + 2px);
+  }
+  .ic-tbl-filter--flip-x {
+    right: auto;
+    left: 0;
   }
 
   .ic-tbl-filter__header {
@@ -246,6 +365,10 @@
   }
   .ic-tbl-filter__input--full {
     width: 100%;
+  }
+
+  .ic-tbl-filter__body :global(.ic-select) {
+    margin-bottom: 6px;
   }
 
   .ic-tbl-filter__range {

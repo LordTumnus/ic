@@ -43,6 +43,16 @@ export interface NumberFilterValue {
   max?: number;
 }
 
+/** Empty filter value — matches rows where cell is empty (null, undefined, or ""). */
+export interface EmptyFilterValue {
+  isEmpty: true;
+}
+
+/** Not-empty filter value — matches rows where cell has a value. */
+export interface NotEmptyFilterValue {
+  isNotEmpty: true;
+}
+
 /** A row paired with its original index in the unsorted/unfiltered data. */
 export interface IndexedRow {
   data: TableRow;
@@ -290,6 +300,18 @@ export function filterRows(
       const col = colMap.get(field);
 
       if (!col) continue;
+
+      // "Is empty" / "Is not empty" filters (text + number types)
+      if (typeof filterVal === 'object' && filterVal !== null && !Array.isArray(filterVal)) {
+        if ('isEmpty' in (filterVal as Record<string, unknown>)) {
+          if (cellVal != null && cellVal !== '') return false;
+          continue;
+        }
+        if ('isNotEmpty' in (filterVal as Record<string, unknown>)) {
+          if (cellVal == null || cellVal === '') return false;
+          continue;
+        }
+      }
 
       if (col.type === 'number') {
         const range = filterVal as NumberFilterValue;
