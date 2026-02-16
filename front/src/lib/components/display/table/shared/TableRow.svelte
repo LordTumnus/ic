@@ -249,7 +249,6 @@
     display: flex;
     box-shadow: inset 0 -1px 0 var(--ic-border);
     transition: background-color 0.08s ease;
-    user-select: none;
   }
   .ic-tbl__row:last-child {
     box-shadow: none;
@@ -317,6 +316,8 @@
   }
   .ic-tbl__cell--rownum-selected:hover {
     background: var(--ic-primary);
+    color: var(--ic-primary-foreground);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   }
 
   /* Data cells */

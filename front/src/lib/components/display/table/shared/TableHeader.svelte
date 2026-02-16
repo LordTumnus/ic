@@ -41,10 +41,12 @@
   } = $props();
 
   let openFilterField = $state<string | null>(null);
+  let hoveredSortCol = $state<string | null>(null);
 
-  // SVG for sort arrows (6×6)
+  // SVG for sort arrows (6×6) and clear icon
   const SORT_UP = '<svg width="6" height="6" viewBox="0 0 8 8"><path d="M4 1L7 5H1Z" fill="currentColor"/></svg>';
   const SORT_DOWN = '<svg width="6" height="6" viewBox="0 0 8 8"><path d="M4 7L1 3H7Z" fill="currentColor"/></svg>';
+  const SORT_CLEAR = '<svg width="6" height="6" viewBox="0 0 8 8"><path d="M2 2L6 6M6 2L2 6" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>';
   // Filled funnel SVG (7×7)
   const FILTER_ICON = '<svg width="7" height="7" viewBox="0 0 10 10"><path d="M0 1h10L6.2 5.5V9L3.8 8V5.5Z" fill="currentColor"/></svg>';
 
@@ -215,17 +217,32 @@
       {#if col.sortable || col.filterable}
         <div class="ic-tbl__hcell-actions">
           {#if col.sortable}
+            {@const isHovering = hoveredSortCol === col.field}
             <button
               class="ic-tbl__sort-btn"
               class:ic-tbl__sort-btn--active={isSorted}
               onclick={(e: MouseEvent) => handleSortClick(e, col)}
+              onpointerenter={() => { hoveredSortCol = col.field; }}
+              onpointerleave={() => { if (hoveredSortCol === col.field) hoveredSortCol = null; }}
               tabindex={-1}
               aria-label="Sort {col.header}"
             >
-              {#if isSorted && sortDirection === 'desc'}
-                {@html SORT_DOWN}
+              {#if isHovering}
+                {#if isSorted && sortDirection === 'asc'}
+                  {@html SORT_DOWN}
+                {:else if isSorted && sortDirection === 'desc'}
+                  {@html SORT_CLEAR}
+                {:else}
+                  {@html SORT_UP}
+                {/if}
               {:else}
-                {@html SORT_UP}
+                {#if isSorted && sortDirection === 'asc'}
+                  {@html SORT_UP}
+                {:else if isSorted && sortDirection === 'desc'}
+                  {@html SORT_DOWN}
+                {:else}
+                  {@html SORT_UP}
+                {/if}
               {/if}
             </button>
           {/if}
@@ -319,6 +336,11 @@
     color: var(--ic-primary-foreground);
     border-color: var(--ic-primary);
     box-shadow: none;
+  }
+  .ic-tbl__hcell--active.ic-tbl__hcell--selectable:hover {
+    background: var(--ic-primary);
+    color: var(--ic-primary-foreground);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   }
   .ic-tbl__hcell--pinned.ic-tbl__hcell--active {
     background: var(--ic-primary);
