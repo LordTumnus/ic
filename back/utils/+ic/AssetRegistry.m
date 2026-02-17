@@ -10,15 +10,15 @@ classdef AssetRegistry < handle
    end
 
    properties (Access = private)
-      % > VIEWMAP containers.Map: uint64(view) → containers.Map (sent hashes)
+      % > VIEWMAP containers.Map: double(view) → containers.Map (sent hashes)
       ViewMap % containers.Map()
       % > CURRENTSENT handle ref to the active View's sent-hash map
-      CurrentSent
+      CurrentSent % containers.Map()
    end
 
    methods (Access = private)
       function this = AssetRegistry()
-         this.ViewMap = containers.Map('KeyType', 'uint64', 'ValueType', 'any');
+         this.ViewMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
          this.CurrentSent = containers.Map();
       end
 
@@ -41,7 +41,7 @@ classdef AssetRegistry < handle
       function activate(view)
          % > ACTIVATE Set the active View. Creates its sent map on first call.
          r = ic.AssetRegistry.getInstance();
-         key = uint64(view);
+         key = double(view);
          if ~r.ViewMap.isKey(key)
             r.ViewMap(key) = containers.Map();
             addlistener(view, 'ObjectBeingDestroyed', @(~,~) r.cleanup(key));
