@@ -2,7 +2,7 @@ function mustBeImage(asset)
    % > MUSTBEIMAGE Validates that an asset is a valid image source.
    %
    % Use as a property validator after implicit conversion:
-   %   Source ic.Asset {ic.assets.mustBeImage} = ic.Asset()
+   %   Source ic.asset.Asset {ic.assets.mustBeImage} = ic.asset.Asset()
    %
    % Accepts:
    %   - empty: no image

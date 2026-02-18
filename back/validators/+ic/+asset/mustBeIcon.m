@@ -2,7 +2,7 @@ function mustBeIcon(asset)
    % > MUSTBEICON Validates that an asset is a valid icon source.
    %
    % Use as a property validator after implicit conversion:
-   %   Source ic.Asset {ic.assets.mustBeIcon} = ic.Asset("info")
+   %   Source ic.Asset {ic.assets.mustBeIcon} = ic.asset.Asset("info")
    %
    % Accepts:
    %   - empty: no icon

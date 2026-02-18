@@ -6,7 +6,7 @@ classdef AssetRegistry < handle
 
    properties (Constant, Access = private)
       % > INSTANCE Singleton — evaluated once when the class first loads.
-      Instance = ic.AssetRegistry()
+      Instance = ic.asset.AssetRegistry()
    end
 
    properties (Access = private)
@@ -33,14 +33,14 @@ classdef AssetRegistry < handle
    methods (Static, Access = private)
       function r = getInstance()
          % > GETINSTANCE Return the singleton.
-         r = ic.AssetRegistry.Instance;
+         r = ic.asset.AssetRegistry.Instance;
       end
    end
 
    methods (Static, Access = {?ic.core.View})
       function activate(view)
          % > ACTIVATE Set the active View. Creates its sent map on first call.
-         r = ic.AssetRegistry.getInstance();
+         r = ic.asset.AssetRegistry.getInstance();
          key = double(view);
          if ~r.ViewMap.isKey(key)
             r.ViewMap(key) = containers.Map();
@@ -50,15 +50,15 @@ classdef AssetRegistry < handle
       end
    end
 
-   methods (Static, Access = {?ic.Asset})
+   methods (Static, Access = {?ic.asset.Asset})
       function tf = hasSent(hash)
          % > HASSENT Check if this hash was already sent to the active View.
-         tf = ic.AssetRegistry.getInstance().CurrentSent.isKey(hash);
+         tf = ic.asset.AssetRegistry.getInstance().CurrentSent.isKey(hash);
       end
 
       function markSent(hash)
          % > MARKSENT Record that this hash has been sent to the active View.
-         r = ic.AssetRegistry.getInstance();
+         r = ic.asset.AssetRegistry.getInstance();
          r.CurrentSent(hash) = true;
       end
    end

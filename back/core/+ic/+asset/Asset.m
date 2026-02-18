@@ -1,9 +1,9 @@
 classdef Asset
    % > ASSET Universal source: Lucide name, local file, or URL.
-   %   ic.Asset("home")           → name (Lucide)
-   %   ic.Asset("photo.png")      → file (isfile=true)
-   %   ic.Asset("https://...")    → url
-   %   ic.Asset() or ic.Asset("") → empty
+   %   ic.asset.Asset("home")           → name (Lucide)
+   %   ic.asset.Asset("photo.png")      → file (isfile=true)
+   %   ic.asset.Asset("https://...")    → url
+   %   ic.asset.Asset() or ic.asset.Asset("") → empty
 
    properties (SetAccess = immutable)
       % > TYPE source kind: "" | "name" | "file" | "url"
@@ -45,17 +45,17 @@ classdef Asset
          end
          % file or url → read raw bytes, compute hash, encode only if needed
          if this.Type == "file"
-            [raw, ext] = ic.Asset.readFile(this.Value);
+            [raw, ext] = ic.asset.Asset.readFile(this.Value);
          else
-            [raw, ext] = ic.Asset.downloadUrl(this.Value);
+            [raw, ext] = ic.asset.Asset.downloadUrl(this.Value);
          end
-         hash = ic.Asset.computeHash(raw);
-         if ic.AssetRegistry.hasSent(hash)
+         hash = ic.asset.Asset.computeHash(raw);
+         if ic.asset.AssetRegistry.hasSent(hash)
             s = struct('hash', hash);
          else
-            ic.AssetRegistry.markSent(hash);
+            ic.asset.AssetRegistry.markSent(hash);
             s = struct('hash', hash, ...
-                       'mime', ic.Asset.mimeFromExt(ext), ...
+                       'mime', ic.asset.Asset.mimeFromExt(ext), ...
                        'data', string(matlab.net.base64encode(raw)));
          end
          json = jsonencode(s, varargin{:});
