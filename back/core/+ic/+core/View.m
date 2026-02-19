@@ -70,7 +70,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
          data = this.Queue;
          this.Queue = ic.event.JsEvent.empty();
          % activate asset registry before sending to the view
-         ic.AssetRegistry.activate(this);
+         ic.asset.AssetRegistry.activate(this);
          % cast queue into a cell -> JSON encoded will allways be an array
          this.HTMLElement.Data = num2cell(data);
 
