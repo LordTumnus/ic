@@ -7,7 +7,7 @@ classdef Tree < ic.tree.TreeBase
     %
     %   Example:
     %       t = ic.Tree();
-    %       fruits = ic.tree.Node("Fruits", Icon=ic.IconType.lucide("apple"));
+    %       fruits = ic.tree.Node("Fruits", Icon="apple");
     %       apple  = fruits.add("Apple");
     %       citrus = fruits.add("Citrus");
     %       orange = citrus.add("Orange");

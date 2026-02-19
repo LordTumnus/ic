@@ -99,7 +99,7 @@ classdef (Abstract) TreeBase < ic.core.Component
                 this
                 parent ic.tree.Node
                 label (1,1) string
-                opts.Icon = ic.IconType.empty
+                opts.Icon ic.asset.Asset = ic.asset.Asset()
                 opts.Data struct = struct.empty
             end
             child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);
