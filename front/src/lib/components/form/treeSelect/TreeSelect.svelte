@@ -3,7 +3,7 @@
   import { toSize } from '$lib/utils/css';
   import Tag from '$lib/components/shared/Tag.svelte';
   import TreePanel from './TreePanel.svelte';
-  import { resolveIconType } from '$lib/utils/icons';
+  import { resolveIcon } from '$lib/utils/icons';
   import {
     type TreeNode,
     type FlatNode,
@@ -21,10 +21,6 @@
   } from '$lib/utils/tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
-
-  function resolveIcon(icon: string | import('$lib/utils/icons').IconTypeData | undefined, sz: string): string {
-    return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
-  }
 
   // --- Props ---
   let {
@@ -575,7 +571,7 @@
               </span>
 
               {#if node.icon}
-                {@const svg = resolveIcon(node.icon, size)}
+                {@const svg = resolveIcon(node.icon, ICON_SIZES[size] ?? 12)}
                 {#if svg}
                   <span class="ic-ts__search-icon">{@html svg}</span>
                 {/if}

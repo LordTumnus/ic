@@ -10,8 +10,8 @@ classdef Node < handle
         % > LABEL display text for this node
         Label (1,1) string
 
-        % > ICON icon for this node
-        Icon ic.IconType = ic.IconType.empty
+        % > ICON icon for this node (Lucide name, .svg file, or URL)
+        Icon ic.Asset = ic.Asset()
 
         % > CHILDREN child nodes
         Children ic.tree.Node = ic.tree.Node.empty
@@ -24,11 +24,11 @@ classdef Node < handle
         function this = Node(label, opts)
             % > NODE Construct a tree node.
             %   n = ic.tree.Node("Fruits")
-            %   n = ic.tree.Node("Fruits", Icon=ic.IconType.lucide("apple"))
+            %   n = ic.tree.Node("Fruits", Icon="apple")
             %   n = ic.tree.Node("Fruits", Data=struct('weight', 42))
             arguments
                 label (1,1) string
-                opts.Icon = ic.IconType.empty
+                opts.Icon ic.Asset = ic.Asset()
                 opts.Data struct = struct.empty
             end
             this.Label = label;
@@ -41,7 +41,7 @@ classdef Node < handle
             arguments
                 this
                 label (1,1) string
-                opts.Icon = ic.IconType.empty
+                opts.Icon ic.Asset = ic.Asset()
                 opts.Data struct = struct.empty
             end
             child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);
@@ -129,14 +129,17 @@ function key = findKeyOf(nodes, target, prefix)
 end
 
 function s = nodeToScalar(n)
-    if isempty(n.Icon), icon = [];
-    else, icon = struct('type', n.Icon.Type, 'value', n.Icon.Value);
+    if isempty(n.Children)
+        ch = [];
+    else
+        ch = n.Children.toStruct();
     end
-    if isempty(n.Children), ch = [];
-    else, ch = n.Children.toStruct();
+    if isempty(n.Data)
+        d = struct();
+    else
+        d = n.Data;
     end
-    if isempty(n.Data), d = struct();
-    else, d = n.Data;
-    end
-    s = struct('label', n.Label, 'icon', icon, 'children', ch, 'data', d);
+    % ic.Asset.jsonencode handles all cases:
+    %   name → "iconName", file/url → {hash,...}, empty → null
+    s = struct('label', n.Label, 'icon', n.Icon, 'children', ch, 'data', d);
 end

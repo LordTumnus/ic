@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { resolveIconType } from '$lib/utils/icons';
+  import { resolveIcon } from '$lib/utils/icons';
 
   let { value }: { value?: unknown } = $props();
 
-  const svg = $derived(resolveIconType(value as string, 16));
+  const svg = $derived(resolveIcon(value as string, 16));
 </script>
 
 {#if svg}

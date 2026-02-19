@@ -8,7 +8,7 @@
  * (no children arrays). Children are fetched on demand into ChildCache entries.
  */
 
-import type { IconTypeData } from '$lib/utils/icons';
+import type { IconSource } from '$lib/utils/icons';
 import { normalizeIcon } from '$lib/utils/tree-utils';
 
 // --- Types ---
@@ -17,7 +17,7 @@ import { normalizeIcon } from '$lib/utils/tree-utils';
 export interface VirtualNode {
   key: string;
   name: string;
-  icon?: string | IconTypeData;
+  icon?: IconSource;
   isFolder: boolean;
   childCount: number;
 }

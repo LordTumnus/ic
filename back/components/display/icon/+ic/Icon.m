@@ -1,18 +1,15 @@
 classdef Icon < ic.core.Component
     % > ICON Displays an SVG icon.
     %
-    % Create icons using static factory methods or the constructor:
-    %   icon = ic.Icon.fromName("chevron-down")
-    %   icon = ic.Icon.fromFile("path/to/icon.svg")
-    %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
-    %   icon = ic.Icon(IconType=ic.IconType.lucide("apple"))
+    %   icon = ic.Icon(Source="chevron-down")
+    %   icon = ic.Icon(Source="path/to/icon.svg")
+    %   icon = ic.Icon(Source="https://example.com/icon.svg")
     %
-    % Icon names are Lucide filenames without .svg extension.
     % Browse: https://lucide.dev/icons
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ICONTYPE icon descriptor (ic.IconType)
-        IconType ic.IconType = ic.IconType.lucide("info")
+        % > SOURCE icon source (Lucide name, .svg file, or .svg URL)
+        Source ic.asset.Asset {ic.assets.mustBeIcon} = ic.Asset("info")
         % > SIZE size of the icon (width = height)
         Size {ic.check.CssValidators.mustBeSize} = 16
         % > COLOR color of the icon (CSS color string or empty for currentColor)
@@ -21,50 +18,7 @@ classdef Icon < ic.core.Component
         StrokeWidth double = 2
     end
 
-    methods
-        function set.IconType(this, val)
-            assert(val.Type ~= "raster", "ic:Icon:RasterNotSupported", ...
-                "ic.Icon does not support raster images. " + ...
-                "Use ic.Image instead.");
-            this.IconType = val;
-        end
-    end
-
     methods (Static)
-        function icon = fromName(name, id)
-            % > FROMNAME Create icon from Lucide icon name.
-            %   icon = ic.Icon.fromName("check")
-            %   icon = ic.Icon.fromName("chevron-down")
-            arguments
-                name (1,1) string
-                id string = "ic-" + matlab.lang.internal.uuid()
-            end
-            icon = ic.Icon(ID=id, IconType=ic.IconType.lucide(name));
-        end
-
-        function icon = fromFile(path, id)
-            % > FROMFILE Create icon from SVG file.
-            %   icon = ic.Icon.fromFile("path/to/icon.svg")
-            %
-            % Only SVG files are supported. For raster images, use
-            % ic.Image instead.
-            arguments
-                path (1,1) string
-                id string = "ic-" + matlab.lang.internal.uuid()
-            end
-            icon = ic.Icon(ID=id, IconType=ic.IconType.filePath(path));
-        end
-
-        function icon = fromPath(pathData, id)
-            % > FROMPATH Create icon from SVG path data (d attribute).
-            %   icon = ic.Icon.fromPath("M12 2L2 7l10 5 10-5-10-5z")
-            arguments
-                pathData (1,1) string
-                id string = "ic-" + matlab.lang.internal.uuid()
-            end
-            icon = ic.Icon(ID=id, IconType=ic.IconType.svgPath(pathData));
-        end
-
         function names = list()
             % > LIST Return all available Lucide icon names.
             %   names = ic.Icon.list()           % all ~1900 icons
@@ -146,7 +100,7 @@ classdef Icon < ic.core.Component
             prevBtn.Label = "";
             prevBtn.Fill = "ghost";
             prevBtn.Size = "sm";
-            prevBtn.Icon = ic.Icon.fromName("chevron-left");
+            prevBtn.Icon = ic.Icon(Source="chevron-left");
             footer.addChild(prevBtn);
 
             pageLbl = ic.Label();
@@ -159,7 +113,7 @@ classdef Icon < ic.core.Component
             nextBtn.Label = "";
             nextBtn.Fill = "ghost";
             nextBtn.Size = "sm";
-            nextBtn.Icon = ic.Icon.fromName("chevron-right");
+            nextBtn.Icon = ic.Icon(Source="chevron-right");
             footer.addChild(nextBtn);
 
             % ── Compute page size from figure dimensions ──
@@ -224,7 +178,7 @@ classdef Icon < ic.core.Component
                         "borderRadius", "4px", ...
                         "cursor", "default");
 
-                    icn = ic.Icon.fromName(allNames(i));
+                    icn = ic.Icon(Source=allNames(i));
                     icn.Size = 22;
                     tile.addChild(icn);
 

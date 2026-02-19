@@ -5,21 +5,22 @@
  * key-map building, node operations (add/remove/update), and value remapping.
  */
 
-import type { IconTypeData } from '$lib/utils/icons';
+import type { IconSource } from '$lib/utils/icons';
+import type { AssetData } from '$lib/utils/asset-cache';
 
 // --- Types ---
 
 export interface TreeNode {
   key: string;
   name: string;
-  icon?: string | IconTypeData;
+  icon?: IconSource;
   children: TreeNode[];
 }
 
 export interface FlatNode {
   key: string;
   name: string;
-  icon?: string | IconTypeData;
+  icon?: IconSource;
   path: string[];
 }
 
@@ -42,11 +43,11 @@ export function normalizeNodes(raw: unknown, prefix = ''): TreeNode[] {
   });
 }
 
-export function normalizeIcon(raw: unknown): string | IconTypeData | undefined {
+export function normalizeIcon(raw: unknown): IconSource {
   if (raw == null) return undefined;
   if (typeof raw === 'string') return raw || undefined;
-  if (typeof raw === 'object' && 'type' in (raw as object))
-    return raw as IconTypeData;
+  if (typeof raw === 'object' && 'hash' in (raw as object))
+    return raw as AssetData;
   return undefined;
 }
 
@@ -55,8 +56,8 @@ export function normalizeIcon(raw: unknown): string | IconTypeData | undefined {
 /** Build a Map<key, {name, icon}> for O(1) label/icon lookup from positional key. */
 export function buildKeyMap(
   nodes: TreeNode[]
-): Map<string, { name: string; icon?: string | IconTypeData }> {
-  const map = new Map<string, { name: string; icon?: string | IconTypeData }>();
+): Map<string, { name: string; icon?: IconSource }> {
+  const map = new Map<string, { name: string; icon?: IconSource }>();
   function walk(list: TreeNode[]) {
     for (const n of list) {
       map.set(n.key, { name: n.name, icon: n.icon });

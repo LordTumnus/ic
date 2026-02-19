@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
+  import { resolveIcon, type IconSource } from '$lib/utils/icons';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
 
@@ -13,7 +13,7 @@
     onremove,
   }: {
     label: string;
-    icon?: string | IconTypeData;
+    icon?: IconSource;
     size?: string;
     disabled?: boolean;
     active?: boolean;
@@ -22,7 +22,7 @@
   } = $props();
 
   // Resolve icon SVG
-  const iconSvg = $derived(resolveIconType(icon, ICON_SIZES[size] ?? 12));
+  const iconSvg = $derived(resolveIcon(icon, ICON_SIZES[size] ?? 12));
 
   function handleRemoveClick(e: MouseEvent) {
     e.stopPropagation();

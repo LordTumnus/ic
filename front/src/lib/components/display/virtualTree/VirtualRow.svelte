@@ -1,15 +1,11 @@
 <script lang="ts">
-  import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
+  import { resolveIcon } from '$lib/utils/icons';
   import type { FlatRow } from '$lib/utils/virtual-tree';
   import { highlightLabel } from '$lib/utils/filter-tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
   const FOLDER_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };
-
-  function resolveIcon(icon: string | IconTypeData | undefined, sz: string): string {
-    return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
-  }
 
   // --- Props ---
   let {
@@ -51,8 +47,8 @@
   );
 
   // Folder icons
-  const folderSvg = $derived(resolveIconType('folder', FOLDER_SIZES[size] ?? 14));
-  const folderOpenSvg = $derived(resolveIconType('folder-open', FOLDER_SIZES[size] ?? 14));
+  const folderSvg = $derived(resolveIcon('folder', FOLDER_SIZES[size] ?? 14));
+  const folderOpenSvg = $derived(resolveIcon('folder-open', FOLDER_SIZES[size] ?? 14));
 
   // --- Handlers ---
   function handleFolderClick(e: MouseEvent) {
@@ -150,7 +146,7 @@
       class:ic-tn__content--selected={selectable && !isFolder && isItemSelected(node.key)}
     >
       {#if node.icon}
-        {@const svg = resolveIcon(node.icon, size)}
+        {@const svg = resolveIcon(node.icon, ICON_SIZES[size] ?? 12)}
         {#if svg}
           <span class="ic-tn__icon">{@html svg}</span>
         {/if}

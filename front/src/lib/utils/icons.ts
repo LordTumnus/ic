@@ -1,11 +1,15 @@
 /**
- * Shared Lucide icon map — imported once, used by Icon, Tag, TreePanel, TreeSelect.
+ * Shared Lucide icon map and asset-aware icon/image resolvers.
  *
  * Vite's `import.meta.glob` with `eager: true` inlines all SVG strings at build time.
  * By centralizing this in a single module, the ~125KB of icon data is bundled into
  * one shared chunk instead of being duplicated in every consumer's asset.
  */
 
+import type { AssetData } from './asset-cache';
+import { resolveAssetAsString, resolveAssetAsDataUri } from './asset-cache';
+
+// --- Lucide map (internal) ---
 const lucideModules = import.meta.glob(
   '/node_modules/lucide-static/icons/*.svg',
   { query: '?raw', import: 'default', eager: true }
@@ -13,47 +17,62 @@ const lucideModules = import.meta.glob(
 
 export const iconMap = new Map<string, string>();
 for (const [path, content] of Object.entries(lucideModules)) {
-  const filename = path.split('/').pop()?.replace('.svg', '') ?? '';
-  iconMap.set(filename, content);
+  iconMap.set(path.split('/').pop()?.replace('.svg', '') ?? '', content);
 }
 
-/** Resolve an icon name to its SVG string, resized to the given pixel dimensions. */
-export function resolveIcon(name: string | undefined, size: number): string {
-  if (!name) return '';
-  const k = name.toLowerCase();
-  let svg = iconMap.get(k) ?? iconMap.get(name) ?? '';
-  if (!svg) return '';
-  svg = svg.replace(/width="[^"]*"/, `width="${size}"`);
-  svg = svg.replace(/height="[^"]*"/, `height="${size}"`);
+// --- Types ---
+
+/** Icon source: Lucide name, file SVG asset, or empty */
+export type IconSource = string | AssetData | null | undefined;
+
+/** Image source: always an encoded asset or empty */
+export type ImageSource = AssetData | null | undefined;
+
+// --- Helpers ---
+function applySvgSize(svg: string, size: number): string {
+  if (svg.includes('width='))
+    svg = svg.replace(/width="[^"]*"/, `width="${size}"`);
+  else
+    svg = svg.replace('<svg', `<svg width="${size}"`);
+  if (svg.includes('height='))
+    svg = svg.replace(/height="[^"]*"/, `height="${size}"`);
+  else
+    svg = svg.replace('<svg', `<svg height="${size}"`);
   return svg;
 }
 
-/** Structured icon descriptor from ic.IconType serialization. */
-export interface IconTypeData {
-  type: 'lucide' | 'path' | 'file' | 'raster';
-  value: string;
+// --- Public API ---
+
+/**
+ * Resolve an icon source to its SVG string, resized to the given pixel dimensions.
+ *
+ * Handles:
+ *   - string → Lucide icon name lookup
+ *   - AssetData ({hash, mime?, data?}) → file-based SVG via asset cache
+ *   - null/undefined → empty string
+ */
+export function resolveIcon(source: IconSource, size: number): string {
+  if (!source) return '';
+
+  // String → Lucide icon name
+  if (typeof source === 'string') {
+    const svg = iconMap.get(source.toLowerCase()) ?? iconMap.get(source);
+    return svg ? applySvgSize(svg, size) : '';
+  }
+
+  // Object → file-based SVG icon (ic.Asset with file/url type)
+  if (source.hash) {
+    const svg = resolveAssetAsString(source);
+    return svg ? applySvgSize(svg, size) : '';
+  }
+
+  return '';
 }
 
-/** Resolve a string icon name OR an IconTypeData object to its SVG/HTML string. */
-export function resolveIconType(
-  icon: string | IconTypeData | null | undefined,
-  size: number
-): string {
-  if (!icon) return '';
-  if (typeof icon === 'string') return resolveIcon(icon, size);
-  switch (icon.type) {
-    case 'lucide': return resolveIcon(icon.value, size);
-    case 'path':
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icon.value}"/></svg>`;
-    case 'file':
-      try {
-        let svg = atob(icon.value);
-        svg = svg.replace(/width="[^"]*"/, `width="${size}"`);
-        svg = svg.replace(/height="[^"]*"/, `height="${size}"`);
-        return svg;
-      } catch { return ''; }
-    case 'raster':
-      return `<img src="${icon.value}" width="${size}" height="${size}" style="display:block" alt="" />`;
-    default: return '';
-  }
+/**
+ * Resolve an image asset to a data URI suitable for `<img src>`.
+ */
+export function resolveImageSource(source: ImageSource): string {
+  if (!source) return '';
+  return resolveAssetAsDataUri(source);
 }

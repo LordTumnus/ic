@@ -1,15 +1,11 @@
 <script lang="ts">
   import TreePanel from './TreePanel.svelte';
 
-  import { resolveIconType, type IconTypeData } from '$lib/utils/icons';
+  import { resolveIcon } from '$lib/utils/icons';
   import { toSize } from '$lib/utils/css';
   import { type TreeNode as TreeNodeData, getAllLeaves } from '$lib/utils/tree-utils';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
-
-  function resolveIcon(icon: string | IconTypeData | undefined, sz: string): string {
-    return resolveIconType(icon, ICON_SIZES[sz] ?? 12);
-  }
 
   // --- Props ---
   let {
@@ -166,7 +162,7 @@
 
           <!-- Icon (optional) -->
           {#if node.icon}
-            {@const svg = resolveIcon(node.icon, size)}
+            {@const svg = resolveIcon(node.icon, ICON_SIZES[size] ?? 12)}
             {#if svg}
               <span class="ic-tp__icon">{@html svg}</span>
             {/if}

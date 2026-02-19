@@ -2,9 +2,10 @@
   import logger from '$lib/core/logger';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
+  import { resolveImageSource, type ImageSource } from '$lib/utils/icons';
 
   let {
-    src = $bindable(''),
+    source = $bindable<ImageSource>(null),
     width = $bindable<CssSize>('auto'),
     height = $bindable<CssSize>('auto'),
     objectFit = $bindable('contain'),
@@ -14,7 +15,7 @@
     loaded,
     error: errorEvent,
   }: {
-    src?: string;
+    source?: ImageSource;
     width?: CssSize;
     height?: CssSize;
     objectFit?: string;
@@ -25,30 +26,33 @@
     error?: (data?: unknown) => void;
   } = $props();
 
+  // Resolve AssetData → data URI for <img src>
+  const imgSrc = $derived(resolveImageSource(source));
+
   let imgError = $state(false);
 
-  // Reset error when src changes (errors are always async, no race)
+  // Reset error when source changes
   $effect.pre(() => {
-    void src;
+    void source;
     imgError = false;
   });
 
   function handleLoad() {
-    loaded?.({ src });
+    loaded?.({ source });
   }
 
   function handleError() {
-    logger.warn('Image', 'failed to load', { src: src.slice(0, 80) });
+    logger.warn('Image', 'failed to load');
     imgError = true;
-    errorEvent?.({ src });
+    errorEvent?.({ source });
   }
 </script>
 
 {#snippet imageContent()}
-  {#if src && !imgError}
+  {#if imgSrc && !imgError}
     <img
       class="ic-image__img"
-      src={src}
+      src={imgSrc}
       alt=""
       style:object-fit={objectFit}
       style:border-radius={toSize(borderRadius)}
@@ -58,7 +62,7 @@
     />
   {/if}
 
-  {#if !src || imgError}
+  {#if !imgSrc || imgError}
     <div class="ic-image__fallback" style:border-radius={toSize(borderRadius)}>
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
         fill="none" stroke="currentColor" stroke-width="1.5"
@@ -83,7 +87,7 @@
     style:width={toSize(width)}
     style:height={toSize(height)}
     style:border-radius={toSize(borderRadius)}
-    onclick={() => clicked?.({ src })}
+    onclick={() => clicked?.({ source })}
   >
     {@render imageContent()}
   </button>
