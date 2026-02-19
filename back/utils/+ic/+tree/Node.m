@@ -10,8 +10,8 @@ classdef Node < handle
         % > LABEL display text for this node
         Label (1,1) string
 
-        % > ICON icon for this node (Lucide name, .svg file, or URL)
-        Icon ic.Asset = ic.Asset()
+        % > ICON icon for this node (Lucide name, .svg file, image, or URL)
+        Icon ic.asset.Asset {ic.assets.mustBeIconOrImage} = ic.asset.Asset()
 
         % > CHILDREN child nodes
         Children ic.tree.Node = ic.tree.Node.empty
@@ -28,7 +28,7 @@ classdef Node < handle
             %   n = ic.tree.Node("Fruits", Data=struct('weight', 42))
             arguments
                 label (1,1) string
-                opts.Icon ic.Asset = ic.Asset()
+                opts.Icon ic.asset.Asset = ic.asset.Asset()
                 opts.Data struct = struct.empty
             end
             this.Label = label;
@@ -41,7 +41,7 @@ classdef Node < handle
             arguments
                 this
                 label (1,1) string
-                opts.Icon ic.Asset = ic.Asset()
+                opts.Icon ic.asset.Asset = ic.asset.Asset()
                 opts.Data struct = struct.empty
             end
             child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);

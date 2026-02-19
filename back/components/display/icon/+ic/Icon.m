@@ -9,7 +9,7 @@ classdef Icon < ic.core.Component
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > SOURCE icon source (Lucide name, .svg file, or .svg URL)
-        Source ic.asset.Asset {ic.assets.mustBeIcon} = ic.Asset("info")
+        Source ic.asset.Asset {ic.assets.mustBeIcon} = ic.asset.Asset("info")
         % > SIZE size of the icon (width = height)
         Size {ic.check.CssValidators.mustBeSize} = 16
         % > COLOR color of the icon (CSS color string or empty for currentColor)

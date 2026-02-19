@@ -28,6 +28,11 @@ classdef Asset
             this.Type = "file";
             this.Value = source;
          else
+            if ~matches(source, regexpPattern('^[a-z0-9]+(-[a-z0-9]+)*$'))
+               error('ic:asset:InvalidName', ...
+                  'Lucide name must contain only lowercase letters, numbers and hyphens, got "%s"', ...
+                  source);
+            end
             this.Type = "name";
             this.Value = source;
          end

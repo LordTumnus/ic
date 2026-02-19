@@ -9,7 +9,7 @@ classdef Image < ic.core.Component
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > SOURCE image source (file path or URL)
-        Source ic.asset.Asset {ic.assets.mustBeImage} = ic.Asset()
+        Source ic.asset.Asset {ic.assets.mustBeImage} = ic.asset.Asset()
         % > WIDTH width of the image (CSS value: number=px, string=any unit)
         Width {ic.check.CssValidators.mustBeSize} = "auto"
         % > HEIGHT height of the image (CSS value: number=px, string=any unit)
