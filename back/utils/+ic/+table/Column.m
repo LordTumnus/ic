@@ -1,18 +1,10 @@
-classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
+classdef Column < matlab.mixin.SetGetExactNames & ...
+                  matlab.mixin.Heterogeneous
     % > COLUMN Definition of a single table column.
     %
     %   Specifies how a column of data is displayed, including its
     %   header text, cell renderer type, width, sort/filter behavior,
     %   alignment, and type-specific configuration.
-    %
-    %   For type-safe column definitions, use typed subclasses:
-    %       c = ic.table.TextColumn("Name", Sortable=true)
-    %       c = ic.table.NumberColumn("Age", Align="right", Format="%.0f")
-    %       c = ic.table.BadgeColumn("Status", ColorMap=struct('Active','success'))
-    %
-    %   The base Column class remains usable for backward compatibility:
-    %       c = ic.table.Column("Status", Type="badge", Filterable=true, ...
-    %           Config=struct('colorMap', struct('Active','success')))
 
     properties
         % > FIELD data field name (table variable or struct field)
@@ -23,8 +15,7 @@ classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
 
         % > TYPE cell renderer type
         Type (1,1) string {mustBeMember(Type, [ ...
-            "text", "number", "badge", "sparkline", "progress", ...
-            "boolean", "button", "link", "icon", "avatar" ...
+            "text", "number", "boolean" ...
             ])} = "text"
 
         % > WIDTH column width — number for px, or string for CSS (e.g. "20%")
@@ -52,15 +43,7 @@ classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
             "none", "left", "right" ...
             ])} = "none"
 
-        % > FORMAT printf format string for number display (e.g. "$%.2f")
-        Format (1,1) string = ""
-
         % > CONFIG type-specific configuration struct (use typed subclasses instead)
-        %   badge:     colorMap (struct: value → variant name)
-        %   sparkline: type ("line"|"bar"), color (variant), height (px)
-        %   progress:  variant (color variant name)
-        %   button:    label (string), variant, fill ("solid"|"outline"|"ghost")
-        %   avatar:    textField (companion data field), radius (px)
         Config (1,1) struct = struct()
     end
 
@@ -91,14 +74,14 @@ classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
                 s = struct('field',{},'header',{},'type',{}, ...
                     'width',{},'minWidth',{},'sortable',{}, ...
                     'filterable',{},'resizable',{},'align',{}, ...
-                    'pinned',{},'format',{},'config',{});
+                    'pinned',{},'config',{});
                 return;
             end
             e = cell(1, n);
             s = struct('field',e,'header',e,'type',e, ...
                 'width',e,'minWidth',e,'sortable',e, ...
                 'filterable',e,'resizable',e,'align',e, ...
-                'pinned',e,'format',e,'config',e);
+                'pinned',e,'config',e);
             for i = 1:n
                 c = this(i);
                 s(i).field      = c.Field;
@@ -111,7 +94,6 @@ classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
                 s(i).resizable  = c.Resizable;
                 s(i).align      = c.Align;
                 s(i).pinned     = c.Pinned;
-                s(i).format     = c.Format;
                 s(i).config     = c.buildConfig();
             end
         end
@@ -127,7 +109,8 @@ classdef Column < matlab.mixin.SetGetExactNames & matlab.mixin.Heterogeneous
             % > INITFROMOPTS Set common + type-specific properties, lock Type.
             %   Filters out Type and Config (managed internally by subclasses),
             %   then applies all remaining name-value pairs via set().
-            opts = rmfield(opts, intersect(fieldnames(opts), {'Type','Config'}));
+            opts = rmfield(opts, ...
+                intersect(fieldnames(opts), {'Type','Config'}));
             if ~isempty(fieldnames(opts))
                 set(this, opts);
             end

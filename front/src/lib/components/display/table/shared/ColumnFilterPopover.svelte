@@ -6,13 +6,11 @@
   let {
     column,
     filterValue = null,
-    uniqueValues = [],
     onchange,
     onclose,
   }: {
     column: TableColumn;
     filterValue?: unknown;
-    uniqueValues?: string[];
     onchange?: (field: string, value: unknown) => void;
     onclose?: () => void;
   } = $props();
@@ -39,7 +37,6 @@
   let textValue = $state(initMode === 'default' ? ((init as string) ?? '') : '');
   let numMin = $state(initMode === 'default' ? ((init as NumberFilterValue)?.min ?? null) : null);
   let numMax = $state(initMode === 'default' ? ((init as NumberFilterValue)?.max ?? null) : null);
-  let badgeSelected = $state<string[]>(Array.isArray(init) ? init : []);
   let boolValue = $state<boolean | null>(init as boolean | null);
 
   // Flip state for overflow positioning
@@ -81,8 +78,6 @@
       if (numMin != null) range.min = numMin;
       if (numMax != null) range.max = numMax;
       onchange?.(column.field, (range.min != null || range.max != null) ? range : null);
-    } else if (column.type === 'badge') {
-      onchange?.(column.field, badgeSelected.length > 0 ? badgeSelected : null);
     } else if (column.type === 'boolean') {
       onchange?.(column.field, boolValue);
     } else {
@@ -95,7 +90,6 @@
     textValue = '';
     numMin = null;
     numMax = null;
-    badgeSelected = [];
     boolValue = null;
     onchange?.(column.field, null);
   }
@@ -134,15 +128,6 @@
     }
     // Stop all key events from bubbling to the header cell
     e.stopPropagation();
-  }
-
-  function toggleBadge(val: string) {
-    if (badgeSelected.includes(val)) {
-      badgeSelected = badgeSelected.filter(v => v !== val);
-    } else {
-      badgeSelected = [...badgeSelected, val];
-    }
-    emitChange();
   }
 
   function cycleBool() {
@@ -249,22 +234,6 @@
           </label>
         </div>
       {/if}
-    {:else if column.type === 'badge'}
-      <div class="ic-tbl-filter__badges">
-        {#each uniqueValues as val}
-          <label class="ic-tbl-filter__check">
-            <input
-              type="checkbox"
-              checked={badgeSelected.includes(val)}
-              onchange={() => toggleBadge(val)}
-            />
-            <span>{val}</span>
-          </label>
-        {/each}
-        {#if uniqueValues.length === 0}
-          <span class="ic-tbl-filter__empty">No values</span>
-        {/if}
-      </div>
     {:else if column.type === 'boolean'}
       <button class="ic-tbl-filter__bool" onclick={cycleBool}>
         {boolValue === null ? 'All' : boolValue ? 'True' : 'False'}
@@ -382,30 +351,6 @@
     gap: 2px;
     font-size: 0.7rem;
     color: var(--ic-muted-foreground);
-  }
-
-  .ic-tbl-filter__badges {
-    max-height: 160px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .ic-tbl-filter__check {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 0;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-  .ic-tbl-filter__check input {
-    accent-color: var(--ic-primary);
-  }
-  .ic-tbl-filter__empty {
-    color: var(--ic-muted-foreground);
-    opacity: 0.6;
-    font-size: 0.75rem;
   }
 
   .ic-tbl-filter__bool {

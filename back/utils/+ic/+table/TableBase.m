@@ -55,9 +55,6 @@ classdef (Abstract) TableBase < ic.core.Component
         % > FILTERCHANGED fires when the user changes a column filter
         FilterChanged
 
-        % > CELLACTION fires when the user clicks a button or link cell
-        CellAction
-
         % > CELLCLICKED fires when the user clicks any cell
         CellClicked
 

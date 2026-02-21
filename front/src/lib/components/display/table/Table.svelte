@@ -8,7 +8,6 @@
     computePinnedOffsets,
     sortRows,
     filterRows,
-    uniqueValues,
     ROW_HEIGHTS,
   } from '$lib/utils/table-utils';
   import logger from '$lib/core/logger';
@@ -34,7 +33,6 @@
     valueChanged,
     sortChanged,
     filterChanged,
-    cellAction,
     cellClicked,
     rowClicked,
     columnClicked,
@@ -59,7 +57,6 @@
     valueChanged?: (data?: unknown) => void;
     sortChanged?: (data?: unknown) => void;
     filterChanged?: (data?: unknown) => void;
-    cellAction?: (data?: unknown) => void;
     cellClicked?: (data?: unknown) => void;
     rowClicked?: (data?: unknown) => void;
     columnClicked?: (data?: unknown) => void;
@@ -182,17 +179,6 @@
   // Selection
   const selectedSet = $derived(new Set(value ?? []));
 
-  // Unique values for badge filters
-  const uniqueValuesMap = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const col of columns) {
-      if (col.filterable && col.type === 'badge') {
-        map[col.field] = uniqueValues(rows, col.field);
-      }
-    }
-    return map;
-  });
-
   // Height style
   const heightStyle = $derived(
     height === 'auto' ? 'auto' : typeof height === 'number' ? `${height}px` : height
@@ -263,11 +249,6 @@
       logger.debug('Table', 'Active cells', { count: activeCells.length, cells: activeCells });
     }
     cellClicked?.({ field, rowIndex, value: val, rowData });
-  }
-
-  function handleCellAction(field: string, rowIndex: number, val: unknown, rowData: TRow) {
-    logger.debug('Table', 'Cell action', { field, rowIndex });
-    cellAction?.({ field, rowIndex, value: val, rowData });
   }
 
   function handleColumnClick(field: string, shiftKey: boolean) {
@@ -388,7 +369,6 @@
       {selectable}
       {activeColumns}
       {disabled}
-      {uniqueValuesMap}
       onsort={handleSort}
       onfilterchange={handleFilterChange}
       oncolumnclick={handleColumnClick}
@@ -414,7 +394,6 @@
           {activeCells}
           onclick={handleRowClick}
           oncellclick={handleCellClick}
-          oncellaction={handleCellAction}
           onrownumclick={handleRowNumClick}
         />
       {:else}

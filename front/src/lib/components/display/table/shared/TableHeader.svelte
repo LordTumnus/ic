@@ -17,7 +17,6 @@
     selectable = false,
     activeColumns = [] as string[],
     disabled = false,
-    uniqueValuesMap = {} as Record<string, string[]>,
     onsort,
     onfilterchange,
     oncolumnclick,
@@ -34,7 +33,6 @@
     selectable?: boolean;
     activeColumns?: string[];
     disabled?: boolean;
-    uniqueValuesMap?: Record<string, string[]>;
     onsort?: (field: string, direction: 'none' | 'asc' | 'desc') => void;
     onfilterchange?: (field: string, value: unknown) => void;
     oncolumnclick?: (field: string, shiftKey: boolean) => void;
@@ -269,7 +267,6 @@
         <ColumnFilterPopover
           column={col}
           filterValue={filters[col.field] ?? null}
-          uniqueValues={uniqueValuesMap[col.field] ?? []}
           onchange={handleFilterChange}
           onclose={handleFilterClose}
         />

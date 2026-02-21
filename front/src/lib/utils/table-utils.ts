@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'badge' | 'sparkline' | 'progress' | 'boolean' | 'button' | 'link' | 'icon' | 'avatar';
+  type: 'text' | 'number' | 'boolean';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -18,7 +18,6 @@ export interface TableColumn {
   resizable: boolean;
   align: 'left' | 'center' | 'right' | 'auto';
   pinned: 'none' | 'left' | 'right';
-  format: string;
   config: Record<string, unknown>;
 }
 
@@ -130,10 +129,8 @@ export function resolveAlign(col: TableColumn): 'left' | 'center' | 'right' {
   if (col.align !== 'auto') return col.align;
   switch (col.type) {
     case 'number':
-    case 'progress':
       return 'right';
     case 'boolean':
-    case 'icon':
       return 'center';
     default:
       return 'left';
@@ -321,9 +318,6 @@ export function filterRows(
       } else if (col.type === 'boolean') {
         // filterVal: true, false, or null (all)
         if (filterVal != null && Boolean(cellVal) !== filterVal) return false;
-      } else if (col.type === 'badge' && Array.isArray(filterVal)) {
-        // filterVal: array of selected badge values
-        if (filterVal.length > 0 && !filterVal.includes(cellVal)) return false;
       } else {
         // Text-based: contains search (case-insensitive)
         const sv = String(filterVal).toLowerCase();
@@ -375,18 +369,3 @@ export function cycleSortDirection(current: 'none' | 'asc' | 'desc'): 'none' | '
   }
 }
 
-// ============================================================================
-// Badge Unique Values
-// ============================================================================
-
-/**
- * Extract unique non-null values from a column for badge filter dropdowns.
- */
-export function uniqueValues(rows: TableRow[], field: string): string[] {
-  const seen = new Set<string>();
-  for (const row of rows) {
-    const v = row[field];
-    if (v != null && v !== '') seen.add(String(v));
-  }
-  return [...seen].sort();
-}
