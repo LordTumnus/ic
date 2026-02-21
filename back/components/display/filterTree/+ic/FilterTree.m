@@ -1,4 +1,4 @@
-classdef FilterTree < ic.tree.TreeBase
+classdef FilterTree < ic.TreeBase
     % > FILTERTREE Tree with client-side tag-based filtering.
     %
     %   Displays a SearchBar above a Tree view. Typing filter tags
@@ -53,7 +53,7 @@ classdef FilterTree < ic.tree.TreeBase
                 props.?ic.FilterTree
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.tree.TreeBase(props);
+            this@ic.TreeBase(props);
         end
 
         function set.SearchValue(this, val)

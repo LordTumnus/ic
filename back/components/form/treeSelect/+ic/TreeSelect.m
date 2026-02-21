@@ -1,4 +1,4 @@
-classdef TreeSelect < ic.tree.TreeBase
+classdef TreeSelect < ic.TreeBase
     % > TREESELECT Hierarchical multi-value selector with cascading menus.
     %
     %   Displays selected items as closable tags inside the input field.
@@ -51,7 +51,7 @@ classdef TreeSelect < ic.tree.TreeBase
                 props.?ic.TreeSelect
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.tree.TreeBase(props);
+            this@ic.TreeBase(props);
         end
     end
 

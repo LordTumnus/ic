@@ -1,4 +1,4 @@
-classdef Tree < ic.tree.TreeBase
+classdef Tree < ic.TreeBase
     % > TREE Vertical tree view for displaying hierarchical data.
     %
     %   Renders items as a vertical, indented tree with expand/collapse.
@@ -40,7 +40,7 @@ classdef Tree < ic.tree.TreeBase
                 props.?ic.Tree
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.tree.TreeBase(props);
+            this@ic.TreeBase(props);
         end
     end
 

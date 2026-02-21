@@ -1,4 +1,4 @@
-classdef Table < ic.table.TableBase
+classdef Table < ic.TableBase
     % > TABLE Flat data table with rich column types.
     %
     %   Displays tabular data from a MATLAB table with sortable/filterable
@@ -32,7 +32,7 @@ classdef Table < ic.table.TableBase
                 props.?ic.Table
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this@ic.table.TableBase(props);
+            this@ic.TableBase(props);
         end
 
         function set.Data(this, val)
