@@ -68,6 +68,8 @@ classdef (Abstract) TableBase < ic.core.Component
     methods
         function this = TableBase(props)
             this@ic.core.Component(props);
+            this.subscribe('cellAction', ...
+                @(comp, ~, data) comp.dispatchCellAction(data));
         end
 
         function set.SortField(this, val)
@@ -76,6 +78,23 @@ classdef (Abstract) TableBase < ic.core.Component
                 this.setValueSilently('SortDirection', 'asc');
             end
             this.SortField = val;
+        end
+    end
+
+    methods (Access = protected)
+        function dispatchCellAction(this, data)
+            % > DISPATCHCELLACTION route a cell action to the column's callback.
+            field = string(data.field);
+            cols = this.Columns;
+            idx = find(arrayfun(@(c) c.Field == field, cols), 1);
+            if isempty(idx), return; end
+
+            col = cols(idx);
+            if isempty(col.OnCellAction), return; end
+
+            % Convert 0-based row index from Svelte to 1-based
+            rowIndex = double(data.rowIndex) + 1;
+            col.OnCellAction(col, rowIndex, data.data);
         end
     end
 

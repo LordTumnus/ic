@@ -8,9 +8,11 @@
   let {
     column,
     value,
+    oncellaction,
   }: {
     column: TableColumn;
     value: unknown;
+    oncellaction?: (data: unknown) => void;
   } = $props();
 
   const align = $derived(resolveAlign(column));

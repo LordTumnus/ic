@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Resolution } from '$lib/types';
-  import type { TableColumn, TableRow as TRow, FilterState, IndexedRow } from '$lib/utils/table-utils';
+  import type { PublishFn, Resolution } from '$lib/types';
+  import type { TableColumn, TableRow as TRow, FilterState, IndexedRow, CellActionPayload } from '$lib/utils/table-utils';
   import type { PinnedInfo } from '$lib/utils/table-utils';
   import {
     normalizeTableData,
@@ -29,6 +29,9 @@
     value = $bindable(null as number[] | null),
     filters = $bindable({} as FilterState),
 
+    // IC pub/sub
+    publish,
+
     // Events
     valueChanged,
     sortChanged,
@@ -54,6 +57,7 @@
     sortDirection?: 'none' | 'asc' | 'desc';
     value?: number[] | null;
     filters?: FilterState;
+    publish?: PublishFn;
     valueChanged?: (data?: unknown) => void;
     sortChanged?: (data?: unknown) => void;
     filterChanged?: (data?: unknown) => void;
@@ -251,6 +255,11 @@
     cellClicked?.({ field, rowIndex, value: val, rowData });
   }
 
+  function handleCellAction(field: string, rowIndex: number, data: unknown) {
+    logger.debug('Table', 'Cell action', { field, rowIndex });
+    publish?.('cellAction', { field, rowIndex, data } satisfies CellActionPayload);
+  }
+
   function handleColumnClick(field: string, shiftKey: boolean) {
     logger.debug('Table', 'Column click', { field, shiftKey });
     if (selectable) {
@@ -394,6 +403,7 @@
           {activeCells}
           onclick={handleRowClick}
           oncellclick={handleCellClick}
+          oncellaction={handleCellAction}
           onrownumclick={handleRowNumClick}
         />
       {:else}

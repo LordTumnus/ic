@@ -21,6 +21,7 @@
     stickingFields = new Set<string>(),
     onclick,
     oncellclick,
+    oncellaction,
     onrownumclick,
   }: {
     columns: TableColumn[];
@@ -40,6 +41,7 @@
     stickingFields?: Set<string>;
     onclick?: (rowIndex: number, rowData: TRow) => void;
     oncellclick?: (field: string, rowIndex: number, value: unknown, rowData: TRow, shiftKey: boolean) => void;
+    oncellaction?: (field: string, rowIndex: number, data: unknown) => void;
     onrownumclick?: (rowIndex: number, shiftKey: boolean) => void;
   } = $props();
 
@@ -232,6 +234,9 @@
       <TableCell
         column={col}
         value={rowData[col.field]}
+        oncellaction={col.hasAction
+          ? (data: unknown) => oncellaction?.(col.field, rowIndex, data)
+          : undefined}
       />
     </div>
   {/each}

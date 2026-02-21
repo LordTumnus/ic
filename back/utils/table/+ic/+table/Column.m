@@ -45,6 +45,9 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
 
         % > CONFIG type-specific configuration struct (use typed subclasses instead)
         Config (1,1) struct = struct()
+
+        % > ONCELLACTION callback: @(column, rowIndex, data)
+        OnCellAction function_handle = function_handle.empty
     end
 
     methods
@@ -74,14 +77,14 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
                 s = struct('field',{},'header',{},'type',{}, ...
                     'width',{},'minWidth',{},'sortable',{}, ...
                     'filterable',{},'resizable',{},'align',{}, ...
-                    'pinned',{},'config',{});
+                    'pinned',{},'hasAction',{},'config',{});
                 return;
             end
             e = cell(1, n);
             s = struct('field',e,'header',e,'type',e, ...
                 'width',e,'minWidth',e,'sortable',e, ...
                 'filterable',e,'resizable',e,'align',e, ...
-                'pinned',e,'config',e);
+                'pinned',e,'hasAction',e,'config',e);
             for i = 1:n
                 c = this(i);
                 s(i).field      = c.Field;
@@ -94,6 +97,7 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
                 s(i).resizable  = c.Resizable;
                 s(i).align      = c.Align;
                 s(i).pinned     = c.Pinned;
+                s(i).hasAction  = ~isempty(c.OnCellAction);
                 s(i).config     = c.buildConfig();
             end
         end

@@ -18,7 +18,15 @@ export interface TableColumn {
   resizable: boolean;
   align: 'left' | 'center' | 'right' | 'auto';
   pinned: 'none' | 'left' | 'right';
+  hasAction: boolean;
   config: Record<string, unknown>;
+}
+
+/** Payload published to MATLAB when a cell fires its action. */
+export interface CellActionPayload {
+  field: string;
+  rowIndex: number;
+  data: unknown;
 }
 
 /** A single row of table data (field → value). */
