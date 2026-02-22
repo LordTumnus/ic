@@ -25,9 +25,9 @@
   class:ic-tbl__cell--right={align === 'right'}
 >
   {#if column.type === 'number'}
-    <NumberCell {value} />
+    <NumberCell {value} config={column.config} />
   {:else if column.type === 'boolean'}
-    <BooleanCell {value} />
+    <BooleanCell {value} config={column.config} />
   {:else}
     <TextCell {value} />
   {/if}

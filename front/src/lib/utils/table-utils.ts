@@ -29,6 +29,28 @@ export interface CellActionPayload {
   data: unknown;
 }
 
+/** Number column config as received from MATLAB. */
+export interface NumberConfig {
+  decimals: number;    // -1 = auto (no rounding)
+  prefix: string;
+  suffix: string;
+  thousandsSeparator: boolean;
+  colorRules?: ColorRuleConfig[];
+}
+
+/** A single conditional color rule. */
+export interface ColorRuleConfig {
+  op: '>' | '>=' | '<' | '<=' | '==' | '~=' | 'between';
+  value: number | number[];
+  color: string;
+}
+
+/** Boolean column config as received from MATLAB. */
+export interface BooleanConfig {
+  displayMode: 'checkbox' | 'text' | 'numeric';
+  colorRules?: ColorRuleConfig[];
+}
+
 /** A single row of table data (field → value). */
 export type TableRow = Record<string, unknown>;
 
@@ -342,9 +364,50 @@ export function filterRows(
 // ============================================================================
 
 /**
- * Format a number using a printf-style format string.
- * Supports: %d (integer), %f (float), %.Nf (N decimal places),
- *           and prefix/suffix text (e.g., "$%.2f", "%.1f%%").
+ * Format a number using config properties (decimals, prefix, suffix, thousands).
+ */
+export function formatNumberWithConfig(value: number, cfg: NumberConfig): string {
+  let str: string;
+  if (cfg.decimals >= 0) {
+    str = value.toFixed(cfg.decimals);
+  } else {
+    str = String(value);
+  }
+
+  if (cfg.thousandsSeparator) {
+    const [intPart, decPart] = str.split('.');
+    const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    str = decPart != null ? `${withCommas}.${decPart}` : withCommas;
+  }
+
+  return `${cfg.prefix}${str}${cfg.suffix}`;
+}
+
+/**
+ * Evaluate color rules against a value. Returns the first matching color or null.
+ */
+export function evaluateColorRules(value: number, rules: ColorRuleConfig[]): string | null {
+  for (const rule of rules) {
+    const v = rule.value;
+    switch (rule.op) {
+      case '>':       if (value > (v as number))  return rule.color; break;
+      case '>=':      if (value >= (v as number)) return rule.color; break;
+      case '<':       if (value < (v as number))  return rule.color; break;
+      case '<=':      if (value <= (v as number)) return rule.color; break;
+      case '==':      if (value === (v as number)) return rule.color; break;
+      case '~=':      if (value !== (v as number)) return rule.color; break;
+      case 'between': {
+        const [lo, hi] = v as number[];
+        if (value >= lo && value <= hi) return rule.color;
+        break;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Format a number using a printf-style format string (legacy).
  */
 export function formatNumber(value: number, format: string): string {
   if (!format) return String(value);
@@ -353,12 +416,11 @@ export function formatNumber(value: number, format: string): string {
     if (type === 'd') {
       return Math.round(value).toString();
     }
-    // %f or %.Nf
     if (spec && spec.includes('.')) {
       const decimals = parseInt(spec.split('.')[1], 10);
       return value.toFixed(decimals);
     }
-    return value.toFixed(6); // default %f
+    return value.toFixed(6);
   });
 }
 
