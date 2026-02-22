@@ -4,6 +4,7 @@
   import NumberFilter from '../cells/number/NumberFilter.svelte';
   import BooleanFilter from '../cells/boolean/BooleanFilter.svelte';
   import ProgressBarFilter from '../cells/progressbar/ProgressBarFilter.svelte';
+  import SparklineFilter from '../cells/sparkline/SparklineFilter.svelte';
 
   let {
     column,
@@ -105,6 +106,8 @@
         <NumberFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else if column.type === 'progressbar'}
         <ProgressBarFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
+      {:else if column.type === 'sparkline'}
+        <SparklineFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
       {:else if column.type === 'boolean'}
         <BooleanFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else}

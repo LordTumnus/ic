@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -59,6 +59,17 @@ export interface ProgressBarConfig {
   labelFormat?: string;
   variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'destructive';
   colorRules?: ColorRuleConfig[];
+}
+
+/** Sparkline column config as received from MATLAB. */
+export interface SparklineConfig {
+  lineWidth?: number;
+  fillArea?: boolean;
+  showEndDot?: boolean;
+  showLabel?: boolean;
+  metric?: 'total' | 'relative';
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'destructive';
+  colorRules?: ColorRuleConfig[];  // evaluated against the metric value
 }
 
 /** Text column config as received from MATLAB. */
