@@ -100,7 +100,7 @@
 
   <div class="ic-tbl-filter__body">
     {#key clearCount}
-      {#if column.type === 'number'}
+      {#if column.type === 'number' || column.type === 'progressbar'}
         <NumberFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else if column.type === 'boolean'}
         <BooleanFilter initialValue={filterValue} onchange={handleFilterChange} />

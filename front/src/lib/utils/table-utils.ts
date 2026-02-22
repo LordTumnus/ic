@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean';
+  type: 'text' | 'number' | 'boolean' | 'progressbar';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -48,6 +48,16 @@ export interface ColorRuleConfig {
 /** Boolean column config as received from MATLAB. */
 export interface BooleanConfig {
   displayMode: 'checkbox' | 'text' | 'numeric';
+  colorRules?: ColorRuleConfig[];
+}
+
+/** Progress-bar column config as received from MATLAB. */
+export interface ProgressBarConfig {
+  min?: number;
+  max?: number;
+  showLabel?: boolean;
+  labelFormat?: string;
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'destructive';
   colorRules?: ColorRuleConfig[];
 }
 

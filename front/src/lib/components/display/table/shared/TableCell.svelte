@@ -4,6 +4,7 @@
   import TextCell from '../cells/text/TextCell.svelte';
   import NumberCell from '../cells/number/NumberCell.svelte';
   import BooleanCell from '../cells/boolean/BooleanCell.svelte';
+  import ProgressBarCell from '../cells/progressbar/ProgressBarCell.svelte';
 
   let {
     column,
@@ -30,6 +31,8 @@
     <NumberCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'boolean'}
     <BooleanCell {value} config={column.config} bind:style={cellStyle} />
+  {:else if column.type === 'progressbar'}
+    <ProgressBarCell {value} config={column.config} bind:style={cellStyle} />
   {:else}
     <TextCell {value} config={column.config} bind:style={cellStyle} />
   {/if}
