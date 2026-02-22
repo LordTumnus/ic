@@ -11,6 +11,7 @@
     ROW_HEIGHTS,
   } from '$lib/utils/table-utils';
   import logger from '$lib/core/logger';
+  import { filterMatchers } from './cells/filter-matchers';
   import TableHeader from './shared/TableHeader.svelte';
   import TableRowComp from './shared/TableRow.svelte';
 
@@ -91,7 +92,7 @@
   const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection));
 
   // Client-side filter (preserves original indices)
-  const filteredRows = $derived(filterRows(sortedRows, filters, columns));
+  const filteredRows = $derived(filterRows(sortedRows, filters, columns, filterMatchers));
 
   // Dynamic row number width based on total rows (not filtered — avoids layout shift)
   const rowNumWidth = $derived.by(() => {

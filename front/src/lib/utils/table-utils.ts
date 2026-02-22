@@ -99,6 +99,12 @@ export interface NotEmptyFilterValue {
   isNotEmpty: true;
 }
 
+/**
+ * Filter matcher: returns true if the row should be INCLUDED (passes the filter).
+ * isEmpty/isNotEmpty are handled generically before dispatching to type matchers.
+ */
+export type FilterMatcher = (cellValue: unknown, filterValue: unknown) => boolean;
+
 /** A row paired with its original index in the unsorted/unfiltered data. */
 export interface IndexedRow {
   data: TableRow;
@@ -325,6 +331,7 @@ export function filterRows(
   rows: IndexedRow[],
   filters: FilterState,
   columns: TableColumn[],
+  matchers: Record<string, FilterMatcher>,
 ): IndexedRow[] {
   const activeFields = Object.keys(filters).filter(f => {
     const v = filters[f];
@@ -345,7 +352,7 @@ export function filterRows(
 
       if (!col) continue;
 
-      // "Is empty" / "Is not empty" filters (text + number types)
+      // Universal: isEmpty / isNotEmpty (shared across all types)
       if (typeof filterVal === 'object' && filterVal !== null && !Array.isArray(filterVal)) {
         if ('isEmpty' in (filterVal as Record<string, unknown>)) {
           if (cellVal != null && cellVal !== '') return false;
@@ -357,20 +364,9 @@ export function filterRows(
         }
       }
 
-      if (col.type === 'number') {
-        const range = filterVal as NumberFilterValue;
-        const num = Number(cellVal);
-        if (range.min != null && num < range.min) return false;
-        if (range.max != null && num > range.max) return false;
-      } else if (col.type === 'boolean') {
-        // filterVal: true, false, or null (all)
-        if (filterVal != null && Boolean(cellVal) !== filterVal) return false;
-      } else {
-        // Text-based: contains search (case-insensitive)
-        const sv = String(filterVal).toLowerCase();
-        const cv = String(cellVal ?? '').toLowerCase();
-        if (!cv.includes(sv)) return false;
-      }
+      // Dispatch to type-specific matcher
+      const matcher = matchers[col.type];
+      if (matcher && !matcher(cellVal, filterVal)) return false;
     }
     return true;
   });

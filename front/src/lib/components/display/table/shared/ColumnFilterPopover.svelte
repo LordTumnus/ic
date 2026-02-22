@@ -3,6 +3,7 @@
   import TextFilter from '../cells/text/TextFilter.svelte';
   import NumberFilter from '../cells/number/NumberFilter.svelte';
   import BooleanFilter from '../cells/boolean/BooleanFilter.svelte';
+  import ProgressBarFilter from '../cells/progressbar/ProgressBarFilter.svelte';
 
   let {
     column,
@@ -100,8 +101,10 @@
 
   <div class="ic-tbl-filter__body">
     {#key clearCount}
-      {#if column.type === 'number' || column.type === 'progressbar'}
+      {#if column.type === 'number'}
         <NumberFilter initialValue={filterValue} onchange={handleFilterChange} />
+      {:else if column.type === 'progressbar'}
+        <ProgressBarFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
       {:else if column.type === 'boolean'}
         <BooleanFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else}
