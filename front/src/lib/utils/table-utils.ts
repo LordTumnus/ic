@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -77,6 +77,13 @@ export interface TextConfig {
   richText?: boolean;
   placeholder?: string;
   transform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+}
+
+/** Image column config as received from MATLAB. */
+export interface ImageConfig {
+  popupWidth?: number;
+  popupHeight?: number;
+  objectFit?: string;
 }
 
 /** A single row of table data (field → value). */
@@ -195,6 +202,7 @@ export function resolveAlign(col: TableColumn): 'left' | 'center' | 'right' {
     case 'number':
       return 'right';
     case 'boolean':
+    case 'image':
       return 'center';
     default:
       return 'left';

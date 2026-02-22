@@ -4,6 +4,7 @@ import { match as numberMatch } from './number/match';
 import { match as booleanMatch } from './boolean/match';
 import { match as progressbarMatch } from './progressbar/match';
 import { match as sparklineMatch } from './sparkline/match';
+import { match as imageMatch } from './image/match';
 
 /** Registry: column type → filter matcher. Adding a new cell type = add match.ts + one entry here. */
 export const filterMatchers: Record<string, FilterMatcher> = {
@@ -12,4 +13,5 @@ export const filterMatchers: Record<string, FilterMatcher> = {
   boolean: booleanMatch,
   progressbar: progressbarMatch,
   sparkline: sparklineMatch,
+  image: imageMatch,
 };
