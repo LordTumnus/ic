@@ -5,9 +5,11 @@
   let {
     value,
     config = {} as Partial<BooleanConfig>,
+    style = $bindable(''),
   }: {
     value?: unknown;
     config?: Partial<BooleanConfig>;
+    style?: string;
   } = $props();
 
   const checked = $derived(Boolean(value));
@@ -18,6 +20,12 @@
       ? evaluateColorRules(checked ? 1 : 0, config.colorRules)
       : null
   );
+
+  $effect(() => {
+    style = bgColor
+      ? `background-color: ${bgColor}; color: rgba(0,0,0,0.85);`
+      : '';
+  });
 
   let textEl = $state<HTMLSpanElement>(null!);
   let title = $state('');
@@ -35,8 +43,6 @@
   <span
     bind:this={textEl}
     class="ic-tbl-cell-bool-text"
-    class:ic-tbl-cell-bool-text--tinted={bgColor != null}
-    style:background-color={bgColor}
     {title}
     onpointerenter={onenter}
     onpointerleave={onleave}
@@ -45,8 +51,6 @@
   <span
     bind:this={textEl}
     class="ic-tbl-cell-bool-text"
-    class:ic-tbl-cell-bool-text--tinted={bgColor != null}
-    style:background-color={bgColor}
     {title}
     onpointerenter={onenter}
     onpointerleave={onleave}
@@ -56,8 +60,6 @@
     bind:this={textEl}
     class="ic-tbl-cell-bool"
     class:ic-tbl-cell-bool--checked={checked}
-    class:ic-tbl-cell-bool--tinted={bgColor != null}
-    style:background-color={bgColor != null ? bgColor : undefined}
     {title}
     onpointerenter={onenter}
     onpointerleave={onleave}
@@ -87,18 +89,8 @@
     background: var(--ic-primary);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
   }
-  /* Color rule overrides the default checkbox bg */
-  .ic-tbl-cell-bool--tinted {
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
-  }
   .ic-tbl-cell-bool-text {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    border-radius: 2px;
-    transition: background-color 0.15s ease;
-  }
-  .ic-tbl-cell-bool-text--tinted {
-    padding: 0 4px;
-    color: rgba(0, 0, 0, 0.85);
   }
 </style>

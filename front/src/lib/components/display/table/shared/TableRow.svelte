@@ -319,23 +319,23 @@
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   }
 
-  /* Data cells */
+  /* Data cells — no border so cell-renderer backgrounds fill edge-to-edge;
+     focus/active use outline (no layout impact). */
   .ic-tbl__cell {
     position: relative;
     display: flex;
     align-items: center;
     overflow: hidden;
     box-sizing: border-box;
-    border: 1px solid transparent;
-    transition: border-color 0.08s ease, background-color 0.08s ease;
+    transition: background-color 0.08s ease;
   }
   .ic-tbl__cell:focus {
-    outline: none;
-    border-color: var(--ic-primary);
+    outline: 1px solid var(--ic-primary);
+    outline-offset: -1px;
   }
   .ic-tbl__cell--rownum:focus {
-    outline: none;
-    border-color: var(--ic-primary);
+    outline: 1px solid var(--ic-primary);
+    outline-offset: -1px;
     box-shadow: inset 0 0 0 1px var(--ic-primary);
   }
   .ic-tbl__cell--left { justify-content: flex-start; }
@@ -344,25 +344,33 @@
 
   /* Active cell — the specifically clicked cell */
   .ic-tbl__cell--active {
-    border-color: var(--ic-primary);
+    outline: 1px solid var(--ic-primary);
+    outline-offset: -1px;
     background: rgba(59, 130, 246, 0.06);
   }
 
   /* Pinned cell — always opaque so scrolling content doesn't bleed through.
      Reads --_row-tint (inherited from parent row) so hover/striped/selected
-     tints apply automatically without parent > child selectors. */
+     tints apply automatically without parent > child selectors.
+     Bottom separator via inset box-shadow (no border). */
   .ic-tbl__cell--pinned {
     background: linear-gradient(var(--_row-tint), var(--_row-tint)), var(--ic-background);
-    border-bottom-color: var(--ic-border);
+    box-shadow: inset 0 -1px 0 var(--ic-border);
   }
   .ic-tbl__row:last-child > .ic-tbl__cell--pinned {
-    border-bottom-color: transparent;
+    box-shadow: none;
   }
-  /* Sticking — directional shadow when sticky position is active */
+  /* Sticking — directional shadow + bottom separator */
   .ic-tbl__cell--sticking {
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06), inset 0 -1px 0 var(--ic-border);
   }
   .ic-tbl__cell--sticking.ic-tbl__cell--pinned-right {
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06), inset 0 -1px 0 var(--ic-border);
+  }
+  .ic-tbl__row:last-child > .ic-tbl__cell--sticking {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+  }
+  .ic-tbl__row:last-child > .ic-tbl__cell--sticking.ic-tbl__cell--pinned-right {
     box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06);
   }
 

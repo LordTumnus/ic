@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { TableColumn } from '$lib/utils/table-utils';
   import { resolveAlign } from '$lib/utils/table-utils';
-  import TextCell from '../cells/TextCell.svelte';
-  import NumberCell from '../cells/NumberCell.svelte';
-  import BooleanCell from '../cells/BooleanCell.svelte';
+  import TextCell from '../cells/text/TextCell.svelte';
+  import NumberCell from '../cells/number/NumberCell.svelte';
+  import BooleanCell from '../cells/boolean/BooleanCell.svelte';
 
   let {
     column,
@@ -16,6 +16,7 @@
   } = $props();
 
   const align = $derived(resolveAlign(column));
+  let cellStyle = $state('');
 </script>
 
 <div
@@ -23,13 +24,14 @@
   class:ic-tbl__cell--left={align === 'left'}
   class:ic-tbl__cell--center={align === 'center'}
   class:ic-tbl__cell--right={align === 'right'}
+  style={cellStyle || null}
 >
   {#if column.type === 'number'}
-    <NumberCell {value} config={column.config} />
+    <NumberCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'boolean'}
-    <BooleanCell {value} config={column.config} />
+    <BooleanCell {value} config={column.config} bind:style={cellStyle} />
   {:else}
-    <TextCell {value} config={column.config} />
+    <TextCell {value} config={column.config} bind:style={cellStyle} />
   {/if}
 </div>
 
@@ -37,6 +39,7 @@
   .ic-tbl__cell {
     display: flex;
     align-items: center;
+    align-self: stretch;
     padding: 0 6px;
     overflow: hidden;
     box-sizing: border-box;

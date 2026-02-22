@@ -5,9 +5,11 @@
   let {
     value,
     config = {} as Partial<TextConfig>,
+    style = $bindable(''),
   }: {
     value?: unknown;
     config?: Partial<TextConfig>;
+    style?: string;
   } = $props();
 
   const raw = $derived(String(value ?? ''));

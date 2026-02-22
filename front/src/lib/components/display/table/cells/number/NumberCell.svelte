@@ -5,9 +5,11 @@
   let {
     value,
     config = {} as Partial<NumberConfig>,
+    style = $bindable(''),
   }: {
     value?: unknown;
     config?: Partial<NumberConfig>;
+    style?: string;
   } = $props();
 
   const numVal = $derived(value != null ? Number(value) : null);
@@ -30,6 +32,12 @@
       : null
   );
 
+  $effect(() => {
+    style = bgColor
+      ? `background-color: ${bgColor}; color: rgba(0,0,0,0.85);`
+      : '';
+  });
+
   let el = $state<HTMLSpanElement>(null!);
   let title = $state('');
 
@@ -42,8 +50,6 @@
 <span
   bind:this={el}
   class="ic-tbl-cell-number"
-  class:ic-tbl-cell-number--tinted={bgColor != null}
-  style:background-color={bgColor}
   {title}
   onpointerenter={onenter}
   onpointerleave={onleave}
@@ -53,11 +59,5 @@
   .ic-tbl-cell-number {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    border-radius: 2px;
-    transition: background-color 0.15s ease;
-  }
-  .ic-tbl-cell-number--tinted {
-    padding: 0 4px;
-    color: rgba(0, 0, 0, 0.85);
   }
 </style>

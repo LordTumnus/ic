@@ -301,8 +301,7 @@
     gap: 3px;
     padding: 0 6px;
     box-sizing: border-box;
-    border: 1px solid transparent;
-    transition: border-color 0.12s ease;
+    transition: background-color 0.12s ease;
   }
   /* Pinned header cell — always opaque so scrolling content doesn't bleed through */
   .ic-tbl__hcell--pinned {
@@ -316,8 +315,8 @@
     box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06);
   }
   .ic-tbl__hcell:focus {
-    outline: none;
-    border-color: var(--ic-primary);
+    outline: 1px solid var(--ic-primary);
+    outline-offset: -1px;
   }
   .ic-tbl__hcell--selectable {
     cursor: pointer;
@@ -331,7 +330,6 @@
   .ic-tbl__hcell--active {
     background: var(--ic-primary);
     color: var(--ic-primary-foreground);
-    border-color: var(--ic-primary);
     box-shadow: none;
   }
   .ic-tbl__hcell--active.ic-tbl__hcell--selectable:hover {
@@ -449,8 +447,8 @@
     cursor: default;
   }
   .ic-tbl__hcell--rownum:focus {
-    outline: none;
-    border-color: var(--ic-primary);
+    outline: 1px solid var(--ic-primary);
+    outline-offset: -1px;
     box-shadow: inset 0 0 0 1px var(--ic-primary);
   }
 </style>
