@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NumberConfig, ColorRuleConfig } from '$lib/utils/table-utils';
+  import type { NumberConfig } from '$lib/utils/table-utils';
   import { formatNumberWithConfig, evaluateColorRules } from '$lib/utils/table-utils';
 
   let {
@@ -29,12 +29,24 @@
       ? evaluateColorRules(numVal, cfg.colorRules)
       : null
   );
+
+  let el = $state<HTMLSpanElement>(null!);
+  let title = $state('');
+
+  function onenter() {
+    if (el.scrollWidth > el.clientWidth) title = display;
+  }
+  function onleave() { title = ''; }
 </script>
 
 <span
+  bind:this={el}
   class="ic-tbl-cell-number"
   class:ic-tbl-cell-number--tinted={bgColor != null}
   style:background-color={bgColor}
+  {title}
+  onpointerenter={onenter}
+  onpointerleave={onleave}
 >{display}</span>
 
 <style>

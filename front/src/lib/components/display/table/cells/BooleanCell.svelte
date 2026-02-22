@@ -12,31 +12,55 @@
 
   const checked = $derived(Boolean(value));
   const mode = $derived(config.displayMode ?? 'checkbox');
+  const label = $derived(checked ? 'True' : 'False');
   const bgColor = $derived(
     config.colorRules?.length
       ? evaluateColorRules(checked ? 1 : 0, config.colorRules)
       : null
   );
+
+  let textEl = $state<HTMLSpanElement>(null!);
+  let title = $state('');
+
+  // Text/numeric: show on truncation. Checkbox: always show (visual-only).
+  function onenter() {
+    if (mode === 'checkbox' || textEl?.scrollWidth > textEl?.clientWidth) {
+      title = label;
+    }
+  }
+  function onleave() { title = ''; }
 </script>
 
 {#if mode === 'text'}
   <span
+    bind:this={textEl}
     class="ic-tbl-cell-bool-text"
     class:ic-tbl-cell-bool-text--tinted={bgColor != null}
     style:background-color={bgColor}
-  >{checked ? 'True' : 'False'}</span>
+    {title}
+    onpointerenter={onenter}
+    onpointerleave={onleave}
+  >{label}</span>
 {:else if mode === 'numeric'}
   <span
+    bind:this={textEl}
     class="ic-tbl-cell-bool-text"
     class:ic-tbl-cell-bool-text--tinted={bgColor != null}
     style:background-color={bgColor}
+    {title}
+    onpointerenter={onenter}
+    onpointerleave={onleave}
   >{checked ? '1' : '0'}</span>
 {:else}
   <span
+    bind:this={textEl}
     class="ic-tbl-cell-bool"
     class:ic-tbl-cell-bool--checked={checked}
     class:ic-tbl-cell-bool--tinted={bgColor != null}
     style:background-color={bgColor != null ? bgColor : undefined}
+    {title}
+    onpointerenter={onenter}
+    onpointerleave={onleave}
   >
     {#if checked}
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
