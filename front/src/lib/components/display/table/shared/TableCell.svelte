@@ -29,7 +29,7 @@
   {:else if column.type === 'boolean'}
     <BooleanCell {value} config={column.config} />
   {:else}
-    <TextCell {value} />
+    <TextCell {value} config={column.config} />
   {/if}
 </div>
 

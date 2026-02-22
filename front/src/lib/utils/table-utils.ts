@@ -51,6 +51,13 @@ export interface BooleanConfig {
   colorRules?: ColorRuleConfig[];
 }
 
+/** Text column config as received from MATLAB. */
+export interface TextConfig {
+  richText?: boolean;
+  placeholder?: string;
+  transform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+}
+
 /** A single row of table data (field → value). */
 export type TableRow = Record<string, unknown>;
 
@@ -437,5 +444,25 @@ export function cycleSortDirection(current: 'none' | 'asc' | 'desc'): 'none' | '
     case 'asc': return 'desc';
     case 'desc': return 'none';
   }
+}
+
+// ============================================================================
+// Rich Text (inline bold/italic)
+// ============================================================================
+
+/**
+ * Convert **bold** and *italic* markers to <strong>/<em> HTML.
+ * Escapes HTML entities first to prevent XSS via cell values.
+ */
+export function parseInlineRichText(text: string): string {
+  let s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // **bold** (must come before *italic* to avoid partial match)
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // *italic*
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  return s;
 }
 
