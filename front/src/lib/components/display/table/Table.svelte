@@ -89,7 +89,7 @@
   );
 
   // Client-side sort (preserves original indices)
-  const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection));
+  const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection, columns));
 
   // Client-side filter (preserves original indices)
   const filteredRows = $derived(filterRows(sortedRows, filters, columns, filterMatchers));

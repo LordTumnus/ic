@@ -7,6 +7,7 @@
   import ProgressBarCell from '../cells/progressbar/ProgressBarCell.svelte';
   import SparklineCell from '../cells/sparkline/SparklineCell.svelte';
   import ImageCell from '../cells/image/ImageCell.svelte';
+  import EnumCell from '../cells/enum/EnumCell.svelte';
 
   let {
     column,
@@ -39,6 +40,8 @@
     <SparklineCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'image'}
     <ImageCell {value} config={column.config} bind:style={cellStyle} />
+  {:else if column.type === 'enum'}
+    <EnumCell {value} config={column.config} bind:style={cellStyle} />
   {:else}
     <TextCell {value} config={column.config} bind:style={cellStyle} />
   {/if}

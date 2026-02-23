@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -84,6 +84,23 @@ export interface ImageConfig {
   popupWidth?: number;
   popupHeight?: number;
   objectFit?: string;
+}
+
+/** Enum column config as received from MATLAB. */
+export interface EnumConfig {
+  items?: string[];
+  colors?: string[];
+}
+
+/** Build a value→color lookup from parallel items/colors arrays. */
+export function buildEnumColorMap(cfg: Partial<EnumConfig>): Record<string, string> {
+  const map: Record<string, string> = {};
+  const items = cfg.items ?? [];
+  const colors = cfg.colors ?? [];
+  for (let i = 0; i < items.length && i < colors.length; i++) {
+    if (colors[i]) map[items[i]] = colors[i];
+  }
+  return map;
 }
 
 /** A single row of table data (field → value). */
@@ -313,8 +330,21 @@ export function sortRows(
   rows: IndexedRow[],
   field: string,
   direction: 'asc' | 'desc' | 'none',
+  columns?: TableColumn[],
 ): IndexedRow[] {
   if (!field || direction === 'none') return rows;
+
+  // Build enum ordinal map if the sorted column is an enum
+  let enumOrder: Map<string, number> | null = null;
+  if (columns) {
+    const col = columns.find(c => c.field === field);
+    if (col?.type === 'enum') {
+      const items = (col.config as EnumConfig)?.items;
+      if (items) {
+        enumOrder = new Map(items.map((item, i) => [item, i]));
+      }
+    }
+  }
 
   return [...rows].sort((a, b) => {
     const va = a.data[field];
@@ -326,7 +356,11 @@ export function sortRows(
     if (vb == null) return -1;
 
     let cmp: number;
-    if (typeof va === 'number' && typeof vb === 'number') {
+    if (enumOrder) {
+      const ia = enumOrder.get(String(va)) ?? Infinity;
+      const ib = enumOrder.get(String(vb)) ?? Infinity;
+      cmp = ia - ib;
+    } else if (typeof va === 'number' && typeof vb === 'number') {
       cmp = va - vb;
     } else if (typeof va === 'boolean' && typeof vb === 'boolean') {
       cmp = (va === vb) ? 0 : va ? -1 : 1;

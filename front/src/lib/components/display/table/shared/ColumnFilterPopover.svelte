@@ -6,6 +6,7 @@
   import ProgressBarFilter from '../cells/progressbar/ProgressBarFilter.svelte';
   import SparklineFilter from '../cells/sparkline/SparklineFilter.svelte';
   import ImageFilter from '../cells/image/ImageFilter.svelte';
+  import EnumFilter from '../cells/enum/EnumFilter.svelte';
 
   let {
     column,
@@ -111,6 +112,8 @@
         <SparklineFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
       {:else if column.type === 'image'}
         <ImageFilter initialValue={filterValue} onchange={handleFilterChange} />
+      {:else if column.type === 'enum'}
+        <EnumFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
       {:else if column.type === 'boolean'}
         <BooleanFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else}
