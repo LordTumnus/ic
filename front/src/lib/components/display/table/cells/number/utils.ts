@@ -1,5 +1,4 @@
-import type { FilterMatcher } from '$lib/utils/table-utils';
-import type { NumberFilterValue } from '$lib/utils/table-utils';
+import type { FilterMatcher, SortComparator, NumberFilterValue } from '$lib/utils/table-utils';
 
 /**
  * Numeric range matcher: checks min/max bounds.
@@ -12,3 +11,7 @@ export const match: FilterMatcher = (cellValue, filterValue) => {
   if (range.max != null && num > range.max) return false;
   return true;
 };
+
+/** Numeric sort: arithmetic comparison. */
+export const sort: SortComparator = (a, b) =>
+  Number(a) - Number(b);

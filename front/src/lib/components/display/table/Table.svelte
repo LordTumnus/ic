@@ -12,6 +12,7 @@
   } from '$lib/utils/table-utils';
   import logger from '$lib/core/logger';
   import { filterMatchers } from './cells/filter-matchers';
+  import { sortComparators } from './cells/sort-comparators';
   import TableHeader from './shared/TableHeader.svelte';
   import TableRowComp from './shared/TableRow.svelte';
 
@@ -89,7 +90,7 @@
   );
 
   // Client-side sort (preserves original indices)
-  const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection, columns));
+  const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection, columns, sortComparators));
 
   // Client-side filter (preserves original indices)
   const filteredRows = $derived(filterRows(sortedRows, filters, columns, filterMatchers));

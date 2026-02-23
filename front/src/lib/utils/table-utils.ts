@@ -140,6 +140,13 @@ export interface NotEmptyFilterValue {
  */
 export type FilterMatcher = (cellValue: unknown, filterValue: unknown) => boolean;
 
+/**
+ * Sort comparator: returns negative if a < b, 0 if equal, positive if a > b.
+ * Only needed for types whose sort differs from the default (number/boolean/string).
+ * Receives the column config for context (e.g. enum items order, sparkline metric).
+ */
+export type SortComparator = (a: unknown, b: unknown, config: Record<string, unknown>) => number;
+
 /** A row paired with its original index in the unsorted/unfiltered data. */
 export interface IndexedRow {
   data: TableRow;
@@ -323,6 +330,16 @@ export function computePinnedOffsets(
 // ============================================================================
 
 /**
+ * Default comparator: auto-detects value types (number, boolean, string).
+ * Used when no type-specific comparator is registered.
+ */
+export function defaultSortComparator(a: unknown, b: unknown): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (typeof a === 'boolean' && typeof b === 'boolean') return (a === b) ? 0 : a ? -1 : 1;
+  return String(a).localeCompare(String(b));
+}
+
+/**
  * Sort indexed rows client-side by a column field.
  * Returns a NEW sorted array (does not mutate input).
  */
@@ -331,20 +348,14 @@ export function sortRows(
   field: string,
   direction: 'asc' | 'desc' | 'none',
   columns?: TableColumn[],
+  comparators?: Record<string, SortComparator>,
 ): IndexedRow[] {
   if (!field || direction === 'none') return rows;
 
-  // Build enum ordinal map if the sorted column is an enum
-  let enumOrder: Map<string, number> | null = null;
-  if (columns) {
-    const col = columns.find(c => c.field === field);
-    if (col?.type === 'enum') {
-      const items = (col.config as EnumConfig)?.items;
-      if (items) {
-        enumOrder = new Map(items.map((item, i) => [item, i]));
-      }
-    }
-  }
+  // Resolve comparator: type-specific → default
+  const col = columns?.find(c => c.field === field);
+  const cmpFn = (col && comparators?.[col.type]) ?? null;
+  const config = col?.config ?? {};
 
   return [...rows].sort((a, b) => {
     const va = a.data[field];
@@ -355,19 +366,7 @@ export function sortRows(
     if (va == null) return 1;
     if (vb == null) return -1;
 
-    let cmp: number;
-    if (enumOrder) {
-      const ia = enumOrder.get(String(va)) ?? Infinity;
-      const ib = enumOrder.get(String(vb)) ?? Infinity;
-      cmp = ia - ib;
-    } else if (typeof va === 'number' && typeof vb === 'number') {
-      cmp = va - vb;
-    } else if (typeof va === 'boolean' && typeof vb === 'boolean') {
-      cmp = (va === vb) ? 0 : va ? -1 : 1;
-    } else {
-      cmp = String(va).localeCompare(String(vb));
-    }
-
+    const cmp = cmpFn ? cmpFn(va, vb, config) : defaultSortComparator(va, vb);
     return direction === 'asc' ? cmp : -cmp;
   });
 }

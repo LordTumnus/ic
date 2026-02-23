@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import type { NumberFilterValue, SparklineConfig } from '$lib/utils/table-utils';
-  import type { SparklineFilterValue } from './match';
+  import type { SparklineFilterValue } from './utils';
 
   let {
     initialValue,
