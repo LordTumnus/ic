@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PublishFn, Resolution } from '$lib/types';
   import type { TableColumn, TableRow as TRow, FilterState, IndexedRow, CellActionPayload } from '$lib/utils/table-utils';
-  import type { PinnedInfo, CellSelection, SelectionState } from '$lib/utils/table-utils';
+  import type { PinnedInfo, CellSelection, SelectionState, EditingCell } from '$lib/utils/table-utils';
   import {
     normalizeTableData,
     computeColumnWidths,
@@ -9,6 +9,7 @@
     sortRows,
     filterRows,
     ROW_HEIGHTS,
+    isColumnEditable,
   } from '$lib/utils/table-utils';
   import logger from '$lib/core/logger';
   import { filterMatchers } from './cells/filter-matchers';
@@ -257,6 +258,14 @@
 
   function handleCellClick(field: string, rowIndex: number, val: unknown, rowData: TRow, shiftKey: boolean) {
     logger.debug('Table', 'Cell click', { field, rowIndex, shiftKey });
+
+    // Editable boolean: toggle on single click (no double-click needed)
+    const clickedCol = columns.find(c => c.field === field);
+    if (clickedCol && isColumnEditable(clickedCol) && clickedCol.type === 'boolean' && !disabled) {
+      commitEdit(field, rowIndex, val, !Boolean(val));
+      return;
+    }
+
     if (selectable) {
       const oneBasedRow = rowIndex + 1;
       const currentCells = selection.type === 'cell' ? (selection.value as CellSelection[]) : [];
@@ -338,8 +347,46 @@
     logger.debug('Table', 'Selection', { selection });
   }
 
+  // ── Inline editing ──────────────────────────────────
+
+  let editingCell = $state<EditingCell | null>(null);
+
+  function startEditing(field: string, rowIndex: number) {
+    if (disabled) return;
+    const col = columns.find(c => c.field === field);
+    if (!col || !isColumnEditable(col)) return;
+    editingCell = { rowIndex, field };
+  }
+
+  function commitEdit(field: string, rowIndex: number, oldValue: unknown, newValue: unknown) {
+    editingCell = null;
+    if (oldValue === newValue) return;
+    // Update local rows directly (no round-trip)
+    rows = rows.map((row, i) => i === rowIndex ? { ...row, [field]: newValue } : row);
+    // Notify MATLAB
+    publish?.('cellEdited', { field, rowIndex, oldValue, newValue });
+  }
+
+  function cancelEdit() {
+    editingCell = null;
+  }
+
+  // Cancel editing when sort/filter changes
+  $effect(() => {
+    void sortField;
+    void sortDirection;
+    void Object.keys(filters).length;
+    editingCell = null;
+  });
+
   // ── Container keydown — entry/exit the grid ──────────
   function handleContainerKeydown(e: KeyboardEvent) {
+    // If editing, let the cell editor handle Escape (its stopPropagation prevents this)
+    if (e.key === 'Escape' && editingCell) {
+      cancelEdit();
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape' && e.target !== containerEl) {
       logger.debug('Table', 'Escape → exit grid, clear selection');
       e.preventDefault();
@@ -493,11 +540,15 @@
           even={i % 2 === 1}
           activeColumns={activeColumnsList}
           activeCells={activeCellsList}
+          editingField={editingCell?.rowIndex === irow.originalIndex ? editingCell.field : null}
           onclick={handleRowClick}
           oncellclick={handleCellClick}
           oncellaction={handleCellAction}
           oncontextmenuaction={handleContextMenuAction}
           onrownumclick={handleRowNumClick}
+          onstartedit={startEditing}
+          oncommitedit={commitEdit}
+          oncanceledit={cancelEdit}
         />
       {:else}
         <div class="ic-tbl__empty">{rows.length > 0 ? 'No matching rows' : 'No data'}</div>

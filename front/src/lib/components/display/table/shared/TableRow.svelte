@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TableColumn, TableRow as TRow, PinnedInfo } from '$lib/utils/table-utils';
   import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
-  import { resolveAlign } from '$lib/utils/table-utils';
+  import { resolveAlign, isColumnEditable } from '$lib/utils/table-utils';
   import TableCell from './TableCell.svelte';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
 
@@ -19,6 +19,7 @@
     even = false,
     activeColumns = [] as string[],
     activeCells = [] as { field: string; rowIndex: number }[],
+    editingField = null as string | null,
     pinnedOffsets = new Map() as Map<string, PinnedInfo>,
     stickingFields = new Set<string>(),
     onclick,
@@ -26,6 +27,9 @@
     oncellaction,
     oncontextmenuaction,
     onrownumclick,
+    onstartedit,
+    oncommitedit,
+    oncanceledit,
   }: {
     columns: TableColumn[];
     columnWidths: number[];
@@ -40,6 +44,7 @@
     even?: boolean;
     activeColumns?: string[];
     activeCells?: { field: string; rowIndex: number }[];
+    editingField?: string | null;
     pinnedOffsets?: Map<string, PinnedInfo>;
     stickingFields?: Set<string>;
     onclick?: (rowIndex: number, rowData: TRow) => void;
@@ -47,6 +52,9 @@
     oncellaction?: (field: string, rowIndex: number, data: unknown) => void;
     oncontextmenuaction?: (field: string, rowIndex: number, itemKey: string) => void;
     onrownumclick?: (rowIndex: number, shiftKey: boolean) => void;
+    onstartedit?: (field: string, rowIndex: number) => void;
+    oncommitedit?: (field: string, rowIndex: number, oldValue: unknown, newValue: unknown) => void;
+    oncanceledit?: () => void;
   } = $props();
 
   function handleRowClick(e: MouseEvent) {
@@ -62,9 +70,18 @@
     oncellclick?.(field, rowIndex, rowData[field], rowData, e.shiftKey);
   }
 
-  /** Prevent native text range selection on shift+click. */
+  /** Prevent native text selection on shift+click and double-click. */
   function handleMouseDown(e: MouseEvent) {
-    if (e.shiftKey) e.preventDefault();
+    if (e.shiftKey || e.detail === 2) e.preventDefault();
+  }
+
+  function handleCellDblClick(e: MouseEvent, field: string) {
+    e.stopPropagation();
+    e.preventDefault();           // prevent native word-select on double-click
+    const col = columns.find(c => c.field === field);
+    // Boolean toggles on single click, not double-click
+    if (col?.type === 'boolean') return;
+    onstartedit?.(field, rowIndex);
   }
 
   function handleRowNumClick(e: MouseEvent) {
@@ -194,10 +211,16 @@
         }
         break;
       }
-      case 'Enter':
+      case 'Enter': {
         e.preventDefault();
-        oncellclick?.(field, rowIndex, rowData[field], rowData, e.shiftKey);
+        const enterCol = columns.find(c => c.field === field);
+        if (enterCol && isColumnEditable(enterCol) && enterCol.type !== 'boolean' && !editingField) {
+          onstartedit?.(field, rowIndex);
+        } else {
+          oncellclick?.(field, rowIndex, rowData[field], rowData, e.shiftKey);
+        }
         break;
+      }
     }
   }
 </script>
@@ -257,6 +280,7 @@
       style:z-index={pinInfo ? 1 : undefined}
       onmousedown={handleMouseDown}
       onclick={(e: MouseEvent) => handleCellClick(e, col.field)}
+      ondblclick={(e: MouseEvent) => handleCellDblClick(e, col.field)}
       oncontextmenu={(e: MouseEvent) => handleContextMenu(e, col)}
       onkeydown={(e: KeyboardEvent) => handleCellKeydown(e, col.field)}
       role="gridcell"
@@ -265,6 +289,10 @@
       <TableCell
         column={col}
         value={rowData[col.field]}
+        editing={editingField === col.field}
+        oncommitedit={(oldVal: unknown, newVal: unknown) =>
+          oncommitedit?.(col.field, rowIndex, oldVal, newVal)}
+        {oncanceledit}
         oncellaction={col.hasAction
           ? (data: unknown) => oncellaction?.(col.field, rowIndex, data)
           : undefined}

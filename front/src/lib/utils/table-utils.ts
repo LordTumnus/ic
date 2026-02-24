@@ -19,6 +19,7 @@ export interface TableColumn {
   resizable: boolean;
   align: 'left' | 'center' | 'right' | 'auto';
   pinned: 'none' | 'left' | 'right';
+  editable: boolean;
   hasAction: boolean;
   config: Record<string, unknown>;
   contextMenu?: ContextMenuEntry[];
@@ -648,4 +649,22 @@ export type SelectionState =
   | { type: 'row'; value: number[] }
   | { type: 'column'; value: string[] }
   | { type: 'cell'; value: CellSelection[] };
+
+// ── Inline editing types ─────────────────────────────
+
+/** Identifies a cell currently in edit mode (0-based row index). */
+export interface EditingCell {
+  rowIndex: number;
+  field: string;
+}
+
+/** Column types that support inline editing. */
+const EDITABLE_TYPES: ReadonlySet<string> = new Set([
+  'text', 'number', 'boolean', 'enum', 'rating', 'date', 'progressbar',
+]);
+
+/** Whether a column supports inline editing. */
+export function isColumnEditable(col: TableColumn): boolean {
+  return col.editable && EDITABLE_TYPES.has(col.type);
+}
 

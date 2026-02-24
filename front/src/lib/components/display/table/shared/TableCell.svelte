@@ -15,10 +15,16 @@
   let {
     column,
     value,
+    editing = false,
+    oncommitedit,
+    oncanceledit,
     oncellaction,
   }: {
     column: TableColumn;
     value: unknown;
+    editing?: boolean;
+    oncommitedit?: (oldValue: unknown, newValue: unknown) => void;
+    oncanceledit?: () => void;
     oncellaction?: (data: unknown) => void;
   } = $props();
 
@@ -34,25 +40,31 @@
   style={cellStyle || null}
 >
   {#if column.type === 'number'}
-    <NumberCell {value} config={column.config} bind:style={cellStyle} />
+    <NumberCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {:else if column.type === 'boolean'}
     <BooleanCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'progressbar'}
-    <ProgressBarCell {value} config={column.config} bind:style={cellStyle} />
+    <ProgressBarCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {:else if column.type === 'sparkline'}
     <SparklineCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'image'}
     <ImageCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'enum'}
-    <EnumCell {value} config={column.config} bind:style={cellStyle} />
+    <EnumCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {:else if column.type === 'rating'}
-    <RatingCell {value} config={column.config} bind:style={cellStyle} />
+    <RatingCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {:else if column.type === 'date'}
-    <DateCell {value} config={column.config} bind:style={cellStyle} />
+    <DateCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {:else if column.type === 'button'}
     <ButtonCell {value} config={column.config} bind:style={cellStyle} {oncellaction} />
   {:else}
-    <TextCell {value} config={column.config} bind:style={cellStyle} />
+    <TextCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {/if}
 </div>
 
@@ -67,7 +79,7 @@
     flex: 1;
     min-width: 0;
   }
-  .ic-tbl__cell--left { justify-content: flex-start; }
-  .ic-tbl__cell--center { justify-content: center; }
-  .ic-tbl__cell--right { justify-content: flex-end; }
+  .ic-tbl__cell--left { justify-content: flex-start; text-align: left; }
+  .ic-tbl__cell--center { justify-content: center; text-align: center; }
+  .ic-tbl__cell--right { justify-content: flex-end; text-align: right; }
 </style>

@@ -65,11 +65,18 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
         ColumnClicked
     end
 
+    events
+        % > CELLEDITED fires when the user edits a cell value inline
+        CellEdited
+    end
+
     methods
         function this = TableBase(props)
             this@ic.core.Component(props);
             this.subscribe('cellAction', ...
                 @(comp, ~, data) comp.dispatchCellAction(data));
+            this.subscribe('cellEdited', ...
+                @(comp, ~, data) comp.handleCellEdited(data));
         end
 
         function set.Selection(this, val)
@@ -100,6 +107,26 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             % Convert 0-based row index from Svelte to 1-based
             rowIndex = double(data.rowIndex) + 1;
             col.OnCellAction(col, rowIndex, data.data);
+        end
+
+        function handleCellEdited(this, data)
+            % > HANDLECELLEDITED update Data silently and fire CellEdited event.
+            field = string(data.field);
+            rowIndex = double(data.rowIndex) + 1;  % 0-based → 1-based
+            newValue = data.newValue;
+            oldValue = data.oldValue;
+
+            % Update Data without publishing back to Svelte (it already has the value)
+            D = this.Data;
+            D{rowIndex, field} = newValue;
+            this.setValueSilently('Data', D);
+
+            % Fire MATLAB event for user listeners
+            notify(this, 'CellEdited', ic.event.MEvent(struct( ...
+                'field', field, ...
+                'rowIndex', rowIndex, ...
+                'oldValue', oldValue, ...
+                'newValue', newValue)));
         end
     end
 

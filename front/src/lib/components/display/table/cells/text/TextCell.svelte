@@ -6,10 +6,16 @@
     value,
     config = {} as Partial<TextConfig>,
     style = $bindable(''),
+    editing = false,
+    oncommitedit,
+    oncanceledit,
   }: {
     value?: unknown;
     config?: Partial<TextConfig>;
     style?: string;
+    editing?: boolean;
+    oncommitedit?: (oldValue: unknown, newValue: unknown) => void;
+    oncanceledit?: () => void;
   } = $props();
 
   const raw = $derived(String(value ?? ''));
@@ -27,12 +33,47 @@
   let title = $state('');
 
   function onenter() {
-    if (el.scrollWidth > el.clientWidth) title = isEmpty ? '' : raw;
+    if (el?.scrollWidth > el?.clientWidth) title = isEmpty ? '' : raw;
   }
   function onleave() { title = ''; }
+
+  // ── Edit mode ──────────────────────────────────
+  let editValue = $state('');
+
+  $effect(() => {
+    if (editing) editValue = raw;
+  });
+
+  function handleEditKeydown(e: KeyboardEvent) {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      oncommitedit?.(value, editValue);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      oncanceledit?.();
+    }
+  }
+
+  function handleEditBlur() {
+    oncommitedit?.(value, editValue);
+  }
+
+  function autofocus(node: HTMLInputElement) {
+    requestAnimationFrame(() => { node.focus(); node.select(); });
+  }
 </script>
 
-{#if richText && !isEmpty}
+{#if editing}
+  <input
+    type="text"
+    class="ic-tbl-cell-text__edit"
+    bind:value={editValue}
+    onkeydown={handleEditKeydown}
+    onblur={handleEditBlur}
+    use:autofocus
+  />
+{:else if richText && !isEmpty}
   <span
     bind:this={el}
     class="ic-tbl-cell-text"
@@ -64,5 +105,20 @@
   .ic-tbl-cell-text--placeholder {
     color: var(--ic-muted-foreground);
     font-style: italic;
+  }
+  .ic-tbl-cell-text__edit {
+    width: 100%;
+    height: 100%;
+    padding: 0 4px;
+    margin: 0;
+    border: 1px solid var(--ic-primary);
+    border-radius: 2px;
+    background: var(--ic-background);
+    color: var(--ic-foreground);
+    font: inherit;
+    text-align: inherit;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    outline: none;
+    box-sizing: border-box;
   }
 </style>
