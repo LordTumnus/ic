@@ -15,7 +15,7 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
 
         % > TYPE cell renderer type
         Type (1,1) string {mustBeMember(Type, [ ...
-            "text", "number", "boolean", "progressbar", "sparkline", "image", "enum", "rating" ...
+            "text", "number", "boolean", "progressbar", "sparkline", "image", "enum", "rating", "date" ...
             ])} = "text"
 
         % > WIDTH column width — number for px, or string for CSS (e.g. "20%")
@@ -159,6 +159,8 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
                     colCell{i} = ic.table.NumberColumn(vn);
                 elseif islogical(col)
                     colCell{i} = ic.table.BooleanColumn(vn);
+                elseif isdatetime(col)
+                    colCell{i} = ic.table.DateColumn(vn);
                 else
                     colCell{i} = ic.table.TextColumn(vn);
                 end

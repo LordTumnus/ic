@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -97,6 +97,17 @@ export interface RatingConfig {
   maxStars?: number;
   allowHalf?: boolean;
   color?: string;
+}
+
+/** Date column config as received from MATLAB. */
+export interface DateConfig {
+  format?: string;
+}
+
+/** Date filter value — ISO date string bounds. */
+export interface DateFilterValue {
+  min?: string;  // "yyyy-mm-dd"
+  max?: string;
 }
 
 /** Build a value→color lookup from parallel items/colors arrays. */
@@ -530,5 +541,41 @@ export function parseInlineRichText(text: string): string {
   // *italic*
   s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
   return s;
+}
+
+// ============================================================================
+// Date Formatting
+// ============================================================================
+
+/** Named presets → Intl.DateTimeFormat options. */
+const DATE_PRESETS: Record<string, Intl.DateTimeFormatOptions> = {
+  short:    { year: 'numeric', month: 'short', day: 'numeric' },
+  long:     { year: 'numeric', month: 'long',  day: 'numeric' },
+  numeric:  { year: 'numeric', month: 'numeric', day: 'numeric' },
+  datetime: { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' },
+  time:     { hour: 'numeric', minute: '2-digit' },
+};
+
+/**
+ * Format a date value using a named preset.
+ * Accepts ISO strings or epoch numbers. Returns raw string on parse failure.
+ */
+export function formatDate(value: unknown, format: string = 'short'): string {
+  if (value == null || value === '') return '';
+  const d = new Date(value as string | number);
+  if (isNaN(d.getTime())) return String(value);
+
+  if (format === 'iso') return d.toISOString().slice(0, 10);
+
+  const opts = DATE_PRESETS[format] ?? DATE_PRESETS.short;
+  return new Intl.DateTimeFormat(undefined, opts).format(d);
+}
+
+/**
+ * Parse a date value to epoch milliseconds. Returns NaN for invalid dates.
+ */
+export function dateToEpoch(value: unknown): number {
+  if (value == null || value === '') return NaN;
+  return new Date(value as string | number).getTime();
 }
 

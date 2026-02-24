@@ -8,6 +8,7 @@
   import ImageFilter from '../cells/image/ImageFilter.svelte';
   import EnumFilter from '../cells/enum/EnumFilter.svelte';
   import RatingFilter from '../cells/rating/RatingFilter.svelte';
+  import DateFilter from '../cells/date/DateFilter.svelte';
 
   let {
     column,
@@ -117,6 +118,8 @@
         <EnumFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
       {:else if column.type === 'rating'}
         <RatingFilter initialValue={filterValue} config={column.config} onchange={handleFilterChange} />
+      {:else if column.type === 'date'}
+        <DateFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else if column.type === 'boolean'}
         <BooleanFilter initialValue={filterValue} onchange={handleFilterChange} />
       {:else}
