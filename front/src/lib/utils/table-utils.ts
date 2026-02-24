@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date' | 'button' | 'menu';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -110,6 +110,35 @@ export interface RatingConfig {
 export interface DateConfig {
   format?: string;
   colorRules?: ColorRuleConfig[];
+}
+
+/** A single button definition inside a ButtonColumn cell. */
+export interface CellButtonDef {
+  key: string;
+  label?: string;
+  icon?: string | { hash: string; mime?: string; data?: string };
+  tooltip?: string;
+  variant?: 'default' | 'primary' | 'destructive';
+  disabled?: boolean;
+}
+
+/** Button column config. */
+export interface ButtonConfig {
+  buttons?: CellButtonDef[];
+}
+
+/** A single menu item definition inside a MenuColumn cell. */
+export interface MenuItemDef {
+  key: string;
+  label?: string;
+  icon?: string | { hash: string; mime?: string; data?: string };
+  disabled?: boolean;
+  separator?: boolean;
+}
+
+/** Menu column config. */
+export interface MenuConfig {
+  items?: MenuItemDef[];
 }
 
 /** Date filter value — ISO date string bounds. */
@@ -254,6 +283,8 @@ export function resolveAlign(col: TableColumn): 'left' | 'center' | 'right' {
     case 'boolean':
     case 'image':
     case 'rating':
+    case 'button':
+    case 'menu':
       return 'center';
     default:
       return 'left';

@@ -8,6 +8,7 @@ import { sort as imageSort } from './image/utils';
 import { sort as enumSort } from './enum/utils';
 import { sort as ratingSort } from './rating/utils';
 import { sort as dateSort } from './date/utils';
+import { sort as buttonSort } from './button/utils';
 
 /** Registry: column type → sort comparator. Adding a new cell type = add utils.ts + one entry here. */
 export const sortComparators: Record<string, SortComparator> = {
@@ -20,4 +21,5 @@ export const sortComparators: Record<string, SortComparator> = {
   enum: enumSort,
   rating: ratingSort,
   date: dateSort,
+  button: buttonSort,
 };

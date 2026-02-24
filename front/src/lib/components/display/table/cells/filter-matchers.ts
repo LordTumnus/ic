@@ -8,6 +8,7 @@ import { match as imageMatch } from './image/utils';
 import { match as enumMatch } from './enum/utils';
 import { match as ratingMatch } from './rating/utils';
 import { match as dateMatch } from './date/utils';
+import { match as buttonMatch } from './button/utils';
 
 /** Registry: column type → filter matcher. Adding a new cell type = add utils.ts + one entry here. */
 export const filterMatchers: Record<string, FilterMatcher> = {
@@ -20,4 +21,5 @@ export const filterMatchers: Record<string, FilterMatcher> = {
   enum: enumMatch,
   rating: ratingMatch,
   date: dateMatch,
+  button: buttonMatch,
 };

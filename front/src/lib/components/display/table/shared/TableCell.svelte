@@ -10,6 +10,7 @@
   import EnumCell from '../cells/enum/EnumCell.svelte';
   import RatingCell from '../cells/rating/RatingCell.svelte';
   import DateCell from '../cells/date/DateCell.svelte';
+  import ButtonCell from '../cells/button/ButtonCell.svelte';
 
   let {
     column,
@@ -48,6 +49,8 @@
     <RatingCell {value} config={column.config} bind:style={cellStyle} />
   {:else if column.type === 'date'}
     <DateCell {value} config={column.config} bind:style={cellStyle} />
+  {:else if column.type === 'button'}
+    <ButtonCell {value} config={column.config} bind:style={cellStyle} {oncellaction} />
   {:else}
     <TextCell {value} config={column.config} bind:style={cellStyle} />
   {/if}
