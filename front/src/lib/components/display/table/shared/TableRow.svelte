@@ -62,6 +62,11 @@
     oncellclick?.(field, rowIndex, rowData[field], rowData, e.shiftKey);
   }
 
+  /** Prevent native text range selection on shift+click. */
+  function handleMouseDown(e: MouseEvent) {
+    if (e.shiftKey) e.preventDefault();
+  }
+
   function handleRowNumClick(e: MouseEvent) {
     e.stopPropagation();
     onrownumclick?.(rowIndex, e.shiftKey);
@@ -218,6 +223,7 @@
       style:position="sticky"
       style:left="0px"
       style:z-index={1}
+      onmousedown={handleMouseDown}
       onclick={handleRowNumClick}
       onkeydown={handleRowNumKeydown}
       role="rowheader"
@@ -249,6 +255,7 @@
       style:left={pinInfo?.side === 'left' ? pinInfo.offset + 'px' : undefined}
       style:right={pinInfo?.side === 'right' ? pinInfo.offset + 'px' : undefined}
       style:z-index={pinInfo ? 1 : undefined}
+      onmousedown={handleMouseDown}
       onclick={(e: MouseEvent) => handleCellClick(e, col.field)}
       oncontextmenu={(e: MouseEvent) => handleContextMenu(e, col)}
       onkeydown={(e: KeyboardEvent) => handleCellKeydown(e, col.field)}

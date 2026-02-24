@@ -34,20 +34,20 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
         % > SORTDIRECTION sort direction
         SortDirection (1,1) string {mustBeMember(SortDirection, ...
             ["none", "asc", "desc"])} = "none"
+
+        % > SELECTION current selection state (struct with .type and .value)
+        Selection (1,1) struct = struct('type', 'none', 'value', [])
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
             Access = ?ic.mixin.Reactive, Hidden)
-        % > VALUE selected row keys (hidden from user — use Selection)
-        Value = []
-
         % > FILTERS active column filters (field → filterValue)
         Filters (1,1) struct = struct()
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
-        ValueChanged
+        % > SELECTIONCHANGED fires when the user changes the selection
+        SelectionChanged
 
         % > SORTCHANGED fires when the user clicks a sortable column header
         SortChanged
@@ -70,6 +70,11 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             this@ic.core.Component(props);
             this.subscribe('cellAction', ...
                 @(comp, ~, data) comp.dispatchCellAction(data));
+        end
+
+        function set.Selection(this, val)
+            mustBeMember(val.type, {'none', 'row', 'column', 'cell'});
+            this.Selection = val;
         end
 
         function set.SortField(this, val)
@@ -105,8 +110,8 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
         end
 
         function out = clearSelection(this)
-            % > CLEARSELECTION clear all selected rows
-            this.Value = [];
+            % > CLEARSELECTION clear the current selection
+            this.setValueSilently('Selection', struct('type', 'none', 'value', []));
             out = this.publish("clearSelection", []);
         end
 

@@ -634,3 +634,18 @@ export function dateToEpoch(value: unknown): number {
   return new Date(value as string | number).getTime();
 }
 
+// ── Selection types ──────────────────────────────────
+
+/** Cell selection entry (1-based row index, field name). */
+export interface CellSelection {
+  row: number;
+  field: string;
+}
+
+/** Unified table selection state. */
+export type SelectionState =
+  | { type: 'none'; value: null }
+  | { type: 'row'; value: number[] }
+  | { type: 'column'; value: string[] }
+  | { type: 'cell'; value: CellSelection[] };
+

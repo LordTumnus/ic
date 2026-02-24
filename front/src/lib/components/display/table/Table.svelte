@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PublishFn, Resolution } from '$lib/types';
   import type { TableColumn, TableRow as TRow, FilterState, IndexedRow, CellActionPayload } from '$lib/utils/table-utils';
-  import type { PinnedInfo } from '$lib/utils/table-utils';
+  import type { PinnedInfo, CellSelection, SelectionState } from '$lib/utils/table-utils';
   import {
     normalizeTableData,
     computeColumnWidths,
@@ -16,6 +16,8 @@
   import TableHeader from './shared/TableHeader.svelte';
   import TableRowComp from './shared/TableRow.svelte';
 
+  const NONE_SEL: SelectionState = { type: 'none', value: null };
+
   let {
     // Reactive props
     data = $bindable(null as unknown),
@@ -28,14 +30,14 @@
     striped = $bindable(false),
     sortField = $bindable(''),
     sortDirection = $bindable('none' as 'none' | 'asc' | 'desc'),
-    value = $bindable(null as number[] | null),
+    selection = $bindable(NONE_SEL as SelectionState),
     filters = $bindable({} as FilterState),
 
     // IC pub/sub
     publish,
 
     // Events
-    valueChanged,
+    selectionChanged,
     sortChanged,
     filterChanged,
     cellClicked,
@@ -47,6 +49,9 @@
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     clearSelection = $bindable((): Resolution => ({ success: true, data: null })),
     scrollToRow = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
+    removeRow = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
+    removeColumn = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
+    editCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
   }: {
     data?: unknown;
     columns?: TableColumn[];
@@ -58,10 +63,10 @@
     striped?: boolean;
     sortField?: string;
     sortDirection?: 'none' | 'asc' | 'desc';
-    value?: number[] | null;
+    selection?: SelectionState;
     filters?: FilterState;
     publish?: PublishFn;
-    valueChanged?: (data?: unknown) => void;
+    selectionChanged?: (data?: unknown) => void;
     sortChanged?: (data?: unknown) => void;
     filterChanged?: (data?: unknown) => void;
     cellClicked?: (data?: unknown) => void;
@@ -71,20 +76,41 @@
     focus?: () => Resolution;
     clearSelection?: () => Resolution;
     scrollToRow?: (data?: unknown) => Resolution;
+    removeRow?: (data?: unknown) => Resolution;
+    removeColumn?: (data?: unknown) => Resolution;
+    editCell?: (data?: unknown) => Resolution;
   } = $props();
 
   let containerEl: HTMLDivElement;
 
-  // Active selection state (local UI — not synced to MATLAB)
-  let activeColumns = $state<string[]>([]);
-  let activeCells = $state<{ field: string; rowIndex: number }[]>([]);
-
-  // Normalize MATLAB data (row-oriented or column-oriented) to rows
-  const rows = $derived.by(() => {
+  // Normalize MATLAB data — local state so incremental methods can mutate directly
+  let rows = $state<TRow[]>([]);
+  $effect(() => {
     const r = normalizeTableData(data);
     logger.info('Table', 'Data received', { format: Array.isArray(data) ? 'row' : 'column', rows: r.length });
-    return r;
+    rows = r;
   });
+
+  // ── Derived visual state from unified selection ─────
+
+  /** 0-based row indices for row-highlight (row selection mode only). */
+  const selectedRowSet = $derived(
+    selection.type === 'row'
+      ? new Set((selection.value as number[]).map(i => i - 1))
+      : new Set<number>()
+  );
+
+  /** Active cells for cell-highlight (cell selection mode only). 0-based rowIndex. */
+  const activeCellsList = $derived(
+    selection.type === 'cell'
+      ? (selection.value as CellSelection[]).map(c => ({ field: c.field, rowIndex: c.row - 1 }))
+      : []
+  );
+
+  /** Active column fields for column-highlight (column selection mode only). */
+  const activeColumnsList = $derived(
+    selection.type === 'column' ? (selection.value as string[]) : []
+  );
 
   // Wrap rows with original indices so selection survives sort/filter
   const indexedRows: IndexedRow[] = $derived(
@@ -184,9 +210,6 @@
     return result;
   });
 
-  // Selection
-  const selectedSet = $derived(new Set(value ?? []));
-
   // Height style
   const heightStyle = $derived(
     height === 'auto' ? 'auto' : typeof height === 'number' ? `${height}px` : height
@@ -225,13 +248,9 @@
 
   function handleRowClick(rowIndex: number, rowData: TRow) {
     logger.debug('Table', 'Row click', { rowIndex });
-    if (selectable) {
-      activeColumns = [];
-      activeCells = [];
-      if (value != null) {
-        value = null;
-        valueChanged?.({ value: null });
-      }
+    if (selectable && selection.type !== 'none') {
+      selection = NONE_SEL;
+      selectionChanged?.({ selection });
     }
     rowClicked?.({ rowIndex, rowData });
   }
@@ -239,22 +258,24 @@
   function handleCellClick(field: string, rowIndex: number, val: unknown, rowData: TRow, shiftKey: boolean) {
     logger.debug('Table', 'Cell click', { field, rowIndex, shiftKey });
     if (selectable) {
-      activeColumns = [];
-      if (value != null) {
-        value = null;
-        valueChanged?.({ value: null });
-      }
-      const exists = activeCells.some(c => c.field === field && c.rowIndex === rowIndex);
+      const oneBasedRow = rowIndex + 1;
+      const currentCells = selection.type === 'cell' ? (selection.value as CellSelection[]) : [];
+      const exists = currentCells.some(c => c.field === field && c.row === oneBasedRow);
+
+      let nextCells: CellSelection[];
       if (shiftKey) {
-        if (exists) {
-          activeCells = activeCells.filter(c => !(c.field === field && c.rowIndex === rowIndex));
-        } else {
-          activeCells = [...activeCells, { field, rowIndex }];
-        }
+        nextCells = exists
+          ? currentCells.filter(c => !(c.field === field && c.row === oneBasedRow))
+          : [...currentCells, { row: oneBasedRow, field }];
       } else {
-        activeCells = exists ? [] : [{ field, rowIndex }];
+        nextCells = exists ? [] : [{ row: oneBasedRow, field }];
       }
-      logger.debug('Table', 'Active cells', { count: activeCells.length, cells: activeCells });
+
+      selection = nextCells.length > 0
+        ? { type: 'cell', value: nextCells }
+        : NONE_SEL;
+      selectionChanged?.({ selection });
+      logger.debug('Table', 'Selection', { selection });
     }
     cellClicked?.({ field, rowIndex, value: val, rowData });
   }
@@ -272,20 +293,23 @@
   function handleColumnClick(field: string, shiftKey: boolean) {
     logger.debug('Table', 'Column click', { field, shiftKey });
     if (selectable) {
-      activeCells = [];
-      if (value != null) {
-        value = null;
-        valueChanged?.({ value: null });
-      }
-      const exists = activeColumns.includes(field);
+      const currentCols = selection.type === 'column' ? (selection.value as string[]) : [];
+      const exists = currentCols.includes(field);
+
+      let nextCols: string[];
       if (shiftKey) {
-        activeColumns = exists
-          ? activeColumns.filter(f => f !== field)
-          : [...activeColumns, field];
+        nextCols = exists
+          ? currentCols.filter(f => f !== field)
+          : [...currentCols, field];
       } else {
-        activeColumns = exists ? [] : [field];
+        nextCols = exists ? [] : [field];
       }
-      logger.debug('Table', 'Active columns', { columns: activeColumns });
+
+      selection = nextCols.length > 0
+        ? { type: 'column', value: nextCols }
+        : NONE_SEL;
+      selectionChanged?.({ selection });
+      logger.debug('Table', 'Selection', { selection });
     }
     const col = columns.find(c => c.field === field);
     columnClicked?.({ field, column: col });
@@ -294,22 +318,24 @@
   function handleRowNumClick(rowIndex: number, shiftKey: boolean) {
     if (!selectable) return;
     logger.debug('Table', 'Row num click', { rowIndex, shiftKey });
-    activeColumns = [];
-    activeCells = [];
 
-    let newValue: number[];
+    const oneBasedIdx = rowIndex + 1;
+    const currentRows = selection.type === 'row' ? (selection.value as number[]) : [];
+
+    let next: number[];
     if (shiftKey) {
-      if (selectedSet.has(rowIndex)) {
-        newValue = (value ?? []).filter(i => i !== rowIndex);
-      } else {
-        newValue = [...(value ?? []), rowIndex];
-      }
+      next = currentRows.includes(oneBasedIdx)
+        ? currentRows.filter(i => i !== oneBasedIdx)
+        : [...currentRows, oneBasedIdx];
     } else {
-      newValue = selectedSet.has(rowIndex) ? [] : [rowIndex];
+      next = currentRows.includes(oneBasedIdx) ? [] : [oneBasedIdx];
     }
-    value = newValue.length > 0 ? newValue : null;
-    logger.debug('Table', 'Selection', { value });
-    valueChanged?.({ value });
+
+    selection = next.length > 0
+      ? { type: 'row', value: next }
+      : NONE_SEL;
+    selectionChanged?.({ selection });
+    logger.debug('Table', 'Selection', { selection });
   }
 
   // ── Container keydown — entry/exit the grid ──────────
@@ -317,11 +343,9 @@
     if (e.key === 'Escape' && e.target !== containerEl) {
       logger.debug('Table', 'Escape → exit grid, clear selection');
       e.preventDefault();
-      activeColumns = [];
-      activeCells = [];
-      if (value != null) {
-        value = null;
-        valueChanged?.({ value: null });
+      if (selection.type !== 'none') {
+        selection = NONE_SEL;
+        selectionChanged?.({ selection });
       }
       containerEl.focus();
       return;
@@ -343,10 +367,8 @@
       return { success: true, data: null };
     };
     clearSelection = (): Resolution => {
-      value = null;
-      activeColumns = [];
-      activeCells = [];
-      valueChanged?.({ value: null });
+      selection = NONE_SEL;
+      selectionChanged?.({ selection });
       return { success: true, data: null };
     };
     scrollToRow = (payload?: unknown): Resolution => {
@@ -355,6 +377,67 @@
         const top = key * rowH;
         containerEl.scrollTop = top;
       }
+      return { success: true, data: null };
+    };
+    removeRow = (payload?: unknown): Resolution => {
+      const { index } = payload as { index: number };
+      if (index < 0 || index >= rows.length) {
+        return { success: false, data: `Row ${index} out of range` };
+      }
+      rows = rows.filter((_, i) => i !== index);
+
+      // Adjust selection based on type (indices in selection are 1-based)
+      const oneBasedIdx = index + 1;
+      if (selection.type === 'row') {
+        const adjusted = (selection.value as number[])
+          .filter(v => v !== oneBasedIdx)
+          .map(v => v > oneBasedIdx ? v - 1 : v);
+        selection = adjusted.length > 0
+          ? { type: 'row', value: adjusted }
+          : NONE_SEL;
+      } else if (selection.type === 'cell') {
+        const adjusted = (selection.value as CellSelection[])
+          .filter(c => c.row !== oneBasedIdx)
+          .map(c => c.row > oneBasedIdx ? { ...c, row: c.row - 1 } : c);
+        selection = adjusted.length > 0
+          ? { type: 'cell', value: adjusted }
+          : NONE_SEL;
+      }
+      // column and none — unaffected by row removal
+      return { success: true, data: null };
+    };
+    removeColumn = (payload?: unknown): Resolution => {
+      const { field } = payload as { field: string };
+      rows = rows.map(row => {
+        const next = { ...row };
+        delete next[field];
+        return next;
+      });
+      // Don't modify `columns` — MATLAB publishes the updated Columns prop
+      // separately. Modifying a $bindable prop from Svelte would echo a
+      // struct back to MATLAB, which can't convert to ic.table.Column.
+
+      // Adjust selection based on type
+      if (selection.type === 'column') {
+        const adjusted = (selection.value as string[]).filter(f => f !== field);
+        selection = adjusted.length > 0
+          ? { type: 'column', value: adjusted }
+          : NONE_SEL;
+      } else if (selection.type === 'cell') {
+        const adjusted = (selection.value as CellSelection[]).filter(c => c.field !== field);
+        selection = adjusted.length > 0
+          ? { type: 'cell', value: adjusted }
+          : NONE_SEL;
+      }
+      // row and none — unaffected by column removal
+      return { success: true, data: null };
+    };
+    editCell = (payload?: unknown): Resolution => {
+      const { rowIndex, field, value: newValue } = payload as { rowIndex: number; field: string; value: unknown };
+      if (rowIndex < 0 || rowIndex >= rows.length) {
+        return { success: false, data: `Row ${rowIndex} out of range` };
+      }
+      rows = rows.map((row, i) => i === rowIndex ? { ...row, [field]: newValue } : row);
       return { success: true, data: null };
     };
   });
@@ -385,7 +468,7 @@
       {pinnedOffsets}
       {stickingFields}
       {selectable}
-      {activeColumns}
+      activeColumns={activeColumnsList}
       {disabled}
       onsort={handleSort}
       onfilterchange={handleFilterChange}
@@ -399,7 +482,7 @@
           {columnWidths}
           rowData={irow.data}
           rowIndex={irow.originalIndex}
-          selected={selectedSet.has(irow.originalIndex)}
+          selected={selectedRowSet.has(irow.originalIndex)}
           {disabled}
           {selectable}
           showRowNumber={showRowNumbers}
@@ -408,8 +491,8 @@
           {stickingFields}
           {striped}
           even={i % 2 === 1}
-          {activeColumns}
-          {activeCells}
+          activeColumns={activeColumnsList}
+          activeCells={activeCellsList}
           onclick={handleRowClick}
           oncellclick={handleCellClick}
           oncellaction={handleCellAction}
