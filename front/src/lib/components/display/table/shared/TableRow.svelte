@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { TableColumn, TableRow as TRow, PinnedInfo } from '$lib/utils/table-utils';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import { resolveAlign } from '$lib/utils/table-utils';
   import TableCell from './TableCell.svelte';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
 
   let {
     columns,
@@ -22,6 +24,7 @@
     onclick,
     oncellclick,
     oncellaction,
+    oncontextmenuaction,
     onrownumclick,
   }: {
     columns: TableColumn[];
@@ -42,10 +45,15 @@
     onclick?: (rowIndex: number, rowData: TRow) => void;
     oncellclick?: (field: string, rowIndex: number, value: unknown, rowData: TRow, shiftKey: boolean) => void;
     oncellaction?: (field: string, rowIndex: number, data: unknown) => void;
+    oncontextmenuaction?: (field: string, rowIndex: number, itemKey: string) => void;
     onrownumclick?: (rowIndex: number, shiftKey: boolean) => void;
   } = $props();
 
-  function handleRowClick() {
+  function handleRowClick(e: MouseEvent) {
+    // Cell/rownum clicks are handled separately — skip if click originated there
+    // (Svelte 5 event delegation may bypass stopPropagation between parent-child)
+    const target = e.target as HTMLElement;
+    if (target !== e.currentTarget && target.closest('.ic-tbl__cell')) return;
     onclick?.(rowIndex, rowData);
   }
 
@@ -57,6 +65,21 @@
   function handleRowNumClick(e: MouseEvent) {
     e.stopPropagation();
     onrownumclick?.(rowIndex, e.shiftKey);
+  }
+
+  // ── Context Menu ────────────────────────────────────
+  let ctxMenu = $state<{ entries: ContextMenuEntry[]; x: number; y: number; field: string } | null>(null);
+
+  function handleContextMenu(e: MouseEvent, col: TableColumn) {
+    if (!col.contextMenu?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { entries: col.contextMenu, x: e.clientX, y: e.clientY, field: col.field };
+  }
+
+  function handleCtxAction(key: string) {
+    if (ctxMenu) oncontextmenuaction?.(ctxMenu.field, rowIndex, key);
+    ctxMenu = null;
   }
 
   // ── DOM Navigation Helpers ────────────────────────────
@@ -227,6 +250,7 @@
       style:right={pinInfo?.side === 'right' ? pinInfo.offset + 'px' : undefined}
       style:z-index={pinInfo ? 1 : undefined}
       onclick={(e: MouseEvent) => handleCellClick(e, col.field)}
+      oncontextmenu={(e: MouseEvent) => handleContextMenu(e, col)}
       onkeydown={(e: KeyboardEvent) => handleCellKeydown(e, col.field)}
       role="gridcell"
       tabindex={-1}
@@ -240,6 +264,16 @@
       />
     </div>
   {/each}
+
+  {#if ctxMenu}
+    <ContextMenu
+      entries={ctxMenu.entries}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onaction={handleCtxAction}
+      onclose={() => { ctxMenu = null; }}
+    />
+  {/if}
 </div>
 
 <style>
@@ -347,6 +381,13 @@
     outline: 1px solid var(--ic-primary);
     outline-offset: -1px;
     background: rgba(59, 130, 246, 0.06);
+  }
+  /* Pinned + active — layer active tint over opaque pinned background */
+  .ic-tbl__cell--pinned.ic-tbl__cell--active {
+    background:
+      linear-gradient(rgba(59, 130, 246, 0.06), rgba(59, 130, 246, 0.06)),
+      linear-gradient(var(--_row-tint), var(--_row-tint)),
+      var(--ic-background);
   }
 
   /* Pinned cell — always opaque so scrolling content doesn't bleed through.

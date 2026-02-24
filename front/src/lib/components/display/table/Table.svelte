@@ -41,6 +41,7 @@
     cellClicked,
     rowClicked,
     columnClicked,
+    contextMenuAction,
 
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
@@ -66,6 +67,7 @@
     cellClicked?: (data?: unknown) => void;
     rowClicked?: (data?: unknown) => void;
     columnClicked?: (data?: unknown) => void;
+    contextMenuAction?: (data?: unknown) => void;
     focus?: () => Resolution;
     clearSelection?: () => Resolution;
     scrollToRow?: (data?: unknown) => Resolution;
@@ -262,6 +264,11 @@
     publish?.('cellAction', { field, rowIndex, data } satisfies CellActionPayload);
   }
 
+  function handleContextMenuAction(field: string, rowIndex: number, itemKey: string) {
+    logger.debug('Table', 'Context menu action', { field, rowIndex, itemKey });
+    contextMenuAction?.({ item: itemKey, field, rowIndex });
+  }
+
   function handleColumnClick(field: string, shiftKey: boolean) {
     logger.debug('Table', 'Column click', { field, shiftKey });
     if (selectable) {
@@ -406,6 +413,7 @@
           onclick={handleRowClick}
           oncellclick={handleCellClick}
           oncellaction={handleCellAction}
+          oncontextmenuaction={handleContextMenuAction}
           onrownumclick={handleRowNumClick}
         />
       {:else}

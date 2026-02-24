@@ -1,6 +1,7 @@
 /**
  * Shared types and utilities for table components.
  */
+import type { ContextMenuEntry } from './context-menu-types';
 
 // ============================================================================
 // Types
@@ -10,7 +11,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date' | 'button' | 'menu';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date' | 'button';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -20,6 +21,7 @@ export interface TableColumn {
   pinned: 'none' | 'left' | 'right';
   hasAction: boolean;
   config: Record<string, unknown>;
+  contextMenu?: ContextMenuEntry[];
 }
 
 /** Payload published to MATLAB when a cell fires its action. */
@@ -127,19 +129,6 @@ export interface ButtonConfig {
   buttons?: CellButtonDef[];
 }
 
-/** A single menu item definition inside a MenuColumn cell. */
-export interface MenuItemDef {
-  key: string;
-  label?: string;
-  icon?: string | { hash: string; mime?: string; data?: string };
-  disabled?: boolean;
-  separator?: boolean;
-}
-
-/** Menu column config. */
-export interface MenuConfig {
-  items?: MenuItemDef[];
-}
 
 /** Date filter value — ISO date string bounds. */
 export interface DateFilterValue {
@@ -284,7 +273,6 @@ export function resolveAlign(col: TableColumn): 'left' | 'center' | 'right' {
     case 'image':
     case 'rating':
     case 'button':
-    case 'menu':
       return 'center';
     default:
       return 'left';

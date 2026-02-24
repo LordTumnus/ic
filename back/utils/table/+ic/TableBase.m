@@ -1,4 +1,4 @@
-classdef (Abstract) TableBase < ic.core.Component
+classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
     % > TABLEBASE Abstract base for table components.
     %
     %   Provides shared column configuration, sorting state, row selection,
