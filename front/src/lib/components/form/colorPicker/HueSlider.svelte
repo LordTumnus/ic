@@ -145,12 +145,11 @@
     width: 8px;
     height: 18px;
     border-radius: 2px;
-    background-color: var(--ic-foreground);
-    border: none;
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.25);
     outline: none;
     box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      0 1px 3px rgba(0, 0, 0, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -160,24 +159,20 @@
 
   .ic-cp-hue__thumb:hover,
   .ic-cp-hue__thumb:focus-visible {
-    box-shadow:
-      0 2px 6px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   }
 
   .ic-cp-hue__thumb--dragging {
     cursor: grabbing;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   }
 
   .ic-cp-hue__grip {
     display: block;
     width: 60%;
     height: 1px;
-    background: rgba(255, 255, 255, 0.3);
-    box-shadow: 0 2px 0 rgba(255, 255, 255, 0.3), 0 -2px 0 rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15), 0 -2px 0 rgba(0, 0, 0, 0.15);
     pointer-events: none;
   }
 </style>

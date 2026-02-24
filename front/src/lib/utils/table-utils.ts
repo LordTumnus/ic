@@ -11,7 +11,7 @@ import type { ContextMenuEntry } from './context-menu-types';
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date' | 'button';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating' | 'date' | 'button' | 'color';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -128,6 +128,13 @@ export interface CellButtonDef {
 /** Button column config. */
 export interface ButtonConfig {
   buttons?: CellButtonDef[];
+}
+
+/** Color column config. */
+export interface ColorConfig {
+  format?: 'hex' | 'rgb' | 'hsl';
+  showAlpha?: boolean;
+  presets?: string[];
 }
 
 
@@ -274,6 +281,7 @@ export function resolveAlign(col: TableColumn): 'left' | 'center' | 'right' {
     case 'image':
     case 'rating':
     case 'button':
+    case 'color':
       return 'center';
     default:
       return 'left';
@@ -660,7 +668,7 @@ export interface EditingCell {
 
 /** Column types that support inline editing. */
 const EDITABLE_TYPES: ReadonlySet<string> = new Set([
-  'text', 'number', 'boolean', 'enum', 'rating', 'date', 'progressbar',
+  'text', 'number', 'boolean', 'enum', 'rating', 'date', 'progressbar', 'color',
 ]);
 
 /** Whether a column supports inline editing. */

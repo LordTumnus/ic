@@ -11,6 +11,7 @@
   import RatingCell from '../cells/rating/RatingCell.svelte';
   import DateCell from '../cells/date/DateCell.svelte';
   import ButtonCell from '../cells/button/ButtonCell.svelte';
+  import ColorCell from '../cells/color/ColorCell.svelte';
 
   let {
     column,
@@ -62,6 +63,9 @@
       {editing} {oncommitedit} {oncanceledit} />
   {:else if column.type === 'button'}
     <ButtonCell {value} config={column.config} bind:style={cellStyle} {oncellaction} />
+  {:else if column.type === 'color'}
+    <ColorCell {value} config={column.config} bind:style={cellStyle}
+      {editing} {oncommitedit} {oncanceledit} />
   {:else}
     <TextCell {value} config={column.config} bind:style={cellStyle}
       {editing} {oncommitedit} {oncanceledit} />
