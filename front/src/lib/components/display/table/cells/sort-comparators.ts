@@ -6,6 +6,7 @@ import { sort as progressbarSort } from './progressbar/utils';
 import { sort as sparklineSort } from './sparkline/utils';
 import { sort as imageSort } from './image/utils';
 import { sort as enumSort } from './enum/utils';
+import { sort as ratingSort } from './rating/utils';
 
 /** Registry: column type → sort comparator. Adding a new cell type = add utils.ts + one entry here. */
 export const sortComparators: Record<string, SortComparator> = {
@@ -16,4 +17,5 @@ export const sortComparators: Record<string, SortComparator> = {
   sparkline: sparklineSort,
   image: imageSort,
   enum: enumSort,
+  rating: ratingSort,
 };

@@ -6,6 +6,7 @@ import { match as progressbarMatch } from './progressbar/utils';
 import { match as sparklineMatch } from './sparkline/utils';
 import { match as imageMatch } from './image/utils';
 import { match as enumMatch } from './enum/utils';
+import { match as ratingMatch } from './rating/utils';
 
 /** Registry: column type → filter matcher. Adding a new cell type = add utils.ts + one entry here. */
 export const filterMatchers: Record<string, FilterMatcher> = {
@@ -16,4 +17,5 @@ export const filterMatchers: Record<string, FilterMatcher> = {
   sparkline: sparklineMatch,
   image: imageMatch,
   enum: enumMatch,
+  rating: ratingMatch,
 };

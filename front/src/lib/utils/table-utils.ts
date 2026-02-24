@@ -10,7 +10,7 @@
 export interface TableColumn {
   field: string;
   header: string;
-  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum';
+  type: 'text' | 'number' | 'boolean' | 'progressbar' | 'sparkline' | 'image' | 'enum' | 'rating';
   width: number | string;
   minWidth: number;
   sortable: boolean;
@@ -90,6 +90,13 @@ export interface ImageConfig {
 export interface EnumConfig {
   items?: string[];
   colors?: string[];
+}
+
+/** Rating column config as received from MATLAB. */
+export interface RatingConfig {
+  maxStars?: number;
+  allowHalf?: boolean;
+  color?: string;
 }
 
 /** Build a value→color lookup from parallel items/colors arrays. */
@@ -227,6 +234,7 @@ export function resolveAlign(col: TableColumn): 'left' | 'center' | 'right' {
       return 'right';
     case 'boolean':
     case 'image':
+    case 'rating':
       return 'center';
     default:
       return 'left';
