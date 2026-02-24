@@ -16,6 +16,9 @@ classdef DateColumn < ic.table.Column
         Format (1,1) string {mustBeMember(Format, [ ...
             "short", "long", "numeric", "iso", "datetime", "time" ...
             ])} = "short"
+
+        % > COLORRULES conditional background color rules (first match wins)
+        ColorRules ic.table.ColorRule = ic.table.ColorRule.empty
     end
 
     methods
@@ -34,6 +37,9 @@ classdef DateColumn < ic.table.Column
             cfg = struct();
             if this.Format ~= "short"
                 cfg.format = this.Format;
+            end
+            if ~isempty(this.ColorRules)
+                cfg.colorRules = this.ColorRules.toStruct();
             end
         end
     end

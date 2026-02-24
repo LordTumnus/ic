@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ProgressBarConfig, ColorRuleConfig } from '$lib/utils/table-utils';
   import { evaluateColorRules } from '$lib/utils/table-utils';
+  import { toComparable } from './utils';
 
   let {
     value,
@@ -47,7 +48,7 @@
   // Color rules override variant — set bar color dynamically
   const ruleColor = $derived(
     numVal != null && colorRules?.length
-      ? evaluateColorRules(numVal, colorRules)
+      ? evaluateColorRules(numVal, colorRules, toComparable)
       : null
   );
 

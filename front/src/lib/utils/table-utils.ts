@@ -41,9 +41,15 @@ export interface NumberConfig {
 /** A single conditional color rule. */
 export interface ColorRuleConfig {
   op: '>' | '>=' | '<' | '<=' | '==' | '~=' | 'between';
-  value: number | number[];
+  value: number | number[] | string | string[];
   color: string;
 }
+
+/**
+ * Convert a raw cell value (or rule value) to a comparable number.
+ * Each cell type exports its own implementation.
+ */
+export type ToComparable = (value: unknown) => number;
 
 /** Boolean column config as received from MATLAB. */
 export interface BooleanConfig {
@@ -97,11 +103,13 @@ export interface RatingConfig {
   maxStars?: number;
   allowHalf?: boolean;
   color?: string;
+  colorRules?: ColorRuleConfig[];
 }
 
 /** Date column config as received from MATLAB. */
 export interface DateConfig {
   format?: string;
+  colorRules?: ColorRuleConfig[];
 }
 
 /** Date filter value — ISO date string bounds. */
@@ -468,26 +476,54 @@ export function formatNumberWithConfig(value: number, cfg: NumberConfig): string
 }
 
 /**
- * Evaluate color rules against a value. Returns the first matching color or null.
+ * Evaluate color rules against a raw cell value.
+ * Both the cell value and each rule value are normalized through `toComp`
+ * so the same logic works for numbers, dates, booleans, etc.
  */
-export function evaluateColorRules(value: number, rules: ColorRuleConfig[]): string | null {
+export function evaluateColorRules(
+  rawValue: unknown,
+  rules: ColorRuleConfig[],
+  toComp: ToComparable,
+): string | null {
+  const value = toComp(rawValue);
+  if (isNaN(value)) return null;
+
   for (const rule of rules) {
-    const v = rule.value;
+    const rv = rule.value;
     switch (rule.op) {
-      case '>':       if (value > (v as number))  return rule.color; break;
-      case '>=':      if (value >= (v as number)) return rule.color; break;
-      case '<':       if (value < (v as number))  return rule.color; break;
-      case '<=':      if (value <= (v as number)) return rule.color; break;
-      case '==':      if (value === (v as number)) return rule.color; break;
-      case '~=':      if (value !== (v as number)) return rule.color; break;
+      case '>':       if (value > toComp(rv))  return rule.color; break;
+      case '>=':      if (value >= toComp(rv)) return rule.color; break;
+      case '<':       if (value < toComp(rv))  return rule.color; break;
+      case '<=':      if (value <= toComp(rv)) return rule.color; break;
+      case '==':      if (value === toComp(rv)) return rule.color; break;
+      case '~=':      if (value !== toComp(rv)) return rule.color; break;
       case 'between': {
-        const [lo, hi] = v as number[];
-        if (value >= lo && value <= hi) return rule.color;
+        const arr = rv as unknown[];
+        if (arr.length >= 2) {
+          const lo = toComp(arr[0]);
+          const hi = toComp(arr[1]);
+          if (value >= lo && value <= hi) return rule.color;
+        }
         break;
       }
     }
   }
   return null;
+}
+
+/**
+ * Build a sort comparator from a ToComparable function.
+ * NaN values are pushed to the end.
+ */
+export function numericSort(toComp: ToComparable): SortComparator {
+  return (a, b) => {
+    const ca = toComp(a);
+    const cb = toComp(b);
+    if (isNaN(ca) && isNaN(cb)) return 0;
+    if (isNaN(ca)) return 1;
+    if (isNaN(cb)) return -1;
+    return ca - cb;
+  };
 }
 
 /**

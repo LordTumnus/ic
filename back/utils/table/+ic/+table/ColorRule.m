@@ -1,23 +1,26 @@
 classdef ColorRule < matlab.mixin.SetGetExactNames
-    % > COLORRULE Conditional color rule for number columns.
+    % > COLORRULE Conditional color rule for table columns.
     %
     %   Defines a condition and a color to apply when the condition is met.
     %   First matching rule wins.
     %
-    %   Example:
+    %   Example (numeric):
     %       rules = [
     %           ic.table.ColorRule(">",  90, "#4ade80")   % green
     %           ic.table.ColorRule("<",  50, "#f87171")   % red
     %           ic.table.ColorRule("between", [60 80], "#facc15")
     %       ];
+    %
+    %   Example (datetime):
+    %       ic.table.ColorRule("<", datetime(2024,1,1), "#fca5a5")
 
     properties
         % > OPERATOR comparison operator
         Operator (1,1) string {mustBeMember(Operator, ...
             [">", ">=", "<", "<=", "==", "~=", "between"])} = ">"
 
-        % > VALUE threshold (scalar, or [lo hi] for "between")
-        Value double = 0
+        % > VALUE threshold (scalar or [lo hi] for "between")
+        Value = 0
 
         % > COLOR hex color string, e.g. "#4ade80"
         Color (1,1) string = ""
@@ -27,7 +30,7 @@ classdef ColorRule < matlab.mixin.SetGetExactNames
         function this = ColorRule(op, val, color)
             arguments
                 op    (1,1) string = ">"
-                val   double       = 0
+                val = 0
                 color (1,1) string = ""
             end
             this.Operator = op;

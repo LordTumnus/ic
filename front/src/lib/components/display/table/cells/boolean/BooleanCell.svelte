@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BooleanConfig } from '$lib/utils/table-utils';
   import { evaluateColorRules } from '$lib/utils/table-utils';
+  import { toComparable } from './utils';
 
   let {
     value,
@@ -17,7 +18,7 @@
   const label = $derived(checked ? 'True' : 'False');
   const bgColor = $derived(
     config.colorRules?.length
-      ? evaluateColorRules(checked ? 1 : 0, config.colorRules)
+      ? evaluateColorRules(checked, config.colorRules, toComparable)
       : null
   );
 

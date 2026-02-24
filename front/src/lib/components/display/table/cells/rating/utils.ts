@@ -1,4 +1,5 @@
-import type { FilterMatcher, SortComparator, NumberFilterValue } from '$lib/utils/table-utils';
+import type { FilterMatcher, ToComparable, NumberFilterValue } from '$lib/utils/table-utils';
+import { numericSort } from '$lib/utils/table-utils';
 
 /**
  * Rating filter matcher: numeric range check (same logic as number).
@@ -12,6 +13,8 @@ export const match: FilterMatcher = (cellValue, filterValue) => {
   return true;
 };
 
-/** Rating sort: simple numeric comparison. */
-export const sort: SortComparator = (a, b) =>
-  Number(a) - Number(b);
+/** Convert a raw rating value to a comparable number. */
+export const toComparable: ToComparable = (v) => Number(v);
+
+/** Rating sort: derived from toComparable. */
+export const sort = numericSort(toComparable);

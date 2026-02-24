@@ -17,6 +17,9 @@ classdef RatingColumn < ic.table.Column
 
         % > COLOR hex color for filled stars (default amber)
         Color (1,1) string = "#f59e0b"
+
+        % > COLORRULES conditional background color rules (first match wins)
+        ColorRules ic.table.ColorRule = ic.table.ColorRule.empty
     end
 
     methods
@@ -41,6 +44,9 @@ classdef RatingColumn < ic.table.Column
             end
             if this.Color ~= "#f59e0b"
                 cfg.color = this.Color;
+            end
+            if ~isempty(this.ColorRules)
+                cfg.colorRules = this.ColorRules.toStruct();
             end
         end
     end

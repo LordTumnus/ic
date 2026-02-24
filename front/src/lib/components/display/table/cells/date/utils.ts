@@ -1,5 +1,5 @@
-import type { FilterMatcher, SortComparator, DateFilterValue } from '$lib/utils/table-utils';
-import { dateToEpoch } from '$lib/utils/table-utils';
+import type { FilterMatcher, ToComparable, DateFilterValue } from '$lib/utils/table-utils';
+import { dateToEpoch, numericSort } from '$lib/utils/table-utils';
 
 /**
  * Date filter matcher: compares cell date against min/max ISO date bounds.
@@ -21,13 +21,8 @@ export const match: FilterMatcher = (cellValue, filterValue) => {
   return true;
 };
 
-/** Date sort: chronological comparison via epoch milliseconds. */
-export const sort: SortComparator = (a, b) => {
-  const ea = dateToEpoch(a);
-  const eb = dateToEpoch(b);
-  // Push invalid dates to the end
-  if (isNaN(ea) && isNaN(eb)) return 0;
-  if (isNaN(ea)) return 1;
-  if (isNaN(eb)) return -1;
-  return ea - eb;
-};
+/** Convert a raw date value (ISO string or epoch number) to epoch milliseconds. */
+export const toComparable: ToComparable = (v) => dateToEpoch(v);
+
+/** Date sort: derived from toComparable (NaN-to-end handled by numericSort). */
+export const sort = numericSort(toComparable);

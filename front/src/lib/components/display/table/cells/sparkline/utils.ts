@@ -1,4 +1,4 @@
-import type { FilterMatcher, SortComparator, NumberFilterValue, SparklineConfig } from '$lib/utils/table-utils';
+import type { FilterMatcher, SortComparator, ToComparable, NumberFilterValue, SparklineConfig } from '$lib/utils/table-utils';
 
 /** Extended filter value that carries the metric mode alongside the numeric range. */
 export interface SparklineFilterValue extends NumberFilterValue {
@@ -34,7 +34,7 @@ export const match: FilterMatcher = (cellValue, filterValue) => {
 };
 
 /** Extract the sortable metric value from a sparkline array. */
-function metricValue(arr: unknown[], metric: string): number {
+export function metricValue(arr: unknown[], metric: string): number {
   if (arr.length === 0) return -Infinity;
   if (metric === 'relative') {
     if (arr.length < 2) return -Infinity;
@@ -44,6 +44,17 @@ function metricValue(arr: unknown[], metric: string): number {
     return ((last - first) / Math.abs(first)) * 100;
   }
   return Number(arr[arr.length - 1]);
+}
+
+/**
+ * Create a ToComparable for sparkline data, bound to a specific metric mode.
+ * Arrays → metric value, scalars (rule values) → Number.
+ */
+export function sparklineToComparable(metric: string): ToComparable {
+  return (v) => {
+    if (Array.isArray(v)) return metricValue(v, metric);
+    return Number(v);
+  };
 }
 
 /**

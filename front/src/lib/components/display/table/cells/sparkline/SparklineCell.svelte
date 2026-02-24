@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SparklineConfig, ColorRuleConfig } from '$lib/utils/table-utils';
   import { evaluateColorRules } from '$lib/utils/table-utils';
+  import { sparklineToComparable } from './utils';
 
   let {
     value,
@@ -52,7 +53,7 @@
   // Color: rules evaluate against the metric value
   const ruleColor = $derived(
     metricVal != null && isFinite(metricVal) && colorRules?.length
-      ? evaluateColorRules(metricVal, colorRules)
+      ? evaluateColorRules(metricVal, colorRules, sparklineToComparable(metric))
       : null
   );
 

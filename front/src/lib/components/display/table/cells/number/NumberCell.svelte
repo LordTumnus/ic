@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { NumberConfig } from '$lib/utils/table-utils';
   import { formatNumberWithConfig, evaluateColorRules } from '$lib/utils/table-utils';
+  import { toComparable } from './utils';
 
   let {
     value,
@@ -28,7 +29,7 @@
 
   const bgColor = $derived(
     numVal != null && cfg.colorRules?.length
-      ? evaluateColorRules(numVal, cfg.colorRules)
+      ? evaluateColorRules(numVal, cfg.colorRules, toComparable)
       : null
   );
 

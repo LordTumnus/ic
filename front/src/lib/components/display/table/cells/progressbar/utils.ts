@@ -1,2 +1,2 @@
-// Progressbar uses the same logic as number for both filtering and sorting.
-export { match, sort } from '../number/utils';
+// Progressbar uses the same logic as number for filtering, sorting, and comparability.
+export { match, sort, toComparable } from '../number/utils';

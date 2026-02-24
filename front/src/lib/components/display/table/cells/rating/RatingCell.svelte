@@ -1,5 +1,7 @@
 <script lang="ts">
-  import type { RatingConfig } from '$lib/utils/table-utils';
+  import type { RatingConfig, ColorRuleConfig } from '$lib/utils/table-utils';
+  import { evaluateColorRules } from '$lib/utils/table-utils';
+  import { toComparable } from './utils';
 
   let {
     value,
@@ -33,7 +35,19 @@
     return 'empty';
   }
 
-  $effect(() => { style = ''; });
+  // Color rules
+  const colorRules = $derived(config.colorRules as ColorRuleConfig[] | undefined);
+  const bgColor = $derived(
+    !isNaN(numVal) && colorRules?.length
+      ? evaluateColorRules(numVal, colorRules, toComparable)
+      : null
+  );
+
+  $effect(() => {
+    style = bgColor
+      ? `background-color: ${bgColor}; color: rgba(0,0,0,0.85);`
+      : '';
+  });
 </script>
 
 {#if !isNaN(numVal)}

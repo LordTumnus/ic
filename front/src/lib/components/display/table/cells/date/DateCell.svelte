@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { DateConfig } from '$lib/utils/table-utils';
-  import { formatDate, dateToEpoch } from '$lib/utils/table-utils';
+  import type { DateConfig, ColorRuleConfig } from '$lib/utils/table-utils';
+  import { formatDate, dateToEpoch, evaluateColorRules } from '$lib/utils/table-utils';
+  import { toComparable } from './utils';
 
   let {
     value,
@@ -20,6 +21,20 @@
   // Tooltip: full ISO string for precision (e.g. when format is "short")
   const tooltip = $derived(hasValue ? new Date(epoch).toISOString() : '');
 
+  // Color rules
+  const colorRules = $derived(config.colorRules as ColorRuleConfig[] | undefined);
+  const bgColor = $derived(
+    hasValue && colorRules?.length
+      ? evaluateColorRules(value, colorRules, toComparable)
+      : null
+  );
+
+  $effect(() => {
+    style = bgColor
+      ? `background-color: ${bgColor}; color: rgba(0,0,0,0.85);`
+      : '';
+  });
+
   let el = $state<HTMLSpanElement>(null!);
   let title = $state('');
 
@@ -28,8 +43,6 @@
     title = tooltip;
   }
   function onleave() { title = ''; }
-
-  $effect(() => { style = ''; });
 </script>
 
 {#if display}
