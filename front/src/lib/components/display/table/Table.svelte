@@ -121,8 +121,10 @@
   // Client-side sort (preserves original indices)
   const sortedRows = $derived(sortRows(indexedRows, sortField, sortDirection, columns, sortComparators));
 
-  // Client-side filter (preserves original indices)
-  const filteredRows = $derived(filterRows(sortedRows, filters, columns, filterMatchers));
+  // Client-side filter + per-column match counts (single pass)
+  const filterResult = $derived(filterRows(sortedRows, filters, columns, filterMatchers));
+  const filteredRows = $derived(filterResult.rows);
+  const filterMatchCounts = $derived(filterResult.matchCounts);
 
   // Dynamic row number width based on total rows (not filtered — avoids layout shift)
   const rowNumWidth = $derived.by(() => {
@@ -517,6 +519,8 @@
       {selectable}
       activeColumns={activeColumnsList}
       {disabled}
+      totalRowCount={sortedRows.length}
+      {filterMatchCounts}
       onsort={handleSort}
       onfilterchange={handleFilterChange}
       oncolumnclick={handleColumnClick}

@@ -434,49 +434,73 @@ export function sortRows(
  * Filter indexed rows client-side by active filters.
  * Returns a NEW filtered array.
  */
+/** Test whether a single cell value passes a single filter. */
+function cellPassesFilter(
+  cellVal: unknown,
+  filterVal: unknown,
+  col: TableColumn,
+  matchers: Record<string, FilterMatcher>,
+): boolean {
+  // Universal: isEmpty / isNotEmpty
+  if (typeof filterVal === 'object' && filterVal !== null && !Array.isArray(filterVal)) {
+    if ('isEmpty' in (filterVal as Record<string, unknown>))
+      return cellVal == null || cellVal === '';
+    if ('isNotEmpty' in (filterVal as Record<string, unknown>))
+      return cellVal != null && cellVal !== '';
+  }
+  // Type-specific matcher
+  const matcher = matchers[col.type];
+  return !matcher || matcher(cellVal, filterVal);
+}
+
+/** Returns the list of filter fields that are meaningfully active. */
+function getActiveFilterFields(filters: FilterState): string[] {
+  return Object.keys(filters).filter(f => {
+    const v = filters[f];
+    return v != null && v !== '' && !(typeof v === 'object' && 'min' in (v as NumberFilterValue) && (v as NumberFilterValue).min == null && (v as NumberFilterValue).max == null);
+  });
+}
+
+export interface FilterResult {
+  rows: IndexedRow[];
+  matchCounts: Record<string, number>;
+}
+
+/**
+ * Filter rows AND count per-column matches in a single pass.
+ * `matchCounts[field]` = how many rows that individual filter matches (ignoring other filters).
+ */
 export function filterRows(
   rows: IndexedRow[],
   filters: FilterState,
   columns: TableColumn[],
   matchers: Record<string, FilterMatcher>,
-): IndexedRow[] {
-  const activeFields = Object.keys(filters).filter(f => {
-    const v = filters[f];
-    return v != null && v !== '' && !(typeof v === 'object' && 'min' in (v as NumberFilterValue) && (v as NumberFilterValue).min == null && (v as NumberFilterValue).max == null);
-  });
-  if (activeFields.length === 0) return rows;
+): FilterResult {
+  const activeFields = getActiveFilterFields(filters);
+  if (activeFields.length === 0) return { rows, matchCounts: {} };
 
-  // Build column lookup
   const colMap = new Map<string, TableColumn>();
   for (const col of columns) colMap.set(col.field, col);
 
-  return rows.filter(irow => {
+  const counts: Record<string, number> = {};
+  for (const f of activeFields) counts[f] = 0;
+
+  const filtered: IndexedRow[] = [];
+
+  for (const irow of rows) {
     const row = irow.data;
+    let passesAll = true;
     for (const field of activeFields) {
-      const filterVal = filters[field];
-      const cellVal = row[field];
       const col = colMap.get(field);
-
       if (!col) continue;
-
-      // Universal: isEmpty / isNotEmpty (shared across all types)
-      if (typeof filterVal === 'object' && filterVal !== null && !Array.isArray(filterVal)) {
-        if ('isEmpty' in (filterVal as Record<string, unknown>)) {
-          if (cellVal != null && cellVal !== '') return false;
-          continue;
-        }
-        if ('isNotEmpty' in (filterVal as Record<string, unknown>)) {
-          if (cellVal == null || cellVal === '') return false;
-          continue;
-        }
-      }
-
-      // Dispatch to type-specific matcher
-      const matcher = matchers[col.type];
-      if (matcher && !matcher(cellVal, filterVal)) return false;
+      const passes = cellPassesFilter(row[field], filters[field], col, matchers);
+      if (passes) counts[field]++;
+      if (!passes) passesAll = false;
     }
-    return true;
-  });
+    if (passesAll) filtered.push(irow);
+  }
+
+  return { rows: filtered, matchCounts: counts };
 }
 
 // ============================================================================

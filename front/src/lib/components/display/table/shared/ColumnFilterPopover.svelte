@@ -13,11 +13,15 @@
   let {
     column,
     filterValue = null,
+    totalRowCount = 0,
+    matchCount,
     onchange,
     onclose,
   }: {
     column: TableColumn;
     filterValue?: unknown;
+    totalRowCount?: number;
+    matchCount?: number;
     onchange?: (field: string, value: unknown) => void;
     onclose?: () => void;
   } = $props();
@@ -127,6 +131,12 @@
       {/if}
     {/key}
   </div>
+
+  {#if matchCount != null}
+    <div class="ic-tbl-filter__footer">
+      {matchCount} of {totalRowCount} rows
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -180,5 +190,13 @@
   .ic-tbl-filter__clear:hover { text-decoration: underline; }
   .ic-tbl-filter__body {
     padding: 6px 8px 8px;
+  }
+  .ic-tbl-filter__footer {
+    padding: 3px 8px 4px;
+    border-top: 1px solid var(--ic-border);
+    font-size: 0.65rem;
+    color: var(--ic-muted-foreground);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 </style>

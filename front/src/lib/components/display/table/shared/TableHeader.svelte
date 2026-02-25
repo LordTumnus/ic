@@ -17,6 +17,8 @@
     selectable = false,
     activeColumns = [] as string[],
     disabled = false,
+    totalRowCount = 0,
+    filterMatchCounts = {} as Record<string, number>,
     onsort,
     onfilterchange,
     oncolumnclick,
@@ -33,6 +35,8 @@
     selectable?: boolean;
     activeColumns?: string[];
     disabled?: boolean;
+    totalRowCount?: number;
+    filterMatchCounts?: Record<string, number>;
     onsort?: (field: string, direction: 'none' | 'asc' | 'desc') => void;
     onfilterchange?: (field: string, value: unknown) => void;
     oncolumnclick?: (field: string, shiftKey: boolean) => void;
@@ -267,6 +271,8 @@
         <ColumnFilterPopover
           column={col}
           filterValue={filters[col.field] ?? null}
+          {totalRowCount}
+          matchCount={filterMatchCounts[col.field]}
           onchange={handleFilterChange}
           onclose={handleFilterClose}
         />
