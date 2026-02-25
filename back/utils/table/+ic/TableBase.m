@@ -3,13 +3,9 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
     %
     %   Provides shared column configuration, sorting state, row selection,
     %   and common events/methods for Table and TreeTable.
-    %
-    %   Subclasses: ic.Table, ic.TreeTable
 
     properties (SetObservable, Description = "Reactive")
         % > COLUMNS column definitions
-        %   No AbortSet — MATLAB's isequal is broken on heterogeneous
-        %   arrays, so AbortSet would silently swallow legitimate changes.
         Columns ic.table.Column = ic.table.Column.empty
     end
 
@@ -92,7 +88,6 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
         end
 
         function set.SortField(this, val)
-            % Reset direction when field changes
             if val ~= this.SortField
                 this.setValueSilently('SortDirection', 'asc');
             end
@@ -111,7 +106,7 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             col = cols(idx);
             if isempty(col.OnCellAction), return; end
 
-            % Convert 0-based row index from Svelte to 1-based
+            % Convert 0-based row index from view to 1-based
             rowIndex = double(data.rowIndex) + 1;
             col.OnCellAction(col, rowIndex, data.data);
         end
@@ -137,23 +132,21 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             newValue = data.newValue;
             oldValue = data.oldValue;
 
-            % Update Data without publishing back to Svelte (it already has the value)
+            % copy data to avoid republishing to the view
             data = this.Data;
 
-            % Let the column definition coerce the raw JSON value
             colDef = this.Columns(strcmp({this.Columns.Field}, field));
             colData = data.(field);
             newValue = colDef.coerceEditValue(newValue, colData);
 
-            % Assign via dot-notation (avoids T{r,c} width restriction)
             if iscell(colData)
-                D.(field){rowIndex} = newValue;
+                data.(field){rowIndex} = newValue;
             else
-                D.(field)(rowIndex) = newValue;
+                data.(field)(rowIndex) = newValue;
             end
             this.setValueSilently('Data', data);
 
-            % Fire MATLAB event for user listeners
+            % fire MATLAB event for user listeners
             notify(this, 'CellEdited', ic.event.MEvent(struct( ...
                 'field', field, ...
                 'rowIndex', rowIndex, ...

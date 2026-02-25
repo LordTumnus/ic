@@ -33,7 +33,7 @@ classdef Table < ic.TableBase
         function set.Data(this, val)
             % Clear selection when data changes
             this.setValueSilently('Selection', struct('type', 'none', 'value', []));
-            % Auto-infer columns if empty
+            % auto-infer columns if empty
             if isempty(this.Columns) && ~isempty(val) && height(val) > 0
                 this.setValueSilently('Columns', ic.table.Column.fromTable(val));
             end
@@ -43,8 +43,7 @@ classdef Table < ic.TableBase
 
     methods (Description = "Reactive")
         function out = removeRow(this, rowIndex)
-            % > REMOVEROW Remove a row by 1-based index without republishing Data.
-            %   t.removeRow(3)
+            % > REMOVEROW Remove a row by 1-based index
             arguments
                 this
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
@@ -52,15 +51,15 @@ classdef Table < ic.TableBase
             assert(rowIndex <= height(this.Data), "ic:Table:RowOutOfRange", ...
                 "Row index %d exceeds table height %d.", rowIndex, height(this.Data));
 
-            % Save selection (set.Data clears it — we restore after)
+            % save selection
             savedSel = this.Selection;
 
-            % Remove row silently
-            D = this.Data;
-            D(rowIndex, :) = [];
-            this.setValueSilently('Data', D);
+            % remove row silently
+            data = this.Data;
+            data(rowIndex, :) = [];
+            this.setValueSilently('Data', data);
 
-            % Adjust selection by type
+            % adjust selection by type
             switch savedSel.type
                 case 'row'
                     vals = savedSel.value;
@@ -85,7 +84,6 @@ classdef Table < ic.TableBase
                     else
                         savedSel.value = cells;
                     end
-                % 'column' and 'none' — no adjustment needed
             end
             this.setValueSilently('Selection', savedSel);
 
@@ -93,8 +91,7 @@ classdef Table < ic.TableBase
         end
 
         function out = removeColumn(this, field)
-            % > REMOVECOLUMN Remove a column by field name without republishing Data.
-            %   t.removeColumn("Weight")
+            % > REMOVECOLUMN Remove a column by field name
             arguments
                 this
                 field (1,1) string
@@ -103,14 +100,14 @@ classdef Table < ic.TableBase
                 "ic:Table:FieldNotFound", ...
                 "Field '%s' does not exist in Data.", field);
 
-            % Save selection
+            % save selection
             savedSel = this.Selection;
 
-            % Remove from Data silently (large — avoid full republish)
-            D = removevars(this.Data, field);
-            this.setValueSilently('Data', D);
+            % remove from Data silently
+            data = removevars(this.Data, field);
+            this.setValueSilently('Data', data);
 
-            % Adjust selection by type
+            % adjust selection by type
             switch savedSel.type
                 case 'column'
                     vals = string(savedSel.value);
@@ -129,16 +126,12 @@ classdef Table < ic.TableBase
                     else
                         savedSel.value = cells;
                     end
-                % 'row' and 'none' — no adjustment needed
             end
             this.setValueSilently('Selection', savedSel);
 
-            % Publish incremental command to remove field from rows
+            % publish event to view
             out = this.publish("removeColumn", struct('field', char(field)));
 
-            % Update Columns normally (small array — publish is cheap).
-            % Must come AFTER the method publish so Svelte cleans up
-            % rows before the column header disappears.
             cols = this.Columns;
             idx = find(arrayfun(@(c) c.Field == field, cols), 1);
             if ~isempty(idx)
@@ -148,8 +141,7 @@ classdef Table < ic.TableBase
         end
 
         function out = editCell(this, rowIndex, field, value)
-            % > EDITCELL Update a single cell without republishing Data.
-            %   t.editCell(3, "Name", "Jane Doe")
+            % > EDITCELL Update a single cell
             arguments
                 this
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
@@ -162,15 +154,15 @@ classdef Table < ic.TableBase
                 "ic:Table:FieldNotFound", ...
                 "Field '%s' does not exist in Data.", field);
 
-            % Save selection
+            % save selection
             savedSel = this.Selection;
 
-            % Modify cell silently
-            D = this.Data;
-            D{rowIndex, field} = value;
-            this.setValueSilently('Data', D);
+            % modify cell silently
+            data = this.Data;
+            data{rowIndex, field} = value;
+            this.setValueSilently('Data', data);
 
-            % Restore selection (unchanged — cell edit doesn't affect structure)
+            % restore selection
             this.setValueSilently('Selection', savedSel);
 
             out = this.publish("editCell", struct( ...
