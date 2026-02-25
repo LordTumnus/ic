@@ -135,7 +135,8 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             % copy data to avoid republishing to the view
             data = this.Data;
 
-            colDef = this.Columns(strcmp({this.Columns.Field}, field));
+            colIdx = find(arrayfun(@(c) c.Field == field, this.Columns), 1);
+            colDef = this.Columns(colIdx);
             colData = data.(field);
             newValue = colDef.coerceEditValue(newValue, colData);
 

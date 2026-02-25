@@ -76,7 +76,6 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             % Kill PostSet listeners BEFORE property teardown to prevent
             % recomputeView from touching the dying Columns array.
             delete(this.ViewListeners);
-            delete@ic.TableBase();
         end
 
         function set.Data(this, val)
@@ -105,7 +104,8 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             newValue = evtData.newValue;
             oldValue = evtData.oldValue;
 
-            colDef = this.Columns(strcmp({this.Columns.Field}, char(field)));
+            colIdx = find(arrayfun(@(c) c.Field == field, this.Columns), 1);
+            colDef = this.Columns(colIdx);
             colData = this.Data.(char(field));
             newValue = colDef.coerceEditValue(newValue, colData);
 
