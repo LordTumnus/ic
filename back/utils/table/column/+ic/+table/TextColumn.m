@@ -44,4 +44,12 @@ classdef TextColumn < ic.table.Column
             end
         end
     end
+
+    methods (Access = {?ic.TableBase, ?ic.table.Column})
+        function mask = filterColumn(~, columnData, filterValue)
+            % Case-insensitive substring match
+            mask = contains(string(columnData), string(filterValue), ...
+                'IgnoreCase', true);
+        end
+    end
 end

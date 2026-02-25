@@ -50,4 +50,18 @@ classdef RatingColumn < ic.table.Column
             end
         end
     end
+
+    methods (Access = {?ic.TableBase, ?ic.table.Column})
+        function mask = filterColumn(~, columnData, filterValue)
+            % Range check (same as NumberColumn)
+            data = double(columnData);
+            mask = true(numel(data), 1);
+            if isfield(filterValue, 'min') && ~isempty(filterValue.min)
+                mask = mask & (data >= filterValue.min);
+            end
+            if isfield(filterValue, 'max') && ~isempty(filterValue.max)
+                mask = mask & (data <= filterValue.max);
+            end
+        end
+    end
 end

@@ -165,6 +165,29 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
                 val = categorical(val);
             end
         end
+
+        function mask = filterColumn(~, columnData, ~)
+            % > FILTERCOLUMN Server-side filter: return logical mask.
+            %   Vectorized operation on the full column vector. Returns a
+            %   logical array where true = row passes the filter.
+            %
+            %   Subclasses override for type-specific logic. Base returns
+            %   all-true (column type does not support filtering).
+            %
+            %   Universal isEmpty/isNotEmpty are handled by the caller
+            %   (VirtualTable.recomputeView) before dispatching here.
+            mask = true(numel(columnData), 1);
+        end
+
+        function keys = sortKey(~, columnData)
+            % > SORTKEY Server-side sort key extraction.
+            %   Returns a vector suitable for MATLAB's sort(). Base returns
+            %   data as-is (works for numeric, string, datetime).
+            %
+            %   Subclasses override when sort order differs from natural
+            %   order (e.g. EnumColumn sorts by ordinal position).
+            keys = columnData;
+        end
     end
 
     methods (Static, Sealed, Access = protected)

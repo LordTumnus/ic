@@ -48,4 +48,28 @@ classdef EnumColumn < ic.table.Column
             end
         end
     end
+
+    methods (Access = {?ic.TableBase, ?ic.table.Column})
+        function mask = filterColumn(~, columnData, filterValue)
+            % Membership check: filterValue is a string/cell array of selected items
+            selected = string(filterValue);
+            if isempty(selected)
+                mask = true(numel(columnData), 1);
+            else
+                mask = ismember(string(columnData), selected);
+            end
+        end
+
+        function keys = sortKey(this, columnData)
+            % Sort by ordinal position in Items (first = lowest)
+            items = this.Items;
+            if isempty(items)
+                keys = string(columnData);
+                return;
+            end
+            [~, keys] = ismember(string(columnData), items);
+            % Unmapped values (0 from ismember) sort to end
+            keys(keys == 0) = numel(items) + 1;
+        end
+    end
 end

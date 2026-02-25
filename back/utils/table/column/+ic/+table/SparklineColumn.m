@@ -71,4 +71,43 @@ classdef SparklineColumn < ic.table.Column
             end
         end
     end
+
+    methods (Access = {?ic.TableBase, ?ic.table.Column})
+        function mask = filterColumn(this, columnData, filterValue)
+            % Extract metric value per row, then range check
+            values = this.extractMetric(columnData);
+            mask = true(numel(values), 1);
+            if isfield(filterValue, 'min') && ~isempty(filterValue.min)
+                mask = mask & (values >= filterValue.min);
+            end
+            if isfield(filterValue, 'max') && ~isempty(filterValue.max)
+                mask = mask & (values <= filterValue.max);
+            end
+        end
+
+        function keys = sortKey(this, columnData)
+            % Sort by metric value
+            keys = this.extractMetric(columnData);
+        end
+    end
+
+    methods (Access = private)
+        function values = extractMetric(this, columnData)
+            % > EXTRACTMETRIC Extract the metric value from each sparkline cell.
+            n = numel(columnData);
+            values = nan(n, 1);
+            for i = 1:n
+                arr = columnData{i};
+                if isempty(arr), continue; end
+                if this.Metric == "relative" && numel(arr) >= 2
+                    first = arr(1);
+                    if first ~= 0
+                        values(i) = ((arr(end) - first) / abs(first)) * 100;
+                    end
+                else
+                    values(i) = arr(end);
+                end
+            end
+        end
+    end
 end

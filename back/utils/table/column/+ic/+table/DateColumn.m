@@ -45,6 +45,29 @@ classdef DateColumn < ic.table.Column
     end
 
     methods (Access = {?ic.TableBase, ?ic.table.Column})
+        function mask = filterColumn(~, columnData, filterValue)
+            % Date range check: filterValue has optional .min and .max (ISO strings)
+            mask = true(numel(columnData), 1);
+            if isfield(filterValue, 'min') && ~isempty(filterValue.min)
+                minDate = datetime(string(filterValue.min), ...
+                    'InputFormat', 'yyyy-MM-dd');
+                if ~isempty(columnData.TimeZone)
+                    minDate.TimeZone = columnData.TimeZone;
+                end
+                mask = mask & (columnData >= minDate);
+            end
+            if isfield(filterValue, 'max') && ~isempty(filterValue.max)
+                maxDate = datetime(string(filterValue.max), ...
+                    'InputFormat', 'yyyy-MM-dd');
+                if ~isempty(columnData.TimeZone)
+                    maxDate.TimeZone = columnData.TimeZone;
+                end
+                % End of day inclusive
+                maxDate = maxDate + days(1) - milliseconds(1);
+                mask = mask & (columnData <= maxDate);
+            end
+        end
+
         function val = coerceEditValue(~, rawValue, colData)
             if ischar(rawValue), rawValue = string(rawValue); end
             val = datetime(rawValue, ...
