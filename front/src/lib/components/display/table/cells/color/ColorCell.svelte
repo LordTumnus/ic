@@ -179,6 +179,7 @@
   </div>
 
   {#if pos}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       bind:this={popupEl}
       class="ic-tbl-cell-color__popup"

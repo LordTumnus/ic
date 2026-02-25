@@ -96,29 +96,31 @@
 </script>
 
 {#if !isNaN(numVal) || editing}
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <span
     class="ic-tbl-cell-rating"
     class:ic-tbl-cell-rating--editing={editing}
     title={editing ? '' : tooltip}
-    role="radiogroup"
-    onpointerleave={handleContainerLeave}
-    onkeydown={handleEditKeydown}
-    tabindex={editing ? 0 : -1}
+    role={editing ? 'radiogroup' : undefined}
+    onpointerleave={editing ? handleContainerLeave : undefined}
+    onkeydown={editing ? handleEditKeydown : undefined}
+    tabindex={editing ? 0 : undefined}
   >
     {#each {length: maxStars} as _, idx (idx)}
       {@const state = starState(idx + 1, renderVal)}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <svg
         class="ic-tbl-cell-rating__star"
         class:ic-tbl-cell-rating__star--clickable={editing}
         viewBox="0 0 24 24"
         width="14"
         height="14"
-        role="radio"
-        aria-checked={state === 'full'}
-        tabindex={-1}
-        onclick={(e: MouseEvent) => handleStarClick(e, idx + 1)}
-        onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleStarClick(e as any, idx + 1); }}
-        onpointerenter={(e: MouseEvent) => handleStarEnter(e, idx + 1)}
+        role={editing ? 'radio' : 'presentation'}
+        aria-checked={editing ? state === 'full' : undefined}
+        tabindex={editing ? -1 : undefined}
+        onclick={editing ? (e: MouseEvent) => handleStarClick(e, idx + 1) : undefined}
+        onkeydown={editing ? (e: KeyboardEvent) => { if (e.key === 'Enter') handleStarClick(e as any, idx + 1); } : undefined}
+        onpointerenter={editing ? (e: MouseEvent) => handleStarEnter(e, idx + 1) : undefined}
       >
         <!-- Empty star (always rendered as background) -->
         <path
