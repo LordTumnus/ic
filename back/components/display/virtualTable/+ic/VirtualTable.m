@@ -42,6 +42,9 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
         % Guard flag: when true, set.Data skips selection clear + recompute
         % (handleCellEdited controls recompute conditionally)
         InCellEdit logical = false
+
+        % PostSet listener handles
+        ViewListeners event.listener
     end
 
     methods
@@ -55,16 +58,25 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             % Register request handler for row fetching
             this.onRequest("getRows", @(comp, data) comp.handleGetRows(data));
 
-            % Recompute view when sort/filter state changes
-            addlistener(this, 'SortField', 'PostSet', ...
-                @(~,~) this.recomputeView());
-            addlistener(this, 'SortDirection', 'PostSet', ...
-                @(~,~) this.recomputeView());
-            addlistener(this, 'Filters', 'PostSet', ...
-                @(~,~) this.recomputeView());
+            % Recompute view when sort/filter state changes.
+            this.ViewListeners = [
+                addlistener(this, 'SortField', 'PostSet', ...
+                    @(~,~) this.recomputeView())
+                addlistener(this, 'SortDirection', 'PostSet', ...
+                    @(~,~) this.recomputeView())
+                addlistener(this, 'Filters', 'PostSet', ...
+                    @(~,~) this.recomputeView())
+            ];
 
             % Initial view computation
             this.recomputeView();
+        end
+
+        function delete(this)
+            % Kill PostSet listeners BEFORE property teardown to prevent
+            % recomputeView from touching the dying Columns array.
+            delete(this.ViewListeners);
+            delete@ic.TableBase();
         end
 
         function set.Data(this, val)
