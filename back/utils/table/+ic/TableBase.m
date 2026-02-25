@@ -117,9 +117,20 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             oldValue = data.oldValue;
 
             % Update Data without publishing back to Svelte (it already has the value)
-            D = this.Data;
-            D{rowIndex, field} = newValue;
-            this.setValueSilently('Data', D);
+            data = this.Data;
+
+            % Let the column definition coerce the raw JSON value
+            colDef = this.Columns(strcmp({this.Columns.Field}, field));
+            colData = data.(field);
+            newValue = colDef.coerceEditValue(newValue, colData);
+
+            % Assign via dot-notation (avoids T{r,c} width restriction)
+            if iscell(colData)
+                D.(field){rowIndex} = newValue;
+            else
+                D.(field)(rowIndex) = newValue;
+            end
+            this.setValueSilently('Data', data);
 
             % Fire MATLAB event for user listeners
             notify(this, 'CellEdited', ic.event.MEvent(struct( ...

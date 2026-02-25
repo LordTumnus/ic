@@ -43,4 +43,18 @@ classdef DateColumn < ic.table.Column
             end
         end
     end
+
+    methods (Access = {?ic.TableBase, ?ic.table.Column})
+        function val = coerceEditValue(~, rawValue, colData)
+            if ischar(rawValue), rawValue = string(rawValue); end
+            val = datetime(rawValue, ...
+                'InputFormat', "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", ...
+                'TimeZone', 'UTC');
+            if isempty(colData.TimeZone)
+                val.TimeZone = '';
+            else
+                val.TimeZone = colData.TimeZone;
+            end
+        end
+    end
 end

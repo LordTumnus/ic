@@ -150,6 +150,19 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
         end
     end
 
+    methods (Access={?ic.TableBase, ?ic.table.Column})
+        function val = coerceEditValue(~, rawValue, colData)
+            % > COERCEEDITVALUE Convert a raw JSON value to the column's MATLAB type.
+            %   Subclasses override for type-specific conversions (e.g. datetime).
+            %   Default: convert char → string; categorical wrapping.
+            val = rawValue;
+            if ischar(val), val = string(val); end
+            if iscategorical(colData)
+                val = categorical(val);
+            end
+        end
+    end
+
     methods (Static, Sealed, Access = protected)
         function obj = getDefaultScalarElement()
             obj = ic.table.Column();
