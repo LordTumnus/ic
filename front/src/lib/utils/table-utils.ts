@@ -19,6 +19,7 @@ export interface TableColumn {
   resizable: boolean;
   align: 'left' | 'center' | 'right' | 'auto';
   pinned: 'none' | 'left' | 'right';
+  visible?: boolean;
   editable: boolean;
   hasAction: boolean;
   config: Record<string, unknown>;

@@ -1,8 +1,10 @@
 <script lang="ts">
   let {
     onresize,
+    onresizeend,
   }: {
     onresize?: (delta: number) => void;
+    onresizeend?: () => void;
   } = $props();
 
   let dragging = $state(false);
@@ -27,6 +29,7 @@
     if (!dragging) return;
     dragging = false;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    onresizeend?.();
   }
 </script>
 

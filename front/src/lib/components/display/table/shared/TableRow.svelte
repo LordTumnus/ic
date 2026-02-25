@@ -231,6 +231,7 @@
   class:ic-tbl__row--selected={selected}
   class:ic-tbl__row--striped={striped && even}
   class:ic-tbl__row--disabled={disabled}
+  data-row-index={rowIndex}
   onclick={handleRowClick}
   role="row"
   tabindex={-1}
@@ -283,6 +284,7 @@
       ondblclick={(e: MouseEvent) => handleCellDblClick(e, col.field)}
       oncontextmenu={(e: MouseEvent) => handleContextMenu(e, col)}
       onkeydown={(e: KeyboardEvent) => handleCellKeydown(e, col.field)}
+      data-field={col.field}
       role="gridcell"
       tabindex={-1}
     >

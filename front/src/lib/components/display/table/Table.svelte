@@ -53,6 +53,7 @@
     removeRow = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
     removeColumn = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
     editCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
+    focusCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
   }: {
     data?: unknown;
     columns?: TableColumn[];
@@ -80,9 +81,13 @@
     removeRow?: (data?: unknown) => Resolution;
     removeColumn?: (data?: unknown) => Resolution;
     editCell?: (data?: unknown) => Resolution;
+    focusCell?: (data?: unknown) => Resolution;
   } = $props();
 
   let containerEl: HTMLDivElement;
+
+  // Filter out hidden columns — visible !== false (default true when omitted)
+  const visibleColumns = $derived(columns.filter(c => c.visible !== false));
 
   // Normalize MATLAB data — local state so incremental methods can mutate directly
   let rows = $state<TRow[]>([]);
@@ -134,20 +139,20 @@
     return digits * 8 + 10;
   });
 
-  // Compute column widths
+  // Compute column widths (visible columns only)
   let columnWidths = $state<number[]>([]);
   $effect(() => {
-    if (columns.length > 0 && containerEl) {
+    if (visibleColumns.length > 0 && containerEl) {
       const w = containerEl.clientWidth;
       let reserved = 0;
       if (showRowNumbers) reserved += rowNumWidth;
-      columnWidths = computeColumnWidths(columns, w - reserved);
+      columnWidths = computeColumnWidths(visibleColumns, w - reserved);
     }
   });
 
   // Pinned column offsets (row number gutter is always pinned-left when visible)
   const pinnedOffsets = $derived(
-    computePinnedOffsets(columns, columnWidths, showRowNumbers ? rowNumWidth : 0)
+    computePinnedOffsets(visibleColumns, columnWidths, showRowNumbers ? rowNumWidth : 0)
   );
 
   // Track horizontal scroll — each pinned column activates its visual treatment
@@ -163,7 +168,7 @@
   }
   // Also seed maxScroll once layout is known (before any scroll happens)
   $effect(() => {
-    if (containerEl && columns.length > 0 && columnWidths.length > 0) {
+    if (containerEl && visibleColumns.length > 0 && columnWidths.length > 0) {
       maxScroll = containerEl.scrollWidth - containerEl.clientWidth;
     }
   });
@@ -179,8 +184,8 @@
 
     // Left-pinned: sticks when scrollLeft > naturalLeft - stickyOffset
     let naturalLeft = showRowNumbers ? rowNumWidth : 0;
-    for (let i = 0; i < columns.length; i++) {
-      const col = columns[i];
+    for (let i = 0; i < visibleColumns.length; i++) {
+      const col = visibleColumns[i];
       const w = columnWidths[i] ?? 0;
       const pinInfo = pinnedOffsets.get(col.field);
 
@@ -194,8 +199,8 @@
     // Right-pinned: sticks when scroll hasn't reached the far right
     if (scrollLeft < maxScroll) {
       let naturalRight = 0;
-      for (let i = columns.length - 1; i >= 0; i--) {
-        const col = columns[i];
+      for (let i = visibleColumns.length - 1; i >= 0; i--) {
+        const col = visibleColumns[i];
         const w = columnWidths[i] ?? 0;
         const pinInfo = pinnedOffsets.get(col.field);
 
@@ -238,6 +243,11 @@
     sortChanged?.({ field, direction });
   }
 
+  function handleColumnResized(field: string, width: number) {
+    logger.debug('Table', 'Column resized', { field, width: Math.round(width) });
+    publish?.('columnResized', { field, width: Math.round(width) });
+  }
+
   function handleFilterChange(field: string, val: unknown) {
     logger.debug('Table', 'Filter change', { field, value: val });
     if (val == null) {
@@ -255,7 +265,7 @@
       selection = NONE_SEL;
       selectionChanged?.({ selection });
     }
-    rowClicked?.({ rowIndex, rowData });
+    rowClicked?.({ rowIndex: rowIndex + 1, rowData });
   }
 
   function handleCellClick(field: string, rowIndex: number, val: unknown, rowData: TRow, shiftKey: boolean) {
@@ -288,7 +298,7 @@
       selectionChanged?.({ selection });
       logger.debug('Table', 'Selection', { selection });
     }
-    cellClicked?.({ field, rowIndex, value: val, rowData });
+    cellClicked?.({ field, rowIndex: rowIndex + 1, value: val, rowData });
   }
 
   function handleCellAction(field: string, rowIndex: number, data: unknown) {
@@ -298,7 +308,7 @@
 
   function handleContextMenuAction(field: string, rowIndex: number, itemKey: string) {
     logger.debug('Table', 'Context menu action', { field, rowIndex, itemKey });
-    contextMenuAction?.({ item: itemKey, field, rowIndex });
+    contextMenuAction?.({ item: itemKey, field, rowIndex: rowIndex + 1 });
   }
 
   function handleColumnClick(field: string, shiftKey: boolean) {
@@ -489,6 +499,18 @@
       rows = rows.map((row, i) => i === rowIndex ? { ...row, [field]: newValue } : row);
       return { success: true, data: null };
     };
+    focusCell = (payload?: unknown): Resolution => {
+      const { rowIndex, field } = payload as { rowIndex: number; field: string };
+      if (rowIndex < 0 || rowIndex >= rows.length) {
+        return { success: false, data: `Row ${rowIndex} out of range` };
+      }
+      const rowEl = containerEl?.querySelector(`.ic-tbl__row[data-row-index="${rowIndex}"]`) as HTMLElement | null;
+      if (!rowEl) return { success: false, data: `Row ${rowIndex} not visible` };
+      rowEl.scrollIntoView({ block: 'nearest' });
+      const cell = rowEl.querySelector(`[data-field="${field}"]`) as HTMLElement | null;
+      cell?.focus();
+      return { success: true, data: null };
+    };
   });
 </script>
 
@@ -507,7 +529,7 @@
 >
   <div class="ic-tbl__inner" style:min-width="{totalWidth ? totalWidth + 'px' : '100%'}">
     <TableHeader
-      {columns}
+      columns={visibleColumns}
       bind:columnWidths
       {sortField}
       {sortDirection}
@@ -524,12 +546,13 @@
       onsort={handleSort}
       onfilterchange={handleFilterChange}
       oncolumnclick={handleColumnClick}
+      oncolumnresized={handleColumnResized}
     />
 
     <div class="ic-tbl__body">
       {#each filteredRows as irow, i (irow.originalIndex)}
         <TableRowComp
-          {columns}
+          columns={visibleColumns}
           {columnWidths}
           rowData={irow.data}
           rowIndex={irow.originalIndex}

@@ -22,6 +22,7 @@
     onsort,
     onfilterchange,
     oncolumnclick,
+    oncolumnresized,
   }: {
     columns: TableColumn[];
     columnWidths?: number[];
@@ -40,6 +41,7 @@
     onsort?: (field: string, direction: 'none' | 'asc' | 'desc') => void;
     onfilterchange?: (field: string, value: unknown) => void;
     oncolumnclick?: (field: string, shiftKey: boolean) => void;
+    oncolumnresized?: (field: string, width: number) => void;
   } = $props();
 
   let openFilterField = $state<string | null>(null);
@@ -209,6 +211,7 @@
       style:left={pinInfo?.side === 'left' ? pinInfo.offset + 'px' : undefined}
       style:right={pinInfo?.side === 'right' ? pinInfo.offset + 'px' : undefined}
       style:z-index={pinInfo ? 5 : undefined}
+      data-field={col.field}
       role="columnheader"
       tabindex={-1}
       onclick={(e: MouseEvent) => handleHeaderClick(e, col)}
@@ -264,7 +267,10 @@
       {/if}
 
       {#if col.resizable !== false}
-        <ResizeHandle onresize={(delta) => handleResize(i, delta)} />
+        <ResizeHandle
+          onresize={(delta) => handleResize(i, delta)}
+          onresizeend={() => oncolumnresized?.(col.field, columnWidths[i])}
+        />
       {/if}
 
       {#if openFilterField === col.field}
