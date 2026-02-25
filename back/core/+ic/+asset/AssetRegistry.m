@@ -14,12 +14,15 @@ classdef AssetRegistry < handle
       ViewMap % containers.Map()
       % > CURRENTSENT handle ref to the active View's sent-hash map
       CurrentSent % containers.Map()
+      % > URLCACHE URL → struct(raw, ext, hash): avoids repeated HTTP downloads
+      UrlCache % containers.Map()
    end
 
    methods (Access = private)
       function this = AssetRegistry()
          this.ViewMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
          this.CurrentSent = containers.Map();
+         this.UrlCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
       end
 
       function cleanup(this, key)
@@ -51,6 +54,11 @@ classdef AssetRegistry < handle
    end
 
    methods (Static, Access = {?ic.asset.Asset})
+      function m = getUrlCache()
+         % > GETURLCACHE Return the shared URL download cache (handle ref).
+         m = ic.asset.AssetRegistry.getInstance().UrlCache;
+      end
+
       function tf = hasSent(hash)
          % > HASSENT Check if this hash was already sent to the active View.
          tf = ic.asset.AssetRegistry.getInstance().CurrentSent.isKey(hash);

@@ -51,10 +51,10 @@ classdef Asset
          % file or url → read raw bytes, compute hash, encode only if needed
          if this.Type == "file"
             [raw, ext] = ic.asset.Asset.readFile(this.Value);
+            hash = ic.asset.Asset.computeHash(raw);
          else
-            [raw, ext] = ic.asset.Asset.downloadUrl(this.Value);
+            [raw, ext, hash] = ic.asset.Asset.cachedUrlDownload(this.Value);
          end
-         hash = ic.asset.Asset.computeHash(raw);
          if ic.asset.AssetRegistry.hasSent(hash)
             s = struct('hash', hash);
          else
@@ -68,6 +68,21 @@ classdef Asset
    end
 
    methods (Static, Access = private)
+      function [raw, ext, hash] = cachedUrlDownload(url)
+         % > CACHEDURLDOWNLOAD Download a URL, caching the result.
+         %   Subsequent calls for the same URL skip the HTTP request.
+         cache = ic.asset.AssetRegistry.getUrlCache();
+         key = char(url);
+         if cache.isKey(key)
+            c = cache(key);
+            raw = c.raw; ext = c.ext; hash = c.hash;
+            return;
+         end
+         [raw, ext] = ic.asset.Asset.downloadUrl(url);
+         hash = ic.asset.Asset.computeHash(raw);
+         cache(key) = struct('raw', raw, 'ext', ext, 'hash', hash); %#ok<NASGU> handle
+      end
+
       function [raw, ext] = readFile(path)
          % > READFILE Read a local file into raw bytes.
          absPath = string(path);
