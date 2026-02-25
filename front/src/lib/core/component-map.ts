@@ -35,6 +35,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.FilterTree': modules['../components/display/filterTree/FilterTree.svelte'],
   'ic.VirtualFilterTree': modules['../components/display/virtualFilterTree/VirtualFilterTree.svelte'],
   'ic.Table': modules['../components/display/table/Table.svelte'],
+  'ic.VirtualTable': modules['../components/display/virtualTable/VirtualTable.svelte'],
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],

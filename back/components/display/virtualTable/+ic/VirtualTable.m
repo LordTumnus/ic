@@ -38,6 +38,10 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
     properties (Access = private)
         % Sorted + filtered 1-based row indices into Data
         ViewIndices double = []
+
+        % Guard flag: when true, set.Data skips selection clear + recompute
+        % (handleCellEdited controls recompute conditionally)
+        InCellEdit logical = false
     end
 
     methods
@@ -64,22 +68,26 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
         end
 
         function set.Data(this, val)
-            % Clear selection when data changes
-            this.setValueSilently('Selection', struct('type', 'none', 'value', []));
-            % Auto-infer columns if empty
-            if isempty(this.Columns) && ~isempty(val) && height(val) > 0
-                this.setValueSilently('Columns', ic.table.Column.fromTable(val));
+            if ~this.InCellEdit %#ok<MCSUP>
+                % Clear selection when data changes
+                this.Selection = struct('type', 'none', 'value', []);
+                % Auto-infer columns if empty
+                if isempty(this.Columns) && ~isempty(val) && height(val) > 0
+                    this.setValueSilently('Columns', ic.table.Column.fromTable(val));
+                end
             end
             this.Data = val;
-            this.recomputeView();
+            if ~this.InCellEdit %#ok<MCSUP>
+                this.recomputeView();
+            end
         end
     end
 
     methods (Access = protected)
         function handleCellEdited(this, evtData)
             % > HANDLECELLEDITED modifies the contents of the Data when a
-            % cell gets edited in the view. Since the edit might impact
-            % sorting/filtering, we need to recompute view.
+            % cell gets edited in the view. Only recomputes the view if the
+            % edit affects the current sort column or changes filter status.
             field = string(evtData.field);
             rowIndex = double(evtData.rowIndex) + 1;
             newValue = evtData.newValue;
@@ -89,13 +97,49 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             colData = this.Data.(char(field));
             newValue = colDef.coerceEditValue(newValue, colData);
 
-            % modify cell in internal data
+            % Read old value from Data (proper MATLAB type) before overwrite
+            if iscell(colData)
+                oldMatlabVal = colData{rowIndex};
+            else
+                oldMatlabVal = colData(rowIndex);
+            end
+
+            % Modify cell — guard prevents set.Data from recomputing
+            this.InCellEdit = true;
             if iscell(colData)
                 this.Data.(char(field)){rowIndex} = newValue;
             else
                 this.Data.(char(field))(rowIndex) = newValue;
             end
-            this.recomputeView();
+            this.InCellEdit = false;
+
+            % Only recompute if the edit impacts sorting or filtering
+            needsRecompute = false;
+
+            % Sort: if this column is being sorted, row position may change
+            if this.SortField == field && this.SortDirection ~= "none"
+                needsRecompute = true;
+            end
+
+            % Filter: if this column is being filtered, check pass/fail
+            if ~needsRecompute
+                fk = char(field);
+                fStruct = this.Filters;
+                if isfield(fStruct, fk)
+                    fv = fStruct.(fk);
+                    if ~isempty(fv)
+                        oldPass = this.testFilter(colDef, oldMatlabVal, fv);
+                        newPass = this.testFilter(colDef, newValue, fv);
+                        if oldPass ~= newPass
+                            needsRecompute = true;
+                        end
+                    end
+                end
+            end
+
+            if needsRecompute
+                this.recomputeView();
+            end
 
             % fire MATLAB event
             notify(this, 'CellEdited', ic.event.MEvent(struct( ...
@@ -173,13 +217,36 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
     end
 
     methods (Access = private)
+        function tf = testFilter(~, colDef, value, filterValue)
+            % > TESTFILTER Check if a single scalar value passes a filter.
+            %   Used by handleCellEdited to decide if recomputeView is needed.
+            if isstruct(filterValue) && isfield(filterValue, 'isEmpty')
+                if isstring(value) || ischar(value)
+                    tf = ismissing(string(value)) || string(value) == "";
+                else
+                    tf = ismissing(value);
+                end
+                return
+            end
+            if isstruct(filterValue) && isfield(filterValue, 'isNotEmpty')
+                if isstring(value) || ischar(value)
+                    tf = ~ismissing(string(value)) && string(value) ~= "";
+                else
+                    tf = ~ismissing(value);
+                end
+                return
+            end
+            % Delegate to column's filterColumn (works on scalars)
+            tf = colDef.filterColumn(value, filterValue);
+        end
+
         function recomputeView(this)
             % > RECOMPUTEVIEW Rebuild sorted + filtered index array.
             nRows = height(this.Data);
             if nRows == 0
                 this.ViewIndices = [];
-                this.setValueSilently('RowCount', 0);
-                this.setValueSilently('ViewVersion', this.ViewVersion + 1);
+                this.RowCount = 0;
+                this.ViewVersion = this.ViewVersion + 1;
                 return;
             end
 
@@ -257,8 +324,8 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             end
 
             this.ViewIndices = indices;
-            this.setValueSilently('RowCount', numel(indices));
-            this.setValueSilently('ViewVersion', this.ViewVersion + 1);
+            this.RowCount = numel(indices);
+            this.ViewVersion = this.ViewVersion + 1;
 
             if this.Verbose
                 fprintf("[VirtualTable] recomputeView → %d of %d rows\n", ...
