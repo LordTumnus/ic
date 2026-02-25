@@ -37,10 +37,7 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
 
         % > SELECTION current selection state (struct with .type and .value)
         Selection (1,1) struct = struct('type', 'none', 'value', [])
-    end
 
-    properties (SetObservable, AbortSet, Description = "Reactive", ...
-            Access = ?ic.mixin.Reactive, Hidden)
         % > FILTERS active column filters (field → filterValue)
         Filters (1,1) struct = struct()
     end
