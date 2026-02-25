@@ -44,7 +44,7 @@ classdef DateColumn < ic.table.Column
         end
     end
 
-    methods (Access = {?ic.TableBase, ?ic.table.Column})
+    methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
             % Date range check: filterValue has optional .min and .max (ISO strings)
             mask = true(numel(columnData), 1);

@@ -61,7 +61,7 @@ classdef ProgressBarColumn < ic.table.Column
         end
     end
 
-    methods (Access = {?ic.TableBase, ?ic.table.Column})
+    methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
             % Range check (same as NumberColumn)
             data = double(columnData);

@@ -37,7 +37,7 @@ classdef BooleanColumn < ic.table.Column
         end
     end
 
-    methods (Access = {?ic.TableBase, ?ic.table.Column})
+    methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
             % Exact match: filterValue is a logical scalar
             mask = logical(columnData) == logical(filterValue);

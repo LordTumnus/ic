@@ -155,7 +155,7 @@ classdef Column < matlab.mixin.Heterogeneous
         end
     end
 
-    methods (Access={?ic.TableBase, ?ic.table.Column})
+    methods (Access={?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function val = coerceEditValue(~, rawValue, colData)
             % > COERCEEDITVALUE Convert a raw JSON value to the column's MATLAB type.
             %   Subclasses override for type-specific conversions (e.g. datetime).

@@ -72,7 +72,7 @@ classdef SparklineColumn < ic.table.Column
         end
     end
 
-    methods (Access = {?ic.TableBase, ?ic.table.Column})
+    methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(this, columnData, filterValue)
             % Extract metric value per row, then range check
             values = this.extractMetric(columnData);
