@@ -1,5 +1,4 @@
-classdef Column < matlab.mixin.SetGetExactNames & ...
-                  matlab.mixin.Heterogeneous
+classdef Column < matlab.mixin.Heterogeneous
     % > COLUMN Definition of a single table column.
     %
     %   Specifies how a column of data is displayed, including its
@@ -70,8 +69,9 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
                 opts.?ic.table.Column
             end
             this.Field = field;
-            if ~isempty(fieldnames(opts))
-                set(this, opts);
+            fns = fieldnames(opts);
+            for i = 1:numel(fns)
+                this.(fns{i}) = opts.(fns{i});
             end
             if this.Header == ""
                 this.Header = field;
@@ -131,14 +131,15 @@ classdef Column < matlab.mixin.SetGetExactNames & ...
     end
 
     methods (Access = protected)
-        function initFromOpts(this, type, opts)
+        function this = initFromOpts(this, type, opts)
             % > INITFROMOPTS Set common + type-specific properties, lock Type.
             %   Filters out Type and Config (managed internally by subclasses),
-            %   then applies all remaining name-value pairs via set().
+            %   then applies all remaining name-value pairs.
             opts = rmfield(opts, ...
                 intersect(fieldnames(opts), {'Type','Config'}));
-            if ~isempty(fieldnames(opts))
-                set(this, opts);
+            fns = fieldnames(opts);
+            for i = 1:numel(fns)
+                this.(fns{i}) = opts.(fns{i});
             end
             this.Type = type;
             if this.Header == ""

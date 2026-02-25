@@ -24,7 +24,7 @@ classdef BooleanColumn < ic.table.Column
                 opts.?ic.table.BooleanColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("boolean", opts);
+            this = this.initFromOpts("boolean", opts);
         end
     end
 

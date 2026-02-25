@@ -31,7 +31,7 @@ classdef ColorColumn < ic.table.Column
                 opts.?ic.table.ColorColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("color", opts);
+            this = this.initFromOpts("color", opts);
         end
     end
 

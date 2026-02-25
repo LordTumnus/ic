@@ -26,7 +26,7 @@ classdef TextColumn < ic.table.Column
                 opts.?ic.table.TextColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("text", opts);
+            this = this.initFromOpts("text", opts);
         end
     end
 

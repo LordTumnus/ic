@@ -28,7 +28,7 @@ classdef DateColumn < ic.table.Column
                 opts.?ic.table.DateColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("date", opts);
+            this = this.initFromOpts("date", opts);
         end
     end
 

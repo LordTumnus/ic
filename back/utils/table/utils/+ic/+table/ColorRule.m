@@ -1,4 +1,4 @@
-classdef ColorRule < matlab.mixin.SetGetExactNames
+classdef ColorRule
     % > COLORRULE Conditional color rule for table columns.
     %
     %   Defines a condition and a color to apply when the condition is met.

@@ -53,7 +53,7 @@ classdef SparklineColumn < ic.table.Column
                 opts.?ic.table.SparklineColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("sparkline", opts);
+            this = this.initFromOpts("sparkline", opts);
         end
     end
 

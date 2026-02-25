@@ -25,10 +25,10 @@ classdef EnumColumn < ic.table.Column
                 opts.?ic.table.EnumColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("enum", opts);
+            this = this.initFromOpts("enum", opts);
         end
 
-        function set.Colors(this, val)
+        function this = set.Colors(this, val)
             if ~isempty(val) && ~isempty(this.Items) && numel(val) ~= numel(this.Items) %#ok<MCSUP>
                 error('ic:table:EnumColumn:colorsMismatch', ...
                     'Colors must be empty or same length as Items (%d).', numel(this.Items)); %#ok<MCSUP>

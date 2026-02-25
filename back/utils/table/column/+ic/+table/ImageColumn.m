@@ -33,7 +33,7 @@ classdef ImageColumn < ic.table.Column
                 opts.?ic.table.ImageColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("image", opts);
+            this = this.initFromOpts("image", opts);
         end
     end
 

@@ -43,7 +43,7 @@ classdef ProgressBarColumn < ic.table.Column
                 opts.?ic.table.ProgressBarColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("progressbar", opts);
+            this = this.initFromOpts("progressbar", opts);
         end
     end
 

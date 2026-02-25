@@ -37,7 +37,7 @@ classdef NumberColumn < ic.table.Column
                 opts.?ic.table.NumberColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("number", opts);
+            this = this.initFromOpts("number", opts);
         end
     end
 

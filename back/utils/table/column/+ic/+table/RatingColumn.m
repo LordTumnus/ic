@@ -29,7 +29,7 @@ classdef RatingColumn < ic.table.Column
                 opts.?ic.table.RatingColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("rating", opts);
+            this = this.initFromOpts("rating", opts);
         end
     end
 

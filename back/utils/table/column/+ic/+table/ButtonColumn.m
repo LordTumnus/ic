@@ -25,7 +25,7 @@ classdef ButtonColumn < ic.table.Column
                 opts.?ic.table.ButtonColumn
             end
             this@ic.table.Column(field);
-            this.initFromOpts("button", opts);
+            this = this.initFromOpts("button", opts);
             % Action columns are never sortable or filterable
             this.Sortable = false;
             this.Filterable = false;

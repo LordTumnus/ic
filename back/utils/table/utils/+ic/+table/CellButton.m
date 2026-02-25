@@ -1,4 +1,4 @@
-classdef CellButton < matlab.mixin.SetGetExactNames
+classdef CellButton
     % > CELLBUTTON Definition of a single button inside a ButtonColumn cell.
     %
     %   Value class defining a button's appearance and identity.
@@ -40,8 +40,9 @@ classdef CellButton < matlab.mixin.SetGetExactNames
             this.Key = key;
             opts = rmfield(opts, ...
                 intersect(fieldnames(opts), {'Key'}));
-            if ~isempty(fieldnames(opts))
-                set(this, opts);
+            fns = fieldnames(opts);
+            for i = 1:numel(fns)
+                this.(fns{i}) = opts.(fns{i});
             end
         end
 
