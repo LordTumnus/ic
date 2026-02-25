@@ -257,7 +257,7 @@
     </div>
   {/if}
 
-  {#each columns as col, i (i)}
+  {#each columns as col, i (col.field)}
     {@const isCellActive = activeCells.some(c => c.field === col.field && c.rowIndex === rowIndex)}
     {@const isColActive = activeColumns.includes(col.field)}
     {@const align = resolveAlign(col)}

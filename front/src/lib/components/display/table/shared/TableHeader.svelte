@@ -187,7 +187,7 @@
     </div>
   {/if}
 
-  {#each columns as col, i (i)}
+  {#each columns as col, i (col.field)}
     {@const isSorted = sortField === col.field && sortDirection !== 'none'}
     {@const align = resolveAlign(col)}
     {@const hasActiveFilter = filters[col.field] != null}

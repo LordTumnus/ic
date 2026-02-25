@@ -419,98 +419,94 @@
   }
 
   // ── Methods ───────────────────────────────────────────
-
   $effect(() => {
-    focus = (): Resolution => {
-      containerEl?.focus();
-      return { success: true, data: null };
-    };
-    clearSelection = (): Resolution => {
-      selection = NONE_SEL;
-      selectionChanged?.({ selection });
-      return { success: true, data: null };
-    };
-    scrollToRow = (payload?: unknown): Resolution => {
-      const key = (payload as { key?: number })?.key;
-      if (key != null && containerEl) {
-        const top = key * rowH;
-        containerEl.scrollTop = top;
-      }
-      return { success: true, data: null };
-    };
-    removeRow = (payload?: unknown): Resolution => {
-      const { index } = payload as { index: number };
-      if (index < 0 || index >= rows.length) {
-        return { success: false, data: `Row ${index} out of range` };
-      }
-      rows = rows.filter((_, i) => i !== index);
+  focus = (): Resolution => {
+    containerEl?.focus();
+    return { success: true, data: null };
+  };
+  clearSelection = (): Resolution => {
+    selection = NONE_SEL;
+    selectionChanged?.({ selection });
+    return { success: true, data: null };
+  };
+  scrollToRow = (payload?: unknown): Resolution => {
+    const key = (payload as { key?: number })?.key;
+    if (key != null && containerEl) {
+      const top = key * rowH;
+      containerEl.scrollTop = top;
+    }
+    return { success: true, data: null };
+  };
+  removeRow = (payload?: unknown): Resolution => {
+    const { index } = payload as { index: number };
+    if (index < 0 || index >= rows.length) {
+      return { success: false, data: `Row ${index} out of range` };
+    }
+    rows = rows.filter((_, i) => i !== index);
 
-      // Adjust selection based on type (indices in selection are 1-based)
-      const oneBasedIdx = index + 1;
-      if (selection.type === 'row') {
-        const adjusted = (selection.value as number[])
-          .filter(v => v !== oneBasedIdx)
-          .map(v => v > oneBasedIdx ? v - 1 : v);
-        selection = adjusted.length > 0
-          ? { type: 'row', value: adjusted }
-          : NONE_SEL;
-      } else if (selection.type === 'cell') {
-        const adjusted = (selection.value as CellSelection[])
-          .filter(c => c.row !== oneBasedIdx)
-          .map(c => c.row > oneBasedIdx ? { ...c, row: c.row - 1 } : c);
-        selection = adjusted.length > 0
-          ? { type: 'cell', value: adjusted }
-          : NONE_SEL;
-      }
-      // column and none — unaffected by row removal
-      return { success: true, data: null };
-    };
-    removeColumn = (payload?: unknown): Resolution => {
-      const { field } = payload as { field: string };
-      rows = rows.map(row => {
-        const next = { ...row };
-        delete next[field];
-        return next;
-      });
-      // Don't modify `columns` — MATLAB publishes the updated Columns prop
-      // separately. Modifying a $bindable prop from Svelte would echo a
-      // struct back to MATLAB, which can't convert to ic.table.Column.
+    // Adjust selection based on type (indices in selection are 1-based)
+    const oneBasedIdx = index + 1;
+    if (selection.type === 'row') {
+      const adjusted = (selection.value as number[])
+        .filter(v => v !== oneBasedIdx)
+        .map(v => v > oneBasedIdx ? v - 1 : v);
+      selection = adjusted.length > 0
+        ? { type: 'row', value: adjusted }
+        : NONE_SEL;
+    } else if (selection.type === 'cell') {
+      const adjusted = (selection.value as CellSelection[])
+        .filter(c => c.row !== oneBasedIdx)
+        .map(c => c.row > oneBasedIdx ? { ...c, row: c.row - 1 } : c);
+      selection = adjusted.length > 0
+        ? { type: 'cell', value: adjusted }
+        : NONE_SEL;
+    }
+    // column and none — unaffected by row removal
+    return { success: true, data: null };
+  };
+  removeColumn = (payload?: unknown): Resolution => {
+    const { field } = payload as { field: string };
+    rows = rows.map(row => {
+      const next = { ...row };
+      delete next[field];
+      return next;
+    });
 
-      // Adjust selection based on type
-      if (selection.type === 'column') {
-        const adjusted = (selection.value as string[]).filter(f => f !== field);
-        selection = adjusted.length > 0
-          ? { type: 'column', value: adjusted }
-          : NONE_SEL;
-      } else if (selection.type === 'cell') {
-        const adjusted = (selection.value as CellSelection[]).filter(c => c.field !== field);
-        selection = adjusted.length > 0
-          ? { type: 'cell', value: adjusted }
-          : NONE_SEL;
-      }
-      // row and none — unaffected by column removal
-      return { success: true, data: null };
-    };
-    editCell = (payload?: unknown): Resolution => {
-      const { rowIndex, field, value: newValue } = payload as { rowIndex: number; field: string; value: unknown };
-      if (rowIndex < 0 || rowIndex >= rows.length) {
-        return { success: false, data: `Row ${rowIndex} out of range` };
-      }
-      rows = rows.map((row, i) => i === rowIndex ? { ...row, [field]: newValue } : row);
-      return { success: true, data: null };
-    };
-    focusCell = (payload?: unknown): Resolution => {
-      const { rowIndex, field } = payload as { rowIndex: number; field: string };
-      if (rowIndex < 0 || rowIndex >= rows.length) {
-        return { success: false, data: `Row ${rowIndex} out of range` };
-      }
-      const rowEl = containerEl?.querySelector(`.ic-tbl__row[data-row-index="${rowIndex}"]`) as HTMLElement | null;
-      if (!rowEl) return { success: false, data: `Row ${rowIndex} not visible` };
-      rowEl.scrollIntoView({ block: 'nearest' });
-      const cell = rowEl.querySelector(`[data-field="${field}"]`) as HTMLElement | null;
-      cell?.focus();
-      return { success: true, data: null };
-    };
+    // Adjust selection based on type
+    if (selection.type === 'column') {
+      const adjusted = (selection.value as string[]).filter(f => f !== field);
+      selection = adjusted.length > 0
+        ? { type: 'column', value: adjusted }
+        : NONE_SEL;
+    } else if (selection.type === 'cell') {
+      const adjusted = (selection.value as CellSelection[]).filter(c => c.field !== field);
+      selection = adjusted.length > 0
+        ? { type: 'cell', value: adjusted }
+        : NONE_SEL;
+    }
+    // row and none — unaffected by column removal
+    return { success: true, data: null };
+  };
+  editCell = (payload?: unknown): Resolution => {
+    const { rowIndex, field, value: newValue } = payload as { rowIndex: number; field: string; value: unknown };
+    if (rowIndex < 0 || rowIndex >= rows.length) {
+      return { success: false, data: `Row ${rowIndex} out of range` };
+    }
+    rows = rows.map((row, i) => i === rowIndex ? { ...row, [field]: newValue } : row);
+    return { success: true, data: null };
+  };
+  focusCell = (payload?: unknown): Resolution => {
+    const { rowIndex, field } = payload as { rowIndex: number; field: string };
+    if (rowIndex < 0 || rowIndex >= rows.length) {
+      return { success: false, data: `Row ${rowIndex} out of range` };
+    }
+    const rowEl = containerEl?.querySelector(`.ic-tbl__row[data-row-index="${rowIndex}"]`) as HTMLElement | null;
+    if (!rowEl) return { success: false, data: `Row ${rowIndex} not visible` };
+    rowEl.scrollIntoView({ block: 'nearest' });
+    const cell = rowEl.querySelector(`[data-field="${field}"]`) as HTMLElement | null;
+    cell?.focus();
+    return { success: true, data: null };
+  };
   });
 </script>
 
