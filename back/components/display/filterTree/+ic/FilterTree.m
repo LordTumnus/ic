@@ -1,4 +1,4 @@
-classdef FilterTree < ic.TreeBase
+classdef FilterTree < ic.TreeBase & ic.mixin.HasContextMenu
     % > FILTERTREE Tree with client-side tag-based filtering.
     %
     %   Displays a SearchBar above a Tree view. Typing filter tags
@@ -34,6 +34,13 @@ classdef FilterTree < ic.TreeBase
         CaseSensitive logical = false
         % > AUTOEXPAND auto-expand ancestors of matching nodes during filter
         AutoExpand logical = true
+    end
+
+    properties (SetObservable, Description = "Reactive")
+        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
+        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+        FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...

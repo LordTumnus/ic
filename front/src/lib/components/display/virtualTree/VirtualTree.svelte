@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Resolution, RequestFn } from '$lib/types';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import logger from '$lib/core/logger';
   import { toSize } from '$lib/utils/css';
   import {
@@ -26,8 +27,12 @@
     // Filter support (passed through from VirtualFilterTree)
     highlightRegex = $bindable(null as RegExp | null),
     initialExpandedKeys = undefined as Set<string> | undefined,
+    // Context menus
+    leafContextMenu = $bindable<ContextMenuEntry[]>([]),
+    folderContextMenu = $bindable<ContextMenuEntry[]>([]),
     // Events
     valueChanged,
+    contextMenuAction,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     clearSelection = $bindable((): Resolution => ({ success: true, data: null })),
@@ -48,7 +53,10 @@
     placeholder?: string;
     highlightRegex?: RegExp | null;
     initialExpandedKeys?: Set<string>;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
     valueChanged?: (data?: unknown) => void;
+    contextMenuAction?: (data?: unknown) => void;
     focus?: () => Resolution;
     clearSelection?: () => Resolution;
     expandNode?: (data: { key: string }) => Resolution;
@@ -132,6 +140,10 @@
     expandedKeys = next;
     // Prefetch children of newly visible collapsed folders
     setTimeout(viewportPrefetch, 50);
+  }
+
+  function handleContextMenuAction(nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string) {
+    contextMenuAction?.({ item: itemKey, nodeKey, nodeType });
   }
 
   function handleExpandChange(key: string, expanded: boolean) {
@@ -385,8 +397,11 @@
             isItemSelected={isSelected}
             {atMaxSelections}
             {highlightRegex}
+            {leafContextMenu}
+            {folderContextMenu}
             ontoggle={toggleItem}
             onexpandchange={handleExpandChange}
+            oncontextmenuaction={handleContextMenuAction}
           />
         </div>
       {/each}

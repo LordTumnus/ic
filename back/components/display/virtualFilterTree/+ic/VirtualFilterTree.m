@@ -1,4 +1,4 @@
-classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable
+classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasContextMenu
     % > VIRTUALFILTERTREE Virtual-scrolling tree with server-side filtering.
     %
     %   Renders a VirtualTree for normal browsing. When filter tags are
@@ -38,6 +38,13 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable
         CaseSensitive logical = false
         % > AUTOEXPAND auto-expand ancestors of matches in filtered view
         AutoExpand logical = true
+    end
+
+    properties (SetObservable, Description = "Reactive")
+        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
+        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+        FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...

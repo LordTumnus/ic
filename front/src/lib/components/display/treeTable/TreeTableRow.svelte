@@ -3,6 +3,8 @@
   import type { TableColumn } from '$lib/utils/table-utils';
   import { resolveAlign } from '$lib/utils/table-utils';
   import { resolveIcon } from '$lib/utils/icons';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
   import TableCell from '../table/shared/TableCell.svelte';
 
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
@@ -30,6 +32,9 @@
     oncommitedit,
     oncanceledit,
     oncellaction,
+    leafContextMenu = [] as ContextMenuEntry[],
+    folderContextMenu = [] as ContextMenuEntry[],
+    oncontextmenuaction,
   }: {
     row: FlatTreeRow;
     columns: TableColumn[];
@@ -51,6 +56,9 @@
     oncommitedit?: (key: string, field: string, oldValue: unknown, newValue: unknown) => void;
     oncanceledit?: () => void;
     oncellaction?: (key: string, field: string, data: unknown) => void;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
+    oncontextmenuaction?: (nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string, field?: string) => void;
   } = $props();
 
   const indent = $derived(INDENT_REM[size] ?? 1.25);
@@ -96,6 +104,37 @@
   function handleCellAction(field: string, data: unknown) {
     oncellaction?.(row.key, field, data);
   }
+
+  // --- Context menu ---
+  let ctxMenu = $state<{ entries: ContextMenuEntry[]; x: number; y: number; field?: string } | null>(null);
+
+  function handleFolderContextMenu(e: MouseEvent) {
+    if (!folderContextMenu?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { entries: folderContextMenu, x: e.clientX, y: e.clientY };
+  }
+
+  function handleCellContextMenu(e: MouseEvent, col: TableColumn) {
+    // Column-level menu takes priority
+    if (col.contextMenu?.length) {
+      e.preventDefault();
+      e.stopPropagation();
+      ctxMenu = { entries: col.contextMenu, x: e.clientX, y: e.clientY, field: col.field };
+      return;
+    }
+    // Fall back to component-level leaf menu
+    if (leafContextMenu?.length) {
+      e.preventDefault();
+      e.stopPropagation();
+      ctxMenu = { entries: leafContextMenu, x: e.clientX, y: e.clientY };
+    }
+  }
+
+  function handleCtxAction(key: string) {
+    oncontextmenuaction?.(row.key, row.isFolder ? 'folder' : 'leaf', key, ctxMenu?.field);
+    ctxMenu = null;
+  }
 </script>
 
 {#if row.isFolder}
@@ -109,6 +148,7 @@
     role="row"
     tabindex={-1}
     onclick={handleRowClick}
+    oncontextmenu={handleFolderContextMenu}
   >
     <div class="ic-tt__cell ic-tt__cell--folder">
       <!-- Guides -->
@@ -186,6 +226,7 @@
         tabindex={-1}
         onclick={() => handleCellClick(col.field)}
         ondblclick={() => handleCellDblClick(col.field)}
+        oncontextmenu={(e: MouseEvent) => handleCellContextMenu(e, col)}
       >
         {#if isExpander}
           <!-- Expander cell: guides + icon + label -->
@@ -236,6 +277,11 @@
       </div>
     {/each}
   </div>
+{/if}
+
+{#if ctxMenu}
+  <ContextMenu entries={ctxMenu.entries} x={ctxMenu.x} y={ctxMenu.y}
+      onaction={handleCtxAction} onclose={() => { ctxMenu = null; }} />
 {/if}
 
 <style>

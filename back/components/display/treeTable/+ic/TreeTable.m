@@ -1,4 +1,4 @@
-classdef TreeTable < ic.TreeBase
+classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
     % > TREETABLE Hierarchical tree with aligned table columns.
     %
     %   Displays tree-structured data with sortable/filterable columns.
@@ -58,6 +58,13 @@ classdef TreeTable < ic.TreeBase
 
         % > FILTERS active column filters (field → filterValue)
         Filters (1,1) struct = struct()
+    end
+
+    properties (SetObservable, Description = "Reactive")
+        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
+        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+        FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     properties (Access = private, Hidden, Transient)

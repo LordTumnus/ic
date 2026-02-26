@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Resolution } from '$lib/types';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import { toSize } from '$lib/utils/css';
   import {
     type TreeTableNode,
@@ -42,11 +43,15 @@
     filters = $bindable<FilterState>({}),
     // Publish function
     publish,
+    // Context menus
+    leafContextMenu = $bindable<ContextMenuEntry[]>([]),
+    folderContextMenu = $bindable<ContextMenuEntry[]>([]),
     // Events
     valueChanged,
     sortChanged,
     filterChanged,
     cellClicked,
+    contextMenuAction,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     addNode = $bindable((_data: { parentKey: string; label: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
@@ -79,6 +84,9 @@
     sortChanged?: (data?: unknown) => void;
     filterChanged?: (data?: unknown) => void;
     cellClicked?: (data?: unknown) => void;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
+    contextMenuAction?: (data?: unknown) => void;
     focus?: () => Resolution;
     addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
     removeNode?: (data: { key: string }) => Resolution;
@@ -213,6 +221,13 @@
     }
     value = next.length > 0 ? next : null;
     valueChanged?.({ value });
+  }
+
+  // --- Context Menu ---
+  function handleContextMenuAction(nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string, field?: string) {
+    const payload: Record<string, unknown> = { item: itemKey, nodeKey, nodeType };
+    if (field) payload.field = field;
+    contextMenuAction?.(payload);
   }
 
   // --- Expand / Collapse ---
@@ -452,6 +467,9 @@
           oncommitedit={handleCommitEdit}
           oncanceledit={handleCancelEdit}
           oncellaction={handleCellAction}
+          {leafContextMenu}
+          {folderContextMenu}
+          oncontextmenuaction={handleContextMenuAction}
         />
       {/each}
 

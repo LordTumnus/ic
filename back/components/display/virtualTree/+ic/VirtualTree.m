@@ -1,4 +1,4 @@
-classdef VirtualTree < ic.core.Component & ic.mixin.Requestable
+classdef VirtualTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasContextMenu
     % > VIRTUALTREE Virtual-scrolling tree for massive datasets.
     %
     %   Renders a tree view with virtual scrolling and on-demand data
@@ -28,6 +28,13 @@ classdef VirtualTree < ic.core.Component & ic.mixin.Requestable
         MaxSelectedItems double {mustBePositive} = Inf
         % > PLACEHOLDER text shown while loading
         Placeholder string = "Loading..."
+    end
+
+    properties (SetObservable, Description = "Reactive")
+        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
+        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+        FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...

@@ -1,4 +1,4 @@
-classdef Tree < ic.TreeBase
+classdef Tree < ic.TreeBase & ic.mixin.HasContextMenu
     % > TREE Vertical tree view for displaying hierarchical data.
     %
     %   Renders items as a vertical, indented tree with expand/collapse.
@@ -32,6 +32,13 @@ classdef Tree < ic.TreeBase
         ShowLine logical = true
         % > LAZYLOAD when true, child nodes are only rendered when their parent is expanded; when false, all nodes are pre-rendered in the DOM
         LazyLoad logical = true
+    end
+
+    properties (SetObservable, Description = "Reactive")
+        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
+        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+        FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     methods

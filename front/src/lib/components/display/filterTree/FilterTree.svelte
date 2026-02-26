@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Resolution } from '$lib/types';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import logger from '$lib/core/logger';
   import { toSize } from '$lib/utils/css';
   import SearchBar from '$lib/components/form/searchBar/SearchBar.svelte';
@@ -38,9 +39,13 @@
     clearable = $bindable(true),
     caseSensitive = $bindable(false),
     autoExpand = $bindable(true),
+    // Context menus
+    leafContextMenu = $bindable<ContextMenuEntry[]>([]),
+    folderContextMenu = $bindable<ContextMenuEntry[]>([]),
     // Events
     valueChanged,
     searchChanged,
+    contextMenuAction,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     clearSearch = $bindable((): Resolution => ({ success: true, data: null })),
@@ -67,8 +72,11 @@
     clearable?: boolean;
     caseSensitive?: boolean;
     autoExpand?: boolean;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
     valueChanged?: (data?: unknown) => void;
     searchChanged?: (data?: unknown) => void;
+    contextMenuAction?: (data?: unknown) => void;
     focus?: () => Resolution;
     clearSearch?: () => Resolution;
     addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
@@ -163,6 +171,11 @@
     value = next.length > 0 ? next : null;
     logger.debug('FilterTree', 'Toggle selection', { key, value });
     valueChanged?.({ value });
+  }
+
+  // --- Context Menu ---
+  function handleContextMenuAction(nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string) {
+    contextMenuAction?.({ item: itemKey, nodeKey, nodeType });
   }
 
   // --- Expand / Collapse ---
@@ -312,8 +325,11 @@
         isItemSelected={isSelected}
         {atMaxSelections}
         {highlightRegex}
+        {leafContextMenu}
+        {folderContextMenu}
         ontoggle={toggleItem}
         onexpandchange={handleExpandChange}
+        oncontextmenuaction={handleContextMenuAction}
       />
     {/each}
 

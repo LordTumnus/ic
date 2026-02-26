@@ -2,6 +2,8 @@
   import { resolveIcon } from '$lib/utils/icons';
   import type { FlatRow } from '$lib/utils/virtual-tree';
   import { highlightLabel } from '$lib/utils/filter-tree-utils';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
@@ -19,8 +21,11 @@
     isItemSelected,
     atMaxSelections = false,
     highlightRegex = null as RegExp | null,
+    leafContextMenu = [] as ContextMenuEntry[],
+    folderContextMenu = [] as ContextMenuEntry[],
     ontoggle,
     onexpandchange,
+    oncontextmenuaction,
   }: {
     row: FlatRow;
     size?: string;
@@ -32,8 +37,11 @@
     isItemSelected: (key: string) => boolean;
     atMaxSelections?: boolean;
     highlightRegex?: RegExp | null;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
     ontoggle: (key: string) => void;
     onexpandchange: (key: string, expanded: boolean) => void;
+    oncontextmenuaction?: (nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string) => void;
   } = $props();
 
   const node = $derived(row.node);
@@ -64,6 +72,22 @@
       if (atMaxSelections && !isItemSelected(node.key)) return;
       ontoggle(node.key);
     }
+  }
+
+  // --- Context menu ---
+  let ctxMenu = $state<{ entries: ContextMenuEntry[]; x: number; y: number } | null>(null);
+
+  function handleContextMenu(e: MouseEvent) {
+    const entries = isFolder ? folderContextMenu : leafContextMenu;
+    if (!entries?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { entries, x: e.clientX, y: e.clientY };
+  }
+
+  function handleCtxAction(key: string) {
+    oncontextmenuaction?.(node.key, isFolder ? 'folder' : 'leaf', key);
+    ctxMenu = null;
   }
 </script>
 
@@ -103,6 +127,7 @@
     aria-expanded={isFolder ? isExpanded : undefined}
     aria-selected={selectable && !isFolder ? isItemSelected(node.key) : undefined}
     onclick={handleRowClick}
+    oncontextmenu={handleContextMenu}
   >
     <!-- Tree line guides -->
     {#if showLine}
@@ -154,6 +179,11 @@
       <span class="ic-tn__label">{#if labelSegments}{#each labelSegments as seg, si (si)}{#if seg.highlight}<mark class="ic-tn__highlight">{seg.text}</mark>{:else}{seg.text}{/if}{/each}{:else}{node.name}{/if}</span>
     </span>
   </div>
+{/if}
+
+{#if ctxMenu}
+  <ContextMenu entries={ctxMenu.entries} x={ctxMenu.x} y={ctxMenu.y}
+      onaction={handleCtxAction} onclose={() => { ctxMenu = null; }} />
 {/if}
 
 <style>

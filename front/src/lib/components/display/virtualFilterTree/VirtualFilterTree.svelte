@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Resolution, RequestFn } from '$lib/types';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import logger from '$lib/core/logger';
   import SearchBar from '$lib/components/form/searchBar/SearchBar.svelte';
   import VirtualTree from '$lib/components/display/virtualTree/VirtualTree.svelte';
@@ -25,9 +26,13 @@
     clearable = $bindable(true),
     caseSensitive = $bindable(false),
     autoExpand = $bindable(true),
+    // Context menus
+    leafContextMenu = $bindable<ContextMenuEntry[]>([]),
+    folderContextMenu = $bindable<ContextMenuEntry[]>([]),
     // Events
     valueChanged,
     searchChanged,
+    contextMenuAction,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     clearSelection = $bindable((): Resolution => ({ success: true, data: null })),
@@ -52,8 +57,11 @@
     clearable?: boolean;
     caseSensitive?: boolean;
     autoExpand?: boolean;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
     valueChanged?: (data?: unknown) => void;
     searchChanged?: (data?: unknown) => void;
+    contextMenuAction?: (data?: unknown) => void;
     focus?: () => Resolution;
     clearSelection?: () => Resolution;
     clearSearch?: () => Resolution;
@@ -236,6 +244,9 @@
           {maxSelectedItems}
           {placeholder}
           {valueChanged}
+          {contextMenuAction}
+          {leafContextMenu}
+          {folderContextMenu}
           {highlightRegex}
           {initialExpandedKeys}
           bind:focus={vtFocus}

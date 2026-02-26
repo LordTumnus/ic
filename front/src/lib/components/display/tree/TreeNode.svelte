@@ -3,6 +3,8 @@
   import { resolveIcon } from '$lib/utils/icons';
   import { type TreeNode as TreeNodeData } from '$lib/utils/tree-utils';
   import { highlightLabel } from '$lib/utils/filter-tree-utils';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
 
   const ICON_SIZES: Record<string, number> = { sm: 10, md: 12, lg: 14 };
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
@@ -23,8 +25,11 @@
     isItemSelected,
     atMaxSelections = false,
     highlightRegex = null as RegExp | null,
+    leafContextMenu = [] as ContextMenuEntry[],
+    folderContextMenu = [] as ContextMenuEntry[],
     ontoggle,
     onexpandchange,
+    oncontextmenuaction,
   }: {
     node: TreeNodeData;
     depth?: number;
@@ -39,8 +44,11 @@
     isItemSelected: (key: string) => boolean;
     atMaxSelections?: boolean;
     highlightRegex?: RegExp | null;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
     ontoggle: (key: string) => void;
     onexpandchange: (key: string, expanded: boolean) => void;
+    oncontextmenuaction?: (nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string) => void;
   } = $props();
 
   const labelSegments = $derived(
@@ -69,6 +77,22 @@
       ontoggle(node.key);
     }
   }
+
+  // --- Context menu ---
+  let ctxMenu = $state<{ entries: ContextMenuEntry[]; x: number; y: number } | null>(null);
+
+  function handleContextMenu(e: MouseEvent) {
+    const entries = isFolder ? folderContextMenu : leafContextMenu;
+    if (!entries?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { entries, x: e.clientX, y: e.clientY };
+  }
+
+  function handleCtxAction(key: string) {
+    oncontextmenuaction?.(node.key, isFolder ? 'folder' : 'leaf', key);
+    ctxMenu = null;
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -84,6 +108,7 @@
     aria-expanded={isFolder ? isExpanded : undefined}
     aria-selected={selectable && !isFolder ? isItemSelected(node.key) : undefined}
     onclick={handleRowClick}
+    oncontextmenu={handleContextMenu}
   >
     <!-- Tree line guides (when showLine is on) -->
     {#if showLine}
@@ -130,6 +155,11 @@
     </span>
   </div>
 
+  {#if ctxMenu}
+    <ContextMenu entries={ctxMenu.entries} x={ctxMenu.x} y={ctxMenu.y}
+        onaction={handleCtxAction} onclose={() => { ctxMenu = null; }} />
+  {/if}
+
   <!-- Children (lazy: mount only when expanded; eager: always in DOM, hidden when collapsed) -->
   {#if isFolder && (!lazyLoad || isExpanded)}
     <div class="ic-tn__children" style:display={isExpanded ? null : 'none'}>
@@ -148,8 +178,11 @@
           {isItemSelected}
           {atMaxSelections}
           {highlightRegex}
+          {leafContextMenu}
+          {folderContextMenu}
           {ontoggle}
           {onexpandchange}
+          {oncontextmenuaction}
         />
       {/each}
     </div>

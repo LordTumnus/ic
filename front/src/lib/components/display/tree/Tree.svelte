@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Resolution } from '$lib/types';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import { toSize } from '$lib/utils/css';
   import TreeNode from './TreeNode.svelte';
   import {
@@ -24,8 +25,12 @@
     height = $bindable<number | string>(400),
     showLine = $bindable(true),
     lazyLoad = $bindable(true),
+    // Context menus
+    leafContextMenu = $bindable<ContextMenuEntry[]>([]),
+    folderContextMenu = $bindable<ContextMenuEntry[]>([]),
     // Events
     valueChanged,
+    contextMenuAction,
     // Methods
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     addNode = $bindable((_data: { parentKey: string; label: string; icon?: unknown }): Resolution => ({ success: true, data: null })),
@@ -46,7 +51,10 @@
     height?: number | string;
     showLine?: boolean;
     lazyLoad?: boolean;
+    leafContextMenu?: ContextMenuEntry[];
+    folderContextMenu?: ContextMenuEntry[];
     valueChanged?: (data?: unknown) => void;
+    contextMenuAction?: (data?: unknown) => void;
     focus?: () => Resolution;
     addNode?: (data: { parentKey: string; label: string; icon?: unknown }) => Resolution;
     removeNode?: (data: { key: string }) => Resolution;
@@ -99,6 +107,10 @@
   }
 
   // --- Expand / Collapse ---
+  function handleContextMenuAction(nodeKey: string, nodeType: 'leaf' | 'folder', itemKey: string) {
+    contextMenuAction?.({ item: itemKey, nodeKey, nodeType });
+  }
+
   function handleExpandChange(key: string, expanded: boolean) {
     const next = new Set(expandedKeys);
     if (expanded) {
@@ -217,8 +229,11 @@
         {expandedKeys}
         isItemSelected={isSelected}
         {atMaxSelections}
+        {leafContextMenu}
+        {folderContextMenu}
         ontoggle={toggleItem}
         onexpandchange={handleExpandChange}
+        oncontextmenuaction={handleContextMenuAction}
       />
     {/each}
 
