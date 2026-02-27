@@ -278,9 +278,47 @@ export async function createStaticChildren(
     if (!result.has(def.target)) {
       result.set(def.target, []);
     }
+    // Build filtered proxy objects for props, events, and methods.
+    // Each delegates to the underlying svelteProps but only exposes
+    // the relevant subset of names — no framework internals leak.
+    const props: Record<string, any> = {};
+    for (const name of child.propNames) {
+      Object.defineProperty(props, name, {
+        get: () => child.svelteProps[name],
+        set: (v: any) => { child.svelteProps[name] = v; },
+        enumerable: true, configurable: true
+      });
+    }
+
+    const events: Record<string, any> = {};
+    for (const name of child.eventNames) {
+      Object.defineProperty(events, name, {
+        get: () => child.svelteProps[name],
+        set: (v: any) => { child.svelteProps[name] = v; },
+        enumerable: true, configurable: true
+      });
+    }
+
+    const methods: Record<string, any> = {};
+    for (const name of child.methodNames) {
+      Object.defineProperty(methods, name, {
+        get: () => child.svelteProps[name],
+        set: (v: any) => { child.svelteProps[name] = v; },
+        enumerable: true, configurable: true
+      });
+    }
+
     result.get(def.target)!.push({
       snippet,
-      props: child.svelteProps
+      props,
+      events,
+      methods,
+      meta: {
+        propNames: child.propNames,
+        eventNames: child.eventNames,
+        methodNames: child.methodNames,
+        mixins: child.mixins
+      }
     });
 
     // Recurse for nested static children

@@ -135,11 +135,24 @@ export type EventCallback = (id: string, name: string, data: unknown) => void | 
 export type Unsubscribe = () => void;
 
 /**
- * Static child -> renderable snippet and its props
+ * Static child -> renderable snippet, props, events, methods, and metadata.
+ *
+ * `props` is a live reactive reference to the child's svelteProps (data state).
+ * `events` is a proxy into the child's event state — set a handler to intercept.
+ * `methods` is a proxy into the child's method state — call to invoke.
+ * `meta` provides name lists for building inspector UIs.
  */
 export interface StaticChild {
   snippet: Snippet;
-  props: Record<string, unknown>;  // The child's svelteProps
+  props: Record<string, unknown>;
+  events: Record<string, ((data?: unknown) => void) | undefined>;
+  methods: Record<string, ((data?: unknown) => Resolution | Promise<Resolution>) | undefined>;
+  meta: {
+    propNames: string[];
+    eventNames: string[];
+    methodNames: string[];
+    mixins: string[];
+  };
 }
 
 /**
