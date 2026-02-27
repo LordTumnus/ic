@@ -68,6 +68,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Panel components
   'ic.Panel': modules['../components/panel/panel/Panel.svelte'],
 
+  // Internal components
+  'ic.internal.DeveloperTools': modules['../components/internal/developerTools/DeveloperTools.svelte'],
+
 };
 
 export default componentMap;
