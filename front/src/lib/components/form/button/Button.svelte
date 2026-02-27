@@ -132,7 +132,7 @@
   }
 
   .ic-btn--pill {
-    border-radius: 3px;
+    border-radius: 999px;
   }
 
   .ic-btn--square {
