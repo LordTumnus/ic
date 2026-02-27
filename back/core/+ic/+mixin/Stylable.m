@@ -160,5 +160,14 @@ classdef (Abstract) Stylable < handle
             this.Styles = dictionary(string.empty(), struct.empty());
             this.publish("@clearStyles", struct());
         end
+
+        function result = getAllStyles(this)
+            % > GETALLSTYLES returns all dynamic styles as a containers.Map (serializable)
+            result = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            selectors = keys(this.Styles);
+            for ii = 1:numel(selectors)
+                result(char(selectors(ii))) = this.Styles(selectors(ii));
+            end
+        end
     end
 end
