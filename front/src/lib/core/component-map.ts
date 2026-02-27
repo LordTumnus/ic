@@ -37,6 +37,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Table': modules['../components/display/table/Table.svelte'],
   'ic.VirtualTable': modules['../components/display/virtualTable/VirtualTable.svelte'],
   'ic.TreeTable': modules['../components/display/treeTable/TreeTable.svelte'],
+  'ic.VirtualTreeTable': modules['../components/display/virtualTreeTable/VirtualTreeTable.svelte'],
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],
