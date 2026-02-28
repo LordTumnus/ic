@@ -1,10 +1,10 @@
 <!--
-  StylesPanel.svelte — Full stylesheet view for inspected component.
+  StylesPanel.svelte — Full stylesheet view for inspected component tree.
 
-  Scans document.styleSheets to collect all CSS rules matching the
+  Scans document.styleSheets to collect all CSS rules matching each
   component's DOM subtree, grouped by source (component/dynamic/global).
-  When the component has children, subtabs let the user switch between
-  parent-only and per-child CSS rules.
+  Uses the same collapsible tree layout as other panels — each component
+  node expands to show its CSS rules and nested children.
   Component-scoped rules include ALL rules (even non-matching) so the user
   can see inactive variants/states. Svelte hash selectors are cleaned.
 -->
@@ -18,17 +18,11 @@
 		componentInfo: ComponentInfo;
 	} = $props();
 
-	// --- Per-component style entries ---
-
-	interface ComponentStyleEntry {
-		id: string;
-		label: string;
-		rules: GroupedRules;
-	}
-
-	let entries = $state<ComponentStyleEntry[]>([]);
-	let activeComponentId = $state<string>('');
+	let rulesMap = $state<Record<string, GroupedRules>>({});
 	let scanning = $state(false);
+	let rootExpanded = $state(true);
+	let expandedChildren = $state<Record<string, boolean>>({});
+	let collapsedSections = $state<Record<string, boolean>>({});
 
 	// Scan on mount
 	$effect(() => {
@@ -44,61 +38,41 @@
 		return type.split('.').pop() ?? type;
 	}
 
-	/** Recursively flatten children into a flat array with direct child IDs. */
-	function flattenChildren(info: ComponentInfo): ChildComponentInfo[] {
-		const result: ChildComponentInfo[] = [];
-		for (const child of info.children ?? []) {
-			result.push(child);
-			result.push(...flattenChildren(child));
-		}
-		return result;
-	}
-
 	/** Get direct child IDs of a component info node. */
 	function directChildIds(info: ComponentInfo): string[] {
 		return (info.children ?? []).map((c) => c.componentId);
 	}
 
-	// --- Core scan logic ---
+	/** Collapse key for a rule section within a specific component. */
+	function sectionCollapseKey(componentId: string, sectionKey: string): string {
+		return `${componentId}:${sectionKey}`;
+	}
+
+	/** Total rule count for a GroupedRules. */
+	function totalRules(rules: GroupedRules | undefined): number {
+		if (!rules) return 0;
+		return rules.component.length + rules.dynamic.length + rules.global.length;
+	}
+
+	// --- Scan logic ---
 
 	function scan() {
 		scanning = true;
 		requestAnimationFrame(() => {
-			const result: ComponentStyleEntry[] = [];
-
-			// Parent: exclude direct children's subtrees
-			const parentChildIds = directChildIds(componentInfo);
-			const parentRules = collectRulesExcludingChildren(
-				componentInfo.componentId,
-				parentChildIds
-			);
-			result.push({
-				id: componentInfo.componentId,
-				label: shortType(componentInfo.componentType),
-				rules: parentRules
-			});
-
-			// All descendants (flattened)
-			const allDescendants = flattenChildren(componentInfo);
-			for (const childInfo of allDescendants) {
-				const grandchildIds = directChildIds(childInfo);
-				const childRules = collectRulesExcludingChildren(
-					childInfo.componentId,
-					grandchildIds
-				);
-				result.push({
-					id: childInfo.componentId,
-					label: `${shortType(childInfo.componentType)} (${childInfo.target})`,
-					rules: childRules
-				});
-			}
-
-			entries = result;
-			if (!activeComponentId || !result.some((e) => e.id === activeComponentId)) {
-				activeComponentId = result[0]?.id ?? '';
-			}
+			const map: Record<string, GroupedRules> = {};
+			scanComponent(componentInfo, map);
+			rulesMap = map;
 			scanning = false;
 		});
+	}
+
+	/** Recursively scan a component and all its children. */
+	function scanComponent(info: ComponentInfo, map: Record<string, GroupedRules>) {
+		const childIds = directChildIds(info);
+		map[info.componentId] = collectRulesExcludingChildren(info.componentId, childIds);
+		for (const child of info.children ?? []) {
+			scanComponent(child, map);
+		}
 	}
 
 	// --- CSS collection ---
@@ -236,82 +210,126 @@
 		{ key: 'dynamic', label: 'Dynamic Styles (.style())' },
 		{ key: 'global', label: 'Global / Type Styles' }
 	];
-
-	let collapsed = $state<Record<string, boolean>>({});
-
-	const activeEntry = $derived(entries.find((e) => e.id === activeComponentId));
-	const hasChildren = $derived(entries.length > 1);
 </script>
 
 <div class="ic-dt-css">
+	<!-- Toolbar with Refresh button -->
 	<div class="ic-dt-css__toolbar">
-		<!-- Component subtabs (only when children exist) -->
-		{#if hasChildren}
-			<div class="ic-dt-css__component-tabs">
-				{#each entries as entry (entry.id)}
-					<button
-						class="ic-dt-css__component-tab"
-						class:ic-dt-css__component-tab--active={activeComponentId === entry.id}
-						onclick={() => (activeComponentId = entry.id)}
-					>
-						{entry.label}
-					</button>
-				{/each}
-			</div>
-		{/if}
 		<button class="ic-dt-css__refresh" onclick={scan} disabled={scanning}>
 			{scanning ? 'Scanning...' : 'Refresh'}
 		</button>
 	</div>
 
-	<!-- Rules for active component -->
-	{#if activeEntry}
-		{#each ruleSections as section (section.key)}
-			{@const sectionRules = activeEntry.rules[section.key]}
-			{#if sectionRules.length > 0}
-				<div class="ic-dt-css__section">
-					<button
-						class="ic-dt-css__section-header"
-						onclick={() => (collapsed[section.key] = !collapsed[section.key])}
-					>
-						<span
-							class="ic-dt-css__chevron"
-							class:ic-dt-css__chevron--open={!collapsed[section.key]}
+	<!-- Grouped rules for a single component -->
+	{#snippet rulesContent(componentId: string)}
+		{@const rules = rulesMap[componentId]}
+		{#if rules}
+			{#each ruleSections as section (section.key)}
+				{@const sectionRules = rules[section.key]}
+				{#if sectionRules.length > 0}
+					{@const sk = sectionCollapseKey(componentId, section.key)}
+					<div class="ic-dt-css__section">
+						<button
+							class="ic-dt-css__section-header"
+							onclick={() => (collapsedSections[sk] = !collapsedSections[sk])}
 						>
-							&#9654;
-						</span>
-						{section.label}
-						<span class="ic-dt-css__count">{sectionRules.length}</span>
-					</button>
+							<span
+								class="ic-dt-css__chevron"
+								class:ic-dt-css__chevron--open={!collapsedSections[sk]}
+							>
+								&#9654;
+							</span>
+							{section.label}
+							<span class="ic-dt-css__count">{sectionRules.length}</span>
+						</button>
 
-					{#if !collapsed[section.key]}
-						<div class="ic-dt-css__rules">
-							{#each sectionRules as rule, idx (rule.selector + idx)}
-								<div
-									class="ic-dt-css__rule"
-									class:ic-dt-css__rule--muted={!rule.matches}
-								>
-									<div class="ic-dt-css__selector">
-										{rule.displaySelector} &#123;
+						{#if !collapsedSections[sk]}
+							<div class="ic-dt-css__rules">
+								{#each sectionRules as rule, idx (rule.selector + idx)}
+									<div
+										class="ic-dt-css__rule"
+										class:ic-dt-css__rule--muted={!rule.matches}
+									>
+										<div class="ic-dt-css__selector">
+											{rule.displaySelector} &#123;
+										</div>
+										<pre class="ic-dt-css__body">{formatCss(rule.cssText)}</pre>
+										<div class="ic-dt-css__brace">&#125;</div>
 									</div>
-									<pre class="ic-dt-css__body">{formatCss(rule.cssText)}</pre>
-									<div class="ic-dt-css__brace">&#125;</div>
-								</div>
-							{/each}
-						</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/if}
+			{/each}
+
+			{#if totalRules(rules) === 0}
+				<div class="ic-dt-css__empty">No matching CSS rules</div>
+			{/if}
+		{/if}
+	{/snippet}
+
+	<!-- Recursive child section -->
+	{#snippet childSection(info: ChildComponentInfo)}
+		{@const cid = info.componentId}
+		{@const count = totalRules(rulesMap[cid])}
+		<div class="ic-dt-css__child">
+			<button
+				class="ic-dt-css__child-header"
+				onclick={() => (expandedChildren[cid] = !expandedChildren[cid])}
+			>
+				<span
+					class="ic-dt-css__tree-chevron"
+					class:ic-dt-css__tree-chevron--open={expandedChildren[cid]}
+				>&#9654;</span>
+				<span class="ic-dt-css__child-type">{shortType(info.componentType)}</span>
+				<span class="ic-dt-css__child-target">({info.target})</span>
+				{#if count > 0}
+					<span class="ic-dt-css__badge">{count}</span>
+				{/if}
+			</button>
+
+			{#if expandedChildren[cid]}
+				<div class="ic-dt-css__child-body">
+					{@render rulesContent(cid)}
+					{#if info.children && info.children.length > 0}
+						{#each info.children as grandchild (grandchild.componentId)}
+							{@render childSection(grandchild)}
+						{/each}
 					{/if}
 				</div>
 			{/if}
-		{/each}
+		</div>
+	{/snippet}
 
-		{#if activeEntry.rules.component.length === 0 && activeEntry.rules.dynamic.length === 0 && activeEntry.rules.global.length === 0}
-			<div class="ic-dt-css__empty">
-				{scanning ? 'Scanning stylesheets...' : 'No matching CSS rules found'}
+	<!-- Root component tree -->
+	<div class="ic-dt-css__child ic-dt-css__child--root">
+		<button
+			class="ic-dt-css__child-header"
+			onclick={() => (rootExpanded = !rootExpanded)}
+		>
+			<span
+				class="ic-dt-css__tree-chevron"
+				class:ic-dt-css__tree-chevron--open={rootExpanded}
+			>&#9654;</span>
+			<span class="ic-dt-css__child-type">{componentInfo.componentType}</span>
+			<span class="ic-dt-css__child-target">{componentInfo.componentId}</span>
+			{#if totalRules(rulesMap[componentInfo.componentId]) > 0}
+				<span class="ic-dt-css__badge">{totalRules(rulesMap[componentInfo.componentId])}</span>
+			{/if}
+		</button>
+
+		{#if rootExpanded}
+			<div class="ic-dt-css__child-body">
+				{@render rulesContent(componentInfo.componentId)}
+				{#if componentInfo.children && componentInfo.children.length > 0}
+					{#each componentInfo.children as childInfo (childInfo.componentId)}
+						{@render childSection(childInfo)}
+					{/each}
+				{/if}
 			</div>
 		{/if}
-	{:else if !scanning}
-		<div class="ic-dt-css__empty">No matching CSS rules found</div>
-	{/if}
+	</div>
 </div>
 
 <style>
@@ -324,38 +342,13 @@
 		padding: 6px 10px;
 		border-bottom: 1px solid var(--ic-border);
 		display: flex;
-		align-items: center;
-		gap: 8px;
+		justify-content: flex-end;
 	}
 
-	/* --- Component subtabs --- */
-
-	.ic-dt-css__component-tabs {
-		display: flex;
-		gap: 0;
-		flex: 1;
-		overflow-x: auto;
-	}
-
-	.ic-dt-css__component-tab {
-		all: unset;
-		padding: 3px 10px;
-		cursor: pointer;
-		font-family: var(--ic-font-family);
-		font-size: 0.9em;
+	.ic-dt-css__empty {
 		color: var(--ic-muted-foreground);
-		border-bottom: 2px solid transparent;
-		white-space: nowrap;
-		transition: color 0.15s, border-color 0.15s;
-	}
-
-	.ic-dt-css__component-tab:hover {
-		color: var(--ic-foreground);
-	}
-
-	.ic-dt-css__component-tab--active {
-		color: var(--ic-primary);
-		border-bottom-color: var(--ic-primary);
+		font-style: italic;
+		padding: 12px 10px;
 	}
 
 	/* --- Refresh button --- */
@@ -371,7 +364,6 @@
 		border-radius: 2px;
 		background: var(--ic-secondary);
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-		margin-left: auto;
 		white-space: nowrap;
 	}
 
@@ -385,10 +377,80 @@
 		cursor: default;
 	}
 
-	/* --- Sections --- */
+	/* --- Tree structure (matches other panels) --- */
+
+	.ic-dt-css__child {
+		border-top: 1px solid var(--ic-border);
+		margin-top: 2px;
+	}
+
+	.ic-dt-css__child--root {
+		border-top: none;
+		margin-top: 0;
+	}
+
+	.ic-dt-css__child-header {
+		all: unset;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		padding: 5px 10px;
+		cursor: pointer;
+		background: var(--ic-secondary);
+		font-family: var(--ic-font-family);
+		font-size: var(--ic-font-size);
+		box-sizing: border-box;
+	}
+
+	.ic-dt-css__child-header:hover {
+		background: rgba(128, 128, 128, 0.1);
+	}
+
+	.ic-dt-css__child-type {
+		font-weight: 600;
+		color: var(--ic-foreground);
+	}
+
+	.ic-dt-css__child-target {
+		color: var(--ic-muted-foreground);
+		font-size: 0.85em;
+	}
+
+	.ic-dt-css__child-body {
+		border-left: 2px solid var(--ic-primary);
+		margin-left: 6px;
+		background: rgba(128, 128, 128, 0.03);
+	}
+
+	.ic-dt-css__tree-chevron {
+		font-size: 0.7em;
+		transition: transform 0.15s;
+		display: inline-block;
+	}
+
+	.ic-dt-css__tree-chevron--open {
+		transform: rotate(90deg);
+	}
+
+	/* --- Rule count badge on tree headers --- */
+
+	.ic-dt-css__badge {
+		margin-left: auto;
+		min-width: 20px;
+		text-align: center;
+		padding: 0 5px;
+		font-size: 0.8em;
+		font-variant-numeric: tabular-nums;
+		color: var(--ic-muted-foreground);
+		background: rgba(128, 128, 128, 0.12);
+		border-radius: 2px;
+	}
+
+	/* --- Rule sections (Component Styles, Dynamic, Global) --- */
 
 	.ic-dt-css__section {
-		border-bottom: 1px solid var(--ic-border);
+		border-bottom: 1px solid rgba(128, 128, 128, 0.08);
 	}
 
 	.ic-dt-css__section-header {
@@ -397,24 +459,24 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		padding: 5px 10px;
+		padding: 4px 10px;
 		cursor: pointer;
-		font-weight: 600;
+		font-weight: 500;
 		font-size: var(--ic-font-size);
 		font-family: var(--ic-font-family);
 		color: var(--ic-foreground);
-		background: var(--ic-secondary);
 		box-sizing: border-box;
 	}
 
 	.ic-dt-css__section-header:hover {
-		background: rgba(128, 128, 128, 0.1);
+		background: rgba(128, 128, 128, 0.06);
 	}
 
 	.ic-dt-css__chevron {
-		font-size: 0.65em;
+		font-size: 0.6em;
 		transition: transform 0.15s;
 		display: inline-block;
+		color: var(--ic-muted-foreground);
 	}
 
 	.ic-dt-css__chevron--open {
@@ -467,11 +529,5 @@
 
 	.ic-dt-css__brace {
 		color: var(--ic-muted-foreground);
-	}
-
-	.ic-dt-css__empty {
-		color: var(--ic-muted-foreground);
-		font-style: italic;
-		padding: 12px 10px;
 	}
 </style>
