@@ -19,6 +19,16 @@ classdef ComponentContainer < ic.core.Component & ...
         end
     end
 
+    methods (Access = public)
+        function queue = flush(this)
+            % > FLUSH sends queued events and cascades into children.
+            queue = flush@ic.mixin.Publishable(this);
+            for ii = 1:numel(this.Children)
+                this.Children(ii).flush();
+            end
+        end
+    end
+
     methods (Access = ?ic.core.Container)
         function definition = getComponentDefinition(this)
             % > GETCOMPONENTDEFINITION returns the component definition struct for this component container
