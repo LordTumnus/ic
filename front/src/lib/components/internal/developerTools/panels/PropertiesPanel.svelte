@@ -24,6 +24,7 @@
 	const visibleProps = $derived(componentInfo.properties.filter((p) => !p.hidden));
 	const hiddenProps = $derived(componentInfo.properties.filter((p) => p.hidden));
 	let showHidden = $state(false);
+	let rootExpanded = $state(true);
 
 	// Track which property is being edited (skip reactive overwrite during typing)
 	// Keys are "componentId:propName" for uniqueness across parent + children
@@ -272,32 +273,51 @@
 		</div>
 	{/snippet}
 
-	<!-- Visible properties -->
-	{#each visibleProps as prop (prop.name)}
-		{@render propRow(prop, null)}
-	{/each}
-
-	<!-- Hidden properties (collapsed) -->
-	{#if hiddenProps.length > 0}
-		<button class="ic-dt-props__section-toggle" onclick={() => (showHidden = !showHidden)}>
-			<span class="ic-dt-props__chevron" class:ic-dt-props__chevron--open={showHidden}>
-				&#9654;
-			</span>
-			Hidden ({hiddenProps.length})
+	<!-- Root component tree -->
+	<div class="ic-dt-props__child ic-dt-props__child--root">
+		<button
+			class="ic-dt-props__child-header"
+			onclick={() => (rootExpanded = !rootExpanded)}
+		>
+			<span
+				class="ic-dt-props__chevron"
+				class:ic-dt-props__chevron--open={rootExpanded}
+			>&#9654;</span>
+			<span class="ic-dt-props__child-type">{componentInfo.componentType}</span>
+			<span class="ic-dt-props__child-target">{componentInfo.componentId}</span>
 		</button>
-		{#if showHidden}
-			{#each hiddenProps as prop (prop.name)}
-				{@render propRow(prop, null)}
-			{/each}
-		{/if}
-	{/if}
 
-	<!-- Child components -->
-	{#if componentInfo.children && componentInfo.children.length > 0}
-		{#each componentInfo.children as childInfo (childInfo.componentId)}
-			{@render childSection(childInfo)}
-		{/each}
-	{/if}
+		{#if rootExpanded}
+			<div class="ic-dt-props__child-body">
+				<!-- Visible properties -->
+				{#each visibleProps as prop (prop.name)}
+					{@render propRow(prop, null)}
+				{/each}
+
+				<!-- Hidden properties (collapsed) -->
+				{#if hiddenProps.length > 0}
+					<button class="ic-dt-props__section-toggle" onclick={() => (showHidden = !showHidden)}>
+						<span class="ic-dt-props__chevron" class:ic-dt-props__chevron--open={showHidden}>
+							&#9654;
+						</span>
+						Hidden ({hiddenProps.length})
+					</button>
+					{#if showHidden}
+						{#each hiddenProps as prop (prop.name)}
+							{@render propRow(prop, null)}
+						{/each}
+					{/if}
+				{/if}
+
+				<!-- Child components -->
+				{#if componentInfo.children && componentInfo.children.length > 0}
+					{#each componentInfo.children as childInfo (childInfo.componentId)}
+						{@render childSection(childInfo)}
+					{/each}
+				{/if}
+			</div>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -462,6 +482,11 @@
 	.ic-dt-props__child {
 		border-top: 1px solid var(--ic-border);
 		margin-top: 2px;
+	}
+
+	.ic-dt-props__child--root {
+		border-top: none;
+		margin-top: 0;
 	}
 
 	.ic-dt-props__child-header {

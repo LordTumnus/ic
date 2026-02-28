@@ -189,18 +189,6 @@
 
 	<!-- Right: inspector -->
 	<div class="ic-dt__inspector" style="width: {100 - splitPercent}%;">
-		<!-- Header -->
-		<div class="ic-dt__header">
-			{#if componentInfo}
-				<span class="ic-dt__type">{componentInfo.componentType}</span>
-				<span class="ic-dt__id">{componentInfo.componentId}</span>
-			{:else if infoError}
-				<span class="ic-dt__error">{infoError}</span>
-			{:else}
-				<span class="ic-dt__loading">Loading...</span>
-			{/if}
-		</div>
-
 		<!-- Tab bar -->
 		<div class="ic-dt__tabs">
 			{#each tabs as tab (tab.id)}
@@ -212,6 +200,12 @@
 					{tab.label}
 				</button>
 			{/each}
+
+			{#if infoError}
+				<span class="ic-dt__error">{infoError}</span>
+			{:else if !componentInfo}
+				<span class="ic-dt__loading">Loading...</span>
+			{/if}
 		</div>
 
 		<!-- Tab content -->
@@ -324,40 +318,17 @@
 		border-left: 1px solid var(--ic-border);
 	}
 
-	/* --- Header --- */
-
-	.ic-dt__header {
-		padding: 6px 10px;
-		background: var(--ic-secondary);
-		border-bottom: 1px solid var(--ic-border);
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		min-height: 28px;
-	}
-
-	.ic-dt__type {
-		font-weight: 600;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.ic-dt__id {
-		color: var(--ic-muted-foreground);
-		font-size: 0.85em;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
 	.ic-dt__error {
 		color: var(--ic-destructive);
+		margin-left: auto;
+		font-size: 0.85em;
 	}
 
 	.ic-dt__loading {
 		color: var(--ic-muted-foreground);
 		font-style: italic;
+		margin-left: auto;
+		font-size: 0.85em;
 	}
 
 	/* --- Tab bar --- */
