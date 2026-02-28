@@ -3,9 +3,12 @@
 
   Scans document.styleSheets to collect all CSS rules matching the
   component's DOM subtree, grouped by source (component/dynamic/global).
+  Component-scoped rules include ALL rules (even non-matching) so the user
+  can see inactive variants/states. Svelte hash selectors are cleaned.
 -->
 <script lang="ts">
 	import type { ComponentInfo, CssRule, GroupedRules } from '../devtools-types';
+	import { cleanSelector } from './dom/dom-utils';
 
 	let {
 		componentInfo
@@ -25,7 +28,6 @@
 
 	function scan() {
 		scanning = true;
-		// Use requestAnimationFrame to ensure DOM is settled
 		requestAnimationFrame(() => {
 			rules = collectComponentRules(componentInfo.componentId);
 			scanning = false;
@@ -40,79 +42,93 @@
 		const groups: GroupedRules = { component: [], dynamic: [], global: [] };
 		const seen = new Set<string>();
 
-		for (const sheet of Array.from(document.styleSheets)) {
+		const allSheets: CSSStyleSheet[] = [
+			...Array.from(document.styleSheets),
+			...(document.adoptedStyleSheets ?? [])
+		];
+
+		// Phase 1: Discover which .svelte-XXXX hashes belong to this component
+		const componentHashes = new Set<string>();
+
+		for (const sheet of allSheets) {
 			try {
 				for (const rule of Array.from(sheet.cssRules)) {
 					if (!(rule instanceof CSSStyleRule)) continue;
+					const hashMatches = rule.selectorText.match(/\.svelte-[a-z0-9]+/g);
+					if (!hashMatches) continue;
 
-					const matches = elements.some((el) => {
+					const matchesElement = elements.some((el) => {
 						try {
 							return el.matches(rule.selectorText);
 						} catch {
 							return false;
 						}
 					});
-					if (!matches) continue;
+					if (matchesElement) {
+						for (const h of hashMatches) componentHashes.add(h);
+					}
+				}
+			} catch {
+				/* CORS */
+			}
+		}
 
-					// Skip our own devtools styles
+		// Phase 2: Collect rules — ALL svelte-scoped rules with discovered hashes,
+		// but only matching rules for dynamic/global groups
+		for (const sheet of allSheets) {
+			const isAdopted = document.adoptedStyleSheets?.includes(sheet) ?? false;
+			try {
+				for (const rule of Array.from(sheet.cssRules)) {
+					if (!(rule instanceof CSSStyleRule)) continue;
 					if (rule.selectorText.startsWith('.ic-dt')) continue;
 
 					const key = `${rule.selectorText}|${rule.style.cssText}`;
 					if (seen.has(key)) continue;
-					seen.add(key);
 
-					const source = classifySource(rule, sheet);
-					groups[source].push({
-						selector: rule.selectorText,
-						cssText: rule.style.cssText
+					const hashMatches = rule.selectorText.match(/\.svelte-[a-z0-9]+/g);
+					const isSvelteScoped =
+						hashMatches != null && hashMatches.some((h) => componentHashes.has(h));
+
+					const matchesElement = elements.some((el) => {
+						try {
+							return el.matches(rule.selectorText);
+						} catch {
+							return false;
+						}
 					});
+
+					if (isSvelteScoped) {
+						// Component-scoped: include ALL rules (matching or not)
+						seen.add(key);
+						groups.component.push({
+							selector: rule.selectorText,
+							displaySelector: cleanSelector(rule.selectorText),
+							cssText: rule.style.cssText,
+							matches: matchesElement
+						});
+					} else if (matchesElement) {
+						// Dynamic / Global: only include matching rules
+						seen.add(key);
+						const source = classifySource(rule, isAdopted);
+						groups[source].push({
+							selector: rule.selectorText,
+							displaySelector: cleanSelector(rule.selectorText),
+							cssText: rule.style.cssText,
+							matches: true
+						});
+					}
 				}
 			} catch {
 				/* CORS or access error — skip sheet */
 			}
 		}
 
-		// Also scan adopted stylesheets
-		if (document.adoptedStyleSheets) {
-			for (const sheet of document.adoptedStyleSheets) {
-				try {
-					for (const rule of Array.from(sheet.cssRules)) {
-						if (!(rule instanceof CSSStyleRule)) continue;
-
-						const matches = elements.some((el) => {
-							try {
-								return el.matches(rule.selectorText);
-							} catch {
-								return false;
-							}
-						});
-						if (!matches) continue;
-						if (rule.selectorText.startsWith('.ic-dt')) continue;
-
-						const key = `${rule.selectorText}|${rule.style.cssText}`;
-						if (seen.has(key)) continue;
-						seen.add(key);
-
-						const source = rule.selectorText.includes('[data-ic-type=')
-							? 'global'
-							: 'dynamic';
-						groups[source].push({
-							selector: rule.selectorText,
-							cssText: rule.style.cssText
-						});
-					}
-				} catch {
-					/* skip */
-				}
-			}
-		}
-
 		return groups;
 	}
 
-	function classifySource(rule: CSSStyleRule, _sheet: CSSStyleSheet): string {
-		if (/\.svelte-[a-z0-9]+/.test(rule.selectorText)) return 'component';
+	function classifySource(rule: CSSStyleRule, isAdopted: boolean): keyof GroupedRules {
 		if (rule.selectorText.includes('[data-ic-type=')) return 'global';
+		if (isAdopted) return 'dynamic';
 		return 'component';
 	}
 
@@ -161,8 +177,13 @@
 				{#if !collapsed[section.key]}
 					<div class="ic-dt-css__rules">
 						{#each sectionRules as rule, idx (rule.selector + idx)}
-							<div class="ic-dt-css__rule">
-								<div class="ic-dt-css__selector">{rule.selector} &#123;</div>
+							<div
+								class="ic-dt-css__rule"
+								class:ic-dt-css__rule--muted={!rule.matches}
+							>
+								<div class="ic-dt-css__selector">
+									{rule.displaySelector} &#123;
+								</div>
 								<pre class="ic-dt-css__body">{formatCss(rule.cssText)}</pre>
 								<div class="ic-dt-css__brace">&#125;</div>
 							</div>
@@ -271,6 +292,14 @@
 
 	.ic-dt-css__rule:last-child {
 		border-bottom: none;
+	}
+
+	.ic-dt-css__rule--muted {
+		opacity: 0.4;
+	}
+
+	.ic-dt-css__rule--muted .ic-dt-css__selector {
+		color: var(--ic-muted-foreground);
 	}
 
 	.ic-dt-css__selector {

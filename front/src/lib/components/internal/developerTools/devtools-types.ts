@@ -59,8 +59,13 @@ export interface ComponentInfo {
 
 /** CSS rule collected from stylesheets */
 export interface CssRule {
+	/** Raw selector (for internal matching) */
 	selector: string;
+	/** Cleaned selector for display (no .svelte-* hashes) */
+	displaySelector: string;
 	cssText: string;
+	/** Whether this rule currently matches an element in the component */
+	matches: boolean;
 }
 
 /** Rules grouped by source */
@@ -70,5 +75,25 @@ export interface GroupedRules {
 	global: CssRule[];
 }
 
+/** Serialized representation of a DOM node for the DOM tree */
+export interface DomNode {
+	/** Unique path-based identifier (e.g., "0", "0-1", "0-1-2") */
+	id: string;
+	/** Node type: 1=Element, 3=Text */
+	nodeType: number;
+	/** Tag name (lowercase) for element nodes */
+	tagName?: string;
+	/** Attributes as key-value pairs (cleaned of svelte internals) */
+	attributes?: Array<{ name: string; value: string }>;
+	/** Text content (for text nodes or short inline text) */
+	textContent?: string;
+	/** Child nodes */
+	children: DomNode[];
+	/** Whether this node has children */
+	hasChildren: boolean;
+	/** Live reference to the actual DOM node (for highlight/pick) */
+	element?: Element | Text;
+}
+
 /** Tab identifiers */
-export type TabId = 'properties' | 'events' | 'methods' | 'styles';
+export type TabId = 'properties' | 'events' | 'methods' | 'styles' | 'dom';

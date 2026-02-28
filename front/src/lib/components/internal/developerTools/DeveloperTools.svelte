@@ -3,17 +3,22 @@
 
   Renders the inspected component on the left (static child "component")
   and an inspector panel on the right with tabs for Properties, Events,
-  Methods, and Styles.
+  Methods, Styles, and DOM.
+
+  Highlight overlay and picker are driven entirely by event handlers (no $effect).
+  The single $effect is for the one-time async componentInfo fetch from MATLAB.
 -->
 <script lang="ts">
 	import type { StaticChildrenMap, RequestFn } from '$lib/types';
 	import type { ComponentInfo, TabId } from './devtools-types';
 	import logger from '$lib/core/logger';
+	import { showHighlight, hideHighlight } from './panels/dom/dom-utils';
 
 	import PropertiesPanel from './panels/PropertiesPanel.svelte';
 	import EventsPanel from './panels/EventsPanel.svelte';
 	import MethodsPanel from './panels/MethodsPanel.svelte';
 	import StylesPanel from './panels/StylesPanel.svelte';
+	import DomPanel from './panels/DomPanel.svelte';
 
 	let {
 		staticChildren = new Map() as StaticChildrenMap,
@@ -29,6 +34,8 @@
 	const child = $derived(childSlot[0]);
 
 	// --- Component metadata (fetched once from MATLAB) ---
+	// This $effect is the only one — justified because it's a one-time async
+	// fetch that can't be expressed as $derived.
 
 	let componentInfo = $state<ComponentInfo | null>(null);
 	let infoError = $state<string | null>(null);
@@ -59,7 +66,8 @@
 		{ id: 'properties', label: 'Properties' },
 		{ id: 'events', label: 'Events' },
 		{ id: 'methods', label: 'Methods' },
-		{ id: 'styles', label: 'Styles' }
+		{ id: 'styles', label: 'Styles' },
+		{ id: 'dom', label: 'DOM' }
 	];
 
 	// --- Resizable split ---
@@ -87,6 +95,55 @@
 		document.removeEventListener('mousemove', handleGutterMove);
 		document.removeEventListener('mouseup', handleGutterUp);
 	}
+
+	// --- DOM panel: picker + highlight (all imperative, no effects) ---
+
+	let previewEl: HTMLElement | undefined;
+	let pickerOverlayEl: HTMLElement | undefined;
+	let pickerActive = $state(false);
+	let pickerHoveredEl: Element | null = null; // not reactive — only used in handlers
+	let domReveal = $state<(el: Element) => void>(() => {});
+
+	/** Called by DomPanel tree hover and also by picker hover. */
+	function handleDomHover(el: Element | null) {
+		if (el && previewEl) {
+			showHighlight(el, previewEl);
+		} else {
+			hideHighlight();
+		}
+	}
+
+	// Picker: temporarily hide overlay to find the real element underneath
+	function handlePickerHover(e: MouseEvent) {
+		if (!componentInfo || !pickerOverlayEl) return;
+		pickerOverlayEl.style.pointerEvents = 'none';
+		const el = document.elementFromPoint(e.clientX, e.clientY);
+		pickerOverlayEl.style.pointerEvents = '';
+		if (!el) return;
+
+		const wrapper = document.getElementById(componentInfo.componentId);
+		if (!wrapper) return;
+		if (wrapper.contains(el) && el !== wrapper) {
+			pickerHoveredEl = el;
+			showHighlight(el, previewEl!);
+		}
+	}
+
+	function handlePickerClick(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (pickerHoveredEl) {
+			domReveal(pickerHoveredEl);
+		}
+		pickerActive = false;
+		pickerHoveredEl = null;
+		hideHighlight();
+	}
+
+	function handlePreviewLeave() {
+		pickerHoveredEl = null;
+		hideHighlight();
+	}
 </script>
 
 <div
@@ -95,11 +152,28 @@
 	bind:this={containerEl}
 >
 	<!-- Left: inspected component -->
-	<div class="ic-dt__preview" style="width: {splitPercent}%;">
+	<div
+		class="ic-dt__preview"
+		style="width: {splitPercent}%;"
+		bind:this={previewEl}
+		role="presentation"
+	>
 		{#if child}
 			{@render child.snippet()}
 		{:else}
 			<div class="ic-dt__empty">No component</div>
+		{/if}
+
+		<!-- Picker overlay: sits on top of everything when active, captures all mouse events -->
+		{#if pickerActive}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="ic-dt__picker-overlay"
+				bind:this={pickerOverlayEl}
+				onmousemove={handlePickerHover}
+				onclick={handlePickerClick}
+				onmouseleave={handlePreviewLeave}
+			></div>
 		{/if}
 	</div>
 
@@ -150,6 +224,13 @@
 					<MethodsPanel {child} {componentInfo} />
 				{:else if activeTab === 'styles'}
 					<StylesPanel {componentInfo} />
+				{:else if activeTab === 'dom'}
+					<DomPanel
+						{componentInfo}
+						bind:pickerActive
+						bind:reveal={domReveal}
+						onhover={handleDomHover}
+					/>
 				{/if}
 			{/if}
 		</div>
@@ -178,10 +259,18 @@
 	.ic-dt__preview {
 		overflow: auto;
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
 		justify-content: center;
 		padding: 12px;
 		min-width: 0;
+		position: relative;
+	}
+
+	.ic-dt__picker-overlay {
+		position: absolute;
+		inset: 0;
+		cursor: crosshair;
+		z-index: 10000;
 	}
 
 	.ic-dt__empty {
