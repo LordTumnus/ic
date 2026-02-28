@@ -55,6 +55,14 @@ export interface ComponentInfo {
 	mixins: string[];
 	/** Whether the component implements ic.mixin.Stylable */
 	isStylable: boolean;
+	/** Child components with metadata (recursive, empty if not a container) */
+	children: ChildComponentInfo[];
+}
+
+/** Child component metadata — extends ComponentInfo with target slot name. */
+export interface ChildComponentInfo extends ComponentInfo {
+	/** Target slot this child occupies in the parent (e.g., "icon", "default") */
+	target: string;
 }
 
 /** CSS rule collected from stylesheets */

@@ -31,7 +31,13 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
 
     methods (Access = private)
         function result = handleGetComponentInfo(this)
-            comp = this.InspectedComponent;
+            result = this.getInfoForComponent(this.InspectedComponent);
+        end
+
+        function info = getInfoForComponent(this, comp)
+            % > GETINFOFORCOMPONENT Introspect a component's reactive API.
+            %   Returns props, events, methods, mixins, and recursively
+            %   collects children info for containers.
             mc = meta.class.fromName(class(comp));
 
             % Reactive properties
@@ -78,18 +84,43 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             mixinMask = startsWith(allSupers, "ic.mixin.");
             mixins = lower(extractAfter(allSupers(mixinMask), "ic.mixin."));
 
-            result = struct( ...
+            % Children (recursive)
+            childInfos = {};
+            if isa(comp, 'ic.core.Container')
+                for tt = 1:numel(comp.Targets)
+                    target = comp.Targets(tt);
+                    kids = comp.getChildrenInTarget(target);
+                    for cc = 1:numel(kids)
+                        ci = this.getInfoForComponent(kids(cc));
+                        ci.target = char(target);
+                        childInfos{end+1} = ci; %#ok<AGROW>
+                    end
+                end
+            end
+
+            info = struct( ...
                 'componentType', char(class(comp)), ...
                 'componentId',   char(comp.ID), ...
                 'properties',    {propInfos}, ...
                 'events',        {eventInfos}, ...
                 'methods',       {methodInfos}, ...
                 'mixins',        {cellstr(mixins)}, ...
-                'isStylable',    isa(comp, 'ic.mixin.Stylable'));
+                'isStylable',    isa(comp, 'ic.mixin.Stylable'), ...
+                'children',      {childInfos});
         end
 
         function result = handleSetPropertyValue(this, data)
-            comp = this.InspectedComponent;
+            % Determine target: inspected component or a child
+            if isfield(data, 'componentId') && ~isempty(data.componentId)
+                comp = this.findChildById(string(data.componentId));
+                if isempty(comp)
+                    error('ic:DevTools:ChildNotFound', ...
+                        'Child component "%s" not found', data.componentId);
+                end
+            else
+                comp = this.InspectedComponent;
+            end
+
             propName = string(data.matlabName);
             value = data.value;
             currentVal = comp.(propName);
@@ -125,6 +156,28 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             this.InspectedComponent.style( ...
                 string(data.selector), string(data.property), "");
             result = true;
+        end
+
+        function child = findChildById(this, targetId)
+            % > FINDCHILDBYID Recursively search for a child by ID.
+            child = this.searchChildren(this.InspectedComponent, targetId);
+        end
+
+        function found = searchChildren(this, parent, targetId)
+            % > SEARCHCHILDREN Walk container children recursively.
+            found = [];
+            if ~isa(parent, 'ic.core.Container'), return; end
+            for tt = 1:numel(parent.Targets)
+                kids = parent.getChildrenInTarget(parent.Targets(tt));
+                for kk = 1:numel(kids)
+                    if kids(kk).ID == targetId
+                        found = kids(kk);
+                        return;
+                    end
+                    found = this.searchChildren(kids(kk), targetId);
+                    if ~isempty(found), return; end
+                end
+            end
         end
 
         function info = extractValidation(~, metaProp)

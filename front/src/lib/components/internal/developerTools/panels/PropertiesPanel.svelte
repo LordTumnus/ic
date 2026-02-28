@@ -3,10 +3,12 @@
 
   Reads live values from child.props (reactive proxy), writes back via
   request('setPropertyValue') for MATLAB-side type coercion.
+  Recursively displays child component properties in collapsible sections.
 -->
 <script lang="ts">
 	import type { StaticChild, RequestFn } from '$lib/types';
-	import type { ComponentInfo, PropInfo } from '../devtools-types';
+	import type { ComponentInfo, ChildComponentInfo, PropInfo } from '../devtools-types';
+	import Registry from '$lib/core/registry';
 
 	let {
 		child,
@@ -24,13 +26,26 @@
 	let showHidden = $state(false);
 
 	// Track which property is being edited (skip reactive overwrite during typing)
+	// Keys are "componentId:propName" for uniqueness across parent + children
 	let editingProp = $state<string | null>(null);
 
 	// Local edit buffer for text/number inputs
 	let editBuffer = $state<Record<string, string>>({});
 
-	function getDisplayValue(prop: PropInfo): string {
-		const val = child.props[prop.name];
+	// Child section expand state (keyed by componentId)
+	let expandedChildren = $state<Record<string, boolean>>({});
+
+	// --- Value access (parameterized by componentId) ---
+
+	/** Read a prop value. null componentId = parent, string = child via Registry. */
+	function getPropValue(componentId: string | null, propName: string): unknown {
+		if (componentId === null) return child.props[propName];
+		const comp = Registry.instance.get(componentId) as any;
+		return comp?.svelteProps?.[propName];
+	}
+
+	function getDisplayValue(prop: PropInfo, componentId: string | null = null): string {
+		const val = getPropValue(componentId, prop.name);
 		if (val === null || val === undefined) return '';
 		if (typeof val === 'object') return summarize(val, prop.type);
 		return String(val);
@@ -83,49 +98,67 @@
 		return prop.type === 'double' || prop.type === 'single';
 	}
 
-	function getBooleanValue(prop: PropInfo): boolean {
-		const val = child.props[prop.name];
+	function getBooleanValue(prop: PropInfo, componentId: string | null = null): boolean {
+		const val = getPropValue(componentId, prop.name);
 		if (prop.type === 'matlab.lang.OnOffSwitchState') return val === 'on';
 		return !!val;
 	}
 
-	// --- Handlers ---
+	/** Edit key: unique across parent + children */
+	function editKey(prop: PropInfo, componentId: string | null): string {
+		return componentId ? `${componentId}:${prop.name}` : prop.name;
+	}
 
-	async function setProperty(prop: PropInfo, value: unknown) {
+	/** Short type label: "ic.Button" → "Button" */
+	function shortType(type: string): string {
+		return type.split('.').pop() ?? type;
+	}
+
+	// --- Handlers (parameterized by componentId) ---
+
+	async function setProperty(
+		prop: PropInfo,
+		value: unknown,
+		componentId: string | null = null
+	) {
 		if (!request) return;
-		await request('setPropertyValue', { matlabName: prop.matlabName, value });
+		const payload: Record<string, unknown> = { matlabName: prop.matlabName, value };
+		if (componentId) payload.componentId = componentId;
+		await request('setPropertyValue', payload);
 	}
 
-	function handleToggle(prop: PropInfo) {
-		const newVal = !getBooleanValue(prop);
+	function handleToggle(prop: PropInfo, componentId: string | null = null) {
+		const newVal = !getBooleanValue(prop, componentId);
 		if (prop.type === 'matlab.lang.OnOffSwitchState') {
-			setProperty(prop, newVal ? 'on' : 'off');
+			setProperty(prop, newVal ? 'on' : 'off', componentId);
 		} else {
-			setProperty(prop, newVal);
+			setProperty(prop, newVal, componentId);
 		}
 	}
 
-	function handleSelect(prop: PropInfo, e: Event) {
+	function handleSelect(prop: PropInfo, e: Event, componentId: string | null = null) {
 		const target = e.target as HTMLSelectElement;
-		setProperty(prop, target.value);
+		setProperty(prop, target.value, componentId);
 	}
 
-	function startEdit(prop: PropInfo) {
-		editingProp = prop.name;
-		editBuffer[prop.name] = getDisplayValue(prop);
+	function startEdit(prop: PropInfo, componentId: string | null = null) {
+		const key = editKey(prop, componentId);
+		editingProp = key;
+		editBuffer[key] = getDisplayValue(prop, componentId);
 	}
 
-	function commitEdit(prop: PropInfo) {
+	function commitEdit(prop: PropInfo, componentId: string | null = null) {
+		const key = editKey(prop, componentId);
 		editingProp = null;
-		const val = editBuffer[prop.name];
-		if (val !== undefined && val !== getDisplayValue(prop)) {
-			setProperty(prop, isNumeric(prop) ? Number(val) : val);
+		const val = editBuffer[key];
+		if (val !== undefined && val !== getDisplayValue(prop, componentId)) {
+			setProperty(prop, isNumeric(prop) ? Number(val) : val, componentId);
 		}
 	}
 
-	function handleKeydown(prop: PropInfo, e: KeyboardEvent) {
+	function handleKeydown(prop: PropInfo, e: KeyboardEvent, componentId: string | null = null) {
 		if (e.key === 'Enter') {
-			commitEdit(prop);
+			commitEdit(prop, componentId);
 			(e.target as HTMLElement)?.blur();
 		} else if (e.key === 'Escape') {
 			editingProp = null;
@@ -135,7 +168,8 @@
 </script>
 
 <div class="ic-dt-props">
-	{#snippet propRow(prop: PropInfo)}
+	{#snippet propRow(prop: PropInfo, cid: string | null)}
+		{@const key = editKey(prop, cid)}
 		<div class="ic-dt-props__row">
 			<span class="ic-dt-props__name">{prop.matlabName}</span>
 			<div class="ic-dt-props__value">
@@ -144,8 +178,8 @@
 					<label class="ic-dt-props__toggle">
 						<input
 							type="checkbox"
-							checked={getBooleanValue(prop)}
-							onchange={() => handleToggle(prop)}
+							checked={getBooleanValue(prop, cid)}
+							onchange={() => handleToggle(prop, cid)}
 						/>
 						<span class="ic-dt-props__toggle-track">
 							<span class="ic-dt-props__toggle-thumb"></span>
@@ -155,8 +189,8 @@
 					<!-- Dropdown select -->
 					<select
 						class="ic-dt-props__select"
-						value={String(child.props[prop.name] ?? '')}
-						onchange={(e) => handleSelect(prop, e)}
+						value={String(getPropValue(cid, prop.name) ?? '')}
+						onchange={(e) => handleSelect(prop, e, cid)}
 					>
 						{#each prop.validation.mustBeMember! as option (option)}
 							<option value={option}>{option}</option>
@@ -167,20 +201,20 @@
 					<input
 						class="ic-dt-props__input"
 						type={isNumeric(prop) ? 'number' : 'text'}
-						value={editingProp === prop.name
-							? editBuffer[prop.name]
-							: getDisplayValue(prop)}
-						onfocus={() => startEdit(prop)}
+						value={editingProp === key
+							? editBuffer[key]
+							: getDisplayValue(prop, cid)}
+						onfocus={() => startEdit(prop, cid)}
 						oninput={(e) => {
-							editBuffer[prop.name] = (e.target as HTMLInputElement).value;
+							editBuffer[key] = (e.target as HTMLInputElement).value;
 						}}
-						onblur={() => commitEdit(prop)}
-						onkeydown={(e) => handleKeydown(prop, e)}
+						onblur={() => commitEdit(prop, cid)}
+						onkeydown={(e) => handleKeydown(prop, e, cid)}
 					/>
 				{:else}
 					<!-- Read-only display -->
-					<span class="ic-dt-props__readonly" title={getDisplayValue(prop)}>
-						{getDisplayValue(prop)}
+					<span class="ic-dt-props__readonly" title={getDisplayValue(prop, cid)}>
+						{getDisplayValue(prop, cid)}
 					</span>
 				{/if}
 			</div>
@@ -188,9 +222,59 @@
 		</div>
 	{/snippet}
 
+	{#snippet childSection(info: ChildComponentInfo)}
+		{@const cid = info.componentId}
+		{@const vis = info.properties.filter((p: PropInfo) => !p.hidden)}
+		{@const hid = info.properties.filter((p: PropInfo) => p.hidden)}
+		<div class="ic-dt-props__child">
+			<button
+				class="ic-dt-props__child-header"
+				onclick={() => (expandedChildren[cid] = !expandedChildren[cid])}
+			>
+				<span
+					class="ic-dt-props__chevron"
+					class:ic-dt-props__chevron--open={expandedChildren[cid]}
+				>&#9654;</span>
+				<span class="ic-dt-props__child-type">{shortType(info.componentType)}</span>
+				<span class="ic-dt-props__child-target">({info.target})</span>
+			</button>
+
+			{#if expandedChildren[cid]}
+				<div class="ic-dt-props__child-body">
+					{#each vis as prop (prop.name)}
+						{@render propRow(prop, cid)}
+					{/each}
+					{#if hid.length > 0}
+						<button
+							class="ic-dt-props__section-toggle"
+							onclick={() => (expandedChildren[cid + ':hidden'] = !expandedChildren[cid + ':hidden'])}
+						>
+							<span
+								class="ic-dt-props__chevron"
+								class:ic-dt-props__chevron--open={expandedChildren[cid + ':hidden']}
+							>&#9654;</span>
+							Hidden ({hid.length})
+						</button>
+						{#if expandedChildren[cid + ':hidden']}
+							{#each hid as prop (prop.name)}
+								{@render propRow(prop, cid)}
+							{/each}
+						{/if}
+					{/if}
+					<!-- Recursive: child's own children -->
+					{#if info.children && info.children.length > 0}
+						{#each info.children as grandchild (grandchild.componentId)}
+							{@render childSection(grandchild)}
+						{/each}
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/snippet}
+
 	<!-- Visible properties -->
 	{#each visibleProps as prop (prop.name)}
-		{@render propRow(prop)}
+		{@render propRow(prop, null)}
 	{/each}
 
 	<!-- Hidden properties (collapsed) -->
@@ -203,9 +287,16 @@
 		</button>
 		{#if showHidden}
 			{#each hiddenProps as prop (prop.name)}
-				{@render propRow(prop)}
+				{@render propRow(prop, null)}
 			{/each}
 		{/if}
+	{/if}
+
+	<!-- Child components -->
+	{#if componentInfo.children && componentInfo.children.length > 0}
+		{#each componentInfo.children as childInfo (childInfo.componentId)}
+			{@render childSection(childInfo)}
+		{/each}
 	{/if}
 </div>
 
@@ -364,5 +455,46 @@
 
 	.ic-dt-props__chevron--open {
 		transform: rotate(90deg);
+	}
+
+	/* --- Child component sections --- */
+
+	.ic-dt-props__child {
+		border-top: 1px solid var(--ic-border);
+		margin-top: 2px;
+	}
+
+	.ic-dt-props__child-header {
+		all: unset;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		padding: 5px 10px;
+		cursor: pointer;
+		background: var(--ic-secondary);
+		font-family: var(--ic-font-family);
+		font-size: var(--ic-font-size);
+		box-sizing: border-box;
+	}
+
+	.ic-dt-props__child-header:hover {
+		background: rgba(128, 128, 128, 0.1);
+	}
+
+	.ic-dt-props__child-type {
+		font-weight: 600;
+		color: var(--ic-foreground);
+	}
+
+	.ic-dt-props__child-target {
+		color: var(--ic-muted-foreground);
+		font-size: 0.85em;
+	}
+
+	.ic-dt-props__child-body {
+		border-left: 2px solid var(--ic-primary);
+		margin-left: 6px;
+		background: rgba(128, 128, 128, 0.03);
 	}
 </style>

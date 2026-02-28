@@ -49,7 +49,8 @@
 					type: componentInfo.componentType,
 					props: componentInfo.properties.length,
 					events: componentInfo.events.length,
-					methods: componentInfo.methods.length
+					methods: componentInfo.methods.length,
+					children: componentInfo.children.length
 				});
 			} else {
 				infoError = String(res.data);

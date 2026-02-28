@@ -3,11 +3,13 @@
 
   Scans document.styleSheets to collect all CSS rules matching the
   component's DOM subtree, grouped by source (component/dynamic/global).
+  When the component has children, subtabs let the user switch between
+  parent-only and per-child CSS rules.
   Component-scoped rules include ALL rules (even non-matching) so the user
   can see inactive variants/states. Svelte hash selectors are cleaned.
 -->
 <script lang="ts">
-	import type { ComponentInfo, CssRule, GroupedRules } from '../devtools-types';
+	import type { ComponentInfo, ChildComponentInfo, CssRule, GroupedRules } from '../devtools-types';
 	import { cleanSelector } from './dom/dom-utils';
 
 	let {
@@ -16,7 +18,16 @@
 		componentInfo: ComponentInfo;
 	} = $props();
 
-	let rules = $state<GroupedRules>({ component: [], dynamic: [], global: [] });
+	// --- Per-component style entries ---
+
+	interface ComponentStyleEntry {
+		id: string;
+		label: string;
+		rules: GroupedRules;
+	}
+
+	let entries = $state<ComponentStyleEntry[]>([]);
+	let activeComponentId = $state<string>('');
 	let scanning = $state(false);
 
 	// Scan on mount
@@ -26,19 +37,102 @@
 		}
 	});
 
+	// --- Helpers ---
+
+	/** Short type label: "ic.FlexContainer" → "FlexContainer" */
+	function shortType(type: string): string {
+		return type.split('.').pop() ?? type;
+	}
+
+	/** Recursively flatten children into a flat array with direct child IDs. */
+	function flattenChildren(info: ComponentInfo): ChildComponentInfo[] {
+		const result: ChildComponentInfo[] = [];
+		for (const child of info.children ?? []) {
+			result.push(child);
+			result.push(...flattenChildren(child));
+		}
+		return result;
+	}
+
+	/** Get direct child IDs of a component info node. */
+	function directChildIds(info: ComponentInfo): string[] {
+		return (info.children ?? []).map((c) => c.componentId);
+	}
+
+	// --- Core scan logic ---
+
 	function scan() {
 		scanning = true;
 		requestAnimationFrame(() => {
-			rules = collectComponentRules(componentInfo.componentId);
+			const result: ComponentStyleEntry[] = [];
+
+			// Parent: exclude direct children's subtrees
+			const parentChildIds = directChildIds(componentInfo);
+			const parentRules = collectRulesExcludingChildren(
+				componentInfo.componentId,
+				parentChildIds
+			);
+			result.push({
+				id: componentInfo.componentId,
+				label: shortType(componentInfo.componentType),
+				rules: parentRules
+			});
+
+			// All descendants (flattened)
+			const allDescendants = flattenChildren(componentInfo);
+			for (const childInfo of allDescendants) {
+				const grandchildIds = directChildIds(childInfo);
+				const childRules = collectRulesExcludingChildren(
+					childInfo.componentId,
+					grandchildIds
+				);
+				result.push({
+					id: childInfo.componentId,
+					label: `${shortType(childInfo.componentType)} (${childInfo.target})`,
+					rules: childRules
+				});
+			}
+
+			entries = result;
+			if (!activeComponentId || !result.some((e) => e.id === activeComponentId)) {
+				activeComponentId = result[0]?.id ?? '';
+			}
 			scanning = false;
 		});
 	}
 
-	function collectComponentRules(componentId: string): GroupedRules {
+	// --- CSS collection ---
+
+	/**
+	 * Collect rules for a component, excluding elements inside child wrappers.
+	 * If childIds is empty, this scans the full subtree (same as before).
+	 */
+	function collectRulesExcludingChildren(
+		componentId: string,
+		childIds: string[]
+	): GroupedRules {
 		const wrapper = document.getElementById(componentId);
 		if (!wrapper) return { component: [], dynamic: [], global: [] };
 
-		const elements = [wrapper, ...Array.from(wrapper.querySelectorAll('*'))];
+		const childWrappers = childIds
+			.map((id) => document.getElementById(id))
+			.filter(Boolean) as Element[];
+
+		const allElements = [wrapper, ...Array.from(wrapper.querySelectorAll('*'))];
+
+		// Keep only elements that are NOT inside any child wrapper
+		const elements =
+			childWrappers.length > 0
+				? allElements.filter(
+						(el) => !childWrappers.some((cw) => cw !== el && cw.contains(el))
+					)
+				: allElements;
+
+		return collectRulesForElements(elements);
+	}
+
+	/** Core rule collection: hash discovery + rule grouping for a given set of elements. */
+	function collectRulesForElements(elements: Element[]): GroupedRules {
 		const groups: GroupedRules = { component: [], dynamic: [], global: [] };
 		const seen = new Set<string>();
 
@@ -47,7 +141,7 @@
 			...(document.adoptedStyleSheets ?? [])
 		];
 
-		// Phase 1: Discover which .svelte-XXXX hashes belong to this component
+		// Phase 1: Discover which .svelte-XXXX hashes belong to these elements
 		const componentHashes = new Set<string>();
 
 		for (const sheet of allSheets) {
@@ -73,8 +167,7 @@
 			}
 		}
 
-		// Phase 2: Collect rules — ALL svelte-scoped rules with discovered hashes,
-		// but only matching rules for dynamic/global groups
+		// Phase 2: Collect rules
 		for (const sheet of allSheets) {
 			const isAdopted = document.adoptedStyleSheets?.includes(sheet) ?? false;
 			try {
@@ -98,7 +191,6 @@
 					});
 
 					if (isSvelteScoped) {
-						// Component-scoped: include ALL rules (matching or not)
 						seen.add(key);
 						groups.component.push({
 							selector: rule.selectorText,
@@ -107,7 +199,6 @@
 							matches: matchesElement
 						});
 					} else if (matchesElement) {
-						// Dynamic / Global: only include matching rules
 						seen.add(key);
 						const source = classifySource(rule, isAdopted);
 						groups[source].push({
@@ -140,64 +231,86 @@
 			.join('\n');
 	}
 
-	const sections: { key: keyof GroupedRules; label: string }[] = [
+	const ruleSections: { key: keyof GroupedRules; label: string }[] = [
 		{ key: 'component', label: 'Component Styles' },
 		{ key: 'dynamic', label: 'Dynamic Styles (.style())' },
 		{ key: 'global', label: 'Global / Type Styles' }
 	];
 
 	let collapsed = $state<Record<string, boolean>>({});
+
+	const activeEntry = $derived(entries.find((e) => e.id === activeComponentId));
+	const hasChildren = $derived(entries.length > 1);
 </script>
 
 <div class="ic-dt-css">
 	<div class="ic-dt-css__toolbar">
+		<!-- Component subtabs (only when children exist) -->
+		{#if hasChildren}
+			<div class="ic-dt-css__component-tabs">
+				{#each entries as entry (entry.id)}
+					<button
+						class="ic-dt-css__component-tab"
+						class:ic-dt-css__component-tab--active={activeComponentId === entry.id}
+						onclick={() => (activeComponentId = entry.id)}
+					>
+						{entry.label}
+					</button>
+				{/each}
+			</div>
+		{/if}
 		<button class="ic-dt-css__refresh" onclick={scan} disabled={scanning}>
 			{scanning ? 'Scanning...' : 'Refresh'}
 		</button>
 	</div>
 
-	{#each sections as section (section.key)}
-		{@const sectionRules = rules[section.key]}
-		{#if sectionRules.length > 0}
-			<div class="ic-dt-css__section">
-				<button
-					class="ic-dt-css__section-header"
-					onclick={() => (collapsed[section.key] = !collapsed[section.key])}
-				>
-					<span
-						class="ic-dt-css__chevron"
-						class:ic-dt-css__chevron--open={!collapsed[section.key]}
+	<!-- Rules for active component -->
+	{#if activeEntry}
+		{#each ruleSections as section (section.key)}
+			{@const sectionRules = activeEntry.rules[section.key]}
+			{#if sectionRules.length > 0}
+				<div class="ic-dt-css__section">
+					<button
+						class="ic-dt-css__section-header"
+						onclick={() => (collapsed[section.key] = !collapsed[section.key])}
 					>
-						&#9654;
-					</span>
-					{section.label}
-					<span class="ic-dt-css__count">{sectionRules.length}</span>
-				</button>
+						<span
+							class="ic-dt-css__chevron"
+							class:ic-dt-css__chevron--open={!collapsed[section.key]}
+						>
+							&#9654;
+						</span>
+						{section.label}
+						<span class="ic-dt-css__count">{sectionRules.length}</span>
+					</button>
 
-				{#if !collapsed[section.key]}
-					<div class="ic-dt-css__rules">
-						{#each sectionRules as rule, idx (rule.selector + idx)}
-							<div
-								class="ic-dt-css__rule"
-								class:ic-dt-css__rule--muted={!rule.matches}
-							>
-								<div class="ic-dt-css__selector">
-									{rule.displaySelector} &#123;
+					{#if !collapsed[section.key]}
+						<div class="ic-dt-css__rules">
+							{#each sectionRules as rule, idx (rule.selector + idx)}
+								<div
+									class="ic-dt-css__rule"
+									class:ic-dt-css__rule--muted={!rule.matches}
+								>
+									<div class="ic-dt-css__selector">
+										{rule.displaySelector} &#123;
+									</div>
+									<pre class="ic-dt-css__body">{formatCss(rule.cssText)}</pre>
+									<div class="ic-dt-css__brace">&#125;</div>
 								</div>
-								<pre class="ic-dt-css__body">{formatCss(rule.cssText)}</pre>
-								<div class="ic-dt-css__brace">&#125;</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
+		{/each}
+
+		{#if activeEntry.rules.component.length === 0 && activeEntry.rules.dynamic.length === 0 && activeEntry.rules.global.length === 0}
+			<div class="ic-dt-css__empty">
+				{scanning ? 'Scanning stylesheets...' : 'No matching CSS rules found'}
 			</div>
 		{/if}
-	{/each}
-
-	{#if rules.component.length === 0 && rules.dynamic.length === 0 && rules.global.length === 0}
-		<div class="ic-dt-css__empty">
-			{scanning ? 'Scanning stylesheets...' : 'No matching CSS rules found'}
-		</div>
+	{:else if !scanning}
+		<div class="ic-dt-css__empty">No matching CSS rules found</div>
 	{/if}
 </div>
 
@@ -211,8 +324,41 @@
 		padding: 6px 10px;
 		border-bottom: 1px solid var(--ic-border);
 		display: flex;
-		justify-content: flex-end;
+		align-items: center;
+		gap: 8px;
 	}
+
+	/* --- Component subtabs --- */
+
+	.ic-dt-css__component-tabs {
+		display: flex;
+		gap: 0;
+		flex: 1;
+		overflow-x: auto;
+	}
+
+	.ic-dt-css__component-tab {
+		all: unset;
+		padding: 3px 10px;
+		cursor: pointer;
+		font-family: var(--ic-font-family);
+		font-size: 0.9em;
+		color: var(--ic-muted-foreground);
+		border-bottom: 2px solid transparent;
+		white-space: nowrap;
+		transition: color 0.15s, border-color 0.15s;
+	}
+
+	.ic-dt-css__component-tab:hover {
+		color: var(--ic-foreground);
+	}
+
+	.ic-dt-css__component-tab--active {
+		color: var(--ic-primary);
+		border-bottom-color: var(--ic-primary);
+	}
+
+	/* --- Refresh button --- */
 
 	.ic-dt-css__refresh {
 		all: unset;
@@ -225,6 +371,8 @@
 		border-radius: 2px;
 		background: var(--ic-secondary);
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+		margin-left: auto;
+		white-space: nowrap;
 	}
 
 	.ic-dt-css__refresh:hover:not(:disabled) {
