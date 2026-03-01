@@ -1,23 +1,22 @@
 <!--
   PropertiesPanel.svelte — Type-aware property inspector.
 
-  Reads live values from child.props (reactive proxy), writes back via
-  request('setPropertyValue') for MATLAB-side type coercion.
+  Reads live values from child.props (reactive proxy) and writes back
+  directly via the proxy setter, which debounces and publishes @prop/
+  events to MATLAB through the bridge.
   Recursively displays child component properties in collapsible sections.
 -->
 <script lang="ts">
-	import type { StaticChild, RequestFn } from '$lib/types';
+	import type { StaticChild } from '$lib/types';
 	import type { ComponentInfo, ChildComponentInfo, PropInfo } from '../devtools-types';
 	import Registry from '$lib/core/registry';
 
 	let {
 		child,
-		componentInfo,
-		request
+		componentInfo
 	}: {
 		child: StaticChild;
 		componentInfo: ComponentInfo;
-		request?: RequestFn;
 	} = $props();
 
 	// Internal framework props that should never appear in the inspector
@@ -120,29 +119,28 @@
 
 	// --- Handlers (parameterized by componentId) ---
 
-	async function setProperty(
-		prop: PropInfo,
-		value: unknown,
-		componentId: string | null = null
-	) {
-		if (!request) return;
-		const payload: Record<string, unknown> = { matlabName: prop.matlabName, value };
-		if (componentId) payload.componentId = componentId;
-		await request('setPropertyValue', payload);
+	/** Write a value directly to the component proxy (triggers @prop/ publish to MATLAB). */
+	function setPropValue(componentId: string | null, propName: string, value: unknown): void {
+		if (componentId === null) {
+			child.props[propName] = value;
+		} else {
+			const comp = Registry.instance.get(componentId) as any;
+			if (comp?.svelteProps) comp.svelteProps[propName] = value;
+		}
 	}
 
 	function handleToggle(prop: PropInfo, componentId: string | null = null) {
 		const newVal = !getBooleanValue(prop, componentId);
 		if (prop.type === 'matlab.lang.OnOffSwitchState') {
-			setProperty(prop, newVal ? 'on' : 'off', componentId);
+			setPropValue(componentId, prop.name, newVal ? 'on' : 'off');
 		} else {
-			setProperty(prop, newVal, componentId);
+			setPropValue(componentId, prop.name, newVal);
 		}
 	}
 
 	function handleSelect(prop: PropInfo, e: Event, componentId: string | null = null) {
 		const target = e.target as HTMLSelectElement;
-		setProperty(prop, target.value, componentId);
+		setPropValue(componentId, prop.name, target.value);
 	}
 
 	function startEdit(prop: PropInfo, componentId: string | null = null) {
@@ -156,7 +154,7 @@
 		editingProp = null;
 		const val = editBuffer[key];
 		if (val !== undefined && val !== getDisplayValue(prop, componentId)) {
-			setProperty(prop, isNumeric(prop) ? Number(val) : val, componentId);
+			setPropValue(componentId, prop.name, isNumeric(prop) ? Number(val) : val);
 		}
 	}
 

@@ -2,7 +2,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
     % > DEVELOPERTOOLS Internal IC component for the inspector UI.
     %
     %   Hosts the inspected component as a static child and handles
-    %   metadata/style requests from the Svelte frontend.
+    %   metadata requests from the Svelte frontend.
 
     properties (SetAccess = immutable, Hidden)
         % > INSPECTEDCOMPONENT the component being inspected
@@ -21,11 +21,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
 
             this.addStaticChild(component, "component");
 
-            this.onRequest("getComponentInfo",  @(comp, ~)    comp.handleGetComponentInfo());
-            this.onRequest("setPropertyValue",  @(comp, data) comp.handleSetPropertyValue(data));
-            this.onRequest("getStyles",         @(comp, ~)    comp.handleGetStyles());
-            this.onRequest("setStyle",          @(comp, data) comp.handleSetStyle(data));
-            this.onRequest("removeStyle",       @(comp, data) comp.handleRemoveStyle(data));
+            this.onRequest("getComponentInfo", @(comp, ~) comp.handleGetComponentInfo());
         end
     end
 
@@ -107,77 +103,6 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                 'mixins',        {cellstr(mixins)}, ...
                 'isStylable',    isa(comp, 'ic.mixin.Stylable'), ...
                 'children',      {childInfos});
-        end
-
-        function result = handleSetPropertyValue(this, data)
-            % Determine target: inspected component or a child
-            if isfield(data, 'componentId') && ~isempty(data.componentId)
-                comp = this.findChildById(string(data.componentId));
-                if isempty(comp)
-                    error('ic:DevTools:ChildNotFound', ...
-                        'Child component "%s" not found', data.componentId);
-                end
-            else
-                comp = this.InspectedComponent;
-            end
-
-            propName = string(data.matlabName);
-            value = data.value;
-            currentVal = comp.(propName);
-
-            if islogical(currentVal)
-                value = logical(value);
-            elseif isnumeric(currentVal) && (ischar(value) || isstring(value))
-                value = str2double(value);
-            elseif isstring(currentVal)
-                value = string(value);
-            end
-
-            comp.(propName) = value;
-            result = true;
-        end
-
-        function result = handleGetStyles(this)
-            comp = this.InspectedComponent;
-            if ~isa(comp, 'ic.mixin.Stylable')
-                result = containers.Map();
-                return;
-            end
-            result = comp.getAllStyles();
-        end
-
-        function result = handleSetStyle(this, data)
-            this.InspectedComponent.style( ...
-                string(data.selector), string(data.property), string(data.value));
-            result = true;
-        end
-
-        function result = handleRemoveStyle(this, data)
-            this.InspectedComponent.style( ...
-                string(data.selector), string(data.property), "");
-            result = true;
-        end
-
-        function child = findChildById(this, targetId)
-            % > FINDCHILDBYID Recursively search for a child by ID.
-            child = this.searchChildren(this.InspectedComponent, targetId);
-        end
-
-        function found = searchChildren(this, parent, targetId)
-            % > SEARCHCHILDREN Walk container children recursively.
-            found = [];
-            if ~isa(parent, 'ic.core.Container'), return; end
-            for tt = 1:numel(parent.Targets)
-                kids = parent.getChildrenInTarget(parent.Targets(tt));
-                for kk = 1:numel(kids)
-                    if kids(kk).ID == targetId
-                        found = kids(kk);
-                        return;
-                    end
-                    found = this.searchChildren(kids(kk), targetId);
-                    if ~isempty(found), return; end
-                end
-            end
         end
 
         function info = extractValidation(~, metaProp)

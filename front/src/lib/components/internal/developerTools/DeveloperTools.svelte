@@ -214,7 +214,7 @@
 		<div class="ic-dt__content">
 			{#if componentInfo && child}
 				{#if activeTab === 'properties'}
-					<PropertiesPanel {child} {componentInfo} {request} />
+					<PropertiesPanel {child} {componentInfo} />
 				{:else if activeTab === 'events'}
 					<EventsPanel {child} {componentInfo} />
 				{:else if activeTab === 'methods'}
