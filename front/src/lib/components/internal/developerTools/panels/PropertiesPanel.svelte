@@ -20,9 +20,12 @@
 		request?: RequestFn;
 	} = $props();
 
-	// Separate visible and hidden props
-	const visibleProps = $derived(componentInfo.properties.filter((p) => !p.hidden));
-	const hiddenProps = $derived(componentInfo.properties.filter((p) => p.hidden));
+	// Internal framework props that should never appear in the inspector
+	const internalProps = new Set(['Targets']);
+
+	// Separate visible and hidden props (excluding internals)
+	const visibleProps = $derived(componentInfo.properties.filter((p) => !p.hidden && !internalProps.has(p.matlabName)));
+	const hiddenProps = $derived(componentInfo.properties.filter((p) => p.hidden && !internalProps.has(p.matlabName)));
 	let showHidden = $state(false);
 	let rootExpanded = $state(true);
 
@@ -225,8 +228,8 @@
 
 	{#snippet childSection(info: ChildComponentInfo)}
 		{@const cid = info.componentId}
-		{@const vis = info.properties.filter((p: PropInfo) => !p.hidden)}
-		{@const hid = info.properties.filter((p: PropInfo) => p.hidden)}
+		{@const vis = info.properties.filter((p: PropInfo) => !p.hidden && !internalProps.has(p.matlabName))}
+		{@const hid = info.properties.filter((p: PropInfo) => p.hidden && !internalProps.has(p.matlabName))}
 		<div class="ic-dt-props__child">
 			<button
 				class="ic-dt-props__child-header"
@@ -329,7 +332,7 @@
 
 	.ic-dt-props__row {
 		display: grid;
-		grid-template-columns: minmax(90px, 1fr) minmax(80px, 1.5fr) auto;
+		grid-template-columns: minmax(90px, 1fr) minmax(80px, 1.5fr) 100px;
 		align-items: center;
 		gap: 6px;
 		padding: 3px 10px;
@@ -357,7 +360,10 @@
 		color: var(--ic-muted-foreground);
 		font-size: 0.8em;
 		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		opacity: 0.7;
+		text-align: right;
 	}
 
 	/* --- Value editors --- */

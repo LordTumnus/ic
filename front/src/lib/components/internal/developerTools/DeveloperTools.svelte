@@ -100,7 +100,7 @@
 	// --- DOM panel: picker + highlight (all imperative, no effects) ---
 
 	let previewEl: HTMLElement | undefined;
-	let pickerOverlayEl: HTMLElement | undefined;
+	let pickerOverlayEl = $state<HTMLElement | undefined>();
 	let pickerActive = $state(false);
 	let pickerHoveredEl: Element | null = null; // not reactive — only used in handlers
 	let domReveal = $state<(el: Element) => void>(() => {});
@@ -145,6 +145,7 @@
 		pickerHoveredEl = null;
 		hideHighlight();
 	}
+
 </script>
 
 <div
@@ -168,6 +169,7 @@
 		<!-- Picker overlay: sits on top of everything when active, captures all mouse events -->
 		{#if pickerActive}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div
 				class="ic-dt__picker-overlay"
 				bind:this={pickerOverlayEl}
@@ -235,9 +237,9 @@
 <style>
 	.ic-dt {
 		display: flex;
-		width: 100%;
-		height: 100%;
-		overflow: hidden;
+		position: fixed;
+		inset: 0;
+		overflow: clip;
 		background: var(--ic-background);
 		color: var(--ic-foreground);
 		font-family: var(--ic-font-family);
@@ -253,9 +255,6 @@
 
 	.ic-dt__preview {
 		overflow: auto;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		padding: 12px;
 		min-width: 0;
 		position: relative;
@@ -314,7 +313,8 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
-		overflow: hidden;
+		min-height: 0;
+		overflow: clip;
 		border-left: 1px solid var(--ic-border);
 	}
 
@@ -366,6 +366,7 @@
 
 	.ic-dt__content {
 		flex: 1;
+		min-height: 0;
 		overflow: auto;
 		padding: 0;
 	}
