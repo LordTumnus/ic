@@ -1,22 +1,25 @@
 <!--
   PropertiesPanel.svelte — Type-aware property inspector.
 
-  Reads live values from child.props (reactive proxy) and writes back
-  directly via the proxy setter, which debounces and publishes @prop/
-  events to MATLAB through the bridge.
+  Reads live values from child.props (reactive proxy). All writes are
+  routed through MATLAB via request('setNestedProp') so that property
+  setters, PostSet listeners, and dependent recomputation fire correctly.
   Recursively displays child component properties in collapsible sections.
 -->
 <script lang="ts">
-	import type { StaticChild } from '$lib/types';
-	import type { ComponentInfo, ChildComponentInfo, PropInfo } from '../devtools-types';
+	import type { StaticChild, RequestFn } from '$lib/types';
+	import type { ComponentInfo, ChildComponentInfo, PropInfo, PathSegment } from '../devtools-types';
 	import Registry from '$lib/core/registry';
+	import ValueTree from './ValueTree.svelte';
 
 	let {
 		child,
-		componentInfo
+		componentInfo,
+		request
 	}: {
 		child: StaticChild;
 		componentInfo: ComponentInfo;
+		request?: RequestFn;
 	} = $props();
 
 	// Internal framework props that should never appear in the inspector
@@ -37,6 +40,9 @@
 
 	// Child section expand state (keyed by componentId)
 	let expandedChildren = $state<Record<string, boolean>>({});
+
+	// Complex property expand state (keyed by editKey)
+	let expandedValues = $state<Record<string, boolean>>({});
 
 	// --- Value access (parameterized by componentId) ---
 
@@ -80,6 +86,7 @@
 		const t = prop.type;
 		return (
 			t === 'string' ||
+			t === 'char' ||
 			t === 'double' ||
 			t === 'single' ||
 			t === 'logical' ||
@@ -119,28 +126,65 @@
 
 	// --- Handlers (parameterized by componentId) ---
 
-	/** Write a value directly to the component proxy (triggers @prop/ publish to MATLAB). */
-	function setPropValue(componentId: string | null, propName: string, value: unknown): void {
-		if (componentId === null) {
-			child.props[propName] = value;
-		} else {
-			const comp = Registry.instance.get(componentId) as any;
-			if (comp?.svelteProps) comp.svelteProps[propName] = value;
+	/** Walk a nested path on a JS object and set the leaf value in-place. */
+	function applyNestedValue(obj: unknown, path: PathSegment[], value: unknown): void {
+		let target = obj as any;
+		for (let i = 0; i < path.length - 1; i++) {
+			const seg = path[i];
+			target = seg.key != null ? target[seg.key] : target[seg.index!];
+			if (target == null) return;
+		}
+		const last = path[path.length - 1];
+		if (last.key != null) target[last.key] = value;
+		else target[last.index!] = value;
+	}
+
+	/** Write a property value via MATLAB request (MATLAB is the single source of truth).
+	 *  Also optimistically updates the proxy for instant UI feedback.
+	 *  Used for both top-level props (path=[]) and nested sub-props (path=[...segments]). */
+	async function setPropValue(
+		prop: PropInfo,
+		componentId: string | null,
+		value: unknown,
+		path: PathSegment[] = []
+	): Promise<void> {
+		// Optimistic update: mutate the JS-side value immediately to prevent
+		// flicker while the MATLAB round-trip completes.
+		const current = getPropValue(componentId, prop.name);
+		if (path.length === 0) {
+			if (componentId === null) {
+				child.props[prop.name] = value;
+			} else {
+				const comp = Registry.instance.get(componentId) as any;
+				if (comp?.svelteProps) comp.svelteProps[prop.name] = value;
+			}
+		} else if (current != null && typeof current === 'object') {
+			applyNestedValue(current, path, value);
+		}
+		if (!request) return;
+		const res = await request('setNestedProp', {
+			componentId: componentId ?? '',
+			propName: prop.matlabName,
+			path,
+			value
+		});
+		if (!res.success) {
+			console.warn('DevTools: setNestedProp failed', res.data);
 		}
 	}
 
 	function handleToggle(prop: PropInfo, componentId: string | null = null) {
 		const newVal = !getBooleanValue(prop, componentId);
 		if (prop.type === 'matlab.lang.OnOffSwitchState') {
-			setPropValue(componentId, prop.name, newVal ? 'on' : 'off');
+			setPropValue(prop, componentId, newVal ? 'on' : 'off');
 		} else {
-			setPropValue(componentId, prop.name, newVal);
+			setPropValue(prop, componentId, newVal);
 		}
 	}
 
 	function handleSelect(prop: PropInfo, e: Event, componentId: string | null = null) {
 		const target = e.target as HTMLSelectElement;
-		setPropValue(componentId, prop.name, target.value);
+		setPropValue(prop, componentId, target.value);
 	}
 
 	function startEdit(prop: PropInfo, componentId: string | null = null) {
@@ -154,7 +198,7 @@
 		editingProp = null;
 		const val = editBuffer[key];
 		if (val !== undefined && val !== getDisplayValue(prop, componentId)) {
-			setPropValue(componentId, prop.name, isNumeric(prop) ? Number(val) : val);
+			setPropValue(prop, componentId, isNumeric(prop) ? Number(val) : val);
 		}
 	}
 
@@ -167,13 +211,59 @@
 			(e.target as HTMLElement)?.blur();
 		}
 	}
+
+	// --- Complex type support ---
+
+	/** True when a property has structural type info that can be expanded. */
+	function isComplex(prop: PropInfo): boolean {
+		if (!prop.typeInfo) return false;
+		const k = prop.typeInfo.kind;
+		return (
+			k === 'struct' || k === 'object' ||
+			k === 'objectArray' || k === 'structArray' ||
+			k === 'array' || k === 'cell'
+		);
+	}
+
+	/** Generate a compact summary string from typeInfo + live value. */
+	function typeInfoSummary(prop: PropInfo, liveVal?: unknown): string {
+		const ti = prop.typeInfo!;
+		const total = ti.size[0] * ti.size[1];
+		switch (ti.kind) {
+			case 'struct': {
+				const n = (liveVal != null && typeof liveVal === 'object')
+					? Object.keys(liveVal as object).length
+					: ti.children.length;
+				return `{${n} field${n !== 1 ? 's' : ''}}`;
+			}
+			case 'structArray':  return `[${total} structs]`;
+			case 'object':       return shortType(ti.className);
+			case 'objectArray':  return `[${total} ${shortType(ti.className)}]`;
+			case 'array':        return `[${total} ${ti.className}]`;
+			case 'cell':         return `{${total} cells}`;
+			default:             return '';
+		}
+	}
 </script>
 
 <div class="ic-dt-props">
 	{#snippet propRow(prop: PropInfo, cid: string | null)}
 		{@const key = editKey(prop, cid)}
+		{@const complex = isComplex(prop)}
 		<div class="ic-dt-props__row">
-			<span class="ic-dt-props__name">{prop.matlabName}</span>
+			<span class="ic-dt-props__name">
+				{#if complex}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<span
+						class="ic-dt-props__chevron ic-dt-props__chevron--inline"
+						class:ic-dt-props__chevron--open={expandedValues[key]}
+						onclick={() => (expandedValues[key] = !expandedValues[key])}
+						role="button"
+						tabindex="-1"
+					>&#9654;</span>
+				{/if}
+				{prop.matlabName}
+			</span>
 			<div class="ic-dt-props__value">
 				{#if isBoolean(prop)}
 					<!-- Toggle checkbox -->
@@ -213,6 +303,14 @@
 						onblur={() => commitEdit(prop, cid)}
 						onkeydown={(e) => handleKeydown(prop, e, cid)}
 					/>
+				{:else if complex}
+					<!-- Complex type: clickable summary -->
+					<button
+						class="ic-dt-props__expand-btn"
+						onclick={() => (expandedValues[key] = !expandedValues[key])}
+					>
+						{typeInfoSummary(prop, getPropValue(cid, prop.name))}
+					</button>
 				{:else}
 					<!-- Read-only display -->
 					<span class="ic-dt-props__readonly" title={getDisplayValue(prop, cid)}>
@@ -222,6 +320,16 @@
 			</div>
 			<span class="ic-dt-props__type">{prop.type}</span>
 		</div>
+		<!-- Expanded value tree (below the row) -->
+		{#if complex && expandedValues[key]}
+			<div class="ic-dt-props__value-tree">
+				<ValueTree
+					value={getPropValue(cid, prop.name)}
+					typeInfo={prop.typeInfo!}
+					oncommit={(path, val) => setPropValue(prop, cid, val, path)}
+				/>
+			</div>
+		{/if}
 	{/snippet}
 
 	{#snippet childSection(info: ChildComponentInfo)}
@@ -330,12 +438,12 @@
 
 	.ic-dt-props__row {
 		display: grid;
-		grid-template-columns: minmax(90px, 1fr) minmax(80px, 1.5fr) 100px;
+		grid-template-columns: minmax(80px, 1fr) minmax(60px, 1.5fr) 72px;
 		align-items: center;
-		gap: 6px;
-		padding: 3px 10px;
-		min-height: 26px;
-		border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+		gap: 4px;
+		padding: 2px 8px;
+		min-height: 22px;
+		border-bottom: 1px solid rgba(128, 128, 128, 0.06);
 	}
 
 	.ic-dt-props__row:hover {
@@ -356,7 +464,7 @@
 
 	.ic-dt-props__type {
 		color: var(--ic-muted-foreground);
-		font-size: 0.8em;
+		font-size: 0.75em;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -458,7 +566,7 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		padding: 4px 10px;
+		padding: 2px 8px;
 		cursor: pointer;
 		color: var(--ic-muted-foreground);
 		font-size: 0.85em;
@@ -499,7 +607,7 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		padding: 5px 10px;
+		padding: 3px 8px;
 		cursor: pointer;
 		background: var(--ic-secondary);
 		font-family: var(--ic-font-family);
@@ -525,5 +633,42 @@
 		border-left: 2px solid var(--ic-primary);
 		margin-left: 6px;
 		background: rgba(128, 128, 128, 0.03);
+	}
+
+	/* --- Complex property expand --- */
+
+	.ic-dt-props__chevron--inline {
+		cursor: pointer;
+		margin-right: 2px;
+		vertical-align: baseline;
+	}
+
+	.ic-dt-props__expand-btn {
+		all: unset;
+		display: block;
+		cursor: pointer;
+		padding: 1px 4px;
+		border-radius: 2px;
+		color: var(--ic-muted-foreground);
+		font-style: italic;
+		font-family: var(--ic-font-family);
+		font-size: var(--ic-font-size);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.ic-dt-props__expand-btn:hover {
+		background: rgba(128, 128, 128, 0.08);
+		color: var(--ic-foreground);
+	}
+
+	.ic-dt-props__value-tree {
+		border-left: 2px solid var(--ic-border);
+		margin-left: 8px;
+		padding: 2px 0;
+		background: rgba(128, 128, 128, 0.02);
 	}
 </style>

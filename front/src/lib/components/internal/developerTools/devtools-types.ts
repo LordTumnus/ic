@@ -17,11 +17,61 @@ export interface PropInfo {
 	validation: PropValidation;
 	/** Whether the property is hidden in MATLAB */
 	hidden: boolean;
+	/** Structural type descriptor for complex values (from MATLAB introspectType) */
+	typeInfo?: TypeInfo;
 }
 
 export interface PropValidation {
 	/** Allowed values from mustBeMember validator */
 	mustBeMember?: string[];
+}
+
+// --- Structural type descriptors (from MATLAB introspectType) ---
+
+/** Classification of a MATLAB value's structure */
+export type TypeInfoKind =
+	| 'primitive'
+	| 'array'
+	| 'struct'
+	| 'structArray'
+	| 'object'
+	| 'objectArray'
+	| 'cell'
+	| 'function_handle'
+	| 'opaque'
+	| 'truncated';
+
+/** Recursive descriptor of a MATLAB value's type and shape */
+export interface TypeInfo {
+	kind: TypeInfoKind;
+	/** MATLAB class name (e.g. "double", "ic.table.Column") */
+	className: string;
+	/** MATLAB size vector (e.g. [1,1] for scalar, [1,10] for 10-element array) */
+	size: number[];
+	/** Named children — for scalar struct (fields) and scalar object (properties) */
+	children: TypeInfoChild[];
+	/** Shared element type — for array, objectArray, structArray */
+	elementTypeInfo?: TypeInfo;
+}
+
+/** One named field/property or indexed element within a TypeInfo */
+export interface TypeInfoChild {
+	/** Field or property name (MATLAB PascalCase). Empty for indexed entries. */
+	key: string;
+	/** 0-based index (only for cell array children) */
+	index?: number;
+	/** Validation constraints (e.g. mustBeMember) for object properties */
+	validation?: PropValidation;
+	/** Recursive type descriptor */
+	typeInfo: TypeInfo;
+}
+
+/** Path segment for the setNestedProp request */
+export interface PathSegment {
+	/** Struct field or object property name (MATLAB PascalCase) */
+	key?: string;
+	/** 0-based array index */
+	index?: number;
 }
 
 export interface EventInfo {
