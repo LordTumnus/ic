@@ -23,6 +23,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
 
             this.onRequest("getComponentInfo", @(comp, ~) comp.handleGetComponentInfo());
             this.onRequest("setNestedProp", @(comp, data) comp.handleSetNestedProp(data));
+            this.onRequest("setStyle", @(comp, data) comp.handleSetStyle(data));
         end
     end
 
@@ -279,6 +280,71 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             elseif ischar(currentVal) && ~ischar(value)
                 value = char(string(value));
             end
+        end
+
+        function result = handleSetStyle(this, data)
+            % > HANDLESETSTYLE Apply CSS styles via the Stylable mixin.
+            %   data fields:
+            %     componentId  — target component ID (empty string = root)
+            %     selector     — CSS selector (e.g. "> *", ".label")
+            %     properties   — struct with camelCase keys and CSS values
+            %     cssVariables — (optional) struct array [{name, value}]
+            %                    for CSS custom properties (--var-name)
+            comp = this.resolveComponent(data.componentId);
+            if ~isa(comp, 'ic.mixin.Stylable')
+                error('ic:devtools:notStylable', ...
+                    'Component "%s" does not support styling.', class(comp));
+            end
+
+            selector = string(data.selector);
+            hasRegular = isfield(data, 'properties') ...
+                && ~isempty(fieldnames(data.properties));
+            hasCssVars = isfield(data, 'cssVariables') ...
+                && ~isempty(data.cssVariables);
+
+            % Regular properties go through the normal style() path
+            if hasRegular
+                comp.style(selector, data.properties);
+            end
+
+            % CSS custom properties (--var) can't be MATLAB struct fields.
+            % Build the full CSS map from internal state + variables and
+            % re-publish the @style event directly.
+            if hasCssVars
+                existing = comp.getStyle(selector);
+                fnames = fieldnames(existing);
+                if ~isempty(fnames)
+                    kk = cellfun(@(f) char(ic.utils.toKebabCase(f)), ...
+                        fnames, 'UniformOutput', false);
+                    vv = cellfun(@(f) existing.(f), fnames, ...
+                        'UniformOutput', false);
+                    cssMap = containers.Map(kk, vv);
+                else
+                    cssMap = containers.Map( ...
+                        'KeyType', 'char', 'ValueType', 'any');
+                end
+
+                vars = data.cssVariables;
+                if isstruct(vars), vars = num2cell(vars); end
+                for ii = 1:numel(vars)
+                    if iscell(vars), v = vars{ii}; else, v = vars(ii); end
+                    varName = char(string(v.name));
+                    varValue = string(v.value);
+                    if varValue == ""
+                        if cssMap.isKey(varName)
+                            remove(cssMap, varName);
+                        end
+                    else
+                        cssMap(varName) = char(varValue);
+                    end
+                end
+
+                comp.publish("@style", struct( ...
+                    "selector", selector, ...
+                    "styles", cssMap));
+            end
+
+            result = struct('success', true);
         end
 
         function result = handleSetNestedProp(this, data)

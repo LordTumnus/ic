@@ -220,7 +220,7 @@
 				{:else if activeTab === 'methods'}
 					<MethodsPanel {child} {componentInfo} />
 				{:else if activeTab === 'styles'}
-					<StylesPanel {componentInfo} />
+					<StylesPanel {componentInfo} {request} />
 				{:else if activeTab === 'dom'}
 					<DomPanel
 						{componentInfo}

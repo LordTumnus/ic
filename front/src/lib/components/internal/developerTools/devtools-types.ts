@@ -115,6 +115,19 @@ export interface ChildComponentInfo extends ComponentInfo {
 	target: string;
 }
 
+/** Origin of a CSS rule */
+export type CssRuleSource = 'component' | 'dynamic' | 'global';
+
+/** Single CSS property within a rule */
+export interface CssProperty {
+	/** kebab-case property name (e.g. "background-color") */
+	name: string;
+	/** Property value (e.g. "red") */
+	value: string;
+	/** True if a higher-specificity dynamic rule overrides this property */
+	overridden: boolean;
+}
+
 /** CSS rule collected from stylesheets */
 export interface CssRule {
 	/** Raw selector (for internal matching) */
@@ -124,13 +137,10 @@ export interface CssRule {
 	cssText: string;
 	/** Whether this rule currently matches an element in the component */
 	matches: boolean;
-}
-
-/** Rules grouped by source */
-export interface GroupedRules {
-	component: CssRule[];
-	dynamic: CssRule[];
-	global: CssRule[];
+	/** Where this rule originates from */
+	source: CssRuleSource;
+	/** Parsed individual properties (for per-property override styling) */
+	properties: CssProperty[];
 }
 
 /** Serialized representation of a DOM node for the DOM tree */
