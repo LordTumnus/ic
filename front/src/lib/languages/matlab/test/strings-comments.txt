@@ -1,0 +1,88 @@
+# Char array literal
+
+x = 'hello'
+
+==>
+
+Program(AssignmentStatement(Identifier, CharArray))
+
+# Char array with escape
+
+x = 'it''s'
+
+==>
+
+Program(AssignmentStatement(Identifier, CharArray))
+
+# Double-quoted string
+
+x = "hello"
+
+==>
+
+Program(AssignmentStatement(Identifier, String))
+
+# Transpose after identifier
+
+x'
+
+==>
+
+Program(ExpressionStatement(TransposeExpression(Identifier, Transpose)))
+
+# Transpose after close paren
+
+(x+y)'
+
+==>
+
+Program(ExpressionStatement(TransposeExpression(ParenExpression(BinaryExpression(Identifier, ArithOp, Identifier)), Transpose)))
+
+# Transpose after close bracket
+
+A(1,2)'
+
+==>
+
+Program(ExpressionStatement(TransposeExpression(CallExpression(Identifier, Number, Number), Transpose)))
+
+# Double transpose
+
+x''
+
+==>
+
+Program(ExpressionStatement(TransposeExpression(TransposeExpression(Identifier, Transpose), Transpose)))
+
+# Char array at start of expression
+
+y = 'text'
+
+==>
+
+Program(AssignmentStatement(Identifier, CharArray))
+
+# Line comment
+
+x = 1 % this is a comment
+
+==>
+
+Program(AssignmentStatement(Identifier, Number), LineComment)
+
+# Block comment
+
+%{ block comment %}
+
+==>
+
+Program(BlockComment)
+
+# Statement after line comment
+
+x = 1 % comment
+y = 2
+
+==>
+
+Program(AssignmentStatement(Identifier, Number), LineComment, AssignmentStatement(Identifier, Number))

@@ -1,0 +1,447 @@
+# Identifier
+
+x
+
+==>
+
+Program(ExpressionStatement(Identifier))
+
+# Number literal
+
+42
+
+==>
+
+Program(ExpressionStatement(Number))
+
+# Float number
+
+3.14
+
+==>
+
+Program(ExpressionStatement(Number))
+
+# Scientific notation
+
+1.5e-3
+
+==>
+
+Program(ExpressionStatement(Number))
+
+# Hex number
+
+0xFF
+
+==>
+
+Program(ExpressionStatement(Number))
+
+# Binary number
+
+0b1010
+
+==>
+
+Program(ExpressionStatement(Number))
+
+# Complex number
+
+3.14j
+
+==>
+
+Program(ExpressionStatement(Number))
+
+# Double-quoted string
+
+"hello world"
+
+==>
+
+Program(ExpressionStatement(String))
+
+# String with escape
+
+"line1\nline2"
+
+==>
+
+Program(ExpressionStatement(String))
+
+# Boolean true
+
+true
+
+==>
+
+Program(ExpressionStatement(BooleanLiteral(BooleanLiteral)))
+
+# Boolean false
+
+false
+
+==>
+
+Program(ExpressionStatement(BooleanLiteral(BooleanLiteral)))
+
+# Addition
+
+a + b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Subtraction
+
+a - b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Multiplication
+
+a * b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Division
+
+a / b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Left division (backslash)
+
+A \ b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Power
+
+x ^ 2
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Number)))
+
+# Element-wise multiply
+
+a .* b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Element-wise divide
+
+a ./ b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Element-wise power
+
+a .^ 2
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, Number)))
+
+# Unary minus
+
+-x
+
+==>
+
+Program(ExpressionStatement(UnaryExpression(ArithOp, Identifier)))
+
+# Unary plus
+
++x
+
+==>
+
+Program(ExpressionStatement(UnaryExpression(ArithOp, Identifier)))
+
+# Logical NOT
+
+~x
+
+==>
+
+Program(ExpressionStatement(NotExpression(LogicOp, Identifier)))
+
+# Comparison equal
+
+a == b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, CompareOp, Identifier)))
+
+# Comparison not equal
+
+a ~= b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, CompareOp, Identifier)))
+
+# Comparison less than
+
+a < b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, CompareOp, Identifier)))
+
+# Comparison greater equal
+
+a >= b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, CompareOp, Identifier)))
+
+# Element-wise AND
+
+a & b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, LogicOp, Identifier)))
+
+# Short-circuit AND
+
+a && b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, LogicOp, Identifier)))
+
+# Element-wise OR
+
+a | b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, LogicOp, Identifier)))
+
+# Short-circuit OR
+
+a || b
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, LogicOp, Identifier)))
+
+# Operator precedence: multiply before add
+
+a + b * c
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, BinaryExpression(Identifier, ArithOp, Identifier))))
+
+# Operator precedence: power before multiply
+
+a * b ^ c
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(Identifier, ArithOp, BinaryExpression(Identifier, ArithOp, Identifier))))
+
+# Parenthesized expression
+
+(a + b) * c
+
+==>
+
+Program(ExpressionStatement(BinaryExpression(ParenExpression(BinaryExpression(Identifier, ArithOp, Identifier)), ArithOp, Identifier)))
+
+# Colon expression (range)
+
+1:10
+
+==>
+
+Program(ExpressionStatement(ColonExpression(Number, Number)))
+
+# Colon expression with step (right-associative)
+
+1:2:10
+
+==>
+
+Program(ExpressionStatement(ColonExpression(Number, ColonExpression(Number, Number))))
+
+# Transpose
+
+x'
+
+==>
+
+Program(ExpressionStatement(TransposeExpression(Identifier, Transpose)))
+
+# Empty matrix
+
+[]
+
+==>
+
+Program(ExpressionStatement(MatrixExpression))
+
+# Row vector
+
+[1, 2, 3]
+
+==>
+
+Program(ExpressionStatement(MatrixExpression(Number, Number, Number)))
+
+# Matrix with semicolons
+
+[1, 2; 3, 4]
+
+==>
+
+Program(ExpressionStatement(MatrixExpression(Number, Number, Number, Number)))
+
+# Cell array
+
+{1, 2, 3}
+
+==>
+
+Program(ExpressionStatement(CellArrayExpression(Number, Number, Number)))
+
+# Empty cell array
+
+{}
+
+==>
+
+Program(ExpressionStatement(CellArrayExpression))
+
+# Member expression
+
+obj.field
+
+==>
+
+Program(ExpressionStatement(MemberExpression(Identifier, PropertyName)))
+
+# Chained member expression
+
+obj.field.subfield
+
+==>
+
+Program(ExpressionStatement(MemberExpression(MemberExpression(Identifier, PropertyName), PropertyName)))
+
+# Call expression
+
+foo(x, y)
+
+==>
+
+Program(ExpressionStatement(CallExpression(Identifier, Identifier, Identifier)))
+
+# Call with no args
+
+foo()
+
+==>
+
+Program(ExpressionStatement(CallExpression(Identifier)))
+
+# Cell index expression
+
+c{1}
+
+==>
+
+Program(ExpressionStatement(CellIndexExpression(Identifier, Number)))
+
+# Method call on member
+
+obj.method(x)
+
+==>
+
+Program(ExpressionStatement(CallExpression(MemberExpression(Identifier, PropertyName), Identifier)))
+
+# End in call argument
+
+A(end)
+
+==>
+
+Program(ExpressionStatement(CallExpression(Identifier, EndExpression(end))))
+
+# End in cell index
+
+c{end}
+
+==>
+
+Program(ExpressionStatement(CellIndexExpression(Identifier, EndExpression(end))))
+
+# End in matrix element
+
+[x, end]
+
+==>
+
+Program(ExpressionStatement(MatrixExpression(Identifier, EndExpression(end))))
+
+# Colon as call argument
+
+A(:, 1)
+
+==>
+
+Program(ExpressionStatement(CallExpression(Identifier, Number)))
+
+# Function handle
+
+@myFunc
+
+==>
+
+Program(ExpressionStatement(FunctionHandle(Identifier)))
+
+# Anonymous function
+
+@(x) x^2
+
+==>
+
+Program(ExpressionStatement(AnonymousFunction(Identifier, BinaryExpression(Identifier, ArithOp, Number))))
+
+# Anonymous function multi-arg
+
+@(x, y) x + y
+
+==>
+
+Program(ExpressionStatement(AnonymousFunction(Identifier, Identifier, BinaryExpression(Identifier, ArithOp, Identifier))))
+
+# Metaclass expression
+
+?MyClass
+
+==>
+
+Program(ExpressionStatement(MetaclassExpression(Identifier)))

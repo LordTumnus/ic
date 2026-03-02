@@ -1,0 +1,124 @@
+# Simple class
+
+classdef MyClass
+  properties
+    Value
+  end
+  methods
+    function obj = MyClass(v)
+      obj.Value = v
+    end
+  end
+end
+
+==>
+
+Program(ClassDefinition(
+  classdef, Identifier,
+  PropertiesBlock(properties, Body(ExpressionStatement(Identifier)), end),
+  MethodsBlock(methods,
+    FunctionDeclaration(
+      function, Identifier, Identifier, ParamList(Identifier),
+      Body(AssignmentStatement(MemberExpression(Identifier, PropertyName), Identifier)),
+      end
+    ),
+    end
+  ),
+  end
+))
+
+# Class with superclass
+
+classdef Dog < Animal
+  properties
+    Breed
+  end
+end
+
+==>
+
+Program(ClassDefinition(
+  classdef, Identifier, Identifier,
+  PropertiesBlock(properties, Body(ExpressionStatement(Identifier)), end),
+  end
+))
+
+# Class with attributes
+
+classdef (Sealed, Abstract) BaseClass
+  methods (Access = private)
+    function helper(obj)
+      disp(obj)
+    end
+  end
+end
+
+==>
+
+Program(ClassDefinition(
+  classdef, AttributeList(Attribute(Identifier), Attribute(Identifier)), Identifier,
+  MethodsBlock(methods, AttributeList(Attribute(Identifier, Identifier)),
+    FunctionDeclaration(
+      function, Identifier, ParamList(Identifier),
+      Body(ExpressionStatement(CallExpression(Identifier, Identifier))),
+      end
+    ),
+    end
+  ),
+  end
+))
+
+# Events block
+
+classdef Observable
+  events
+    DataChanged
+    StatusUpdate
+  end
+end
+
+==>
+
+Program(ClassDefinition(
+  classdef, Identifier,
+  EventsBlock(events, Body(ExpressionStatement(Identifier), ExpressionStatement(Identifier)), end),
+  end
+))
+
+# Enumeration block
+
+classdef Color
+  enumeration
+    Red
+    Green
+    Blue
+  end
+end
+
+==>
+
+Program(ClassDefinition(
+  classdef, Identifier,
+  EnumerationBlock(enumeration, Body(
+    ExpressionStatement(Identifier),
+    ExpressionStatement(Identifier),
+    ExpressionStatement(Identifier)
+  ), end),
+  end
+))
+
+# Class with multiple superclasses
+
+classdef MyHandle < handle & matlab.mixin.SetGet
+  properties
+    Data
+  end
+end
+
+==>
+
+Program(ClassDefinition(
+  classdef, Identifier, Identifier, Identifier, Identifier, Identifier,
+  PropertiesBlock(properties, Body(ExpressionStatement(Identifier)), end),
+  end
+))

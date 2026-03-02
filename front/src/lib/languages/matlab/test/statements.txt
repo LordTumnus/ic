@@ -1,0 +1,103 @@
+# Simple assignment
+
+x = 1
+
+==>
+
+Program(AssignmentStatement(Identifier, Number))
+
+# Expression assignment
+
+x = a + b
+
+==>
+
+Program(AssignmentStatement(Identifier, BinaryExpression(Identifier, ArithOp, Identifier)))
+
+# Matrix destructuring assignment
+
+[a, b] = foo(x)
+
+==>
+
+Program(AssignmentStatement(MatrixExpression(Identifier, Identifier), CallExpression(Identifier, Identifier)))
+
+# Member assignment
+
+obj.field = 42
+
+==>
+
+Program(AssignmentStatement(MemberExpression(Identifier, PropertyName), Number))
+
+# Indexed assignment
+
+A(1, 2) = 0
+
+==>
+
+Program(AssignmentStatement(CallExpression(Identifier, Number, Number), Number))
+
+# Multiple statements with semicolons
+
+x = 1; y = 2
+
+==>
+
+Program(AssignmentStatement(Identifier, Number), AssignmentStatement(Identifier, Number))
+
+# Return statement
+
+return
+
+==>
+
+Program(ReturnStatement(return))
+
+# Break statement
+
+break
+
+==>
+
+Program(BreakStatement(break))
+
+# Continue statement
+
+continue
+
+==>
+
+Program(ContinueStatement(continue))
+
+# Global statement
+
+global x y z
+
+==>
+
+Program(GlobalStatement(global, Identifier, Identifier, Identifier))
+
+# Persistent statement
+
+persistent counter
+
+==>
+
+Program(PersistentStatement(persistent, Identifier))
+
+# Import statement
+
+import pkg.subpkg.MyClass
+
+==>
+
+Program(ImportStatement(import, Identifier, Identifier, Identifier))
+
+# Import dotted path
+
+import pkg.utils.helpers
+
+==>
+
+Program(ImportStatement(import, Identifier, Identifier, Identifier))

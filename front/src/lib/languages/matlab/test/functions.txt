@@ -1,0 +1,159 @@
+# Simple function
+
+function y = square(x)
+  y = x^2
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, Identifier, ParamList(Identifier),
+  Body(AssignmentStatement(Identifier, BinaryExpression(Identifier, ArithOp, Number))),
+  end
+))
+
+# Function no output
+
+function greet(name)
+  disp(name)
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, ParamList(Identifier),
+  Body(ExpressionStatement(CallExpression(Identifier, Identifier))),
+  end
+))
+
+# Function no args no output
+
+function doStuff
+  x = 1
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier,
+  Body(AssignmentStatement(Identifier, Number)),
+  end
+))
+
+# Multiple output function
+
+function [a, b] = swap(x, y)
+  a = y
+  b = x
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, Identifier, Identifier, ParamList(Identifier, Identifier),
+  Body(
+    AssignmentStatement(Identifier, Identifier),
+    AssignmentStatement(Identifier, Identifier)
+  ),
+  end
+))
+
+# Nested functions
+
+function y = outer(x)
+  y = inner(x)
+  function z = inner(w)
+    z = w + 1
+  end
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, Identifier, ParamList(Identifier),
+  Body(
+    AssignmentStatement(Identifier, CallExpression(Identifier, Identifier)),
+    FunctionDeclaration(
+      function, Identifier, Identifier, ParamList(Identifier),
+      Body(AssignmentStatement(Identifier, BinaryExpression(Identifier, ArithOp, Number))),
+      end
+    )
+  ),
+  end
+))
+
+# Function with arguments block
+
+function y = validated(x)
+  arguments
+    x (1,1) double
+  end
+  y = x * 2
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, Identifier, ParamList(Identifier),
+  Body(
+    ArgumentsBlock(arguments, Body(...), end),
+    AssignmentStatement(Identifier, BinaryExpression(Identifier, ArithOp, Number))
+  ),
+  end
+))
+
+# Function with tilde output
+
+function [~, idx] = findMax(data)
+  idx = 1
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, Identifier, ParamList(Identifier),
+  Body(AssignmentStatement(Identifier, Number)),
+  end
+))
+
+# Function handle reference
+
+f = @sin
+
+==>
+
+Program(AssignmentStatement(Identifier, FunctionHandle(Identifier)))
+
+# Anonymous function assignment
+
+f = @(x, y) sqrt(x^2 + y^2)
+
+==>
+
+Program(AssignmentStatement(
+  Identifier,
+  AnonymousFunction(
+    Identifier, Identifier,
+    CallExpression(Identifier,
+      BinaryExpression(
+        BinaryExpression(Identifier, ArithOp, Number),
+        ArithOp,
+        BinaryExpression(Identifier, ArithOp, Number)
+      )
+    )
+  )
+))
+
+# Function with empty param list
+
+function result = compute()
+  result = 42
+end
+
+==>
+
+Program(FunctionDeclaration(
+  function, Identifier, Identifier, ParamList,
+  Body(AssignmentStatement(Identifier, Number)),
+  end
+))

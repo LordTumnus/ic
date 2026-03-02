@@ -1,0 +1,373 @@
+// Lezer LR grammar for MATLAB.
+//
+// Structurally complete — suitable for highlighting, code folding,
+// autocompletion, linting, and semantic analysis.
+
+statementList { (statement separator | separator)* statement? }
+
+@top Program { statementList }
+
+@precedence {
+  member,
+  call,
+  postfix,
+  power @right,
+  unary @right,
+  multiply @left,
+  add @left,
+  colon @right,
+  comparison @left,
+  not,
+  elementAnd @left,
+  elementOr @left,
+  shortAnd @left,
+  shortOr @left,
+  assign @right
+}
+
+separator { newline | ";" | "," }
+
+// ─── Statements ──────────────────────────────────────
+
+statement[@isGroup=Statement] {
+  FunctionDeclaration |
+  ClassDefinition |
+  IfStatement |
+  ForStatement |
+  WhileStatement |
+  SwitchStatement |
+  TryCatchStatement |
+  SpmdStatement |
+  ParforStatement |
+  ReturnStatement |
+  BreakStatement |
+  ContinueStatement |
+  GlobalStatement |
+  PersistentStatement |
+  ImportStatement |
+  ArgumentsBlock |
+  AssignmentStatement |
+  ExpressionStatement
+}
+
+ExpressionStatement { expression }
+
+AssignmentStatement { expression !assign "=" expression }
+
+ReturnStatement   { kw<"return"> }
+BreakStatement    { kw<"break"> }
+ContinueStatement { kw<"continue"> }
+
+GlobalStatement[@dynamicPrecedence=1]     { kw<"global"> Identifier+ }
+PersistentStatement[@dynamicPrecedence=1] { kw<"persistent"> Identifier+ }
+
+ImportStatement { kw<"import"> Identifier ("." Identifier)* }
+
+// ─── Functions ───────────────────────────────────────
+
+FunctionDeclaration[@dynamicPrecedence=2] {
+  kw<"function"> functionOutput? Identifier ParamList? separator
+  Body
+  kw<"end">
+}
+
+functionOutput {
+  Identifier "=" |
+  "[" commaSep1<Identifier | "~"> "]" "="
+}
+
+ParamList { "(" commaSep<paramName> ")" }
+
+paramName { "~" | Identifier }
+
+ArgumentsBlock[@dynamicPrecedence=2] {
+  ckw<"arguments"> AttributeList? separator
+  Body
+  kw<"end">
+}
+
+// ─── Classes ─────────────────────────────────────────
+
+ClassDefinition[@dynamicPrecedence=2] {
+  kw<"classdef"> AttributeList? Identifier superclassList? separator
+  classBody*
+  kw<"end">
+}
+
+superclassList { "<" superclass ("&" superclass)* }
+
+superclass { Identifier ("." Identifier)* }
+
+classBody {
+  PropertiesBlock |
+  MethodsBlock |
+  EventsBlock |
+  EnumerationBlock |
+  separator
+}
+
+PropertiesBlock[@dynamicPrecedence=2] {
+  ckw<"properties"> AttributeList? separator
+  Body
+  kw<"end">
+}
+
+MethodsBlock[@dynamicPrecedence=2] {
+  ckw<"methods"> AttributeList? separator
+  methodsBody
+  kw<"end">
+}
+
+methodsBody { (FunctionDeclaration | separator)* }
+
+EventsBlock[@dynamicPrecedence=2] {
+  ckw<"events"> AttributeList? separator
+  Body
+  kw<"end">
+}
+
+EnumerationBlock[@dynamicPrecedence=2] {
+  ckw<"enumeration"> AttributeList? separator
+  Body
+  kw<"end">
+}
+
+AttributeList { "(" commaSep1<Attribute> ")" }
+
+Attribute { Identifier ("=" expression)? }
+
+// ─── Control Flow ────────────────────────────────────
+
+IfStatement[@dynamicPrecedence=2] {
+  kw<"if"> expression separator
+  Body
+  ElseifClause*
+  ElseClause?
+  kw<"end">
+}
+
+ElseifClause { kw<"elseif"> expression separator Body }
+
+ElseClause { kw<"else"> separator Body }
+
+ForStatement[@dynamicPrecedence=2] {
+  kw<"for"> Identifier "=" expression separator
+  Body
+  kw<"end">
+}
+
+WhileStatement[@dynamicPrecedence=2] {
+  kw<"while"> expression separator
+  Body
+  kw<"end">
+}
+
+SwitchStatement[@dynamicPrecedence=2] {
+  kw<"switch"> expression separator
+  CaseClause*
+  OtherwiseClause?
+  kw<"end">
+}
+
+CaseClause  { kw<"case"> expression separator Body }
+OtherwiseClause { kw<"otherwise"> separator Body }
+
+TryCatchStatement[@dynamicPrecedence=2] {
+  kw<"try"> separator
+  Body
+  CatchClause?
+  kw<"end">
+}
+
+CatchClause { kw<"catch"> Identifier? separator Body }
+
+SpmdStatement[@dynamicPrecedence=2] {
+  ckw<"spmd"> separator
+  Body
+  kw<"end">
+}
+
+ParforStatement[@dynamicPrecedence=2] {
+  ckw<"parfor"> Identifier "=" expression separator
+  Body
+  kw<"end">
+}
+
+Body { statementList }
+
+// ─── Expressions ─────────────────────────────────────
+//
+// EndExpression is intentionally NOT part of `expression`.
+// It only appears inside ( ) [ ] { } via callArg / matrixElement.
+// At statement level, `end` always means "close block".
+
+expression[@isGroup=Expression] {
+  Identifier |
+  Number |
+  String |
+  CharArray |
+  BooleanLiteral |
+  ParenExpression |
+  MatrixExpression |
+  CellArrayExpression |
+  UnaryExpression |
+  BinaryExpression |
+  ColonExpression |
+  TransposeExpression |
+  MemberExpression |
+  CallExpression |
+  CellIndexExpression |
+  FunctionHandle |
+  AnonymousFunction |
+  NotExpression |
+  MetaclassExpression
+}
+
+ParenExpression { "(" expression ")" }
+
+MatrixExpression {
+  "[" matrixContent? "]"
+}
+
+matrixContent { matrixElement (("," | ";" | newline) matrixElement)* }
+
+matrixElement { expression | EndExpression }
+
+CellArrayExpression { "{" matrixContent? "}" }
+
+UnaryExpression {
+  !unary (ArithOp<"+"> | ArithOp<"-">) expression
+}
+
+NotExpression {
+  !not LogicOp<"~"> expression
+}
+
+BinaryExpression {
+  expression !multiply (ArithOp<"*"> | ArithOp<"/"> | ArithOp<"\\"> |
+                        ArithOp<".*"> | ArithOp<"./"> | ArithOp<".\\">) expression |
+  expression !add (ArithOp<"+"> | ArithOp<"-">) expression |
+  expression !power (ArithOp<"^"> | ArithOp<".^">) expression |
+  expression !comparison CompareOp expression |
+  expression !elementAnd LogicOp<"&"> expression |
+  expression !elementOr LogicOp<"|"> expression |
+  expression !shortAnd LogicOp<"&&"> expression |
+  expression !shortOr LogicOp<"||"> expression
+}
+
+ColonExpression {
+  expression !colon ":" expression
+}
+
+TransposeExpression {
+  expression !postfix Transpose
+}
+
+MemberExpression {
+  expression !member "." PropertyName
+}
+
+CallExpression {
+  expression !call "(" commaSep<callArg> ")"
+}
+
+callArg { expression | EndExpression | ":" | "~" }
+
+CellIndexExpression {
+  expression !call "{" commaSep<callArg> "}"
+}
+
+FunctionHandle { "@" Identifier }
+
+AnonymousFunction {
+  "@" "(" commaSep<Identifier> ")" expression
+}
+
+MetaclassExpression { "?" Identifier }
+
+EndExpression { kw<"end"> }
+
+BooleanLiteral { @specialize[@name=BooleanLiteral]<Identifier, "true" | "false"> }
+
+CompareOp { "==" | "~=" | "<" | ">" | "<=" | ">=" }
+
+ArithOp<op> { op }
+LogicOp<op> { op }
+
+PropertyName { identifier }
+
+// ─── Keywords ────────────────────────────────────────
+//
+// kw<>  — @specialize: always a keyword (function, if, end, …)
+// ckw<> — @extend: contextual, also valid as identifier
+//         (arguments, properties, methods, events, enumeration, spmd, parfor)
+
+kw<term>  { @specialize[@name={term}]<Identifier, term> }
+ckw<term> { @extend[@name={term}]<Identifier, term> }
+
+// ─── Helpers ─────────────────────────────────────────
+
+commaSep<content>  { (content ("," content)*)? }
+commaSep1<content> { content ("," content)* }
+
+// ─── External ────────────────────────────────────────
+
+@external tokens transposeToken from "./tokens" { Transpose, CharArray }
+@external tokens lineContinuationToken from "./tokens" { LineContinuation }
+
+@external propSource matlabHighlighting from "./highlight"
+
+// ─── Skip ────────────────────────────────────────────
+
+@skip { spaces | LineContinuation | LineComment | BlockComment }
+
+// ─── Tokens ──────────────────────────────────────────
+
+@tokens {
+  spaces[@export] { $[\t \u00a0]+ }
+  newline[@export] { $[\r\n] }
+
+  LineComment[isolate] { "%" ![\r\n{]* }
+
+  BlockComment[isolate] { "%{" blockCommentContent* "%}" }
+  blockCommentContent { ![%] | "%" ![}] }
+
+  Number {
+    @digit ("_" @digit | @digit)* ("." @digit ("_" @digit | @digit)*)? (("e" | "E") ("+" | "-")? @digit+)? ("i" | "j")? |
+    "." @digit ("_" @digit | @digit)* (("e" | "E") ("+" | "-")? @digit+)? ("i" | "j")? |
+    "0" $[xX] $[0-9a-fA-F] ("_" $[0-9a-fA-F] | $[0-9a-fA-F])* |
+    "0" $[bB] $[01] ("_" $[01] | $[01])*
+  }
+
+  String[isolate] { "\"" (stringEscape | stringContent)* "\"" }
+  stringContent { ![\\"\r\n]+ }
+  stringEscape { "\\" _ }
+
+  identifier { $[a-zA-Z_] $[a-zA-Z0-9_]* }
+  Identifier { identifier }
+
+  "(" ")" "[" "]" "{" "}"
+  "." "," ";" ":" "@" "?" "~"
+  "=" "=="
+  "+" "-" "*" "/" "\\" "^"
+  ".*" "./" ".\\" ".^"
+  "<" ">" "<=" ">=" "~="
+  "&" "|" "&&" "||"
+
+  @precedence {
+    BlockComment,
+    LineComment,
+    ".*", "./", ".\\", ".^",
+    ".",
+    "&&", "&",
+    "||", "|",
+    "==", "=",
+    "~=", "~",
+    "<=", "<",
+    ">=", ">",
+    Number,
+    spaces, newline, identifier
+  }
+}
+
+@detectDelim

@@ -1,0 +1,185 @@
+# Simple if
+
+if x > 0
+  y = 1
+end
+
+==>
+
+Program(IfStatement(
+  if,
+  BinaryExpression(Identifier, CompareOp, Number),
+  Body(AssignmentStatement(Identifier, Number)),
+  end
+))
+
+# If-else
+
+if flag
+  x = 1
+else
+  x = 0
+end
+
+==>
+
+Program(IfStatement(
+  if, Identifier,
+  Body(AssignmentStatement(Identifier, Number)),
+  ElseClause(else, Body(AssignmentStatement(Identifier, Number))),
+  end
+))
+
+# If-elseif-else
+
+if x > 0
+  y = 1
+elseif x < 0
+  y = -1
+else
+  y = 0
+end
+
+==>
+
+Program(IfStatement(
+  if, BinaryExpression(Identifier, CompareOp, Number),
+  Body(AssignmentStatement(Identifier, Number)),
+  ElseifClause(
+    elseif, BinaryExpression(Identifier, CompareOp, Number),
+    Body(AssignmentStatement(Identifier, UnaryExpression(ArithOp, Number)))
+  ),
+  ElseClause(else, Body(AssignmentStatement(Identifier, Number))),
+  end
+))
+
+# For loop
+
+for i = 1:10
+  x = i
+end
+
+==>
+
+Program(ForStatement(
+  for, Identifier, ColonExpression(Number, Number),
+  Body(AssignmentStatement(Identifier, Identifier)),
+  end
+))
+
+# While loop
+
+while x > 0
+  x = x - 1
+end
+
+==>
+
+Program(WhileStatement(
+  while, BinaryExpression(Identifier, CompareOp, Number),
+  Body(AssignmentStatement(Identifier, BinaryExpression(Identifier, ArithOp, Number))),
+  end
+))
+
+# Switch statement
+
+switch val
+  case 1
+    x = 'a'
+  case 2
+    x = 'b'
+  otherwise
+    x = 'c'
+end
+
+==>
+
+Program(SwitchStatement(
+  switch, Identifier,
+  CaseClause(case, Number, Body(AssignmentStatement(Identifier, CharArray))),
+  CaseClause(case, Number, Body(AssignmentStatement(Identifier, CharArray))),
+  OtherwiseClause(otherwise, Body(AssignmentStatement(Identifier, CharArray))),
+  end
+))
+
+# Try-catch
+
+try
+  x = riskyOp()
+catch e
+  disp(e)
+end
+
+==>
+
+Program(TryCatchStatement(
+  try,
+  Body(AssignmentStatement(Identifier, CallExpression(Identifier))),
+  CatchClause(catch, Identifier, Body(ExpressionStatement(CallExpression(Identifier, Identifier)))),
+  end
+))
+
+# Try without catch
+
+try
+  x = 1
+end
+
+==>
+
+Program(TryCatchStatement(
+  try,
+  Body(AssignmentStatement(Identifier, Number)),
+  end
+))
+
+# Nested if inside for
+
+for i = 1:5
+  if i > 3
+    break
+  end
+end
+
+==>
+
+Program(ForStatement(
+  for, Identifier, ColonExpression(Number, Number),
+  Body(IfStatement(
+    if, BinaryExpression(Identifier, CompareOp, Number),
+    Body(BreakStatement(break)),
+    end
+  )),
+  end
+))
+
+# Spmd statement
+
+spmd
+  x = labindex
+end
+
+==>
+
+Program(SpmdStatement(
+  spmd,
+  Body(AssignmentStatement(Identifier, Identifier)),
+  end
+))
+
+# Parfor statement
+
+parfor i = 1:100
+  A(i) = compute(i)
+end
+
+==>
+
+Program(ParforStatement(
+  parfor, Identifier, ColonExpression(Number, Number),
+  Body(AssignmentStatement(
+    CallExpression(Identifier, Identifier),
+    CallExpression(Identifier, Identifier)
+  )),
+  end
+))
