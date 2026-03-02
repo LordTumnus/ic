@@ -19,6 +19,7 @@
 		CssProperty
 	} from '../devtools-types';
 	import { cleanSelector } from './dom/dom-utils';
+	import ColorPicker from '$lib/components/form/colorPicker/ColorPicker.svelte';
 
 	// --- Merged rule types (local to this component) ---
 
@@ -71,6 +72,18 @@
 
 	let filterText = $state('');
 	let filterEl: HTMLInputElement | undefined;
+
+	// --- Color picker state ---
+
+	let optimisticColors = $state<Record<string, string>>({});
+	let colorDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let pendingColorCommit: {
+		componentId: string;
+		rule: MergedRule;
+		propName: string;
+		color: string;
+		key: string;
+	} | null = null;
 
 	// --- Add Rule state ---
 
@@ -162,6 +175,41 @@
 	function kebabToCamel(str: string): string {
 		if (str.startsWith('--')) return str;
 		return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+	}
+
+	// --- Color detection & conversion ---
+
+	let colorCtx: CanvasRenderingContext2D | null = null;
+
+	function getColorCtx(): CanvasRenderingContext2D {
+		if (!colorCtx) colorCtx = document.createElement('canvas').getContext('2d')!;
+		return colorCtx;
+	}
+
+	function isColorValue(value: string): boolean {
+		const v = value.trim();
+		if (!v) return false;
+		if (/^#[0-9a-f]{3,8}$/i.test(v)) return true;
+		if (/^(rgb|hsl)a?\([^)]+\)\s*$/i.test(v)) return true;
+		if (/^(inherit|initial|unset|revert|none|auto|transparent|currentcolor|var\(|calc\()/i.test(v)) return false;
+		// Named colors: validate via canvas
+		if (/^[a-z]+$/i.test(v)) {
+			const ctx = getColorCtx();
+			ctx.fillStyle = '#000001';
+			ctx.fillStyle = v;
+			return ctx.fillStyle !== '#000001';
+		}
+		return false;
+	}
+
+	/** Resolve any CSS color to a format parseColor understands (hex/rgb/hsl). */
+	function resolveColor(value: string): string {
+		const v = value.trim();
+		if (v.startsWith('#') || /^(rgb|hsl)a?\(/i.test(v)) return v;
+		const ctx = getColorCtx();
+		ctx.fillStyle = '#000000';
+		ctx.fillStyle = v;
+		return ctx.fillStyle;
 	}
 
 	/**
@@ -558,6 +606,64 @@
 		}
 	}
 
+	function scheduleColorCommit(
+		componentId: string,
+		rule: MergedRule,
+		propName: string,
+		color: string,
+		key: string
+	) {
+		pendingColorCommit = { componentId, rule, propName, color, key };
+		if (colorDebounceTimer) clearTimeout(colorDebounceTimer);
+		colorDebounceTimer = setTimeout(flushColorCommit, 500);
+	}
+
+	function flushColorCommit() {
+		if (colorDebounceTimer) {
+			clearTimeout(colorDebounceTimer);
+			colorDebounceTimer = null;
+		}
+		if (!pendingColorCommit) return;
+		const { componentId, rule, propName, color, key } = pendingColorCommit;
+		pendingColorCommit = null;
+		commitColorChange(componentId, rule, propName, color).then(() => {
+			setTimeout(() => {
+				scan();
+				// Clear optimistic after scan's rAF commits the new rulesMap
+				requestAnimationFrame(() => {
+					delete optimisticColors[key];
+				});
+			}, 200);
+		});
+	}
+
+	async function commitColorChange(
+		componentId: string,
+		rule: MergedRule,
+		propName: string,
+		newColor: string
+	) {
+		if (!request) return;
+
+		const isCssVar = propName.startsWith('--');
+		const properties: Record<string, string> = {};
+		const cssVariables: Array<{ name: string; value: string }> = [];
+
+		if (isCssVar) {
+			cssVariables.push({ name: propName, value: newColor });
+		} else {
+			properties[kebabToCamel(propName)] = newColor;
+		}
+
+		const payload: Record<string, unknown> = {
+			componentId,
+			selector: rule.editSelector,
+			properties
+		};
+		if (cssVariables.length > 0) payload.cssVariables = cssVariables;
+		await request('setStyle', payload);
+	}
+
 	function handlePanelKeydown(e: KeyboardEvent) {
 		if (e.key === 'f' && (e.ctrlKey || e.metaKey)) {
 			e.preventDefault();
@@ -665,12 +771,25 @@
 						{:else}
 							<div class="ic-dt-css__body">
 								{#each rule.properties as prop (prop.name + prop.source)}
+									{@const colorKey = `${componentId}:${rule.editSelector}:${prop.name}:${prop.source}`}
+									{@const displayValue = optimisticColors[colorKey] ?? prop.value}
 									<div
 										class="ic-dt-css__prop"
 										class:ic-dt-css__prop--overridden={prop.overridden}
 										class:ic-dt-css__prop--dynamic={prop.source === 'dynamic'}
 									>
-										<span class="ic-dt-css__prop-name">{prop.name}</span>: <span class="ic-dt-css__prop-value">{prop.value}</span>;
+										<span class="ic-dt-css__prop-name">{prop.name}</span>:{' '}{#if isColorValue(displayValue)}{#if stylable && !!request && !prop.overridden}<span class="ic-dt-css__color-picker-wrap"><ColorPicker
+											value={resolveColor(displayValue)}
+											size="sm"
+											showAlpha
+											popupPosition="best"
+											valueChanging={(data) => {
+												const d = data as { value: string };
+												optimisticColors[colorKey] = d.value;
+												scheduleColorCommit(componentId, rule, prop.name, d.value, colorKey);
+											}}
+											closed={flushColorCommit}
+										/></span>{:else}<span class="ic-dt-css__swatch" style="background-color: {displayValue}"></span>{/if}{' '}{/if}<span class="ic-dt-css__prop-value">{displayValue}</span>;
 									</div>
 								{/each}
 							</div>
@@ -1059,6 +1178,27 @@
 
 	.ic-dt-css__prop-name {
 		color: var(--ic-primary);
+	}
+
+	.ic-dt-css__swatch {
+		display: inline-block;
+		width: 11px;
+		height: 11px;
+		border: 1px solid var(--ic-border);
+		border-radius: 2px;
+		vertical-align: middle;
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+	}
+
+	.ic-dt-css__color-picker-wrap {
+		display: inline-flex;
+		vertical-align: middle;
+	}
+
+	/* Shrink the ColorPicker swatch to match devtools scale */
+	.ic-dt-css__color-picker-wrap :global(.ic-color-picker__swatch) {
+		width: 12px;
+		height: 12px;
 	}
 
 	.ic-dt-css__prop-value {
