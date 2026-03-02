@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@fontsource/roboto-mono": "^5.2.8",
-    "lucide-static": "^0.563.0"
+    "lucide-static": "^0.563.0",
+    "pdfjs-dist": "^4.10.38"
   }
 }
