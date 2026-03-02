@@ -60,7 +60,7 @@
 	}
 
 	let rootExpanded = $state(true);
-	let expandedChildren = $state<Record<string, boolean>>({});
+	let collapsedChildren = $state<Record<string, boolean>>({});
 
 	/** Short type label */
 	function shortType(type: string): string {
@@ -107,17 +107,17 @@
 		<div class="ic-dt-mth__child">
 			<button
 				class="ic-dt-mth__child-header"
-				onclick={() => (expandedChildren[cid] = !expandedChildren[cid])}
+				onclick={() => (collapsedChildren[cid] = !collapsedChildren[cid])}
 			>
 				<span
 					class="ic-dt-mth__tree-chevron"
-					class:ic-dt-mth__tree-chevron--open={expandedChildren[cid]}
+					class:ic-dt-mth__tree-chevron--open={!collapsedChildren[cid]}
 				>&#9654;</span>
 				<span class="ic-dt-mth__child-type">{shortType(info.componentType)}</span>
 				<span class="ic-dt-mth__child-target">({info.target})</span>
 			</button>
 
-			{#if expandedChildren[cid]}
+			{#if !collapsedChildren[cid]}
 				<div class="ic-dt-mth__child-body">
 					{#if info.methods.length === 0}
 						<div class="ic-dt-mth__empty">No methods</div>
@@ -293,15 +293,23 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		padding: 5px 10px;
+		padding: 3px 8px;
 		cursor: pointer;
-		background: var(--ic-secondary);
+		background: transparent;
 		font-family: var(--ic-font-family);
 		font-size: var(--ic-font-size);
 		box-sizing: border-box;
 	}
 
 	.ic-dt-mth__child-header:hover {
+		background: rgba(128, 128, 128, 0.06);
+	}
+
+	.ic-dt-mth__child--root > .ic-dt-mth__child-header {
+		background: var(--ic-secondary);
+	}
+
+	.ic-dt-mth__child--root > .ic-dt-mth__child-header:hover {
 		background: rgba(128, 128, 128, 0.1);
 	}
 

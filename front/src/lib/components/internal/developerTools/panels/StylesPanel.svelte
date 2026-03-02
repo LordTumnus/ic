@@ -60,7 +60,7 @@
 	let rulesMap = $state<Record<string, MergedRule[]>>({});
 	let scanning = $state(false);
 	let rootExpanded = $state(true);
-	let expandedChildren = $state<Record<string, boolean>>({});
+	let collapsedChildren = $state<Record<string, boolean>>({});
 
 	// --- Edit state ---
 
@@ -814,11 +814,11 @@
 			<div class="ic-dt-css__child-row">
 				<button
 					class="ic-dt-css__child-header"
-					onclick={() => (expandedChildren[cid] = !expandedChildren[cid])}
+					onclick={() => (collapsedChildren[cid] = !collapsedChildren[cid])}
 				>
 					<span
 						class="ic-dt-css__tree-chevron"
-						class:ic-dt-css__tree-chevron--open={expandedChildren[cid]}
+						class:ic-dt-css__tree-chevron--open={!collapsedChildren[cid]}
 					>&#9654;</span>
 					<span class="ic-dt-css__child-type">{shortType(info.componentType)}</span>
 					<span class="ic-dt-css__child-target">({info.target})</span>
@@ -836,7 +836,7 @@
 							addingFor = cid;
 							newSelector = '> *';
 							newBody = '';
-							if (!expandedChildren[cid]) expandedChildren[cid] = true;
+							if (collapsedChildren[cid]) collapsedChildren[cid] = false;
 						}}
 						disabled={scanning || editPending}
 						title="Add .style() rule to {shortType(info.componentType)}"
@@ -844,7 +844,7 @@
 				{/if}
 			</div>
 
-			{#if expandedChildren[cid]}
+			{#if !collapsedChildren[cid]}
 				<div class="ic-dt-css__child-body">
 					{@render rulesContent(cid)}
 					{#if info.children && info.children.length > 0}
@@ -1003,7 +1003,7 @@
 	.ic-dt-css__child-row {
 		display: flex;
 		align-items: center;
-		background: var(--ic-secondary);
+		background: transparent;
 	}
 
 	.ic-dt-css__child-header {
@@ -1013,7 +1013,7 @@
 		gap: 6px;
 		flex: 1;
 		min-width: 0;
-		padding: 5px 10px;
+		padding: 3px 8px;
 		cursor: pointer;
 		font-family: var(--ic-font-family);
 		font-size: var(--ic-font-size);
@@ -1021,6 +1021,14 @@
 	}
 
 	.ic-dt-css__child-row:hover {
+		background: rgba(128, 128, 128, 0.06);
+	}
+
+	.ic-dt-css__child--root > .ic-dt-css__child-row {
+		background: var(--ic-secondary);
+	}
+
+	.ic-dt-css__child--root > .ic-dt-css__child-row:hover {
 		background: rgba(128, 128, 128, 0.1);
 	}
 

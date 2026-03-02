@@ -38,8 +38,11 @@
 	// Local edit buffer for text/number inputs
 	let editBuffer = $state<Record<string, string>>({});
 
-	// Child section expand state (keyed by componentId)
-	let expandedChildren = $state<Record<string, boolean>>({});
+	// Child section collapse state (keyed by componentId) — empty = all expanded
+	let collapsedChildren = $state<Record<string, boolean>>({});
+
+	// Hidden-props expand state (keyed by componentId) — empty = all collapsed
+	let expandedHidden = $state<Record<string, boolean>>({});
 
 	// Complex property expand state (keyed by editKey)
 	let expandedValues = $state<Record<string, boolean>>({});
@@ -339,17 +342,17 @@
 		<div class="ic-dt-props__child">
 			<button
 				class="ic-dt-props__child-header"
-				onclick={() => (expandedChildren[cid] = !expandedChildren[cid])}
+				onclick={() => (collapsedChildren[cid] = !collapsedChildren[cid])}
 			>
 				<span
 					class="ic-dt-props__chevron"
-					class:ic-dt-props__chevron--open={expandedChildren[cid]}
+					class:ic-dt-props__chevron--open={!collapsedChildren[cid]}
 				>&#9654;</span>
 				<span class="ic-dt-props__child-type">{shortType(info.componentType)}</span>
 				<span class="ic-dt-props__child-target">({info.target})</span>
 			</button>
 
-			{#if expandedChildren[cid]}
+			{#if !collapsedChildren[cid]}
 				<div class="ic-dt-props__child-body">
 					{#each vis as prop (prop.name)}
 						{@render propRow(prop, cid)}
@@ -357,15 +360,15 @@
 					{#if hid.length > 0}
 						<button
 							class="ic-dt-props__section-toggle"
-							onclick={() => (expandedChildren[cid + ':hidden'] = !expandedChildren[cid + ':hidden'])}
+							onclick={() => (expandedHidden[cid] = !expandedHidden[cid])}
 						>
 							<span
 								class="ic-dt-props__chevron"
-								class:ic-dt-props__chevron--open={expandedChildren[cid + ':hidden']}
+								class:ic-dt-props__chevron--open={expandedHidden[cid]}
 							>&#9654;</span>
 							Hidden ({hid.length})
 						</button>
-						{#if expandedChildren[cid + ':hidden']}
+						{#if expandedHidden[cid]}
 							{#each hid as prop (prop.name)}
 								{@render propRow(prop, cid)}
 							{/each}
@@ -609,13 +612,21 @@
 		width: 100%;
 		padding: 3px 8px;
 		cursor: pointer;
-		background: var(--ic-secondary);
+		background: transparent;
 		font-family: var(--ic-font-family);
 		font-size: var(--ic-font-size);
 		box-sizing: border-box;
 	}
 
 	.ic-dt-props__child-header:hover {
+		background: rgba(128, 128, 128, 0.06);
+	}
+
+	.ic-dt-props__child--root > .ic-dt-props__child-header {
+		background: var(--ic-secondary);
+	}
+
+	.ic-dt-props__child--root > .ic-dt-props__child-header:hover {
 		background: rgba(128, 128, 128, 0.1);
 	}
 
