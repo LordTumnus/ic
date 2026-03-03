@@ -17,7 +17,8 @@
 		typeInfo,
 		path = [] as PathSegment[],
 		depth = 0,
-		oncommit
+		oncommit,
+		onremove
 	}: {
 		/** Live JS value for this node (from reactive proxy) */
 		value: unknown;
@@ -29,6 +30,8 @@
 		depth?: number;
 		/** Callback to commit a leaf edit: (fullPath, newValue) */
 		oncommit: (path: PathSegment[], value: unknown) => void;
+		/** Optional callback to remove an element by index (only for primitive arrays) */
+		onremove?: (index: number) => void;
 	} = $props();
 
 	const INDENT = 14;
@@ -114,8 +117,11 @@
 
 		// Indexed collection with shared element type (homogeneous arrays)
 		if (isIndexed && typeInfo.elementTypeInfo) {
-			const arr = Array.isArray(value) ? value : [];
-			const count = Math.min(showCount, totalElements, arr.length);
+			// Handle JSON scalar collapse: [x] → x after MATLAB round-trip
+			const arr = Array.isArray(value) ? value : (value != null ? [value] : []);
+			// Use live array length — typeInfo.size is a stale snapshot and
+			// won't reflect elements added/removed via the devtools input.
+			const count = Math.min(showCount, arr.length);
 			const result: Entry[] = [];
 			for (let i = 0; i < count; i++) {
 				result.push({
@@ -148,7 +154,7 @@
 
 	const remaining = $derived(
 		isIndexed
-			? Math.max(0, Math.min(totalElements, (Array.isArray(value) ? value.length : 0)) - showCount)
+			? Math.max(0, (Array.isArray(value) ? value.length : (value != null ? 1 : 0)) - showCount)
 			: typeInfo.kind === 'cell'
 				? Math.max(0, typeInfo.children.length - showCount)
 				: 0
@@ -389,6 +395,16 @@
 
 		<!-- Type badge -->
 		<span class="ic-dt-vt__type">{shortClass(entry.typeInfo.className)}</span>
+		{#if onremove && entry.path.length > 0}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<span
+				class="ic-dt-vt__remove"
+				onclick={() => onremove(entry.path[entry.path.length - 1].index!)}
+				role="button"
+				tabindex="-1"
+				title="Remove entry"
+			>&times;</span>
+		{/if}
 	</div>
 
 	<!-- Expanded children (recursive) -->
@@ -503,6 +519,24 @@
 		opacity: 0.5;
 		margin-left: auto;
 		flex-shrink: 0;
+	}
+
+	.ic-dt-vt__remove {
+		flex-shrink: 0;
+		cursor: pointer;
+		color: var(--ic-destructive);
+		opacity: 0;
+		font-size: 13px;
+		line-height: 1;
+		padding: 0 2px;
+	}
+
+	.ic-dt-vt__row:hover .ic-dt-vt__remove {
+		opacity: 0.6;
+	}
+
+	.ic-dt-vt__remove:hover {
+		opacity: 1 !important;
 	}
 
 	/* --- Inline select --- */

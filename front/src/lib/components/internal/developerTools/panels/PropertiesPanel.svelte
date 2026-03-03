@@ -216,6 +216,56 @@
 		}
 	}
 
+	// --- Array editing support ---
+
+	/** True when a property holds an array value.
+	 *  Checks both the live value AND typeInfo.kind — the latter catches the case
+	 *  where JSON serialization collapsed a single-element array [x] to scalar x. */
+	function isArrayValue(prop: PropInfo, cid: string | null): boolean {
+		if (prop.typeInfo?.kind === 'array') return true;
+		return Array.isArray(getPropValue(cid, prop.name));
+	}
+
+	/** Get the comma-separated representation of the live array value.
+	 *  Handles scalars (JSON-collapsed single-element arrays). */
+	function getArrayDisplay(prop: PropInfo, cid: string | null): string {
+		const val = getPropValue(cid, prop.name);
+		if (Array.isArray(val)) return val.length === 0 ? '' : val.join(', ');
+		// Scalar: JSON collapsed [x] to x — show as single entry
+		if (val == null || val === '') return '';
+		return String(val);
+	}
+
+	function startArrayEdit(prop: PropInfo, cid: string | null) {
+		const key = editKey(prop, cid);
+		editingProp = key;
+		editBuffer[key] = getArrayDisplay(prop, cid);
+	}
+
+	function commitArrayEdit(prop: PropInfo, cid: string | null) {
+		const key = editKey(prop, cid);
+		editingProp = null;
+		const raw = editBuffer[key];
+		if (raw === undefined) return;
+		const parsed = raw.trim() === ''
+			? []
+			: raw.split(',').map((s) => s.trim()).filter((s) => s !== '')
+				.map((s) => isNumeric(prop) ? Number(s) : s);
+		setPropValue(prop, cid, parsed);
+		// Auto-expand the ValueTree so the user sees the result
+		if (parsed.length > 0) expandedValues[key] = true;
+	}
+
+	function handleArrayKeydown(prop: PropInfo, e: KeyboardEvent, cid: string | null) {
+		if (e.key === 'Enter') {
+			commitArrayEdit(prop, cid);
+			(e.target as HTMLElement)?.blur();
+		} else if (e.key === 'Escape') {
+			editingProp = null;
+			(e.target as HTMLElement)?.blur();
+		}
+	}
+
 	// --- Complex type support ---
 
 	/** True when a property has structural type info that can be expanded. */
@@ -227,6 +277,42 @@
 			k === 'objectArray' || k === 'structArray' ||
 			k === 'array' || k === 'cell'
 		);
+	}
+
+	/** Whether the expanded tree should show an "add entry" button.
+	 *  Only for non-readOnly primitive arrays (double[], string[], etc.) — not for
+	 *  complex types like ic.table.Column[] or struct arrays. */
+	function canAddElement(prop: PropInfo): boolean {
+		if (prop.readOnly) return false;
+		const ti = prop.typeInfo;
+		if (!ti || ti.kind !== 'array') return false;
+		const elClass = ti.elementTypeInfo?.className;
+		return elClass === 'double' || elClass === 'single' ||
+			elClass === 'string' || elClass === 'char' ||
+			elClass === 'logical';
+	}
+
+	/** Coerce the live value to a JS array, handling JSON scalar collapse. */
+	function toLiveArray(cid: string | null, propName: string): unknown[] {
+		const val = getPropValue(cid, propName);
+		if (Array.isArray(val)) return val;
+		if (val != null) return [val]; // scalar from JSON collapse
+		return [];
+	}
+
+	function addArrayElement(prop: PropInfo, cid: string | null) {
+		const arr = [...toLiveArray(cid, prop.name)];
+		const elClass = prop.typeInfo?.elementTypeInfo?.className;
+		const defaultVal = (elClass === 'double' || elClass === 'single') ? 0
+			: (elClass === 'logical') ? false
+			: '';
+		arr.push(defaultVal);
+		setPropValue(prop, cid, arr);
+	}
+
+	function removeArrayElement(prop: PropInfo, cid: string | null, index: number) {
+		const arr = toLiveArray(cid, prop.name).filter((_: unknown, i: number) => i !== index);
+		setPropValue(prop, cid, arr);
 	}
 
 	/** Generate a compact summary string from typeInfo + live value. */
@@ -301,6 +387,22 @@
 							<option value={option}>{option}</option>
 						{/each}
 					</select>
+				{:else if isEditable(prop) && isArrayValue(prop, cid)}
+					<!-- Comma-separated array input -->
+					<input
+						class="ic-dt-props__input"
+						type="text"
+						placeholder="comma-separated"
+						value={editingProp === key
+							? editBuffer[key]
+							: getArrayDisplay(prop, cid)}
+						onfocus={() => startArrayEdit(prop, cid)}
+						oninput={(e) => {
+							editBuffer[key] = (e.target as HTMLInputElement).value;
+						}}
+						onblur={() => commitArrayEdit(prop, cid)}
+						onkeydown={(e) => handleArrayKeydown(prop, e, cid)}
+					/>
 				{:else if isEditable(prop)}
 					<!-- Text / number input -->
 					<input
@@ -340,7 +442,16 @@
 					value={getPropValue(cid, prop.name)}
 					typeInfo={prop.typeInfo!}
 					oncommit={(path, val) => setPropValue(prop, cid, val, path)}
+					onremove={canAddElement(prop)
+						? (index) => removeArrayElement(prop, cid, index)
+						: undefined}
 				/>
+				{#if canAddElement(prop)}
+					<button
+						class="ic-dt-props__add-btn"
+						onclick={() => addArrayElement(prop, cid)}
+					>+ Add</button>
+				{/if}
 			</div>
 		{/if}
 	{/snippet}
@@ -702,5 +813,21 @@
 		margin-left: 8px;
 		padding: 2px 0;
 		background: rgba(128, 128, 128, 0.02);
+	}
+
+	.ic-dt-props__add-btn {
+		all: unset;
+		display: block;
+		cursor: pointer;
+		padding: 1px 8px;
+		margin-top: 1px;
+		color: var(--ic-primary);
+		font-family: var(--ic-font-family);
+		font-size: 0.85em;
+		opacity: 0.7;
+	}
+
+	.ic-dt-props__add-btn:hover {
+		opacity: 1;
 	}
 </style>
