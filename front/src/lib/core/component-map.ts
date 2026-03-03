@@ -75,6 +75,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Overlay components
   'ic.Toast': modules['../components/overlay/toast/Toast.svelte'],
   'ic.Dialog': modules['../components/overlay/dialog/Dialog.svelte'],
+  'ic.Drawer': modules['../components/overlay/drawer/Drawer.svelte'],
 
   // Internal components
   'ic.internal.DeveloperTools': modules['../components/internal/developerTools/DeveloperTools.svelte'],
