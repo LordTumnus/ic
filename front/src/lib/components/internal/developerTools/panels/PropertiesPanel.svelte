@@ -11,6 +11,7 @@
 	import type { ComponentInfo, ChildComponentInfo, PropInfo, PathSegment } from '../devtools-types';
 	import Registry from '$lib/core/registry';
 	import ValueTree from './ValueTree.svelte';
+	import { addToast } from '$lib/components/overlay/toast/toast-store.svelte';
 
 	let {
 		child,
@@ -130,6 +131,22 @@
 
 	// --- Handlers (parameterized by componentId) ---
 
+	/** Resolve the Component instance for silent prop writes (no @prop/ publish). */
+	function resolveComponent(componentId: string | null) {
+		const id = componentId ?? componentInfo.componentId;
+		return Registry.instance.get(id);
+	}
+
+	/** Walk a nested path on a JS object and read the leaf value. */
+	function getNestedValue(obj: unknown, path: PathSegment[]): unknown {
+		let target = obj as any;
+		for (const seg of path) {
+			target = seg.key != null ? target[seg.key] : target[seg.index!];
+			if (target == null) return target;
+		}
+		return target;
+	}
+
 	/** Walk a nested path on a JS object and set the leaf value in-place. */
 	function applyNestedValue(obj: unknown, path: PathSegment[], value: unknown): void {
 		let target = obj as any;
@@ -144,27 +161,31 @@
 	}
 
 	/** Write a property value via MATLAB request (MATLAB is the single source of truth).
-	 *  Also optimistically updates the proxy for instant UI feedback.
-	 *  Used for both top-level props (path=[]) and nested sub-props (path=[...segments]). */
+	 *  Optimistically updates the UI via setPropSilently (bypasses the reactive @prop/
+	 *  channel so invalid values don't reach MATLAB validators). On failure, rolls back
+	 *  and shows a toast. */
 	async function setPropValue(
 		prop: PropInfo,
 		componentId: string | null,
 		value: unknown,
 		path: PathSegment[] = []
 	): Promise<void> {
-		// Optimistic update: mutate the JS-side value immediately to prevent
-		// flicker while the MATLAB round-trip completes.
 		const current = getPropValue(componentId, prop.name);
+		const comp = resolveComponent(componentId);
+
+		// Snapshot old value for rollback.
+		const oldValue =
+			path.length > 0 && current != null && typeof current === 'object'
+				? getNestedValue(current, path)
+				: current;
+
+		// Optimistic update — silent (no @prop/ publish to MATLAB).
 		if (path.length === 0) {
-			if (componentId === null) {
-				child.props[prop.name] = value;
-			} else {
-				const comp = Registry.instance.get(componentId) as any;
-				if (comp?.svelteProps) comp.svelteProps[prop.name] = value;
-			}
+			comp?.setPropSilently(prop.name, value);
 		} else if (current != null && typeof current === 'object') {
 			applyNestedValue(current, path, value);
 		}
+
 		if (!request) return;
 		const res = await request('setNestedProp', {
 			componentId: componentId ?? '',
@@ -172,8 +193,21 @@
 			path,
 			value
 		});
+
 		if (!res.success) {
-			console.warn('DevTools: setNestedProp failed', res.data);
+			// Rollback the optimistic update (also silent).
+			if (path.length === 0) {
+				comp?.setPropSilently(prop.name, oldValue);
+			} else if (current != null && typeof current === 'object') {
+				applyNestedValue(current, path, oldValue);
+			}
+
+			const msg = String(res.data).replace(/<[^>]*>/g, '');
+			addToast({
+				value: `${prop.matlabName}: ${msg}`,
+				variant: 'destructive',
+				duration: 5
+			});
 		}
 	}
 
@@ -201,6 +235,7 @@
 		const key = editKey(prop, componentId);
 		editingProp = null;
 		const val = editBuffer[key];
+		delete editBuffer[key];
 		if (val !== undefined && val !== getDisplayValue(prop, componentId)) {
 			setPropValue(prop, componentId, isNumeric(prop) ? Number(val) : val);
 		}
@@ -246,6 +281,7 @@
 		const key = editKey(prop, cid);
 		editingProp = null;
 		const raw = editBuffer[key];
+		delete editBuffer[key];
 		if (raw === undefined) return;
 		const parsed = raw.trim() === ''
 			? []

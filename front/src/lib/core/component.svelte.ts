@@ -394,6 +394,18 @@ class Component implements Registrable {
   }
 
   /**
+   * Update a prop value without publishing to MATLAB.
+   *
+   * Used by DevTools for optimistic updates that bypass the reactive
+   * @prop/ channel (the request path handles MATLAB synchronization).
+   */
+  setPropSilently(name: string, value: unknown): void {
+    this._updatingFromMatlab = true;
+    this._dataState[name] = value;
+    this._updatingFromMatlab = false;
+  }
+
+  /**
    * Publish an event to MATLAB.
    *
    * @param name - Event name (e.g., "click", "@prop/Label")
