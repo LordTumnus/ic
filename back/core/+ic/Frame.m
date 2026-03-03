@@ -306,6 +306,19 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container & ic.mixin.Stylable
             % > LOGS returns the Logger instance for log inspection
             logger = this.Logger;
         end
+
+        function t = toast(this, value, props)
+            % > TOAST creates and shows an ephemeral notification message.
+            arguments
+                this (1,1) ic.Frame
+                value (1,1) string
+                props.?ic.Toast
+            end
+            props.Value = value;
+            propsCell = namedargs2cell(props);
+            t = ic.Toast(propsCell{:});
+            this.addChild(t);
+        end
     end
 
     methods (Access = private)
