@@ -18,28 +18,41 @@ import { parser } from './matlab.grammar';
  * The highlighting is loaded via @external propSource in the grammar file,
  * so it doesn't need to be configured here.
  */
+// Indent helpers: dedent when the line being indented starts with a
+// closing keyword (end, else, elseif, case, otherwise, catch).
+const endRe = /^\s*end\b/;
+const endElseRe = /^\s*(end|else|elseif)\b/;
+const endCaseRe = /^\s*(end|case|otherwise)\b/;
+const endCatchRe = /^\s*(end|catch)\b/;
+
+type IndentCx = { baseIndent: number; unit: number; textAfter: string };
+const block = (re: RegExp = endRe) => (cx: IndentCx) =>
+  cx.baseIndent + (re.test(cx.textAfter) ? 0 : cx.unit);
+
 export const matlabLanguage = LRLanguage.define({
   name: 'matlab',
   parser: parser.configure({
     props: [
       indentNodeProp.add({
-        FunctionDeclaration: (cx) => cx.baseIndent + cx.unit,
-        IfStatement: (cx) => cx.baseIndent + cx.unit,
-        ElseifClause: (cx) => cx.baseIndent + cx.unit,
-        ElseClause: (cx) => cx.baseIndent + cx.unit,
-        ForStatement: (cx) => cx.baseIndent + cx.unit,
-        WhileStatement: (cx) => cx.baseIndent + cx.unit,
-        SwitchStatement: (cx) => cx.baseIndent + cx.unit,
-        CaseClause: (cx) => cx.baseIndent + cx.unit,
-        OtherwiseClause: (cx) => cx.baseIndent + cx.unit,
-        TryCatchStatement: (cx) => cx.baseIndent + cx.unit,
-        CatchClause: (cx) => cx.baseIndent + cx.unit,
-        ClassDefinition: (cx) => cx.baseIndent + cx.unit,
-        PropertiesBlock: (cx) => cx.baseIndent + cx.unit,
-        MethodsBlock: (cx) => cx.baseIndent + cx.unit,
-        EventsBlock: (cx) => cx.baseIndent + cx.unit,
-        EnumerationBlock: (cx) => cx.baseIndent + cx.unit,
-        ArgumentsBlock: (cx) => cx.baseIndent + cx.unit,
+        FunctionDeclaration: block(),
+        IfStatement: block(endElseRe),
+        ElseifClause: block(endElseRe),
+        ElseClause: block(),
+        ForStatement: block(),
+        WhileStatement: block(),
+        SwitchStatement: block(endCaseRe),
+        CaseClause: block(endCaseRe),
+        OtherwiseClause: block(),
+        TryCatchStatement: block(endCatchRe),
+        CatchClause: block(),
+        ClassDefinition: block(),
+        PropertiesBlock: block(),
+        MethodsBlock: block(),
+        EventsBlock: block(),
+        EnumerationBlock: block(),
+        ArgumentsBlock: block(),
+        SpmdStatement: block(),
+        ParforStatement: block(),
       }),
       foldNodeProp.add({
         FunctionDeclaration: foldInside,
