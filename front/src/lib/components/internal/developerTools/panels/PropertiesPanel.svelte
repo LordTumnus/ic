@@ -86,6 +86,7 @@
 	}
 
 	function isEditable(prop: PropInfo): boolean {
+		if (prop.readOnly) return false;
 		const t = prop.type;
 		return (
 			t === 'string' ||
@@ -254,7 +255,7 @@
 		{@const key = editKey(prop, cid)}
 		{@const complex = isComplex(prop)}
 		<div class="ic-dt-props__row">
-			<span class="ic-dt-props__name">
+			<span class="ic-dt-props__name" title={prop.readOnly ? `${prop.matlabName} (read-only)` : prop.matlabName}>
 				{#if complex}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<span
@@ -266,9 +267,18 @@
 					>&#9654;</span>
 				{/if}
 				{prop.matlabName}
+				{#if prop.readOnly}
+					<span class="ic-dt-props__lock" title="Read-only (non-public SetAccess)">
+						<!-- No-entry / stop sign icon -->
+						<svg viewBox="0 0 16 16" width="11" height="11" fill="none">
+							<circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+							<line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.5"/>
+						</svg>
+					</span>
+				{/if}
 			</span>
 			<div class="ic-dt-props__value">
-				{#if isBoolean(prop)}
+				{#if isBoolean(prop) && !prop.readOnly}
 					<!-- Toggle checkbox -->
 					<label class="ic-dt-props__toggle">
 						<input
@@ -280,7 +290,7 @@
 							<span class="ic-dt-props__toggle-thumb"></span>
 						</span>
 					</label>
-				{:else if hasDropdown(prop)}
+				{:else if hasDropdown(prop) && !prop.readOnly}
 					<!-- Dropdown select -->
 					<select
 						class="ic-dt-props__select"
@@ -461,6 +471,17 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	/* --- Read-only indicator --- */
+
+	.ic-dt-props__lock {
+		display: inline-flex;
+		align-items: center;
+		margin-left: 3px;
+		color: var(--ic-destructive);
+		opacity: 0.6;
+		vertical-align: baseline;
 	}
 
 	/* --- Type badge --- */

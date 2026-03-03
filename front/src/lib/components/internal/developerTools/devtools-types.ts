@@ -17,6 +17,8 @@ export interface PropInfo {
 	validation: PropValidation;
 	/** Whether the property is hidden in MATLAB */
 	hidden: boolean;
+	/** Whether the property has non-public SetAccess (not editable from outside) */
+	readOnly: boolean;
 	/** Structural type descriptor for complex values (from MATLAB introspectType) */
 	typeInfo?: TypeInfo;
 }
