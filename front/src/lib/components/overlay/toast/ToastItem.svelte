@@ -2,10 +2,11 @@
   ToastItem.svelte — individual toast notification UI.
 
   Renders the toast content with icon, message, and close button.
-  Handles auto-dismiss timer. Entrance animation via CSS.
-  No exit animation — removal is immediate to avoid stacking bugs.
+  Handles auto-dismiss timer. Entrance animation via CSS keyframes,
+  exit animation via Svelte out:fade (150ms).
 -->
 <script lang="ts">
+  import { fade } from 'svelte/transition';
   import type { ToastData } from './toast-store.svelte';
   import { removeToast } from './toast-store.svelte';
   import { resolveIcon } from '$lib/utils/icons';
@@ -56,6 +57,7 @@
   class:ic-toast--top={toast.position === 'top'}
   class:ic-toast--bottom={toast.position === 'bottom'}
   role="status"
+  out:fade={{ duration: 150 }}
 >
   <span class="ic-toast__accent"></span>
 
