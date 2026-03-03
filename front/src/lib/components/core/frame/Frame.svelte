@@ -38,17 +38,25 @@
   });
 
   const children = $derived(snippets.default ?? []);
+  const overlays = $derived(snippets.overlay ?? []);
 </script>
 
 <div id="ic-frame" class="ic-frame" style={themeStyle}>
   {#each children as child (child)}
     {@render child()}
   {/each}
+
+  <!-- Overlay layer — renders at root level, above normal content -->
+  {#each overlays as overlay (overlay)}
+    {@render overlay()}
+  {/each}
+
   <ToastContainer />
 </div>
 
 <style>
   .ic-frame {
+    position: relative;
     width: 100%;
     height: 100%;
     overflow: clip;

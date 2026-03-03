@@ -1,5 +1,8 @@
 % > FRAME is the root component that holds other interactive components and bridges them to the HTML view
-classdef Frame < ic.core.ComponentBase & ic.core.Container & ic.mixin.Stylable
+classdef Frame < ic.core.ComponentBase & ...
+                 ic.core.Container & ...
+                 ic.mixin.Stylable & ...
+                 ic.mixin.AllowsOverlay
 
     properties (SetAccess = private)
         % > VIEW the view bridge that handles HTML communication
@@ -305,19 +308,6 @@ classdef Frame < ic.core.ComponentBase & ic.core.Container & ic.mixin.Stylable
         function logger = logs(this)
             % > LOGS returns the Logger instance for log inspection
             logger = this.Logger;
-        end
-
-        function t = toast(this, value, props)
-            % > TOAST creates and shows an ephemeral notification message.
-            arguments
-                this (1,1) ic.Frame
-                value (1,1) string
-                props.?ic.Toast
-            end
-            props.Value = value;
-            propsCell = namedargs2cell(props);
-            t = ic.Toast(propsCell{:});
-            this.addChild(t);
         end
     end
 

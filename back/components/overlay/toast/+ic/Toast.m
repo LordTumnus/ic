@@ -1,4 +1,4 @@
-classdef Toast < ic.core.Component
+classdef Toast < ic.core.Component & ic.mixin.Overlay
     % > TOAST Ephemeral notification message.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
@@ -26,7 +26,7 @@ classdef Toast < ic.core.Component
         Closed
     end
 
-    methods (Access = {?ic.Frame})
+    methods
         function this = Toast(props)
             arguments
                 props.?ic.Toast

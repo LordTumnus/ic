@@ -224,6 +224,11 @@ class Component implements Registrable {
     for (const target of normalizeTargets(targetsProp?.value)) {
       this._snippets[target] = [];
     }
+    // Always create the "overlay" slot — used by AllowsOverlay.addOverlay().
+    // Separated from Targets so addChild() can't route children here.
+    if (!this._snippets['overlay']) {
+      this._snippets['overlay'] = [];
+    }
 
     // Expose all snippets as a single 'snippets' prop
     Object.defineProperty(stateObj, 'snippets', {
@@ -339,9 +344,10 @@ class Component implements Registrable {
       }
 
       // Remove old target slots (Svelte auto-unmounts snippets)
+      // Preserve "overlay" — it's managed by AllowsOverlay, not Targets.
       const newTargetSet = new Set(newTargets);
       for (const target of Object.keys(this._snippets)) {
-        if (!newTargetSet.has(target)) {
+        if (target !== 'overlay' && !newTargetSet.has(target)) {
           delete this._snippets[target];
         }
       }

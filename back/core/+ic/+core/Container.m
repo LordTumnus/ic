@@ -61,7 +61,7 @@ classdef Container < handle & ic.mixin.Registrable
         end
 
         function addChild(this, child, target)
-            % > ADDCHILD inserts a new child inside the container. Used by the component whenever its parent property is reassigned
+            % > ADDCHILD validates and inserts a child into the container.
             arguments
                 this % ic.core.Container
                 child ic.core.Component
@@ -70,62 +70,7 @@ classdef Container < handle & ic.mixin.Registrable
 
             % Allow parent to validate/reject the child before insertion
             this.validateChild(child, target);
-
-            if ~isempty(child.Parent)
-                oldParent = child.Parent;
-
-                oldFrame = child.getFrame();
-                if isa(this, "ic.core.Component")
-                    newFrame = this.getFrame();
-                else
-                    newFrame = [];
-                end
-
-                if ~isequal(oldFrame, newFrame)
-                    error("ic:core:Component:ReparentingAcrossFrames", ...
-                        "Cannot reparent component across different Frames");
-                end
-
-                addlistener(child, "ObjectBeingDestroyed", ...
-                @(~,~) ic.core.Container.safeRemoveChild(this, child));
-
-                % Old parent publishes reparent event
-                data = struct(...
-                    "id", child.ID, "parent", this.ID, "target", target);
-                oldParent.publish("@reparent", data);
-
-                % Remove from old parent's Children
-                mask = [oldParent.Children.ID] == child.ID;
-                oldParent.Children(mask) = [];
-
-                % Update child's references
-                child.Parent = this;
-                child.Target = target;
-
-                % Add to new parent's Children
-                this.Children(end + 1) = child;
-                return;
-            end
-
-            addlistener(child, "ObjectBeingDestroyed", ...
-                @(~,~) ic.core.Container.safeRemoveChild(this, child));
-
-            % Get child definition via introspection
-            definition = child.getComponentDefinition();
-            data = struct("component", definition, "target", target);
-
-            % Publish insert child
-            this.publish("@insert", data); %#ok<MCNPN>
-
-            child.Parent = this;
-            child.Target = target;
-
-            % Store & register child
-            this.Children(end + 1) = child;
-            this.registerSubtree(child);
-
-            % flush the event queue into the parent
-            child.flush();
+            this.insertChild(child, target);
         end
 
         function removeChild(this, child)
@@ -354,6 +299,68 @@ classdef Container < handle & ic.mixin.Registrable
                 this.moveChild(child2, idx1);
                 this.moveChild(child1, idx2);
             end
+        end
+    end
+
+    methods (Access = {?ic.core.Container, ?ic.mixin.AllowsOverlay})
+        function insertChild(this, child, target)
+            % > INSERTCHILD raw child insertion — no validation.
+
+            if ~isempty(child.Parent)
+                oldParent = child.Parent;
+
+                oldFrame = child.getFrame();
+                if isa(this, "ic.core.Component")
+                    newFrame = this.getFrame();
+                else
+                    newFrame = [];
+                end
+
+                if ~isequal(oldFrame, newFrame)
+                    error("ic:core:Component:ReparentingAcrossFrames", ...
+                        "Cannot reparent component across different Frames");
+                end
+
+                addlistener(child, "ObjectBeingDestroyed", ...
+                    @(~,~) ic.core.Container.safeRemoveChild(this, child));
+
+                % Old parent publishes reparent event
+                data = struct(...
+                    "id", child.ID, "parent", this.ID, "target", target);
+                oldParent.publish("@reparent", data);
+
+                % Remove from old parent's Children
+                mask = [oldParent.Children.ID] == child.ID;
+                oldParent.Children(mask) = [];
+
+                % Update child's references
+                child.Parent = this;
+                child.Target = target;
+
+                % Add to new parent's Children
+                this.Children(end + 1) = child;
+                return;
+            end
+
+            addlistener(child, "ObjectBeingDestroyed", ...
+                @(~,~) ic.core.Container.safeRemoveChild(this, child));
+
+            % Get child definition via introspection
+            definition = child.getComponentDefinition();
+            data = struct("component", definition, "target", target);
+
+            % Publish insert child
+            this.publish("@insert", data); %#ok<MCNPN>
+
+            child.Parent = this;
+            child.Target = target;
+
+            % Store & register child
+            this.Children(end + 1) = child;
+            this.registerSubtree(child);
+
+            % flush the event queue into the parent
+            child.flush();
         end
     end
 
