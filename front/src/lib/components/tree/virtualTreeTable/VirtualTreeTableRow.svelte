@@ -5,7 +5,7 @@
   import { resolveIcon } from '$lib/utils/icons';
   import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
-  import TableCell from '../table/shared/TableCell.svelte';
+  import TableCell from '../../table/table/shared/TableCell.svelte';
 
   const INDENT_REM: Record<string, number> = { sm: 1, md: 1.25, lg: 1.5 };
   const FOLDER_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };

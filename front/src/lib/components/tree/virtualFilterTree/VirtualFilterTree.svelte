@@ -3,7 +3,7 @@
   import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
   import logger from '$lib/core/logger';
   import SearchBar from '$lib/components/form/searchBar/SearchBar.svelte';
-  import VirtualTree from '$lib/components/display/virtualTree/VirtualTree.svelte';
+  import VirtualTree from '$lib/components/tree/virtualTree/VirtualTree.svelte';
   import {
     FILTER_TRIGGERS,
     parseFilters,

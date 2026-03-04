@@ -12,7 +12,7 @@
     flattenVisible,
     computeTotalRows,
   } from '$lib/utils/virtual-tree-table';
-  import TableHeader from '../table/shared/TableHeader.svelte';
+  import TableHeader from '../../table/table/shared/TableHeader.svelte';
   import VirtualTreeTableRow from './VirtualTreeTableRow.svelte';
 
   const ROW_HEIGHTS: Record<string, number> = { sm: 24, md: 28, lg: 32 };

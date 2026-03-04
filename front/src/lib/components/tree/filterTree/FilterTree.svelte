@@ -4,7 +4,7 @@
   import logger from '$lib/core/logger';
   import { toSize } from '$lib/utils/css';
   import SearchBar from '$lib/components/form/searchBar/SearchBar.svelte';
-  import TreeNode from '$lib/components/display/tree/TreeNode.svelte';
+  import TreeNode from '$lib/components/tree/tree/TreeNode.svelte';
   import {
     type TreeNode as TreeNodeData,
     normalizeNodes,

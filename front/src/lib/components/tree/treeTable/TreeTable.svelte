@@ -19,9 +19,9 @@
     removeAndReindex,
     remapValues,
   } from '$lib/utils/tree-utils';
-  import { filterMatchers } from '../table/cells/filter-matchers';
-  import { sortComparators } from '../table/cells/sort-comparators';
-  import TableHeader from '../table/shared/TableHeader.svelte';
+  import { filterMatchers } from '../../table/table/cells/filter-matchers';
+  import { sortComparators } from '../../table/table/cells/sort-comparators';
+  import TableHeader from '../../table/table/shared/TableHeader.svelte';
   import TreeTableRow from './TreeTableRow.svelte';
 
   // --- Props ---

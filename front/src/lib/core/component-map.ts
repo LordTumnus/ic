@@ -30,14 +30,6 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.CircularProgressBar': modules['../components/display/circularProgressBar/CircularProgressBar.svelte'],
   'ic.Spinner': modules['../components/display/spinner/Spinner.svelte'],
   'ic.Image': modules['../components/display/image/Image.svelte'],
-  'ic.Tree': modules['../components/display/tree/Tree.svelte'],
-  'ic.VirtualTree': modules['../components/display/virtualTree/VirtualTree.svelte'],
-  'ic.FilterTree': modules['../components/display/filterTree/FilterTree.svelte'],
-  'ic.VirtualFilterTree': modules['../components/display/virtualFilterTree/VirtualFilterTree.svelte'],
-  'ic.Table': modules['../components/display/table/Table.svelte'],
-  'ic.VirtualTable': modules['../components/display/virtualTable/VirtualTable.svelte'],
-  'ic.TreeTable': modules['../components/display/treeTable/TreeTable.svelte'],
-  'ic.VirtualTreeTable': modules['../components/display/virtualTreeTable/VirtualTreeTable.svelte'],
 
   // Editor components
   'ic.CodeEditor': modules['../components/editor/codeEditor/CodeEditor.svelte'],
@@ -74,6 +66,17 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Renderer components
   'ic.PDFViewer': modules['../components/renderer/pdfViewer/PDFViewer.svelte'],
 
+  // Table components
+  'ic.Table': modules['../components/display/table/Table.svelte'],
+  'ic.VirtualTable': modules['../components/display/virtualTable/VirtualTable.svelte'],
+
+  // Tree components
+  'ic.Tree': modules['../components/display/tree/Tree.svelte'],
+  'ic.VirtualTree': modules['../components/display/virtualTree/VirtualTree.svelte'],
+  'ic.FilterTree': modules['../components/display/filterTree/FilterTree.svelte'],
+  'ic.VirtualFilterTree': modules['../components/display/virtualFilterTree/VirtualFilterTree.svelte'],
+  'ic.TreeTable': modules['../components/display/treeTable/TreeTable.svelte'],
+  'ic.VirtualTreeTable': modules['../components/display/virtualTreeTable/VirtualTreeTable.svelte'],
 
   // Overlay components
   'ic.Toast': modules['../components/overlay/toast/Toast.svelte'],
