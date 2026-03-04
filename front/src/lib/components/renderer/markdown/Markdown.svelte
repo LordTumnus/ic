@@ -19,6 +19,12 @@
     emoji = $bindable(true),
     containers = $bindable(true),
     mark = $bindable(true),
+    definitionLists = $bindable(true),
+    abbreviations = $bindable(true),
+    insert = $bindable(true),
+    headingAnchors = $bindable(true),
+    attributes = $bindable(false),
+    tableOfContents = $bindable(false),
     // Request function (for MATLAB-side image fetching)
     request,
   }: {
@@ -34,6 +40,12 @@
     emoji?: boolean;
     containers?: boolean;
     mark?: boolean;
+    definitionLists?: boolean;
+    abbreviations?: boolean;
+    insert?: boolean;
+    headingAnchors?: boolean;
+    attributes?: boolean;
+    tableOfContents?: boolean;
     request?: RequestFn;
   } = $props();
 
@@ -57,6 +69,12 @@
       emoji,
       containers,
       mark,
+      definitionLists,
+      abbreviations,
+      insert,
+      headingAnchors,
+      attributes,
+      tableOfContents,
     };
 
     const currentBuild = ++buildId;
@@ -95,6 +113,12 @@
     emoji: boolean;
     containers: boolean;
     mark: boolean;
+    definitionLists: boolean;
+    abbreviations: boolean;
+    insert: boolean;
+    headingAnchors: boolean;
+    attributes: boolean;
+    tableOfContents: boolean;
   }
 
   async function buildInstance(opts: ExtensionOpts): Promise<MarkdownIt> {
@@ -291,6 +315,94 @@
           const plugin = getPlugin(mod as unknown as Record<string, unknown>);
           return (md: MarkdownIt) => {
             md.use(plugin);
+          };
+        })()
+      );
+    }
+
+    // ── Definition lists ────────────────────────────────────────────────
+    if (opts.definitionLists) {
+      loaders.push(
+        (async () => {
+          const mod = await import('markdown-it-deflist');
+          const plugin = getPlugin(mod as unknown as Record<string, unknown>);
+          return (md: MarkdownIt) => {
+            md.use(plugin);
+          };
+        })()
+      );
+    }
+
+    // ── Abbreviations ──────────────────────────────────────────────────
+    if (opts.abbreviations) {
+      loaders.push(
+        (async () => {
+          const mod = await import('markdown-it-abbr');
+          const plugin = getPlugin(mod as unknown as Record<string, unknown>);
+          return (md: MarkdownIt) => {
+            md.use(plugin);
+          };
+        })()
+      );
+    }
+
+    // ── Insert (underline) ─────────────────────────────────────────────
+    if (opts.insert) {
+      loaders.push(
+        (async () => {
+          const mod = await import('markdown-it-ins');
+          const plugin = getPlugin(mod as unknown as Record<string, unknown>);
+          return (md: MarkdownIt) => {
+            md.use(plugin);
+          };
+        })()
+      );
+    }
+
+    // ── Heading anchors ────────────────────────────────────────────────
+    if (opts.headingAnchors) {
+      loaders.push(
+        (async () => {
+          const mod = await import('markdown-it-anchor');
+          const plugin = mod.default ?? mod;
+          return (md: MarkdownIt) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (md as any).use(plugin, {
+              permalink: false,
+              slugify: (s: string) => s.toLowerCase().replace(/[^\w]+/g, '-').replace(/(^-|-$)/g, ''),
+            });
+          };
+        })()
+      );
+    }
+
+    // ── Attributes ({.class #id}) ──────────────────────────────────────
+    // Must load BEFORE heading anchors take effect, but apply after.
+    // markdown-it-attrs should be applied before anchor so IDs are reused.
+    if (opts.attributes) {
+      loaders.push(
+        (async () => {
+          const mod = await import('markdown-it-attrs');
+          const plugin = getPlugin(mod as unknown as Record<string, unknown>);
+          return (md: MarkdownIt) => {
+            md.use(plugin);
+          };
+        })()
+      );
+    }
+
+    // ── Table of contents ──────────────────────────────────────────────
+    if (opts.tableOfContents) {
+      loaders.push(
+        (async () => {
+          const mod = await import('markdown-it-table-of-contents');
+          const plugin = getPlugin(mod as unknown as Record<string, unknown>);
+          return (md: MarkdownIt) => {
+            md.use(plugin, {
+              includeLevel: [1, 2, 3, 4],
+              containerClass: 'ic-md-toc',
+              listType: 'ul',
+            });
           };
         })()
       );
@@ -744,6 +856,77 @@
   }
   .ic-md__content :global(.ic-md-container--danger .ic-md-container__title) {
     color: var(--ic-destructive);
+  }
+
+  /* ── Definition lists ────────────────────────────────────────────────── */
+  .ic-md__content :global(dl) {
+    margin: 0.75em 0;
+  }
+
+  .ic-md__content :global(dt) {
+    font-weight: 600;
+    margin-top: 0.5em;
+  }
+
+  .ic-md__content :global(dd) {
+    margin-left: 1.5em;
+    margin-bottom: 0.25em;
+    color: var(--ic-muted-foreground);
+  }
+
+  /* ── Abbreviations ──────────────────────────────────────────────────── */
+  .ic-md__content :global(abbr[title]) {
+    text-decoration: underline dotted var(--ic-muted-foreground);
+    cursor: help;
+  }
+
+  /* ── Insert (underline) ─────────────────────────────────────────────── */
+  .ic-md__content :global(ins) {
+    text-decoration: underline;
+    text-decoration-color: var(--ic-primary);
+    text-underline-offset: 2px;
+  }
+
+  /* ── Heading anchors ────────────────────────────────────────────────── */
+  .ic-md__content :global(h1[id]),
+  .ic-md__content :global(h2[id]),
+  .ic-md__content :global(h3[id]),
+  .ic-md__content :global(h4[id]),
+  .ic-md__content :global(h5[id]),
+  .ic-md__content :global(h6[id]) {
+    scroll-margin-top: 0.5em;
+  }
+
+  /* ── Table of contents ──────────────────────────────────────────────── */
+  .ic-md__content :global(.ic-md-toc) {
+    background-color: var(--ic-secondary);
+    border: 1px solid var(--ic-border);
+    border-radius: 2px;
+    padding: 0.75em 1em;
+    margin: 1em 0;
+  }
+
+  .ic-md__content :global(.ic-md-toc ul) {
+    list-style: none;
+    padding-left: 1em;
+    margin: 0;
+  }
+
+  .ic-md__content :global(.ic-md-toc > ul) {
+    padding-left: 0;
+  }
+
+  .ic-md__content :global(.ic-md-toc li) {
+    margin: 0.15em 0;
+    font-size: 0.9em;
+  }
+
+  .ic-md__content :global(.ic-md-toc a) {
+    color: var(--ic-muted-foreground);
+  }
+
+  .ic-md__content :global(.ic-md-toc a:hover) {
+    color: var(--ic-primary);
   }
 
   /* ── KaTeX overrides ─────────────────────────────────────────────────── */

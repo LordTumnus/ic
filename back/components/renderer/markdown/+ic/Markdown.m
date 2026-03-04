@@ -50,6 +50,24 @@ classdef Markdown < ic.core.Component & ic.mixin.Requestable
 
         % > MARK highlighted text: ==marked==
         Mark (1,1) logical = true
+
+        % > DEFINITIONLISTS definition list syntax: Term\n: Definition
+        DefinitionLists (1,1) logical = true
+
+        % > ABBREVIATIONS abbreviation tooltips: *[HTML]: Hyper Text Markup Language
+        Abbreviations (1,1) logical = true
+
+        % > INSERT underlined/inserted text: ++inserted++
+        Insert (1,1) logical = true
+
+        % > HEADINGANCHORS auto-generate id anchors on headings
+        HeadingAnchors (1,1) logical = true
+
+        % > ATTRIBUTES custom classes/attributes: {.class #id attr=val}
+        Attributes (1,1) logical = false
+
+        % > TABLEOFCONTENTS render a table of contents via [[toc]]
+        TableOfContents (1,1) logical = false
     end
 
     methods
