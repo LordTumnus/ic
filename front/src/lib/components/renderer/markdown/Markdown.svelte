@@ -2,6 +2,7 @@
   import MarkdownIt from 'markdown-it';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
+  import type { RequestFn } from '$lib/types';
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
@@ -18,6 +19,8 @@
     emoji = $bindable(true),
     containers = $bindable(true),
     mark = $bindable(true),
+    // Request function (for MATLAB-side image fetching)
+    request,
   }: {
     value?: string;
     height?: CssSize;
@@ -31,6 +34,7 @@
     emoji?: boolean;
     containers?: boolean;
     mark?: boolean;
+    request?: RequestFn;
   } = $props();
 
   // ─── State ────────────────────────────────────────────────────────────
@@ -316,12 +320,77 @@
     return instance;
   }
 
-  // Prevent all link clicks from navigating (breaks uihtml)
+  // ─── Image resolution (MATLAB fetches URLs + local file paths) ───────
+  let contentEl: HTMLElement;
+  const imageCache = new Map<string, string>(); // src → dataUri
+  const pendingImages = new Set<string>();
+
+  /** True if src needs MATLAB to resolve (URL or absolute file path). */
+  function needsResolve(src: string): boolean {
+    if (src.startsWith('http://') || src.startsWith('https://')) return true;
+    if (src.startsWith('/')) return true;             // Unix absolute
+    if (/^[A-Za-z]:[/\\]/.test(src)) return true;    // Windows absolute
+    return false;
+  }
+
+  // After each render, find <img> with external/file src and resolve via MATLAB
+  $effect(() => {
+    // Read `rendered` to establish dependency (re-run when markdown changes)
+    rendered;
+    if (!contentEl || !request) return;
+
+    // Run after DOM update
+    requestAnimationFrame(() => {
+      const imgs = contentEl.querySelectorAll<HTMLImageElement>('img[src]');
+      for (const img of imgs) {
+        const src = img.getAttribute('src') ?? '';
+        if (!needsResolve(src)) continue;
+
+        // Already resolved
+        if (imageCache.has(src)) {
+          img.src = imageCache.get(src)!;
+          continue;
+        }
+
+        // Already fetching
+        if (pendingImages.has(src)) continue;
+        pendingImages.add(src);
+
+        request('fetchImage', { url: src })
+          .then((res) => {
+            if (res.success && res.data) {
+              const dataUri = (res.data as { dataUri: string }).dataUri;
+              imageCache.set(src, dataUri);
+              // Apply to all matching images currently in the DOM
+              contentEl?.querySelectorAll<HTMLImageElement>(`img[src="${CSS.escape(src)}"]`)
+                .forEach((el) => { el.src = dataUri; });
+            }
+          })
+          .catch(() => { /* image fetch failed — leave broken */ })
+          .finally(() => { pendingImages.delete(src); });
+      }
+    });
+  });
+
+  // Intercept link clicks:
+  //  - Internal anchors (#fn1, #fnref1): let browser scroll
+  //  - External URLs: send to MATLAB → opens system browser
   function handleClick(e: MouseEvent) {
     const link = (e.target as HTMLElement).closest('a');
-    if (link) {
-      e.preventDefault();
-      e.stopPropagation();
+    if (!link) return;
+
+    const href = link.getAttribute('href') ?? '';
+    if (href.startsWith('#')) {
+      // Internal anchor — let the browser scroll to the target
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Open external link via MATLAB's system browser
+    if (request && (href.startsWith('http://') || href.startsWith('https://'))) {
+      request('openLink', { url: href });
     }
   }
 </script>
@@ -334,7 +403,7 @@
   style:height={toSize(height)}
   onclick={handleClick}
 >
-  <div class="ic-md__content">
+  <div class="ic-md__content" bind:this={contentEl}>
     {@html rendered}
   </div>
 </div>
@@ -574,6 +643,17 @@
 
   .ic-md__content :global(tr:nth-child(even)) {
     background-color: var(--ic-secondary);
+  }
+
+  /* ── Links ───────────────────────────────────────────────────────────── */
+  .ic-md__content :global(a) {
+    color: var(--ic-primary);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .ic-md__content :global(a:hover) {
+    text-decoration: underline;
   }
 
   /* ── Images ──────────────────────────────────────────────────────────── */
