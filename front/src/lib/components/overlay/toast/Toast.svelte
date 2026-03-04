@@ -1,24 +1,26 @@
 <!--
-  Toast.svelte — MATLAB bridge component (headless).
+  Toast.svelte — Ephemeral notification overlay.
 
-  This component renders nothing. It syncs MATLAB reactive props to the
-  shared toast store, and the ToastContainer handles all rendering.
+  Each Toast renders its own UI and portals it into a shared flex
+  container (managed by toast-registry) for stacking. Auto-dismisses
+  after `duration` seconds (0 = persistent).
 
-  When the toast is dismissed (auto-timer or close button), the store's
-  onClose callback uses `publish` to fire @event/closed directly to MATLAB.
-  This bypasses the @listenEvent enable/disable mechanism, ensuring the
-  event always reaches MATLAB regardless of timing.
+  Exit animation uses CSS transitions via inline styles (applied by
+  the registry), NOT Svelte `out:` directives — the snippet system
+  unmounts components immediately, so Svelte transitions never run.
+
+  After the exit transition completes, @event/closed is published
+  to MATLAB, whose ClosedListener auto-deletes the Toast object.
 -->
 <script lang="ts">
   import type { PublishFn, Resolution } from '$lib/types';
   import type { IconSource } from '$lib/utils/icons';
-  import {
-    addToast,
-    removeToast,
-    forceRemoveToast,
-    updateToast,
-  } from './toast-store.svelte';
+  import { toastPortal } from './toast-registry.svelte';
+  import ToastItem from './ToastItem.svelte';
   import logger from '$lib/core/logger';
+
+  const TRANSITION_MS = 150;
+  const SAFETY_TIMEOUT_MS = TRANSITION_MS + 50;
 
   let {
     value = $bindable(''),
@@ -40,41 +42,92 @@
     dismiss?: () => Resolution;
   } = $props();
 
-  // Register with the toast store on component init.
-  // The onClose callback fires @event/closed directly via publish(),
-  // bypassing the event enable/disable mechanism to avoid timing issues.
-  const toastId = addToast({
-    value,
-    variant,
-    duration,
-    position,
-    closable,
-    icon,
-    onClose: () => {
-      logger.debug('Toast', 'closed', { toastId });
-      publish?.('@event/closed', { timestamp: Date.now() });
-    },
-  });
+  let portalEl: HTMLDivElement;
 
-  // Sync prop changes from MATLAB to the store
+  /** Whether the toast is in its exit-animation phase. */
+  let dismissing = false;
+
+  /** Auto-dismiss timer handle. */
+  let autoTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Start the dismiss sequence.
+   * Applies the exit transition, then fires @event/closed after it completes.
+   * Idempotent — safe to call multiple times.
+   */
+  function handleDismiss() {
+    if (dismissing) return;
+    dismissing = true;
+    clearAutoTimer();
+
+    // Apply exit animation via inline styles (matches registry's applyDismissStyle)
+    if (portalEl) {
+      portalEl.style.opacity = '0';
+      portalEl.style.transform = 'translateY(-8px)';
+      portalEl.style.pointerEvents = 'none';
+
+      portalEl.addEventListener('transitionend', (e) => {
+        if (e.propertyName === 'opacity') fireClose();
+      }, { once: true });
+    }
+
+    // Safety timeout in case transitionend doesn't fire
+    setTimeout(fireClose, SAFETY_TIMEOUT_MS);
+  }
+
+  /** Fire the MATLAB Closed event (idempotent). */
+  let closeFired = false;
+  function fireClose() {
+    if (closeFired) return;
+    closeFired = true;
+    logger.debug('Toast', 'closed');
+    publish?.('@event/closed', { timestamp: Date.now() });
+  }
+
+  function clearAutoTimer() {
+    if (autoTimer !== null) {
+      clearTimeout(autoTimer);
+      autoTimer = null;
+    }
+  }
+
+  // Auto-dismiss timer — restarts when duration changes
   $effect(() => {
-    updateToast(toastId, { value, variant, duration, position, closable, icon });
+    clearAutoTimer();
+    if (duration > 0 && !dismissing) {
+      autoTimer = setTimeout(handleDismiss, duration * 1000);
+    }
+    return () => clearAutoTimer();
   });
 
   // Wire up the dismiss reactive method
   $effect(() => {
     dismiss = (): Resolution => {
-      removeToast(toastId);
+      handleDismiss();
       return { success: true, data: null };
     };
   });
-
-  // Cleanup: force-remove on unmount (e.g., MATLAB delete(toast)).
-  // Uses forceRemoveToast which does NOT fire onClose, since the MATLAB
-  // component is already being destroyed at this point.
-  $effect(() => {
-    return () => {
-      forceRemoveToast(toastId);
-    };
-  });
 </script>
+
+<div
+  bind:this={portalEl}
+  class="ic-toast-portal"
+  use:toastPortal={position}
+>
+  <ToastItem
+    {value}
+    {variant}
+    {position}
+    {closable}
+    {icon}
+    onclose={handleDismiss}
+  />
+</div>
+
+<style>
+  .ic-toast-portal {
+    transition: opacity 150ms ease, transform 150ms ease;
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>

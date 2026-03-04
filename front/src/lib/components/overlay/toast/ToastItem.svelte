@@ -1,17 +1,29 @@
 <!--
-  ToastItem.svelte — individual toast notification UI.
+  ToastItem.svelte — Pure visual toast notification.
 
   Renders the toast content with icon, message, and close button.
-  Handles auto-dismiss timer. Entrance animation via CSS keyframes,
-  exit animation via Svelte out:fade (150ms).
+  Entrance animation via CSS keyframes. No dismiss logic — the
+  parent (Toast.svelte or addToast) handles timer and lifecycle.
 -->
 <script lang="ts">
-  import { fade } from 'svelte/transition';
-  import type { ToastData } from './toast-store.svelte';
-  import { removeToast } from './toast-store.svelte';
+  import type { IconSource } from '$lib/utils/icons';
   import { resolveIcon } from '$lib/utils/icons';
 
-  let { toast }: { toast: ToastData } = $props();
+  let {
+    value = '',
+    variant = 'primary',
+    position = 'bottom',
+    closable = true,
+    icon = null as IconSource,
+    onclose,
+  }: {
+    value?: string;
+    variant?: string;
+    position?: string;
+    closable?: boolean;
+    icon?: IconSource;
+    onclose?: () => void;
+  } = $props();
 
   /** Default Lucide icon name per variant. */
   const defaultIcons: Record<string, string> = {
@@ -25,39 +37,25 @@
   /** Resolve icon: custom if valid, otherwise variant default. */
   const iconSvg = $derived.by(() => {
     // Try custom icon first (guard against truthy-but-empty values like [])
-    if (toast.icon && typeof toast.icon === 'string') {
-      const svg = resolveIcon(toast.icon, 16);
+    if (icon && typeof icon === 'string') {
+      const svg = resolveIcon(icon, 16);
       if (svg) return svg;
-    } else if (toast.icon && typeof toast.icon === 'object' && 'hash' in toast.icon) {
-      const svg = resolveIcon(toast.icon, 16);
+    } else if (icon && typeof icon === 'object' && 'hash' in icon) {
+      const svg = resolveIcon(icon, 16);
       if (svg) return svg;
     }
     // Fall back to variant default
-    return resolveIcon(defaultIcons[toast.variant] ?? 'bell', 16);
+    return resolveIcon(defaultIcons[variant] ?? 'bell', 16);
   });
 
   const closeSvg = resolveIcon('x', 14);
-
-  // Auto-dismiss timer
-  $effect(() => {
-    if (toast.duration <= 0) return;
-    const timer = setTimeout(() => {
-      removeToast(toast.id);
-    }, toast.duration * 1000);
-    return () => clearTimeout(timer);
-  });
-
-  function handleClose() {
-    removeToast(toast.id);
-  }
 </script>
 
 <div
-  class="ic-toast ic-toast--{toast.variant}"
-  class:ic-toast--top={toast.position === 'top'}
-  class:ic-toast--bottom={toast.position === 'bottom'}
+  class="ic-toast ic-toast--{variant}"
+  class:ic-toast--top={position === 'top'}
+  class:ic-toast--bottom={position === 'bottom'}
   role="status"
-  out:fade={{ duration: 150 }}
 >
   <span class="ic-toast__accent"></span>
 
@@ -65,12 +63,12 @@
     {@html iconSvg}
   </span>
 
-  <span class="ic-toast__message">{toast.value}</span>
+  <span class="ic-toast__message">{value}</span>
 
-  {#if toast.closable}
+  {#if closable}
     <button
       class="ic-toast__close"
-      onclick={handleClose}
+      onclick={onclose}
       aria-label="Dismiss"
     >
       {@html closeSvg}

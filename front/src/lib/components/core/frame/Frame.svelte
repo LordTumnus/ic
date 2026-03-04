@@ -7,7 +7,6 @@
 -->
 <script lang="ts">
   import type { Snippets, ThemeEventData } from '$lib/types';
-  import ToastContainer from '../../overlay/toast/ToastContainer.svelte';
 
   interface Props {
     snippets: Snippets;
@@ -50,8 +49,6 @@
   {#each overlays as overlay (overlay)}
     {@render overlay()}
   {/each}
-
-  <ToastContainer />
 </div>
 
 <style>

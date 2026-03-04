@@ -11,7 +11,7 @@
 	import type { ComponentInfo, ChildComponentInfo, PropInfo, PathSegment } from '../devtools-types';
 	import Registry from '$lib/core/registry';
 	import ValueTree from './ValueTree.svelte';
-	import { addToast } from '$lib/components/overlay/toast/toast-store.svelte';
+	import { addToast } from '$lib/components/overlay/toast/toast-registry.svelte';
 
 	let {
 		child,
