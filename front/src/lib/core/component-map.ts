@@ -65,6 +65,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
 
   // Renderer components
   'ic.PDFViewer': modules['../components/renderer/pdfViewer/PDFViewer.svelte'],
+  'ic.Markdown': modules['../components/renderer/markdown/Markdown.svelte'],
 
   // Table components
   'ic.Table': modules['../components/display/table/Table.svelte'],

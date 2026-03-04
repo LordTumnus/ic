@@ -16,6 +16,7 @@
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@testing-library/svelte": "^5.2.7",
     "@tsconfig/svelte": "^5.0.6",
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^24.10.1",
     "jsdom": "^26.0.0",
     "svelte": "^5.43.8",
@@ -42,7 +43,18 @@
     "@lezer/common": "^1.5.1",
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.8",
+    "@mdit/plugin-katex": "^0.25.1",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.16.33",
     "lucide-static": "^0.563.0",
+    "markdown-it": "^14.1.1",
+    "markdown-it-container": "^4.0.0",
+    "markdown-it-emoji": "^3.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-mark": "^4.0.0",
+    "markdown-it-sub": "^2.0.0",
+    "markdown-it-sup": "^2.0.0",
+    "markdown-it-task-lists": "^2.1.1",
     "pdfjs-dist": "^4.10.38"
   }
 }
