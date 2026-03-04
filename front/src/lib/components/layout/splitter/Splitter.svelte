@@ -266,26 +266,30 @@
 		if (n === 0) return [];
 
 		const sizes = localSizes.length === n ? localSizes : Array(n).fill(100 / n);
-		// During drag, use cached container size to prevent non-adjacent pane jitter
-		const available = isDragging ? dragCachedAvailable : (containerReady ? getAvailableSize() : 0);
 		const gutterCount = Math.max(0, n - 1);
 		const gutterTotal = gutterCount * gutterSize;
 
-		return sizes.map((size) => {
-			if (available <= 0) {
-				const calcExpr = `calc((100% - ${gutterTotal}px) * ${size} / 100)`;
+		// During drag: use cached pixel sizes to prevent non-adjacent pane jitter.
+		// Otherwise: use calc() expressions which are inherently responsive to
+		// container resize (no ResizeObserver needed).
+		if (isDragging) {
+			const available = dragCachedAvailable;
+			return sizes.map((size) => {
+				const pixels = (size / 100) * available;
 				if (direction === 'horizontal') {
-					return `width: ${calcExpr}; flex-basis: ${calcExpr};`;
+					return `width: ${pixels}px; flex-basis: ${pixels}px;`;
 				} else {
-					return `height: ${calcExpr}; flex-basis: ${calcExpr};`;
+					return `height: ${pixels}px; flex-basis: ${pixels}px;`;
 				}
-			}
+			});
+		}
 
-			const pixels = (size / 100) * available;
+		return sizes.map((size) => {
+			const calcExpr = `calc((100% - ${gutterTotal}px) * ${size} / 100)`;
 			if (direction === 'horizontal') {
-				return `width: ${pixels}px; flex-basis: ${pixels}px;`;
+				return `width: ${calcExpr}; flex-basis: ${calcExpr};`;
 			} else {
-				return `height: ${pixels}px; flex-basis: ${pixels}px;`;
+				return `height: ${calcExpr}; flex-basis: ${calcExpr};`;
 			}
 		});
 	});
