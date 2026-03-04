@@ -270,10 +270,10 @@
 					)
 				: allElements;
 
-		return collectRulesForElements(elements);
+		return collectRulesForElements(elements, componentId);
 	}
 
-	function collectRulesForElements(elements: Element[]): CssRule[] {
+	function collectRulesForElements(elements: Element[], componentId: string): CssRule[] {
 		const rules: CssRule[] = [];
 		const seen = new Set<string>();
 
@@ -281,6 +281,9 @@
 			...Array.from(document.styleSheets),
 			...(document.adoptedStyleSheets ?? [])
 		];
+
+		// Build the scoping prefix for dynamic rules belonging to this component
+		const scopePrefix = `#${CSS.escape(componentId)} `;
 
 		// Phase 1: Discover .svelte-XXXX hashes belonging to these elements
 		const componentHashes = new Set<string>();
@@ -339,6 +342,20 @@
 							cssText: rule.style.cssText,
 							matches: true,
 							source,
+							properties: parseCssProperties(rule.style.cssText)
+						});
+					} else if (isAdopted && rule.selectorText.startsWith(scopePrefix)) {
+						// Dynamic rule scoped to this component — always collect even
+						// when no element in the filtered set matches (the selector may
+						// target elements inside child components).
+						seen.add(key);
+						const matches = !!document.querySelector(rule.selectorText);
+						rules.push({
+							selector: rule.selectorText,
+							displaySelector: cleanSelector(rule.selectorText),
+							cssText: rule.style.cssText,
+							matches,
+							source: 'dynamic',
 							properties: parseCssProperties(rule.style.cssText)
 						});
 					}
@@ -449,6 +466,13 @@
 				dynamicOverrides
 			});
 		}
+
+		// Dynamic-only rules (user-added) appear first, like element.style in browser DevTools
+		merged.sort((a, b) => {
+			const aDynOnly = a.hasDynamic && !a.hasComponent ? 1 : 0;
+			const bDynOnly = b.hasDynamic && !b.hasComponent ? 1 : 0;
+			return bDynOnly - aDynOnly;
+		});
 
 		return merged;
 	}
