@@ -145,12 +145,12 @@ classdef CodeEditor < ic.core.Component
 
         function out = foldAll(this)
             % > FOLDALL fold all collapsible regions
-            out = this.publish("foldAllMethod", []);
+            out = this.publish("foldAll", []);
         end
 
         function out = unfoldAll(this)
             % > UNFOLDALL unfold all collapsed regions
-            out = this.publish("unfoldAllMethod", []);
+            out = this.publish("unfoldAll", []);
         end
 
         function out = scrollToLine(this, line)

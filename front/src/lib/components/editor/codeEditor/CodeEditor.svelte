@@ -2,7 +2,7 @@
   import { untrack, tick } from 'svelte';
   import { EditorView } from '@codemirror/view';
   import { EditorState, type Extension } from '@codemirror/state';
-  import { foldAll, unfoldAll } from '@codemirror/language';
+  import { foldAll as cmFoldAll, unfoldAll as cmUnfoldAll } from '@codemirror/language';
   import { undo as undoCmd, redo as redoCmd } from '@codemirror/commands';
   import type { Resolution } from '$lib/types';
   import type { CssSize } from '$lib/utils/css';
@@ -95,8 +95,8 @@
     ),
     undo = $bindable((): Resolution => ({ success: true, data: null })),
     redo = $bindable((): Resolution => ({ success: true, data: null })),
-    foldAllMethod = $bindable((): Resolution => ({ success: true, data: null })),
-    unfoldAllMethod = $bindable((): Resolution => ({ success: true, data: null })),
+    foldAll = $bindable((): Resolution => ({ success: true, data: null })),
+    unfoldAll = $bindable((): Resolution => ({ success: true, data: null })),
     scrollToLine = $bindable((_line: number): Resolution => ({ success: true, data: null })),
   }: {
     value?: string;
@@ -138,8 +138,8 @@
     replaceSelection?: (text: string) => Resolution;
     undo?: () => Resolution;
     redo?: () => Resolution;
-    foldAllMethod?: () => Resolution;
-    unfoldAllMethod?: () => Resolution;
+    foldAll?: () => Resolution;
+    unfoldAll?: () => Resolution;
     scrollToLine?: (line: number) => Resolution;
   } = $props();
 
@@ -510,15 +510,15 @@
       return { success: true, data: null };
     };
 
-    foldAllMethod = (): Resolution => {
+    foldAll = (): Resolution => {
       if (!view) return { success: false, data: 'Editor not mounted' };
-      foldAll(view);
+      cmFoldAll(view);
       return { success: true, data: null };
     };
 
-    unfoldAllMethod = (): Resolution => {
+    unfoldAll = (): Resolution => {
       if (!view) return { success: false, data: 'Editor not mounted' };
-      unfoldAll(view);
+      cmUnfoldAll(view);
       return { success: true, data: null };
     };
 
