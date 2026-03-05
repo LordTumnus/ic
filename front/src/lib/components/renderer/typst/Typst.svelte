@@ -73,6 +73,7 @@
     plus: resolveIcon('plus', ICON_SIZE),
     minus: resolveIcon('minus', ICON_SIZE),
     home: resolveIcon('home', ICON_SIZE),
+    maximize: resolveIcon('maximize', ICON_SIZE),
     download: resolveIcon('download', ICON_SIZE),
     chevronUp: resolveIcon('chevron-up', 12),
     chevronDown: resolveIcon('chevron-down', 12),
@@ -87,6 +88,7 @@
   let hovered = $state(false);
   let exporting = $state(false);
   let errorExpanded = $state(false);
+  let currentPage = $state(1);
 
   // Track render version to discard stale results
   let renderTicket = 0;
@@ -295,6 +297,25 @@
     };
   });
 
+  // ─── Track current page on scroll ───────────────────────────────────
+  $effect(() => {
+    if (!viewportEl) return;
+    function onScroll() {
+      const pageEls = viewportEl.querySelectorAll('.ic-typst__page');
+      if (pageEls.length <= 1) { currentPage = 1; return; }
+      // untrack: read zoom without subscribing — we only need it for the offset calc
+      const zoom = untrack(() => currentZoom);
+      const vpMid = viewportEl.scrollTop + viewportEl.clientHeight / 2;
+      let best = 1;
+      for (let i = 0; i < pageEls.length; i++) {
+        if ((pageEls[i] as HTMLElement).offsetTop * zoom <= vpMid) best = i + 1;
+      }
+      currentPage = best;
+    }
+    viewportEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewportEl.removeEventListener('scroll', onScroll);
+  });
+
   // ─── Zoom actions ────────────────────────────────────────────────────
   function doZoomIn() {
     currentZoom = Math.min(MAX_ZOOM, currentZoom * (1 + ZOOM_STEP));
@@ -306,6 +327,19 @@
 
   function doResetView() {
     currentZoom = 1;
+  }
+
+  function doFitPage() {
+    if (!viewportEl) return;
+    const firstPage = viewportEl.querySelector('.ic-typst__page');
+    if (!firstPage) return;
+    // offsetHeight = layout height, unaffected by parent's CSS transform: scale()
+    const pageH = (firstPage as HTMLElement).offsetHeight;
+    const padding = isMultiPage ? 32 : 24; // top + bottom padding of scroll-content
+    const availH = viewportEl.clientHeight - padding;
+    if (pageH > 0) {
+      currentZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, availH / pageH));
+    }
   }
 
   function doScrollToPage(pageNum: number) {
@@ -452,9 +486,17 @@
         <button
           class="ic-typst__btn"
           onclick={doResetView}
-          title="Reset view"
+          title="Reset to 100%"
         >
           {@html icons.home}
+        </button>
+
+        <button
+          class="ic-typst__btn"
+          onclick={doFitPage}
+          title="Fit page"
+        >
+          {@html icons.maximize}
         </button>
 
         <div class="ic-typst__sep"></div>
@@ -471,7 +513,7 @@
 
         {#if isMultiPage && pages.length > 1}
           <div class="ic-typst__sep"></div>
-          <span class="ic-typst__info">{pages.length} pg</span>
+          <span class="ic-typst__info">{currentPage}/{pages.length}</span>
         {/if}
       </div>
     {/if}
@@ -518,6 +560,7 @@
 
   /* ─── Individual page ────────────────────────────────────────────────── */
   .ic-typst__page {
+    width: 100%;
     line-height: 0;
   }
   .ic-typst__page :global(svg) {
