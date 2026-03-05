@@ -68,6 +68,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Markdown': modules['../components/renderer/markdown/Markdown.svelte'],
   'ic.Mermaid': modules['../components/renderer/mermaid/Mermaid.svelte'],
   'ic.Typst': modules['../components/renderer/typst/Typst.svelte'],
+  'ic.Latex': modules['../components/renderer/latex/Latex.svelte'],
 
   // Table components
   'ic.Table': modules['../components/display/table/Table.svelte'],
