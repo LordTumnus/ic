@@ -2,6 +2,7 @@
   import MarkdownIt from 'markdown-it';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
+  import { renderMermaid } from '$lib/utils/mermaid-renderer';
   import type { RequestFn } from '$lib/types';
 
   // ─── Props ────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@
     headingAnchors = $bindable(true),
     attributes = $bindable(false),
     tableOfContents = $bindable(false),
+    mermaid = $bindable(false),
     // Request function (for MATLAB-side image fetching)
     request,
   }: {
@@ -46,6 +48,7 @@
     headingAnchors?: boolean;
     attributes?: boolean;
     tableOfContents?: boolean;
+    mermaid?: boolean;
     request?: RequestFn;
   } = $props();
 
@@ -75,6 +78,7 @@
       headingAnchors,
       attributes,
       tableOfContents,
+      mermaid,
     };
 
     const currentBuild = ++buildId;
@@ -119,6 +123,7 @@
     headingAnchors: boolean;
     attributes: boolean;
     tableOfContents: boolean;
+    mermaid: boolean;
   }
 
   async function buildInstance(opts: ExtensionOpts): Promise<MarkdownIt> {
@@ -408,6 +413,42 @@
       );
     }
 
+    // ── Mermaid diagrams (fence override) ──────────────────────────────
+    // Must be added LAST so it can wrap any existing fence behavior
+    // (e.g. highlight.js via md.options.highlight).
+    if (opts.mermaid) {
+      loaders.push(
+        (async () => {
+          return (md: MarkdownIt) => {
+            md.renderer.rules.fence = (tokens, idx, options, _env, _self) => {
+              const token = tokens[idx];
+              const info = token.info ? md.utils.unescapeAll(token.info).trim() : '';
+              const lang = info.split(/\s+/g)[0];
+
+              // Mermaid block → placeholder div (rendered in post-render $effect)
+              if (lang.toLowerCase() === 'mermaid') {
+                const source = encodeURIComponent(token.content);
+                return `<div class="ic-md-mermaid" data-source="${source}"></div>\n`;
+              }
+
+              // Default fence rendering (replicates markdown-it built-in behavior)
+              let highlighted = '';
+              if (options.highlight) {
+                highlighted = options.highlight(token.content, lang, '') || md.utils.escapeHtml(token.content);
+              } else {
+                highlighted = md.utils.escapeHtml(token.content);
+              }
+              if (highlighted.indexOf('<pre') === 0) {
+                return highlighted + '\n';
+              }
+              const langClass = lang ? ` class="${options.langPrefix}${md.utils.escapeHtml(lang)}"` : '';
+              return `<pre><code${langClass}>${highlighted}</code></pre>\n`;
+            };
+          };
+        })()
+      );
+    }
+
     // Resolve all loaders in parallel, then apply in order
     const appliers = await Promise.all(loaders);
     for (const apply of appliers) {
@@ -480,6 +521,35 @@
           })
           .catch(() => { /* image fetch failed — leave broken */ })
           .finally(() => { pendingImages.delete(src); });
+      }
+    });
+  });
+
+  // ─── Mermaid post-render (replace placeholders with SVGs) ───────────
+  $effect(() => {
+    rendered; // re-run when markdown changes
+    if (!contentEl || !mermaid) return;
+
+    requestAnimationFrame(() => {
+      const blocks = contentEl.querySelectorAll<HTMLDivElement>('.ic-md-mermaid[data-source]');
+      for (const block of blocks) {
+        // Skip already-rendered blocks
+        if (block.querySelector('svg')) continue;
+
+        const source = decodeURIComponent(block.dataset.source ?? '');
+        if (!source) continue;
+
+        // Show loading state
+        block.textContent = 'Rendering…';
+
+        renderMermaid(source, contentEl).then((result) => {
+          if (result.ok) {
+            block.innerHTML = result.svg;
+          } else {
+            block.textContent = result.message;
+            block.classList.add('ic-md-mermaid--error');
+          }
+        });
       }
     });
   });
@@ -938,5 +1008,30 @@
     margin: 1em 0;
     overflow-x: auto;
     overflow-y: clip;
+  }
+
+  /* ── Mermaid diagrams (static, inline) ─────────────────────────────── */
+  .ic-md__content :global(.ic-md-mermaid) {
+    margin: 1em 0;
+    padding: 16px;
+    background-color: var(--ic-muted);
+    border: 1px solid var(--ic-border);
+    border-radius: 2px;
+    overflow-x: auto;
+    text-align: center;
+    min-height: 40px;
+    color: var(--ic-muted-foreground);
+    font-size: 12px;
+  }
+
+  .ic-md__content :global(.ic-md-mermaid svg) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .ic-md__content :global(.ic-md-mermaid--error) {
+    color: var(--ic-destructive);
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 </style>

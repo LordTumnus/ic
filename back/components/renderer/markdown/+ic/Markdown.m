@@ -68,6 +68,9 @@ classdef Markdown < ic.core.Component & ic.mixin.Requestable
 
         % > TABLEOFCONTENTS render a table of contents via [[toc]]
         TableOfContents (1,1) logical = false
+
+        % > MERMAID render ```mermaid code blocks as diagrams
+        Mermaid (1,1) logical = false
     end
 
     methods
