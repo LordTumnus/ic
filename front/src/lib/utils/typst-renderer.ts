@@ -9,6 +9,8 @@
  */
 
 import logger from '$lib/core/logger';
+import { resolveAsset } from '$lib/utils/asset-cache';
+import type { AssetData } from '$lib/utils/asset-cache';
 
 // ============================================================================
 // Types
@@ -54,6 +56,14 @@ export interface TypstRenderOptions {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- lazy-loaded; strict typing not worth the complexity
 let snippet: any = null;
 let configPromise: Promise<void> | null = null;
+
+/**
+ * Single map tracking all images mapped into the WASM shadow filesystem.
+ * Key: original path as written in `#image("...")`.
+ * Value: shadow filename for source rewriting, or `null` for relative
+ *        paths that don't need rewriting (mapped directly under /tmp/).
+ */
+const shadowMap = new Map<string, string | null>();
 
 // ============================================================================
 // Initialization
@@ -274,8 +284,131 @@ function extractPages(svgString: string): string[] {
 }
 
 // ============================================================================
+// Image Resolution
+// ============================================================================
+
+/** Match `#image("path")` or bare `image("path")` calls in Typst source. */
+const IMAGE_RE = /#?image\s*\(\s*"([^"]+)"/g;
+
+/**
+ * Extract all image paths referenced in Typst source.
+ *
+ * Finds `#image("...")` calls and returns the raw paths as written.
+ * Does not deduplicate — callers should filter with `isShadowMapped`.
+ */
+export function extractImagePaths(source: string): string[] {
+  const paths: string[] = [];
+  let m: RegExpExecArray | null;
+  // Reset lastIndex since the regex is global (reused across calls)
+  IMAGE_RE.lastIndex = 0;
+  while ((m = IMAGE_RE.exec(source)) !== null) {
+    paths.push(m[1]);
+  }
+  return paths;
+}
+
+/** Check whether a path has already been mapped into the WASM shadow filesystem. */
+export function isShadowMapped(path: string): boolean {
+  return shadowMap.has(path);
+}
+
+/** Get the source-rewrite map for all currently cached paths that need rewriting. */
+export function getShadowRewrites(paths: string[]): Record<string, string> {
+  const rewrites: Record<string, string> = {};
+  for (const p of paths) {
+    const r = shadowMap.get(p);
+    if (r) rewrites[p] = r; // null entries (relative paths) are skipped
+  }
+  return rewrites;
+}
+
+/**
+ * Map resolved images into the WASM compiler's shadow filesystem and
+ * return a path-rewrite map for source substitution.
+ *
+ * Typst's project root is `/tmp/` (where the snippet places the main
+ * `.typ` file). URLs and absolute paths would be rejected as "outside
+ * project root", so we map them under `/tmp/_img_{hash}.{ext}` and
+ * rewrite the source to use these sanitized paths before compilation.
+ *
+ * Returns `Record<originalPath, shadowFilename>` for paths that need
+ * rewriting. Simple relative paths (e.g. `photo.png`) map directly
+ * and don't need rewriting.
+ */
+export async function mapImagesToShadow(
+  paths: string[],
+  assets: AssetData[],
+): Promise<Record<string, string>> {
+  await ensureConfigured();
+  const rewrites: Record<string, string> = {};
+
+  for (let i = 0; i < paths.length; i++) {
+    const path = paths[i];
+    const asset = assets[i];
+    if (!path || !asset) continue;
+
+    // Already mapped — return existing rewrite if applicable
+    if (shadowMap.has(path)) {
+      const existing = shadowMap.get(path);
+      if (existing) rewrites[path] = existing;
+      continue;
+    }
+
+    // Resolve through asset-cache (caches by hash, dedup with other components)
+    const resolved = resolveAsset(asset);
+    if (!resolved) continue;
+
+    const shadowPath = toShadowPath(path, asset.hash);
+    const bytes = base64ToUint8Array(resolved.data);
+    await snippet.mapShadow(shadowPath, bytes);
+
+    // Track in unified map: shadow filename for URLs/absolute, null for relative
+    const needsRewrite = path !== shadowPath.replace('/tmp/', '');
+    if (needsRewrite) {
+      const filename = shadowPath.slice('/tmp/'.length);
+      rewrites[path] = filename;
+      shadowMap.set(path, filename);
+    } else {
+      shadowMap.set(path, null);
+    }
+
+    logger.info('Typst', 'Mapped shadow image', { path: shadowPath, size: bytes.length });
+  }
+
+  return rewrites;
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Convert an image path to a safe shadow filesystem path under `/tmp/`.
+ *
+ * Typst's project root is `/tmp/` (where the main `.typ` lives). Paths
+ * containing `://` or starting with `/` would be rejected as "outside
+ * project root". We flatten those using the asset hash + original extension.
+ * Simple relative paths (e.g. `photo.png`) map directly to `/tmp/photo.png`.
+ */
+function toShadowPath(originalPath: string, hash: string): string {
+  // Simple relative path — map directly under /tmp/
+  if (!originalPath.includes('://') && !originalPath.startsWith('/')) {
+    return `/tmp/${originalPath}`;
+  }
+  // URL or absolute path — use hash + extension to stay under project root
+  const ext = originalPath.match(/\.(\w+)(?:[?#].*)?$/)?.[1] ?? 'bin';
+  return `/tmp/_img_${hash}.${ext}`;
+}
+
+/** Decode a base64 string to Uint8Array. */
+function base64ToUint8Array(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
 
 /** Convert Uint8Array to base64 string (chunked to avoid stack overflow). */
 function uint8ArrayToBase64(bytes: Uint8Array): string {

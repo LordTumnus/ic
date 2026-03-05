@@ -1,6 +1,14 @@
 <script lang="ts">
-  import { renderTypst, renderTypstPdf } from '$lib/utils/typst-renderer';
+  import {
+    renderTypst,
+    renderTypstPdf,
+    extractImagePaths,
+    isShadowMapped,
+    mapImagesToShadow,
+    getShadowRewrites,
+  } from '$lib/utils/typst-renderer';
   import type { TypstRenderOptions } from '$lib/utils/typst-renderer';
+  import type { AssetData } from '$lib/utils/asset-cache';
   import { resolveIcon } from '$lib/utils/icons';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
@@ -104,14 +112,19 @@
   }
 
   // ─── Render when value or options change ─────────────────────────────
+  // Debounce: image downloads take time; without debouncing, each keystroke
+  // in a live editor fires a new render that invalidates the in-progress one.
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  const RENDER_DEBOUNCE_MS = 300;
+
   $effect(() => {
     const v = value;
     void styleVersion;
-    // Read all option props to register as dependencies
     const opts = buildOptions();
-    const ticket = ++renderTicket;
 
     if (!v.trim()) {
+      clearTimeout(debounceTimer);
+      ++renderTicket;
       pages = [];
       errorMsg = '';
       numPages = 0;
@@ -121,10 +134,60 @@
     loading = true;
     errorMsg = '';
 
-    renderTypst(v, opts).then((result) => {
-      if (ticket !== renderTicket) return; // stale
-      loading = false;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const ticket = ++renderTicket;
+      resolveAndRender(v, opts, ticket);
+    }, RENDER_DEBOUNCE_MS);
+  });
 
+  /** Resolve images from MATLAB (if needed), then compile. */
+  async function resolveAndRender(
+    source: string,
+    opts: TypstRenderOptions,
+    ticket: number,
+  ) {
+    try {
+      // 1. Extract image paths and filter to uncached ones
+      const allPaths = extractImagePaths(source);
+      const uncached = allPaths.filter((p) => !isShadowMapped(p));
+
+      // 2. Fetch uncached images from MATLAB
+      let rewrites: Record<string, string> = {};
+      if (uncached.length > 0 && request) {
+        try {
+          const res = await request('resolveImages', { paths: uncached });
+          if (res.success && res.data) {
+            const d = res.data as { paths: string | string[]; assets: AssetData | AssetData[] };
+            // Normalize: MATLAB encodes single-element arrays as scalars
+            const resPaths = Array.isArray(d.paths) ? d.paths : d.paths ? [d.paths] : [];
+            const resAssets = Array.isArray(d.assets) ? d.assets : d.assets ? [d.assets] : [];
+            rewrites = await mapImagesToShadow(resPaths, resAssets);
+          }
+        } catch (err) {
+          logger.error('Typst', 'Image resolution failed', { error: String(err) });
+        }
+      }
+      // Always merge rewrites for already-cached paths (covers mixed cached+uncached)
+      if (allPaths.length > 0) {
+        const cachedRewrites = getShadowRewrites(allPaths);
+        rewrites = { ...cachedRewrites, ...rewrites };
+      }
+
+      // 3. Rewrite image paths in source (URLs → shadow filenames)
+      let compileSrc = source;
+      for (const [original, shadowName] of Object.entries(rewrites)) {
+        compileSrc = compileSrc.replaceAll(original, shadowName);
+      }
+
+      // 4. Stale guard — another edit may have started during the await
+      if (ticket !== renderTicket) return;
+
+      // 5. Compile
+      const result = await renderTypst(compileSrc, opts);
+      if (ticket !== renderTicket) return;
+
+      loading = false;
       if (result.ok) {
         pages = result.pages;
         numPages = result.pages.length;
@@ -137,8 +200,12 @@
         errorEvent?.({ value: { message: result.message } });
         logger.warn('Typst', 'Compilation failed', { error: result.message });
       }
-    });
-  });
+    } catch (err) {
+      if (ticket !== renderTicket) return;
+      loading = false;
+      errorMsg = String(err);
+    }
+  }
 
   // ─── Handle SVG links ───────────────────────────────────────────
   // Typst SVG embeds onclick="handleTypstLocation(this, page, x, y); return false"
