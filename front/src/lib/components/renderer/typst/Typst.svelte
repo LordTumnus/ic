@@ -73,6 +73,8 @@
     minus: resolveIcon('minus', ICON_SIZE),
     home: resolveIcon('home', ICON_SIZE),
     download: resolveIcon('download', ICON_SIZE),
+    chevronUp: resolveIcon('chevron-up', 12),
+    chevronDown: resolveIcon('chevron-down', 12),
   };
 
   // ─── State ────────────────────────────────────────────────────────────
@@ -83,6 +85,7 @@
   let currentZoom = $state(1);
   let hovered = $state(false);
   let exporting = $state(false);
+  let errorExpanded = $state(false);
 
   // Track render version to discard stale results
   let renderTicket = 0;
@@ -131,7 +134,8 @@
       return;
     }
 
-    loading = true;
+    // Only show spinner on initial load — during recompiles, keep old pages visible
+    if (pages.length === 0) loading = true;
     errorMsg = '';
 
     clearTimeout(debounceTimer);
@@ -154,15 +158,33 @@
 
       // 2. Fetch uncached images from MATLAB
       let rewrites: Record<string, string> = {};
+      let imageErrors: string[] = [];
       if (uncached.length > 0 && request) {
         try {
           const res = await request('resolveImages', { paths: uncached });
           if (res.success && res.data) {
-            const d = res.data as { paths: string | string[]; assets: AssetData | AssetData[] };
+            const d = res.data as {
+              paths: string | string[];
+              assets: AssetData | AssetData[];
+              errors?: { path: string; message: string } | { path: string; message: string }[];
+            };
             // Normalize: MATLAB encodes single-element arrays as scalars
             const resPaths = Array.isArray(d.paths) ? d.paths : d.paths ? [d.paths] : [];
             const resAssets = Array.isArray(d.assets) ? d.assets : d.assets ? [d.assets] : [];
             rewrites = await mapImagesToShadow(resPaths, resAssets);
+
+            // Collect image fetch errors from MATLAB
+            if (d.errors) {
+              const errs = Array.isArray(d.errors) ? d.errors : [d.errors];
+              imageErrors = errs.map((e) => {
+                // Shorten MATLAB HTTP errors: extract just the status
+                const statusMatch = e.message.match(/status (\d+)/);
+                const short = statusMatch ? `HTTP ${statusMatch[1]}` : e.message;
+                // Shorten long URLs to just the filename
+                const name = e.path.includes('/') ? e.path.split('/').pop() : e.path;
+                return `image "${name}": ${short}`;
+              });
+            }
           }
         } catch (err) {
           logger.error('Typst', 'Image resolution failed', { error: String(err) });
@@ -191,13 +213,16 @@
       if (result.ok) {
         pages = result.pages;
         numPages = result.pages.length;
-        errorMsg = '';
+        // Show image errors even on successful compilation
+        errorMsg = imageErrors.length > 0 ? imageErrors.join('\n') : '';
+        errorExpanded = false;
         compiled?.({ value: { numPages: result.pages.length } });
       } else {
-        pages = [];
-        numPages = 0;
-        errorMsg = result.message;
-        errorEvent?.({ value: { message: result.message } });
+        const parts = imageErrors.length > 0
+          ? [result.message, ...imageErrors]
+          : [result.message];
+        errorMsg = parts.join('\n');
+        errorEvent?.({ value: { message: errorMsg } });
         logger.warn('Typst', 'Compilation failed', { error: result.message });
       }
     } catch (err) {
@@ -344,12 +369,13 @@
   onmouseenter={() => (hovered = true)}
   onmouseleave={() => (hovered = false)}
 >
-  {#if loading}
+  <!-- Status: only shown when no pages to display -->
+  {#if loading && pages.length === 0}
     <div class="ic-typst__status">
       <div class="ic-typst__spinner"></div>
       <span class="ic-typst__status-text">Compiling...</span>
     </div>
-  {:else if errorMsg}
+  {:else if errorMsg && pages.length === 0}
     <div class="ic-typst__status ic-typst__status--error">
       <span class="ic-typst__status-icon">{@html resolveIcon('triangle-alert', 20)}</span>
       <span class="ic-typst__status-text">{errorMsg}</span>
@@ -358,7 +384,10 @@
     <div class="ic-typst__status">
       <span class="ic-typst__status-text">No content</span>
     </div>
-  {:else}
+  {/if}
+
+  <!-- Viewport: stays mounted once pages exist (preserves scroll position) -->
+  {#if pages.length > 0}
     <div
       class="ic-typst__viewport"
       bind:this={viewportEl}
@@ -379,8 +408,21 @@
       </div>
     </div>
 
+    {#if errorMsg}
+      <div
+        class="ic-typst__error-bar"
+        class:ic-typst__error-bar--expanded={errorExpanded}
+      >
+        <span class="ic-typst__error-bar-icon">{@html resolveIcon('triangle-alert', 12)}</span>
+        <span class="ic-typst__error-bar-text">{errorMsg}</span>
+        <button class="ic-typst__error-bar-toggle" onclick={() => (errorExpanded = !errorExpanded)}>
+          {@html errorExpanded ? icons.chevronDown : icons.chevronUp}
+        </button>
+      </div>
+    {/if}
+
     <!-- Floating controls -->
-    {#if toolbarOnHover}
+    {#if toolbarOnHover && !errorMsg}
       <div
         class="ic-typst__controls"
         class:ic-typst__controls--visible={hovered}
@@ -591,6 +633,49 @@
   }
   .ic-typst__status-icon {
     line-height: 0;
+  }
+
+  /* ─── Error bar (overlay when pages exist) ────────────────────────────── */
+  .ic-typst__error-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background-color: var(--ic-destructive, #ef4444);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow: clip;
+  }
+  .ic-typst__error-bar-icon {
+    flex-shrink: 0;
+    line-height: 0;
+  }
+  .ic-typst__error-bar-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ic-typst__error-bar--expanded .ic-typst__error-bar-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: visible;
+  }
+  .ic-typst__error-bar-toggle {
+    flex-shrink: 0;
+    line-height: 0;
+    opacity: 0.7;
+    background: none;
+    border: none;
+    color: inherit;
+    padding: 2px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .ic-typst__error-bar-toggle:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.15);
   }
 
   /* ─── Spinner ────────────────────────────────────────────────────────── */

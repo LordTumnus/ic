@@ -151,6 +151,34 @@ function buildPreamble(options?: TypstRenderOptions): string {
 }
 
 // ============================================================================
+// Error Formatting
+// ============================================================================
+
+/**
+ * Parse Typst's Rust-debug `SourceDiagnostic` array into human-readable lines.
+ *
+ * Input looks like:
+ *   [SourceDiagnostic { severity: Error, span: Span(...), message: "...", trace: [], hints: ["..."] }, ...]
+ *
+ * Output:
+ *   error: failed to load file (access denied)
+ *     hint: cannot read file outside of project root
+ *   warning: `diff` is deprecated, use `partial` instead
+ */
+function formatTypstError(raw: string): string {
+  const diagRe = /SourceDiagnostic\s*\{[^}]*severity:\s*(\w+)[^}]*message:\s*"([^"]*)"[^}]*\}/g;
+  const parts: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = diagRe.exec(raw)) !== null) {
+    if (match[1].toLowerCase() === 'warning') continue; // skip warnings
+    parts.push(match[2]);
+  }
+
+  return parts.length > 0 ? parts.join('\n') : raw;
+}
+
+// ============================================================================
 // Rendering
 // ============================================================================
 
@@ -177,10 +205,10 @@ export async function renderTypst(
     const pages = extractPages(svg);
     return { pages, ok: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const raw = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
-    logger.error('Typst', 'Render failed', { message, stack });
-    return { message, ok: false };
+    logger.error('Typst', 'Render failed', { message: raw, stack });
+    return { message: formatTypstError(raw), ok: false };
   }
 }
 

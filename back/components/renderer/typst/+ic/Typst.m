@@ -122,6 +122,7 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
             paths = string(data.paths);
             outPaths = string.empty;
             outAssets = {};
+            outErrors = {};
 
             for i = 1:numel(paths)
                 p = paths(i);
@@ -174,7 +175,9 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
                         'mime', mime, ...
                         'data', matlab.net.base64encode(raw));
                 catch ME
-                    fprintf('[Typst] ResolveImages error for "%s": %s\n', p, ME.message);
+                    outErrors{end+1} = struct( ...          %#ok<AGROW>
+                        'path', p, ...
+                        'message', ME.message);
                     continue
                 end
             end
@@ -182,6 +185,7 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
             result = struct();
             result.paths = outPaths;
             result.assets = outAssets;
+            result.errors = outErrors;
         end
     end
 
