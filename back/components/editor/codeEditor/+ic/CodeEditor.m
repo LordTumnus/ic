@@ -7,8 +7,8 @@ classdef CodeEditor < ic.core.Component
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > VALUE editor text content
         Value string = ""
-        % > LANGUAGE syntax language: "matlab", "javascript", "markdown", "css", "plain"
-        Language string {mustBeMember(Language, ["matlab", "javascript", "markdown", "css", "plain"])} = "matlab"
+        % > LANGUAGE syntax language: "matlab", "javascript", "markdown", "css", "typst", "plain"
+        Language string {mustBeMember(Language, ["matlab", "javascript", "markdown", "css", "typst", "plain"])} = "matlab"
         % > READONLY make the entire editor read-only
         ReadOnly logical = false
         % > HEIGHT editor height (CSS value: number=px, string=any unit)

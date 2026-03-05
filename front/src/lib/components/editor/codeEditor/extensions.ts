@@ -93,6 +93,7 @@ export function createCompartments(): EditorCompartments {
 let jsLang: LanguageSupport | null = null;
 let mdLang: LanguageSupport | null = null;
 let cssLang: LanguageSupport | null = null;
+let typstLang: LanguageSupport | null = null;
 
 /** Lazy-load language support. */
 async function loadLanguage(lang: string): Promise<Extension> {
@@ -117,6 +118,12 @@ async function loadLanguage(lang: string): Promise<Extension> {
         cssLang = mod.css();
       }
       return cssLang;
+    case 'typst':
+      if (!typstLang) {
+        const mod = await import('$lib/languages/typst');
+        typstLang = mod.typst();
+      }
+      return typstLang;
     case 'plain':
     default:
       return [];

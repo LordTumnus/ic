@@ -49,6 +49,7 @@
     "@myriaddreamin/typst-ts-renderer": "^0.7.0-rc2",
     "@myriaddreamin/typst-ts-web-compiler": "^0.7.0-rc2",
     "@myriaddreamin/typst.ts": "^0.7.0-rc2",
+    "codemirror-lang-typst": "^0.4.0",
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
     "highlight.js": "^11.11.1",
@@ -69,6 +70,7 @@
     "markdown-it-table-of-contents": "^1.1.0",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^10.9.5",
-    "pdfjs-dist": "^4.10.38"
+    "pdfjs-dist": "^4.10.38",
+    "vite-plugin-wasm": "^3.5.0"
   }
 }

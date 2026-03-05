@@ -2,11 +2,12 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { lezer } from '@lezer/generator/rollup'
+import wasm from 'vite-plugin-wasm'
 import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [lezer(), svelte()],
+  plugins: [wasm(), lezer(), svelte()],
   // Use relative paths so the build works with file:// URLs (MATLAB's uihtml)
   base: './',
   resolve: {
