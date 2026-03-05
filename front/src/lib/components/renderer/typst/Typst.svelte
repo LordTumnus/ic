@@ -14,6 +14,7 @@
   import { toSize } from '$lib/utils/css';
   import type { Resolution, SubscribeFn, RequestFn } from '$lib/types';
   import logger from '$lib/core/logger';
+  import { untrack } from 'svelte';
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
@@ -135,7 +136,8 @@
     }
 
     // Only show spinner on initial load — during recompiles, keep old pages visible
-    if (pages.length === 0) loading = true;
+    // untrack: don't subscribe to `pages` here — resolveAndRender writes it async
+    if (untrack(() => pages.length) === 0) loading = true;
     errorMsg = '';
 
     clearTimeout(debounceTimer);
