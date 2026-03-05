@@ -223,6 +223,12 @@ function extractPages(svgString: string): string[] {
 
   // Find page groups — typst.ts uses data-page-width on page <g> elements
   let pageGroups = svg.querySelectorAll(':scope > g[data-page-width]');
+
+  // Also try nested: some typst.ts versions wrap pages in a container <g>
+  if (pageGroups.length === 0) {
+    pageGroups = svg.querySelectorAll('g[data-page-width]');
+  }
+
   if (pageGroups.length === 0) {
     // Fallback: direct child <g> elements (skip <defs>, <style>, etc.)
     pageGroups = svg.querySelectorAll(':scope > g');

@@ -2,20 +2,14 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
     % > TYPST Renders Typst markup as formatted SVG pages.
     %
     %   t = ic.Typst(Value="= Hello Typst" + newline + "This is a #emph[test].")
-    %   t = ic.Typst(Value="#lorem(500)", Mode="document", Height=600)
+    %   t = ic.Typst(Value="#lorem(500)", Height=600)
     %
-    % Two rendering modes:
-    %   "auto"     — content-hugging, no page breaks (formulas, snippets)
-    %   "document" — paginated A4 pages with gaps (full documents)
-    %
-    % All compilation happens client-side via WASM. No external
-    % dependencies or network access required.
+    % Uses Typst's default page layout (A4). Control pagination with
+    % #set page(...) rules in the markup, or via PageWidth/PageHeight
+    % properties. All compilation happens client-side via WASM.
     %
     % Export to PDF:
     %   t.exportPdf("output.pdf")   % saves PDF to file
-    %
-    % Typst page/font settings can be configured via properties or
-    % embedded directly in the markup using #set rules.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > VALUE Typst source text
@@ -23,9 +17,6 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
 
         % > HEIGHT container height (CSS value: number=px, string=any unit)
         Height {ic.check.CssValidators.mustBeSize} = "100%"
-
-        % > MODE rendering mode: "auto" (content-hugging) or "document" (paginated)
-        Mode (1,1) string {mustBeMember(Mode, ["auto", "document"])} = "auto"
 
         % > TOOLBARONHOVER show zoom/export toolbar on mouse hover
         ToolbarOnHover (1,1) logical = true
@@ -45,7 +36,7 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
         % > FONTFAMILY font family name (must be available in the WASM renderer)
         FontFamily string = ""
 
-        % > PAGEGAP vertical gap between rendered pages in pixels (document mode)
+        % > PAGEGAP vertical gap between rendered pages in pixels
         PageGap (1,1) double {mustBeNonnegative} = 16
 
         % > PACKAGES Typst universe packages to load (future, no-op in v1)
@@ -76,6 +67,7 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
             end
             this@ic.core.Component(props);
             this.onRequest("SavePdf", @(comp, data) comp.handleSavePdf(data));
+            this.onRequest("OpenLink", @(~, data) ic.Typst.handleOpenLink(data));
         end
     end
 
@@ -96,7 +88,7 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
         end
 
         function out = scrollToPage(this, pageNum)
-            % > SCROLLTOPAGE scroll to a specific page (document mode)
+            % > SCROLLTOPAGE scroll to a specific page number
             arguments
                 this
                 pageNum (1,1) double {mustBePositive, mustBeInteger}
@@ -113,6 +105,14 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
                 filepath (1,1) string = ""
             end
             out = this.publish("exportPdf", filepath);
+        end
+    end
+
+    methods (Access = private, Static)
+        function result = handleOpenLink(data)
+            url = string(data.url);
+            web(url, '-browser');
+            result = true;
         end
     end
 

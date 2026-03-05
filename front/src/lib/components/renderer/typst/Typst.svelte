@@ -11,7 +11,6 @@
   let {
     value = $bindable(''),
     height = $bindable<CssSize>('100%'),
-    mode = $bindable<string>('auto'),
     toolbarOnHover = $bindable(true),
     pageWidth = $bindable(''),
     pageHeight = $bindable(''),
@@ -35,7 +34,6 @@
   }: {
     value?: string;
     height?: CssSize;
-    mode?: string;
     toolbarOnHover?: boolean;
     pageWidth?: string;
     pageHeight?: string;
@@ -85,7 +83,7 @@
 
   const heightCss = $derived(toSize(height));
   const zoomPercent = $derived(Math.round(currentZoom * 100));
-  const isDocument = $derived(mode === 'document');
+  const isMultiPage = $derived(pages.length > 1);
 
   // ─── Watch for style() changes ───────────────────────────────────────
   $effect(() => {
@@ -96,23 +94,12 @@
   // ─── Build render options ────────────────────────────────────────────
   function buildOptions(): TypstRenderOptions {
     const opts: TypstRenderOptions = {};
-
-    if (mode === 'auto') {
-      // Content-hugging: force auto page dimensions
-      opts.pageWidth = 'auto';
-      opts.pageHeight = 'auto';
-      opts.pageMargin = '0pt';
-    } else {
-      // Document mode: use user-specified or Typst defaults
-      if (pageWidth) opts.pageWidth = pageWidth;
-      if (pageHeight) opts.pageHeight = pageHeight;
-      if (pageMargin) opts.pageMargin = pageMargin;
-    }
-
+    if (pageWidth) opts.pageWidth = pageWidth;
+    if (pageHeight) opts.pageHeight = pageHeight;
+    if (pageMargin) opts.pageMargin = pageMargin;
     if (fontSize) opts.fontSize = fontSize;
     if (fontFamily) opts.fontFamily = fontFamily;
     if (packages.length > 0) opts.packages = packages;
-
     return opts;
   }
 
@@ -153,6 +140,67 @@
     });
   });
 
+  // ─── Handle SVG links ───────────────────────────────────────────
+  // Typst SVG embeds onclick="handleTypstLocation(this, page, x, y); return false"
+  // on cross-ref anchors. We define the global function so the inline
+  // handler works natively. The capture listener only handles external
+  // links and acts as a safety net for xlink:href="#" navigation.
+  $effect(() => {
+    if (!viewportEl) return;
+
+    // Define the global callback that Typst's inline onclick expects.
+    // Parameters: (element, page [1-based], x, y) in SVG units.
+    (window as any).handleTypstLocation = (
+      _el: Element,
+      page: number,
+      _x: number,
+      y: number,
+    ) => {
+      const pageEls = viewportEl.querySelectorAll('.ic-typst__page');
+      const pageEl = pageEls[page - 1] ?? pageEls[page];
+      if (!pageEl) return;
+
+      const svg = pageEl.querySelector('svg');
+      if (!svg) return;
+      const vbHeight = parseFloat(svg.getAttribute('viewBox')?.split(/\s+/)[3] ?? '0');
+      const scale = vbHeight > 0 ? pageEl.getBoundingClientRect().height / vbHeight : 1;
+      const pageTop = (pageEl as HTMLElement).offsetTop - viewportEl.offsetTop;
+
+      viewportEl.scrollTo({
+        top: (pageTop + y * scale) * currentZoom - 40,
+        behavior: 'smooth',
+      });
+    };
+
+    // Capture-phase: prevent xlink:href="#" navigation (crashes uihtml)
+    // and intercept external links for MATLAB's system browser.
+    function handleLink(e: Event) {
+      const anchor = (e.target as Element).closest('a');
+      if (!anchor) return;
+
+      // Always prevent the xlink:href="#" default navigation
+      e.preventDefault();
+
+      const href =
+        anchor.getAttribute('href') ||
+        anchor.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+        '';
+
+      // External link → open via MATLAB, block propagation
+      if (request && (href.startsWith('http://') || href.startsWith('https://'))) {
+        e.stopPropagation();
+        request('openLink', { url: href });
+      }
+      // For Typst refs: don't stopPropagation — let inline onclick fire
+    }
+
+    viewportEl.addEventListener('click', handleLink, true);
+    return () => {
+      viewportEl.removeEventListener('click', handleLink, true);
+      delete (window as any).handleTypstLocation;
+    };
+  });
+
   // ─── Zoom actions ────────────────────────────────────────────────────
   function doZoomIn() {
     currentZoom = Math.min(MAX_ZOOM, currentZoom * (1 + ZOOM_STEP));
@@ -178,16 +226,7 @@
     exporting = true;
 
     try {
-      // For PDF export, always use document-mode page settings
-      // (auto height doesn't make sense for PDF)
-      const opts: TypstRenderOptions = {};
-      if (pageWidth) opts.pageWidth = pageWidth;
-      if (pageHeight) opts.pageHeight = pageHeight;
-      if (pageMargin) opts.pageMargin = pageMargin;
-      if (fontSize) opts.fontSize = fontSize;
-      if (fontFamily) opts.fontFamily = fontFamily;
-
-      const result = await renderTypstPdf(value, opts);
+      const result = await renderTypstPdf(value, buildOptions());
       if (!result.ok) {
         logger.warn('Typst', 'PDF export failed', { error: result.message });
         return;
@@ -233,7 +272,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="ic-typst"
-  class:ic-typst--document={isDocument}
+  class:ic-typst--multi={isMultiPage}
   style:height={heightCss}
   onmouseenter={() => (hovered = true)}
   onmouseleave={() => (hovered = false)}
@@ -265,7 +304,7 @@
         {#each pages as pageSvg, i}
           <div
             class="ic-typst__page"
-            style:margin-bottom="{i < pages.length - 1 ? (isDocument ? pageGap : 0) : 0}px"
+            style:margin-bottom="{i < pages.length - 1 ? (isMultiPage ? pageGap : 0) : 0}px"
           >
             {@html pageSvg}
           </div>
@@ -319,7 +358,7 @@
           {@html icons.download}
         </button>
 
-        {#if isDocument && pages.length > 1}
+        {#if isMultiPage && pages.length > 1}
           <div class="ic-typst__sep"></div>
           <span class="ic-typst__info">{pages.length} pg</span>
         {/if}
@@ -340,8 +379,8 @@
     overflow: clip;
   }
 
-  /* Document mode: gray background for page cards */
-  .ic-typst--document {
+  /* Multi-page: gray background for page cards */
+  .ic-typst--multi {
     background-color: var(--ic-muted);
   }
 
@@ -351,7 +390,7 @@
     flex: 1;
     overflow: auto;
   }
-  .ic-typst--document .ic-typst__viewport {
+  .ic-typst--multi .ic-typst__viewport {
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
@@ -362,7 +401,7 @@
     align-items: center;
     padding: 12px;
   }
-  .ic-typst--document .ic-typst__scroll-content {
+  .ic-typst--multi .ic-typst__scroll-content {
     padding: 16px;
   }
 
@@ -376,8 +415,8 @@
     height: auto;
   }
 
-  /* Document mode: page cards */
-  .ic-typst--document .ic-typst__page {
+  /* Multi-page: page cards */
+  .ic-typst--multi .ic-typst__page {
     background-color: var(--ic-background);
     border: 1px solid var(--ic-border);
     border-radius: 2px;
