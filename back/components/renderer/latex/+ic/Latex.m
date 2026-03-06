@@ -1,16 +1,39 @@
 classdef Latex < ic.core.Component & ic.mixin.Requestable
     % > LATEX Renders LaTeX markup as formatted PDF pages.
     %
-    %   l = ic.Latex(Value="\documentclass{article}" + newline + ...
-    %       "\begin{document}" + newline + "Hello \LaTeX!" + newline + ...
-    %       "\end{document}")
-    %   l = ic.Latex(Value=latexSource, Height=600)
-    %
     % Compilation happens client-side via SwiftLaTeX's PdfTeX WASM engine.
-    % LaTeX packages are fetched on demand from CTAN (requires internet).
+    % Packages are bundled locally (no internet required).
     %
-    % Export to PDF:
-    %   l.exportPdf("output.pdf")   % saves PDF to file
+    % BUNDLED PACKAGES
+    %
+    %   Math:
+    %     amsmath, amssymb, amsfonts, amsthm, amstext, amscd, amsxtra,
+    %     mathtools, bm, centernot, eucal, eufrak, euscript, xfrac
+    %
+    %   Document Structure:
+    %     geometry, fancyhdr, enumitem, booktabs, float, setspace, parskip,
+    %     longtable, multicol, tabularx, caption, subcaption, rotating,
+    %     lscape, indentfirst, varioref, xr
+    %
+    %   Graphics & Color:
+    %     tikz (+ pgf, shapes.geometric, positioning, arrows libraries),
+    %     graphicx, xcolor, epstopdf-base
+    %
+    %   Code Listings:
+    %     listings (+ lstlang1, lstlang2, lstlang3 language definitions)
+    %
+    %   References & Links:
+    %     hyperref, nameref, url, backref, xr-hyper
+    %
+    %   Utilities:
+    %     etoolbox, calc, ifthen, xparse, expl3, keyval, array,
+    %     verbatim, shortvrb, showkeys, makeidx, xspace, theorem
+    %
+    %   Document Classes:
+    %     article, report, book, letter, proc, slides
+    %
+    % NOTE: Packages not listed above are NOT available. If compilation
+    % fails with "File 'xxx.sty' not found", the package is not bundled.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > VALUE LaTeX source text

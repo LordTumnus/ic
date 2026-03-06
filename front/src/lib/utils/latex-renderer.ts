@@ -191,14 +191,17 @@ const imageMap = new Map<string, string | null>();
 // Initialization
 // ============================================================================
 
+/** Cache-busting version — bump when bundle contents change. */
+const BUNDLE_VERSION = '5';
+
 /** Bundled TeX Live packages (.sty, .cls, etc.) as JSON: { filename: content } */
-const TEXLIVE_BUNDLE_PATH = './wasm/swiftlatex/texlive-bundle.json';
+const TEXLIVE_BUNDLE_PATH = `./wasm/swiftlatex/texlive-bundle.json?v=${BUNDLE_VERSION}`;
 
 /** Bundled font files (.tfm, .pfb, .map) as JSON: { filename: base64 } */
-const TEXLIVE_FONTS_PATH = './wasm/swiftlatex/texlive-fonts.json';
+const TEXLIVE_FONTS_PATH = `./wasm/swiftlatex/texlive-fonts.json?v=${BUNDLE_VERSION}`;
 
 /** Pre-compiled LaTeX format file (the LaTeX kernel in binary form). */
-const FORMAT_FILE_PATH = './wasm/swiftlatex/swiftlatexpdftex.fmt.bin';
+const FORMAT_FILE_PATH = `./wasm/swiftlatex/swiftlatexpdftex.fmt.bin?v=${BUNDLE_VERSION}`;
 
 /**
  * Lazy-load the PdfTeX WASM engine on first use.
@@ -298,9 +301,20 @@ export async function compileLaTeX(
     engine!.writeMemFSFile('main.tex', injectPreamble(source));
     engine!.setEngineMainFile('main.tex');
 
+    // First pass: generates .aux file with label/ref data
+    const firstPass = await engine!.compileLaTeX();
+
+    // Second pass: resolves cross-references using .aux from first pass
+    // (the .aux file persists in MemFS between compilations)
+    engine!.setEngineMainFile('main.tex');
     const result = await engine!.compileLaTeX();
 
     if (result.status !== 0 || !result.pdf || result.pdf.length === 0) {
+      // If second pass fails, try returning first pass result
+      if (firstPass.status === 0 && firstPass.pdf && firstPass.pdf.length > 0) {
+        logger.warn('LaTeX', 'Second pass failed, using first pass result');
+        return { pdf: firstPass.pdf, log: firstPass.log, ok: true };
+      }
       logger.warn('LaTeX', 'TeX compilation log', { status: result.status, log: result.log });
       const message = parseLatexErrors(result.log);
       return { message, log: result.log, ok: false };
