@@ -213,33 +213,40 @@ async function ensureEngine(): Promise<void> {
   if (engine?.isReady()) return;
   if (!initPromise) {
     initPromise = (async () => {
-      logger.info('LaTeX', 'Starting PdfTeX WASM initialization...');
-      engine = new PdfTeXEngine();
-      await engine.loadEngine();
-      logger.info('LaTeX', 'PdfTeX engine ready — loading bundles...');
+      try {
+        logger.info('LaTeX', 'Starting PdfTeX WASM initialization...');
+        engine = new PdfTeXEngine();
+        await engine.loadEngine();
+        logger.info('LaTeX', 'PdfTeX engine ready — loading bundles...');
 
-      // Fetch all three bundles in parallel
-      const [fmtResp, texResp, fontResp] = await Promise.all([
-        fetch(FORMAT_FILE_PATH),
-        fetch(TEXLIVE_BUNDLE_PATH),
-        fetch(TEXLIVE_FONTS_PATH),
-      ]);
+        // Fetch all three bundles in parallel
+        const [fmtResp, texResp, fontResp] = await Promise.all([
+          fetch(FORMAT_FILE_PATH),
+          fetch(TEXLIVE_BUNDLE_PATH),
+          fetch(TEXLIVE_FONTS_PATH),
+        ]);
 
-      // Write format file directly (always needed, ~10MB)
-      if (fmtResp.ok) {
-        const bytes = new Uint8Array(await fmtResp.arrayBuffer());
-        engine!.writeMemFSFile('swiftlatexpdftex.fmt', bytes);
-        logger.info('LaTeX', 'Format file loaded', { size: bytes.length });
+        // Write format file directly (always needed, ~10MB)
+        if (fmtResp.ok) {
+          const bytes = new Uint8Array(await fmtResp.arrayBuffer());
+          engine!.writeMemFSFile('swiftlatexpdftex.fmt', bytes);
+          logger.info('LaTeX', 'Format file loaded', { size: bytes.length });
+        }
+
+        // Send text + font bundles to Worker in ONE message for lazy loading
+        const textBundle = texResp.ok ? await texResp.json() : {};
+        const fontBundle = fontResp.ok ? await fontResp.json() : {};
+        await engine!.loadBundle(textBundle, fontBundle);
+
+        const textCount = Object.keys(textBundle).length;
+        const fontCount = Object.keys(fontBundle).length;
+        logger.info('LaTeX', `Bundles registered: ${textCount} text + ${fontCount} font files (lazy)`);
+      } catch (err) {
+        // Reset singleton so next call retries instead of re-throwing forever
+        engine = null;
+        initPromise = null;
+        throw err;
       }
-
-      // Send text + font bundles to Worker in ONE message for lazy loading
-      const textBundle = texResp.ok ? await texResp.json() : {};
-      const fontBundle = fontResp.ok ? await fontResp.json() : {};
-      await engine!.loadBundle(textBundle, fontBundle);
-
-      const textCount = Object.keys(textBundle).length;
-      const fontCount = Object.keys(fontBundle).length;
-      logger.info('LaTeX', `Bundles registered: ${textCount} text + ${fontCount} font files (lazy)`);
     })();
   }
   await initPromise;

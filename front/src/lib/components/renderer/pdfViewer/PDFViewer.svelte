@@ -9,14 +9,7 @@
   import { toSize } from '$lib/utils/css';
   import logger from '$lib/core/logger';
 
-  // pdf.js worker — MATLAB's embedded Chromium 104 cannot create module Workers
-  // from blob URLs. Statically importing the worker module registers
-  // globalThis.pdfjsWorker, which pdf.js detects and uses for main-thread
-  // parsing (no Worker/import() needed). Only works with pdfjs-dist v4.
-  // @ts-ignore — no type declarations for the worker bundle
-  import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).pdfjsWorker = pdfjsWorker;
+  import { initPdfWorker } from '$lib/utils/pdf-worker-init';
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
@@ -305,6 +298,9 @@
 
   async function loadPdfAsync(asset: AssetData, ticket: number) {
     try {
+      // Ensure pdf.js worker is initialized (real Worker or main-thread fallback)
+      await initPdfWorker();
+
       const resolved = resolveAsset(asset);
       if (!resolved) {
         if (ticket !== loadTicket) return;

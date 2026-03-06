@@ -18,12 +18,7 @@
   import logger from '$lib/core/logger';
   import { untrack } from 'svelte';
 
-  // pdf.js worker — run parsing on main thread (Chromium 104 can't create
-  // module Workers from blob URLs). Same workaround as PDFViewer.
-  // @ts-ignore — no type declarations for the worker bundle
-  import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).pdfjsWorker = pdfjsWorker;
+  import { initPdfWorker } from '$lib/utils/pdf-worker-init';
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
@@ -229,6 +224,7 @@
 
   // ─── PDF Loading (pdfjs-dist) ──────────────────────────────────────────
   async function loadPdfFromBytes(bytes: Uint8Array, ticket: number) {
+    await initPdfWorker();
     const doc = await getDocument({ data: bytes }).promise;
     if (ticket !== renderTicket) {
       doc.destroy();
