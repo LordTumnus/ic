@@ -8,7 +8,7 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [wasm(), lezer(), svelte()],
-  // Use relative paths so the build works with file:// URLs (MATLAB's uihtml)
+  // relative paths to local HTTPS server
   base: './',
   resolve: {
     alias: {
@@ -19,6 +19,9 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 2000,
+  },
+  worker: {
+    format: 'iife',
   },
   test: {
     globals: true,
