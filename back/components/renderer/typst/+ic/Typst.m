@@ -42,6 +42,9 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
         % > PACKAGES Typst universe packages to load (future, no-op in v1)
         %   Example: ["@preview/cetz:0.3.4", "@preview/fletcher:0.5.0"]
         Packages (1,:) string = string.empty
+
+        % > RENDERONCHANGE automatically render when Value changes (default true)
+        RenderOnChange (1,1) logical = true
     end
 
     properties (SetObservable, AbortSet, ...
@@ -106,6 +109,11 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
                 filepath (1,1) string = ""
             end
             out = this.publish("exportPdf", filepath);
+        end
+
+        function out = render(this)
+            % > RENDER trigger a render of the current Value
+            out = this.publish("render", []);
         end
     end
 

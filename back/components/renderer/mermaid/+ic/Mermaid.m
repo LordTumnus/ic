@@ -42,6 +42,9 @@ classdef Mermaid < ic.core.Component
         %   Or plain structs with camelCase keys for other diagram types:
         %     m.Config = struct('pie', struct('textPosition', 0.75))
         Config = struct()
+
+        % > RENDERONCHANGE automatically render when Value changes (default true)
+        RenderOnChange (1,1) logical = true
     end
 
     methods
@@ -68,6 +71,11 @@ classdef Mermaid < ic.core.Component
         function out = resetView(this)
             % > RESETVIEW reset to initial pan/zoom state
             out = this.publish("resetView", []);
+        end
+
+        function out = render(this)
+            % > RENDER trigger a render of the current Value
+            out = this.publish("render", []);
         end
     end
 end

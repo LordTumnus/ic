@@ -19,6 +19,8 @@
     zoomIn = $bindable((): Resolution => ({ success: true, data: null })),
     zoomOut = $bindable((): Resolution => ({ success: true, data: null })),
     resetView = $bindable((): Resolution => ({ success: true, data: null })),
+    renderOnChange = $bindable(true),
+    render = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     value?: string;
     height?: number | string;
@@ -31,6 +33,8 @@
     zoomIn?: () => Resolution;
     zoomOut?: () => Resolution;
     resetView?: () => Resolution;
+    renderOnChange?: boolean;
+    render?: () => Resolution;
   } = $props();
 
   // ─── Constants ────────────────────────────────────────────────────────
@@ -44,6 +48,7 @@
     plus: resolveIcon('plus', ICON_SIZE),
     minus: resolveIcon('minus', ICON_SIZE),
     home: resolveIcon('home', ICON_SIZE),
+    refreshCw: resolveIcon('refresh-cw', ICON_SIZE),
   };
 
   // ─── State ────────────────────────────────────────────────────────────
@@ -56,6 +61,7 @@
   let currentSvg = $state('');
   let currentZoom = $state(1);
   let hovered = $state(false);
+  let pendingRender = $state(false);
 
   // d3 modules (lazy-loaded)
   let d3Zoom: typeof import('d3-zoom') | null = null;
@@ -65,6 +71,7 @@
 
   // Track render version to discard stale results
   let renderTicket = 0;
+  let hasRenderedOnce = false;
   // Bumped when style() sets CSS vars (via adopted stylesheet, not inline)
   let styleVersion = $state(0);
 
@@ -83,14 +90,20 @@
     void styleVersion; // re-render when style vars change
     // Build render options (reading these registers them as dependencies)
     const opts: RenderOptions = { htmlLabels, wrap, darkMode, config };
+    const roc = renderOnChange;
     const ticket = ++renderTicket;
 
     if (!v.trim()) {
       currentSvg = '';
       errorMsg = '';
+      pendingRender = false;
       return;
     }
 
+    if (!roc && hasRenderedOnce) { pendingRender = true; return; }
+
+    hasRenderedOnce = true;
+    pendingRender = false;
     loading = true;
     errorMsg = '';
 
@@ -150,6 +163,27 @@
     sel.call(zoomBehavior as any);
   }
 
+  // ─── Manual render ──────────────────────────────────────────────────
+  function doRender() {
+    const ticket = ++renderTicket;
+    pendingRender = false;
+    if (!value.trim()) return;
+    if (!currentSvg) loading = true;
+    errorMsg = '';
+    renderMermaid(value, containerEl, { htmlLabels, wrap, darkMode, config }).then((result) => {
+      if (ticket !== renderTicket) return;
+      loading = false;
+      if (result.ok) {
+        currentSvg = result.svg;
+        errorMsg = '';
+        requestAnimationFrame(() => initZoom());
+      } else {
+        currentSvg = '';
+        errorMsg = result.message;
+      }
+    });
+  }
+
   // ─── Zoom actions ─────────────────────────────────────────────────────
   function doZoomIn() {
     if (!zoomBehavior || !d3Selection || !viewportEl) return;
@@ -181,6 +215,10 @@
     };
     resetView = () => {
       doResetView();
+      return { success: true, data: null };
+    };
+    render = () => {
+      doRender();
       return { success: true, data: null };
     };
   });
@@ -227,6 +265,17 @@
         class="ic-mermaid__controls"
         class:ic-mermaid__controls--visible={hovered}
       >
+        {#if !renderOnChange}
+          <button
+            class="ic-mermaid__btn"
+            class:ic-mermaid__btn--active={pendingRender}
+            onclick={doRender}
+            title="Render"
+          >
+            {@html icons.refreshCw}
+          </button>
+          <div class="ic-mermaid__sep"></div>
+        {/if}
         <button
           class="ic-mermaid__btn"
           onclick={doZoomIn}
@@ -399,6 +448,9 @@
   }
   .ic-mermaid__btn:active {
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+  }
+  .ic-mermaid__btn--active {
+    color: var(--ic-primary);
   }
 
   /* ─── Zoom info text ────────────────────────────────────────────────── */

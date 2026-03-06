@@ -14,7 +14,7 @@
   import { toSize } from '$lib/utils/css';
   import type { Resolution, SubscribeFn, RequestFn } from '$lib/types';
   import logger from '$lib/core/logger';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
@@ -40,6 +40,8 @@
     resetView = $bindable((): Resolution => ({ success: true, data: null })),
     scrollToPage = $bindable((_page: number): Resolution => ({ success: true, data: null })),
     exportPdf = $bindable((_filepath: string): Resolution => ({ success: true, data: null })),
+    renderOnChange = $bindable(true),
+    render = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     value?: string;
     height?: CssSize;
@@ -61,6 +63,8 @@
     resetView?: () => Resolution;
     scrollToPage?: (page: number) => Resolution;
     exportPdf?: (filepath: string) => Resolution;
+    renderOnChange?: boolean;
+    render?: () => Resolution;
   } = $props();
 
   // ─── Constants ────────────────────────────────────────────────────────
@@ -75,6 +79,7 @@
     home: resolveIcon('home', ICON_SIZE),
     maximize: resolveIcon('maximize', ICON_SIZE),
     download: resolveIcon('download', ICON_SIZE),
+    refreshCw: resolveIcon('refresh-cw', ICON_SIZE),
     chevronUp: resolveIcon('chevron-up', 12),
     chevronDown: resolveIcon('chevron-down', 12),
   };
@@ -89,9 +94,11 @@
   let exporting = $state(false);
   let errorExpanded = $state(false);
   let currentPage = $state(1);
+  let pendingRender = $state(false);
 
   // Track render version to discard stale results
   let renderTicket = 0;
+  let hasRenderedOnce = false;
   // Bumped when style() sets CSS vars
   let styleVersion = $state(0);
 
@@ -127,6 +134,7 @@
     const v = value;
     void styleVersion;
     const opts = buildOptions();
+    const roc = renderOnChange;
 
     if (!v.trim()) {
       clearTimeout(debounceTimer);
@@ -134,9 +142,14 @@
       pages = [];
       errorMsg = '';
       numPages = 0;
+      pendingRender = false;
       return;
     }
 
+    if (!roc && hasRenderedOnce) { pendingRender = true; return; }
+
+    hasRenderedOnce = true;
+    pendingRender = false;
     // Only show spinner on initial load — during recompiles, keep old pages visible
     // untrack: don't subscribe to `pages` here — resolveAndRender writes it async
     if (untrack(() => pages.length) === 0) loading = true;
@@ -348,6 +361,24 @@
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // ─── Manual render ──────────────────────────────────────────────────
+  async function doRender() {
+    const ticket = ++renderTicket;
+    pendingRender = false;
+    if (!value.trim()) return;
+    if (pages.length === 0) loading = true;
+
+    // Preserve scroll position across re-render
+    const savedScrollTop = viewportEl?.scrollTop ?? 0;
+    await resolveAndRender(value, buildOptions(), ticket);
+
+    // Restore after Svelte flushes DOM updates
+    if (viewportEl && ticket === renderTicket) {
+      await tick();
+      viewportEl.scrollTop = savedScrollTop;
+    }
+  }
+
   // ─── PDF Export ──────────────────────────────────────────────────────
   async function doExportPdf(filepath: string) {
     if (exporting || !value.trim()) return;
@@ -391,6 +422,10 @@
     };
     exportPdf = (filepath: string) => {
       doExportPdf(filepath ?? '');
+      return { success: true, data: null };
+    };
+    render = () => {
+      doRender();
       return { success: true, data: null };
     };
   });
@@ -463,6 +498,17 @@
         class="ic-typst__controls"
         class:ic-typst__controls--visible={hovered}
       >
+        {#if !renderOnChange}
+          <button
+            class="ic-typst__btn"
+            class:ic-typst__btn--active={pendingRender}
+            onclick={doRender}
+            title="Render"
+          >
+            {@html icons.refreshCw}
+          </button>
+          <div class="ic-typst__sep"></div>
+        {/if}
         <button
           class="ic-typst__btn"
           onclick={doZoomIn}

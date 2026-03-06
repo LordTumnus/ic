@@ -16,7 +16,7 @@
   import { toSize } from '$lib/utils/css';
   import type { Resolution, SubscribeFn, RequestFn } from '$lib/types';
   import logger from '$lib/core/logger';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   import { initPdfWorker } from '$lib/utils/pdf-worker-init';
 
@@ -38,6 +38,8 @@
     resetView = $bindable((): Resolution => ({ success: true, data: null })),
     scrollToPage = $bindable((_page: number): Resolution => ({ success: true, data: null })),
     exportPdf = $bindable((_filepath: string): Resolution => ({ success: true, data: null })),
+    renderOnChange = $bindable(true),
+    render = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     value?: string;
     height?: CssSize;
@@ -53,6 +55,8 @@
     resetView?: () => Resolution;
     scrollToPage?: (page: number) => Resolution;
     exportPdf?: (filepath: string) => Resolution;
+    renderOnChange?: boolean;
+    render?: () => Resolution;
   } = $props();
 
   // ─── Constants ────────────────────────────────────────────────────────
@@ -68,6 +72,7 @@
     home: resolveIcon('home', ICON_SIZE),
     maximize: resolveIcon('maximize', ICON_SIZE),
     download: resolveIcon('download', ICON_SIZE),
+    refreshCw: resolveIcon('refresh-cw', ICON_SIZE),
     chevronUp: resolveIcon('chevron-up', 12),
     chevronDown: resolveIcon('chevron-down', 12),
   };
@@ -87,6 +92,7 @@
   let exporting = $state(false);
   let errorExpanded = $state(false);
   let currentPage = $state(1);
+  let pendingRender = $state(false);
 
   let pageInfos = $state<PageInfo[]>([]);
   let pageEls = $state<HTMLDivElement[]>([]);
@@ -101,6 +107,7 @@
 
   // Render versioning
   let renderTicket = 0;
+  let hasRenderedOnce = false;
   let styleVersion = $state(0);
   let prevZoom = 1;
 
@@ -120,6 +127,7 @@
   $effect(() => {
     const v = value;
     void styleVersion;
+    const roc = renderOnChange;
 
     if (!v.trim()) {
       clearTimeout(debounceTimer);
@@ -127,9 +135,14 @@
       destroyDoc();
       errorMsg = '';
       numPages = 0;
+      pendingRender = false;
       return;
     }
 
+    if (!roc && hasRenderedOnce) { pendingRender = true; return; }
+
+    hasRenderedOnce = true;
+    pendingRender = false;
     if (untrack(() => pageInfos.length) === 0) loading = true;
     errorMsg = '';
 
@@ -491,6 +504,24 @@
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // ─── Manual render ──────────────────────────────────────────────────
+  async function doRender() {
+    const ticket = ++renderTicket;
+    pendingRender = false;
+    if (!value.trim()) return;
+    if (pageInfos.length === 0) loading = true;
+
+    // Preserve scroll position across re-render
+    const savedScrollTop = viewportEl?.scrollTop ?? 0;
+    await resolveAndRender(value, ticket);
+
+    // Restore after Svelte flushes DOM updates
+    if (viewportEl && ticket === renderTicket) {
+      await tick();
+      viewportEl.scrollTop = savedScrollTop;
+    }
+  }
+
   // ─── PDF Export ──────────────────────────────────────────────────────
   async function doExportPdf(filepath: string) {
     if (exporting || !lastPdfBytes) return;
@@ -536,6 +567,10 @@
     };
     exportPdf = (filepath: string) => {
       doExportPdf(filepath ?? '');
+      return { success: true, data: null };
+    };
+    render = () => {
+      doRender();
       return { success: true, data: null };
     };
   });
@@ -609,6 +644,17 @@
         class="ic-latex__controls"
         class:ic-latex__controls--visible={hovered}
       >
+        {#if !renderOnChange}
+          <button
+            class="ic-latex__btn"
+            class:ic-latex__btn--active={pendingRender}
+            onclick={doRender}
+            title="Render"
+          >
+            {@html icons.refreshCw}
+          </button>
+          <div class="ic-latex__sep"></div>
+        {/if}
         <button
           class="ic-latex__btn"
           onclick={doZoomIn}

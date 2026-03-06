@@ -24,6 +24,9 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
 
         % > PAGEGAP vertical gap between rendered pages in pixels
         PageGap (1,1) double {mustBeNonnegative} = 16
+
+        % > RENDERONCHANGE automatically render when Value changes (default true)
+        RenderOnChange (1,1) logical = true
     end
 
     properties (SetObservable, AbortSet, ...
@@ -88,6 +91,11 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
                 filepath (1,1) string = ""
             end
             out = this.publish("exportPdf", filepath);
+        end
+
+        function out = render(this)
+            % > RENDER trigger a render of the current Value
+            out = this.publish("render", []);
         end
     end
 
