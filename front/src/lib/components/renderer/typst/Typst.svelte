@@ -358,7 +358,7 @@
   function doScrollToPage(pageNum: number) {
     const pageEls = viewportEl?.querySelectorAll('.ic-typst__page');
     const el = pageEls?.[pageNum - 1];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
 
   // ─── Manual render ──────────────────────────────────────────────────

@@ -213,6 +213,7 @@
                 const name = e.path.includes('/') ? e.path.split('/').pop() : e.path;
                 return `image "${name}": ${short}`;
               });
+              for (const msg of imageErrors) logger.warn('LaTeX', msg);
             }
           }
         } catch (err) {
@@ -252,7 +253,7 @@
         const msgParts = hasSpecificError
           ? [result.message]
           : result.log ? [result.log] : [result.message];
-        const parts = [...msgParts, ...imageErrors];
+        const parts = [...imageErrors, ...msgParts];
         errorMsg = parts.join('\n');
         errorEvent?.({ value: { message: errorMsg } });
         logger.warn('LaTeX', 'Compilation failed', { error: result.message, log: result.log });
@@ -530,7 +531,7 @@
 
   function doScrollToPage(pageNum: number) {
     const el = pageEls[pageNum - 1];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) el.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
 
   // ─── Manual render ──────────────────────────────────────────────────
