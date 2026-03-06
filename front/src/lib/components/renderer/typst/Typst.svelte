@@ -6,8 +6,15 @@
     isShadowMapped,
     mapImagesToShadow,
     getShadowRewrites,
+    extractPackageSpecs,
+    parseManualPackages,
+    isPackageCached,
+    cachePackage,
+    getMissingPackages,
+    resetCompiler,
+    base64ToUint8Array,
   } from '$lib/utils/typst-renderer';
-  import type { TypstRenderOptions } from '$lib/utils/typst-renderer';
+  import type { TypstRenderOptions, PackageSpec } from '$lib/utils/typst-renderer';
   import type { AssetData } from '$lib/utils/asset-cache';
   import { resolveIcon } from '$lib/utils/icons';
   import type { CssSize } from '$lib/utils/css';
@@ -162,18 +169,96 @@
     }, RENDER_DEBOUNCE_MS);
   });
 
-  /** Resolve images from MATLAB (if needed), then compile. */
+  /** Deduplicate package specs by namespace/name/version. */
+  function deduplicateSpecs(specs: PackageSpec[]): PackageSpec[] {
+    const seen = new Set<string>();
+    return specs.filter((s) => {
+      const key = `${s.namespace}/${s.name}/${s.version}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  /**
+   * Fetch package tar.gz data from MATLAB for the given specs.
+   * Returns any error messages for display.
+   */
+  async function fetchPackagesFromMatlab(specs: PackageSpec[]): Promise<string[]> {
+    if (specs.length === 0 || !request) return [];
+    const errors: string[] = [];
+    try {
+      const res = await request('resolvePackages', {
+        specs: specs.map((s) => ({ namespace: s.namespace, name: s.name, version: s.version })),
+      });
+      if (res.success && res.data) {
+        const d = res.data as {
+          // New format: specs + tarballs are parallel (includes transitive deps)
+          specs?: PackageSpec[] | PackageSpec;
+          tarballs: (string | null)[] | string | null;
+          errors?: { spec: string; message: string }[] | { spec: string; message: string };
+        };
+        // Normalize: MATLAB encodes single-element arrays as scalars
+        const tarballs = Array.isArray(d.tarballs) ? d.tarballs : d.tarballs ? [d.tarballs] : [];
+
+        if (d.specs) {
+          // Response includes resolved specs (direct + transitive deps)
+          const resolvedSpecs = Array.isArray(d.specs) ? d.specs : [d.specs];
+          for (let i = 0; i < resolvedSpecs.length; i++) {
+            if (tarballs[i]) {
+              cachePackage(resolvedSpecs[i], base64ToUint8Array(tarballs[i] as string));
+            }
+          }
+        } else {
+          // Fallback: tarballs parallel to input specs
+          for (let i = 0; i < specs.length; i++) {
+            if (tarballs[i]) {
+              cachePackage(specs[i], base64ToUint8Array(tarballs[i] as string));
+            }
+          }
+        }
+
+        if (d.errors) {
+          const errs = Array.isArray(d.errors) ? d.errors : [d.errors];
+          for (const e of errs) {
+            errors.push(`package "${e.spec}": ${e.message}`);
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('Typst', 'Package resolution failed', { error: String(err) });
+    }
+    return errors;
+  }
+
+  /** Resolve packages + images from MATLAB (if needed), then compile. */
   async function resolveAndRender(
     source: string,
     opts: TypstRenderOptions,
     ticket: number,
   ) {
     try {
-      // 1. Extract image paths and filter to uncached ones
+      // ── 1. Package resolution ─────────────────────────────────────────
+      const sourceSpecs = extractPackageSpecs(source);
+      const manualSpecs = parseManualPackages(packages);
+      const allSpecs = deduplicateSpecs([...sourceSpecs, ...manualSpecs]);
+      const uncachedSpecs = allSpecs.filter((s) => !isPackageCached(s));
+
+      let packageErrors: string[] = [];
+      if (uncachedSpecs.length > 0) {
+        packageErrors = await fetchPackagesFromMatlab(uncachedSpecs);
+        // Reset the compiler after downloading new packages. The svg()
+        // path skips compiler.reset(), so the WASM compiler may have
+        // cached "not found" for these packages from a prior render.
+        await resetCompiler();
+      }
+
+      if (ticket !== renderTicket) return;
+
+      // ── 2. Image resolution ───────────────────────────────────────────
       const allPaths = extractImagePaths(source);
       const uncached = allPaths.filter((p) => !isShadowMapped(p));
 
-      // 2. Fetch uncached images from MATLAB
       let rewrites: Record<string, string> = {};
       let imageErrors: string[] = [];
       if (uncached.length > 0 && request) {
@@ -185,19 +270,15 @@
               assets: AssetData | AssetData[];
               errors?: { path: string; message: string } | { path: string; message: string }[];
             };
-            // Normalize: MATLAB encodes single-element arrays as scalars
             const resPaths = Array.isArray(d.paths) ? d.paths : d.paths ? [d.paths] : [];
             const resAssets = Array.isArray(d.assets) ? d.assets : d.assets ? [d.assets] : [];
             rewrites = await mapImagesToShadow(resPaths, resAssets);
 
-            // Collect image fetch errors from MATLAB
             if (d.errors) {
               const errs = Array.isArray(d.errors) ? d.errors : [d.errors];
               imageErrors = errs.map((e) => {
-                // Shorten MATLAB HTTP errors: extract just the status
                 const statusMatch = e.message.match(/status (\d+)/);
                 const short = statusMatch ? `HTTP ${statusMatch[1]}` : e.message;
-                // Shorten long URLs to just the filename
                 const name = e.path.includes('/') ? e.path.split('/').pop() : e.path;
                 return `image "${name}": ${short}`;
               });
@@ -207,36 +288,59 @@
           logger.error('Typst', 'Image resolution failed', { error: String(err) });
         }
       }
-      // Always merge rewrites for already-cached paths (covers mixed cached+uncached)
       if (allPaths.length > 0) {
         const cachedRewrites = getShadowRewrites(allPaths);
         rewrites = { ...cachedRewrites, ...rewrites };
       }
 
-      // 3. Rewrite image paths in source (URLs → shadow filenames)
+      // ── 3. Rewrite image paths ────────────────────────────────────────
       let compileSrc = source;
       for (const [original, shadowName] of Object.entries(rewrites)) {
         compileSrc = compileSrc.replaceAll(original, shadowName);
       }
 
-      // 4. Stale guard — another edit may have started during the await
       if (ticket !== renderTicket) return;
 
-      // 5. Compile
-      const result = await renderTypst(compileSrc, opts);
+      // ── 4. Compile with retry for transitive package deps ─────────────
+      // The compiler calls our PackageRegistry.resolve() synchronously.
+      // Direct imports are pre-fetched above, but transitive deps (packages
+      // importing other packages) cause cache misses tracked in missingPackages.
+      // We retry up to 3 times, fetching the missing packages each iteration.
+      const MAX_RETRIES = 3;
+      let result = await renderTypst(compileSrc, opts);
       if (ticket !== renderTicket) return;
 
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const missing = getMissingPackages();
+        if (result.ok || missing.length === 0) break;
+
+        logger.info('Typst', `Fetching ${missing.length} transitive package(s), retry ${attempt + 1}`);
+        const transErrors = await fetchPackagesFromMatlab(missing);
+        packageErrors = [...packageErrors, ...transErrors];
+        if (ticket !== renderTicket) return;
+
+        // Reset the WASM compiler before retrying. snippet.svg() skips
+        // compiler.reset() for performance, so the compiler caches failed
+        // package resolutions. Without this, resolve() is never re-invoked.
+        await resetCompiler();
+        result = await renderTypst(compileSrc, opts);
+        if (ticket !== renderTicket) return;
+      }
+      // Drain any remaining misses (so they don't leak to next render)
+      getMissingPackages();
+
+      // ── 5. Handle result ──────────────────────────────────────────────
+      const allErrors = [...packageErrors, ...imageErrors];
       loading = false;
       if (result.ok) {
         pages = result.pages;
         numPages = result.pages.length;
-        // Show image errors even on successful compilation
-        errorMsg = imageErrors.length > 0 ? imageErrors.join('\n') : '';
+        errorMsg = allErrors.length > 0 ? allErrors.join('\n') : '';
         errorExpanded = false;
         compiled?.({ value: { numPages: result.pages.length } });
       } else {
-        const parts = imageErrors.length > 0
-          ? [result.message, ...imageErrors]
+        const parts = allErrors.length > 0
+          ? [result.message, ...allErrors]
           : [result.message];
         errorMsg = parts.join('\n');
         errorEvent?.({ value: { message: errorMsg } });

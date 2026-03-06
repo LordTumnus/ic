@@ -45,8 +45,14 @@ export interface TypstRenderOptions {
   fontSize?: string;
   /** Font family name */
   fontFamily?: string;
-  /** Reserved for future Typst universe packages */
+  /** Typst universe packages (e.g. ["@preview/cetz:0.3.4"]) */
   packages?: string[];
+}
+
+export interface PackageSpec {
+  namespace: string;
+  name: string;
+  version: string;
 }
 
 // ============================================================================
@@ -64,6 +70,21 @@ let configPromise: Promise<void> | null = null;
  *        paths that don't need rewriting (mapped directly under /tmp/).
  */
 const shadowMap = new Map<string, string | null>();
+
+/**
+ * Cache of downloaded Typst universe package tar.gz data.
+ * Key: "name-version" (e.g. "cetz-0.3.4").
+ * Value: raw tar.gz bytes.
+ * Persists for page lifetime (packages are immutable/versioned).
+ */
+const packageCache = new Map<string, Uint8Array>();
+
+/**
+ * Specs requested by the compiler during `resolve()` but not found in cache.
+ * Populated by the synchronous package fetcher; consumed by the retry loop
+ * in Typst.svelte after a failed compilation attempt.
+ */
+let missingPackages: PackageSpec[] = [];
 
 // ============================================================================
 // Initialization
@@ -105,6 +126,37 @@ async function ensureConfigured(): Promise<void> {
         assets: ['text', 'cjk', 'emoji'],
         assetUrlPrefix: './fonts/typst/',
       }));
+
+      // Register a custom package registry that serves from our pre-fetched
+      // cache. The built-in FetchPackageRegistry uses sync XHR to the CDN,
+      // which fails in MATLAB's CEF due to CORS (file:// → https://).
+      // Instead, packages are downloaded by MATLAB and cached here before
+      // compilation. The fetcher is synchronous (required by the PackageRegistry
+      // contract); cache misses are tracked in `missingPackages` for retry.
+      const { MemoryAccessModel } = await import(
+        '@myriaddreamin/typst.ts/dist/esm/fs/memory.mjs'
+      );
+      const am = new MemoryAccessModel();
+
+      snippet.use(TypstSnippet.withAccessModel(am));
+      snippet.use(
+        TypstSnippet.fetchPackageBy(
+          am,
+          (spec: { namespace: string; name: string; version: string }) => {
+            const key = `${spec.name}-${spec.version}`;
+            const data = packageCache.get(key);
+            if (!data) {
+              missingPackages.push({
+                namespace: spec.namespace,
+                name: spec.name,
+                version: spec.version,
+              });
+              return undefined;
+            }
+            return data;
+          },
+        ),
+      );
 
       snippet.setCompilerInitOptions({
         getModule: () => compilerWasmUrl.default,
@@ -199,9 +251,7 @@ export async function renderTypst(
   try {
     await ensureConfigured();
     const preamble = buildPreamble(options);
-    logger.info('Typst', 'Calling snippet.svg()', { preambleLength: preamble.length, sourceLength: source.length });
     const svg: string = await snippet.svg({ mainContent: preamble + source });
-    logger.info('Typst', 'SVG rendered', { svgLength: svg?.length ?? 0 });
     const pages = extractPages(svg);
     return { pages, ok: true };
   } catch (err) {
@@ -407,6 +457,83 @@ export async function mapImagesToShadow(
 }
 
 // ============================================================================
+// Package Resolution
+// ============================================================================
+
+/** Match `#import "@namespace/name:version"` in Typst source. */
+const PACKAGE_RE = /#import\s+"@([^/]+)\/([^:]+):([^"]+)"/g;
+
+/**
+ * Extract all package specs referenced in Typst source via `#import`.
+ * Returns deduplicated specs.
+ */
+export function extractPackageSpecs(source: string): PackageSpec[] {
+  const seen = new Set<string>();
+  const specs: PackageSpec[] = [];
+  PACKAGE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = PACKAGE_RE.exec(source)) !== null) {
+    const key = `${m[1]}/${m[2]}/${m[3]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    specs.push({ namespace: m[1], name: m[2], version: m[3] });
+  }
+  return specs;
+}
+
+/**
+ * Parse manual package strings (e.g. "@preview/cetz:0.3.4") from the
+ * Packages property into PackageSpec objects.
+ */
+export function parseManualPackages(packages: string[]): PackageSpec[] {
+  const specs: PackageSpec[] = [];
+  for (const p of packages) {
+    const m = p.match(/^@([^/]+)\/([^:]+):(.+)$/);
+    if (m) specs.push({ namespace: m[1], name: m[2], version: m[3] });
+  }
+  return specs;
+}
+
+/** Check whether a package is already in the pre-fetch cache. */
+export function isPackageCached(spec: PackageSpec): boolean {
+  return packageCache.has(`${spec.name}-${spec.version}`);
+}
+
+/** Store downloaded tar.gz bytes in the pre-fetch cache. */
+export function cachePackage(spec: PackageSpec, tarGzBytes: Uint8Array): void {
+  const key = `${spec.name}-${spec.version}`;
+  packageCache.set(key, tarGzBytes);
+  logger.info('Typst', 'Cached package', { key, size: tarGzBytes.length });
+}
+
+/**
+ * Return and clear the list of packages that the compiler requested
+ * during `resolve()` but were not found in cache. Used by the retry
+ * loop to fetch missing transitive dependencies.
+ */
+export function getMissingPackages(): PackageSpec[] {
+  const specs = missingPackages;
+  missingPackages = [];
+  return specs;
+}
+
+/**
+ * Reset the WASM compiler's internal state.
+ *
+ * Required before retrying compilation after fetching missing packages.
+ * The `snippet.svg()` path intentionally skips `compiler.reset()` for
+ * performance (incremental rendering), which means the WASM compiler
+ * caches failed package resolutions across calls. Calling this before
+ * a retry forces the compiler to re-invoke `PackageRegistry.resolve()`
+ * for packages that previously failed.
+ */
+export async function resetCompiler(): Promise<void> {
+  if (snippet) {
+    await snippet.getCompilerReset();
+  }
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -429,7 +556,7 @@ function toShadowPath(originalPath: string, hash: string): string {
 }
 
 /** Decode a base64 string to Uint8Array. */
-function base64ToUint8Array(b64: string): Uint8Array {
+export function base64ToUint8Array(b64: string): Uint8Array {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {

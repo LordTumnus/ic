@@ -39,8 +39,10 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
         % > PAGEGAP vertical gap between rendered pages in pixels
         PageGap (1,1) double {mustBeNonnegative} = 16
 
-        % > PACKAGES Typst universe packages to load (future, no-op in v1)
+        % > PACKAGES Typst universe packages to pre-load (supplements auto-detection)
         %   Example: ["@preview/cetz:0.3.4", "@preview/fletcher:0.5.0"]
+        %   Packages referenced via #import in the source are detected
+        %   automatically; use this property for transitive deps or pre-warming.
         Packages (1,:) string = string.empty
 
         % > RENDERONCHANGE automatically render when Value changes (default true)
@@ -52,6 +54,11 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
             Description = "Reactive")
         % > NUMPAGES total number of rendered pages (read-only, set by frontend)
         NumPages (1,1) double = 0
+    end
+
+    properties (Access = private)
+        PackageCache  % containers.Map: "ns/name/ver" → base64 tar.gz string
+        PackageDeps   % containers.Map: "ns/name/ver" → cell of dep structs
     end
 
     events (Description = "Reactive")
@@ -69,9 +76,12 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.Component(props);
+            this.PackageCache = containers.Map('KeyType', 'char', 'ValueType', 'char');
+            this.PackageDeps = containers.Map('KeyType', 'char', 'ValueType', 'any');
             this.onRequest("SavePdf", @(comp, data) comp.handleSavePdf(data));
             this.onRequest("OpenLink", @(~, data) ic.Typst.handleOpenLink(data));
             this.onRequest("ResolveImages", @(~, data) ic.Typst.handleResolveImages(data));
+            this.onRequest("ResolvePackages", @(comp, data) comp.handleResolvePackages(data));
         end
     end
 
@@ -118,6 +128,38 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
     end
 
     methods (Access = private, Static)
+        function deps = scanImportsFromTarGz(tarGzFile)
+            % Extract a tar.gz and scan .typ files for #import "@ns/pkg:ver".
+            % Returns a cell array of structs with namespace, name, version.
+            tmpDir = string(tempname);
+            mkdir(tmpDir);
+            cleanupDir = onCleanup(@() rmdir(tmpDir, 's'));
+            untar(tarGzFile, tmpDir);
+
+            typFiles = dir(fullfile(tmpDir, '**', '*.typ'));
+            deps = {};
+            seen = containers.Map('KeyType', 'char', 'ValueType', 'logical');
+
+            for i = 1:numel(typFiles)
+                content = fileread( ...
+                    fullfile(typFiles(i).folder, typFiles(i).name));
+                tokens = regexp(content, ...
+                    '#import\s+"@([^/]+)/([^:]+):([^"]+)"', 'tokens');
+                for j = 1:numel(tokens)
+                    t = tokens{j};
+                    key = char(string(t{1}) + "/" + ...
+                        string(t{2}) + "/" + string(t{3}));
+                    if ~seen.isKey(key)
+                        seen(key) = true;
+                        deps{end+1} = struct( ...             %#ok<AGROW>
+                            'namespace', t{1}, ...
+                            'name', t{2}, ...
+                            'version', t{3});
+                    end
+                end
+            end
+        end
+
         function result = handleOpenLink(data)
             url = string(data.url);
             web(url, '-browser');
@@ -198,6 +240,113 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
     end
 
     methods (Access = private)
+        function result = handleResolvePackages(this, data)
+            % Resolve Typst universe packages including transitive deps.
+            % Downloads tar.gz from the CDN, scans .typ files for #import
+            % statements, and recursively resolves dependencies.
+            specs = data.specs;
+            if ~iscell(specs), specs = {specs}; end
+
+            [outSpecs, outTarballs, outErrors] = ...
+                this.resolvePackageTree(specs);
+
+            result = struct();
+            result.specs = outSpecs;
+            result.tarballs = outTarballs;
+            result.errors = outErrors;
+        end
+
+        function [outSpecs, outTarballs, outErrors] = ...
+                resolvePackageTree(this, initialSpecs)
+            % BFS resolution of packages and their transitive dependencies.
+            MAX_DEPTH = 5;
+            resolved = containers.Map('KeyType', 'char', 'ValueType', 'char');
+            outErrors = {};
+
+            queue = initialSpecs;
+            for depth = 1:MAX_DEPTH
+                if isempty(queue), break; end
+                nextQueue = {};
+
+                for i = 1:numel(queue)
+                    s = queue{i};
+                    ns  = string(s.namespace);
+                    name = string(s.name);
+                    ver  = string(s.version);
+                    key  = char(ns + "/" + name + "/" + ver);
+
+                    if resolved.isKey(key), continue; end
+
+                    % MATLAB-side cache hit
+                    if this.PackageCache.isKey(key)
+                        resolved(key) = this.PackageCache(key);
+                        % Queue known transitive deps
+                        if this.PackageDeps.isKey(key)
+                            deps = this.PackageDeps(key);
+                            for j = 1:numel(deps)
+                                dk = char(string(deps{j}.namespace) + "/" + ...
+                                    string(deps{j}.name) + "/" + ...
+                                    string(deps{j}.version));
+                                if ~resolved.isKey(dk)
+                                    nextQueue{end+1} = deps{j}; %#ok<AGROW>
+                                end
+                            end
+                        end
+                        continue
+                    end
+
+                    try
+                        url = sprintf( ...
+                            'https://packages.typst.org/%s/%s-%s.tar.gz', ...
+                            ns, name, ver);
+                        tmpFile = string(tempname) + ".tar.gz";
+                        cleanupFile = onCleanup(@() delete(tmpFile));
+                        websave(tmpFile, url);
+
+                        fid = fopen(tmpFile, 'rb');
+                        raw = fread(fid, Inf, '*uint8')';
+                        fclose(fid);
+
+                        b64 = matlab.net.base64encode(raw);
+                        this.PackageCache(key) = b64;
+                        resolved(key) = b64;
+
+                        % Scan for transitive deps
+                        deps = ic.Typst.scanImportsFromTarGz(tmpFile);
+                        this.PackageDeps(key) = deps;
+                        for j = 1:numel(deps)
+                            dk = char(string(deps{j}.namespace) + "/" + ...
+                                string(deps{j}.name) + "/" + ...
+                                string(deps{j}.version));
+                            if ~resolved.isKey(dk)
+                                nextQueue{end+1} = deps{j}; %#ok<AGROW>
+                            end
+                        end
+                    catch ME
+                        outErrors{end+1} = struct( ...         %#ok<AGROW>
+                            'spec', key, ...
+                            'message', ME.message);
+                    end
+                end
+
+                queue = nextQueue;
+            end
+
+            % Build parallel output arrays
+            keys = resolved.keys();
+            n = numel(keys);
+            outSpecs = cell(n, 1);
+            outTarballs = cell(n, 1);
+            for i = 1:n
+                parts = strsplit(keys{i}, '/');
+                outSpecs{i} = struct( ...
+                    'namespace', parts{1}, ...
+                    'name', parts{2}, ...
+                    'version', parts{3});
+                outTarballs{i} = resolved(keys{i});
+            end
+        end
+
         function result = handleSavePdf(~, data)
             filepath = string(data.filepath);
 
