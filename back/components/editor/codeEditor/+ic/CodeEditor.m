@@ -2,13 +2,13 @@ classdef CodeEditor < ic.core.Component
     % > CODEEDITOR Source code editor with syntax highlighting.
 
     %   Powered by CodeMirror 6 with Lezer parsers. Supports MATLAB,
-    %   JavaScript, Markdown, CSS, and plain text.
+    %   JavaScript, Markdown, CSS, Typst, LaTeX, and plain text.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > VALUE editor text content
         Value string = ""
-        % > LANGUAGE syntax language: "matlab", "javascript", "markdown", "css", "typst", "plain"
-        Language string {mustBeMember(Language, ["matlab", "javascript", "markdown", "css", "typst", "plain"])} = "matlab"
+        % > LANGUAGE syntax language: "matlab", "javascript", "markdown", "css", "typst", "latex", "plain"
+        Language string {mustBeMember(Language, ["matlab", "javascript", "markdown", "css", "typst", "latex", "plain"])} = "matlab"
         % > READONLY make the entire editor read-only
         ReadOnly logical = false
         % > HEIGHT editor height (CSS value: number=px, string=any unit)

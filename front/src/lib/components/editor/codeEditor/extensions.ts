@@ -94,6 +94,7 @@ let jsLang: LanguageSupport | null = null;
 let mdLang: LanguageSupport | null = null;
 let cssLang: LanguageSupport | null = null;
 let typstLang: LanguageSupport | null = null;
+let latexLang: LanguageSupport | null = null;
 
 /** Lazy-load language support. */
 async function loadLanguage(lang: string): Promise<Extension> {
@@ -124,6 +125,12 @@ async function loadLanguage(lang: string): Promise<Extension> {
         typstLang = mod.typst();
       }
       return typstLang;
+    case 'latex':
+      if (!latexLang) {
+        const mod = await import('codemirror-lang-latex');
+        latexLang = mod.latex();
+      }
+      return latexLang;
     case 'plain':
     default:
       return [];
