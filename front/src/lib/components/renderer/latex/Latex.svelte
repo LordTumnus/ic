@@ -109,16 +109,45 @@
   let renderTicket = 0;
   let hasRenderedOnce = false;
   let styleVersion = $state(0);
-  let prevZoom = 1;
+  let prevRenderScale = 0;
+
+  // Viewport-aware scaling: baseScale maps PDF points → fit-width pixels,
+  // so currentZoom=1 fills the viewport width (same mental model as Typst).
+  let viewportWidth = $state(0);
 
   const heightCss = $derived(toSize(height));
-  const zoomPercent = $derived(Math.round(currentZoom * 100));
   const isMultiPage = $derived(pageInfos.length > 1);
+
+  const baseScale = $derived.by(() => {
+    if (viewportWidth === 0 || pageInfos.length === 0) return 1;
+    const maxW = Math.max(...pageInfos.map((p) => p.width));
+    if (maxW === 0) return 1;
+    const hPadding = isMultiPage ? 32 : 24;
+    const border = isMultiPage ? 2 : 0;
+    return (viewportWidth - hPadding - border) / maxW;
+  });
+
+  const renderScale = $derived(baseScale * currentZoom);
+  const zoomPercent = $derived(Math.round(currentZoom * 100));
 
   // ─── Watch for style() changes ───────────────────────────────────────
   $effect(() => {
     const unsub = subscribe('@style', () => { styleVersion++; });
     return unsub;
+  });
+
+  // ─── Track viewport width for fit-width scaling ─────────────────────
+  $effect(() => {
+    if (!viewportEl) return;
+    viewportWidth = viewportEl.clientWidth;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        viewportWidth =
+          entry.contentBoxSize?.[0]?.inlineSize ?? entry.target.clientWidth;
+      }
+    });
+    ro.observe(viewportEl);
+    return () => ro.disconnect();
   });
 
   // ─── Render when value changes ────────────────────────────────────────
@@ -288,7 +317,7 @@
   // ─── Canvas rendering (IntersectionObserver) ──────────────────────────
   $effect(() => {
     const infos = pageInfos;
-    const z = currentZoom;
+    const rs = renderScale;
     if (infos.length === 0 || !viewportEl) return;
 
     // Clean up previous observer
@@ -300,7 +329,7 @@
           const idx = parseInt(entry.target.getAttribute('data-page-idx') ?? '-1');
           if (idx < 0) continue;
           if (entry.isIntersecting) {
-            renderPageIfNeeded(idx + 1, z);
+            renderPageIfNeeded(idx + 1, rs);
           }
         }
       },
@@ -314,7 +343,7 @@
     // Render currently visible pages immediately
     for (let i = 0; i < infos.length; i++) {
       if (isPageVisible(i)) {
-        renderPageIfNeeded(i + 1, z);
+        renderPageIfNeeded(i + 1, rs);
       }
     }
 
@@ -324,12 +353,12 @@
     };
   });
 
-  // ─── Preserve scroll position on zoom change ─────────────────────────
+  // ─── Preserve scroll position on scale change ─────────────────────────
   $effect(() => {
-    const z = currentZoom;
+    const rs = renderScale;
     if (pageInfos.length === 0 || !viewportEl) return;
 
-    if (z !== prevZoom) {
+    if (rs !== prevRenderScale) {
       const scrollRatio = viewportEl.scrollHeight > 0
         ? viewportEl.scrollTop / viewportEl.scrollHeight
         : 0;
@@ -345,7 +374,7 @@
         }
       });
 
-      prevZoom = z;
+      prevRenderScale = rs;
     }
   });
 
@@ -412,7 +441,7 @@
 
     try {
       const pg = await pdfDoc.getPage(pageNum);
-      const viewport = pg.getViewport({ scale: currentZoom });
+      const viewport = pg.getViewport({ scale: renderScale });
       const annotations = await pg.getAnnotations();
 
       for (const ann of annotations) {
@@ -490,12 +519,12 @@
   }
 
   function doFitPage() {
-    if (!viewportEl || pageInfos.length === 0) return;
+    if (!viewportEl || pageInfos.length === 0 || baseScale <= 0) return;
     const info = pageInfos[0];
-    const padding = isMultiPage ? 32 : 24;
-    const availH = viewportEl.clientHeight - padding;
+    const vPadding = isMultiPage ? 32 : 24;
+    const availH = viewportEl.clientHeight - vPadding;
     if (info.height > 0) {
-      currentZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, availH / info.height));
+      currentZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, availH / (info.height * baseScale)));
     }
   }
 
@@ -542,8 +571,8 @@
   // ─── Scaled page size ────────────────────────────────────────────────
   function scaledSize(info: PageInfo): { w: number; h: number } {
     return {
-      w: Math.floor(info.width * currentZoom),
-      h: Math.floor(info.height * currentZoom),
+      w: Math.floor(info.width * renderScale),
+      h: Math.floor(info.height * renderScale),
     };
   }
 
