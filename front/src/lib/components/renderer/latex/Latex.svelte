@@ -463,7 +463,11 @@
           if (ann.url && request) {
             request('openLink', { url: ann.url });
           } else if (ann.dest && pdfDoc) {
-            pdfDoc.getDestination(ann.dest).then(dest => {
+            // dest can be a string (named destination) or an array (explicit destination)
+            const destPromise = typeof ann.dest === 'string'
+              ? pdfDoc.getDestination(ann.dest)
+              : Promise.resolve(ann.dest);
+            destPromise.then(dest => {
               if (dest) {
                 pdfDoc!.getPageIndex(dest[0]).then(idx => {
                   doScrollToPage(idx + 1);
@@ -479,9 +483,13 @@
     }
   }
 
-  // Re-render annotations when pages are rendered
+  // Re-render annotations when pages are rendered or scale changes
   $effect(() => {
     if (pageInfos.length === 0 || !pdfDoc) return;
+    // Read renderScale synchronously so Svelte tracks it as a dependency —
+    // the async renderAnnotations() reads it after an await, which is invisible
+    // to effect tracking.
+    const _scale = renderScale;
     for (let i = 0; i < pageInfos.length; i++) {
       if (pageEls[i]) {
         renderAnnotations(i + 1, pageEls[i]);
@@ -802,9 +810,11 @@
   /* ─── Link overlays ────────────────────────────────────────────────── */
   .ic-latex :global(.ic-latex__link-overlay) {
     z-index: 1;
+    border-radius: 1px;
   }
   .ic-latex :global(.ic-latex__link-overlay:hover) {
-    background-color: rgba(0, 100, 255, 0.08);
+    background-color: rgba(0, 100, 255, 0.04);
+    box-shadow: 0 1px 0 0 rgba(0, 100, 255, 0.35);
   }
 
   /* ─── Floating controls ──────────────────────────────────────────────── */
