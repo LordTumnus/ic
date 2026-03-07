@@ -7,6 +7,7 @@
     onImageClick,
     onLinkClick,
     onColorClick,
+    onTableClick,
     focusMode = false,
     onFocusModeToggle,
   }: {
@@ -14,6 +15,7 @@
     onImageClick: (e: MouseEvent) => void;
     onLinkClick: (e: MouseEvent) => void;
     onColorClick: (e: MouseEvent) => void;
+    onTableClick: (e: MouseEvent) => void;
     focusMode?: boolean;
     onFocusModeToggle: () => void;
   } = $props();
@@ -169,7 +171,7 @@
       case 'blockquote': editor.chain().focus().toggleBlockquote().run(); break;
       case 'codeBlock': editor.chain().focus().toggleCodeBlock().run(); break;
       case 'hr': editor.chain().focus().setHorizontalRule().run(); break;
-      case 'table': editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+      // table is handled by onTableClick callback
       case 'alignLeft': editor.chain().focus().setTextAlign('left').run(); break;
       case 'alignCenter': editor.chain().focus().setTextAlign('center').run(); break;
       case 'alignRight': editor.chain().focus().setTextAlign('right').run(); break;
@@ -265,7 +267,7 @@
   <div class="ic-rte-toolbar__group">
     <button class="ic-rte-toolbar__btn" class:ic-rte-toolbar__btn--active={activeStates.link} onclick={(e) => onLinkClick(e)} title="Link">{@html icons.link}</button>
     <button class="ic-rte-toolbar__btn" onclick={(e) => onImageClick(e)} title="Image">{@html icons.image}</button>
-    <button class="ic-rte-toolbar__btn" onclick={() => cmd('table')} title="Table">{@html icons.table}</button>
+    <button class="ic-rte-toolbar__btn" onclick={(e) => onTableClick(e)} title="Table">{@html icons.table}</button>
   </div>
 
   <div class="ic-rte-toolbar__sep"></div>

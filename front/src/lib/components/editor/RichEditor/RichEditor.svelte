@@ -35,6 +35,7 @@
   import { DetailsNode, DetailsSummary, DetailsContent } from './DetailsNode';
   import { SlashCommands, filterCommands } from './slash-commands';
   import { createBlockGripPlugin, type GripMenuEvent } from './BlockGrip';
+  import { TableControls } from './TableControls';
   import { CodeBlockLanguageSelector } from './CodeBlockLangSelector';
 
   import Toolbar from './Toolbar.svelte';
@@ -45,6 +46,7 @@
   import LinkDialog from './LinkDialog.svelte';
   import LinkPreview from './LinkPreview.svelte';
   import ColorPicker from './ColorPicker.svelte';
+  import TableGridPicker from './TableGridPicker.svelte';
   import GripMenu from './GripMenu.svelte';
 
   // Import editor theme CSS
@@ -139,6 +141,9 @@
   let colorPickerVisible = $state(false);
   let colorPickerX = $state(0);
   let colorPickerY = $state(0);
+  let tablePickerVisible = $state(false);
+  let tablePickerX = $state(0);
+  let tablePickerY = $state(0);
 
   // Grip menu state
   let gripMenuVisible = $state(false);
@@ -217,6 +222,7 @@
             TableRow,
             TableCell,
             TableHeader,
+            TableControls,
             TaskList,
             TaskItem.configure({ nested: true }),
             TextAlign.configure({
@@ -736,6 +742,16 @@
     colorPickerY = pos.y;
     colorPickerVisible = true;
   }
+  function openTablePicker(e: MouseEvent) {
+    const btn = (e.target as HTMLElement).closest('button');
+    const rect = btn?.getBoundingClientRect();
+    const ax = rect ? rect.left : e.clientX;
+    const ay = rect ? rect.bottom + 4 : e.clientY + 4;
+    const pos = clampPopup(ax, ay, 190, 170);
+    tablePickerX = pos.x;
+    tablePickerY = pos.y;
+    tablePickerVisible = true;
+  }
   function toggleFocusMode() { focusMode = !focusMode; }
 
   // ─── Block type for status bar ────────────────────
@@ -852,6 +868,7 @@
       onImageClick={openImageDialog}
       onLinkClick={openLinkDialog}
       onColorClick={openColorPicker}
+      onTableClick={openTablePicker}
       onFocusModeToggle={toggleFocusMode}
     />
   {/if}
@@ -941,6 +958,12 @@
     bind:visible={colorPickerVisible}
     x={colorPickerX}
     y={colorPickerY}
+  />
+  <TableGridPicker
+    {editor}
+    bind:visible={tablePickerVisible}
+    x={tablePickerX}
+    y={tablePickerY}
   />
   <GripMenu
     {editor}

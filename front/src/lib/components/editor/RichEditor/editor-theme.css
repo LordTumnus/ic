@@ -313,11 +313,119 @@
 
 .ic-rte__editor .tableWrapper {
   overflow-x: auto;
+  overflow-y: visible;
   margin: 1em 0;
+  position: relative;
+  padding-left: 20px;
+  padding-top: 20px;
 }
 
 .ic-rte__editor .resize-cursor {
   cursor: col-resize;
+}
+
+/* ── Table row/column controls ("..." handles + dropdown) ──────────── */
+.ic-rte__editor .ic-rte-tblctrl {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ic-rte__editor .ic-rte-tblctrl__handle {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background-color: transparent;
+  color: var(--ic-muted-foreground);
+  cursor: pointer;
+  padding: 0;
+  line-height: 0;
+  pointer-events: auto;
+  transition: background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.ic-rte__editor .ic-rte-tblctrl__handle:hover {
+  background-color: var(--ic-muted);
+  color: var(--ic-foreground);
+  border-color: var(--ic-border);
+}
+
+.ic-rte__editor .ic-rte-tblctrl__handle:active {
+  background-color: var(--ic-secondary);
+}
+
+/* Row handle: in left gutter */
+.ic-rte__editor .ic-rte-tblctrl__handle--row {
+  left: 0;
+}
+
+/* Column handle: in top gutter */
+.ic-rte__editor .ic-rte-tblctrl__handle--col {
+  top: 0;
+}
+
+/* ── Table dropdown menu (appended to body) ────────────────────────── */
+.ic-rte-tblmenu {
+  position: fixed;
+  z-index: 50;
+  min-width: 180px;
+  background-color: var(--ic-popover, var(--ic-background));
+  border: 1px solid var(--ic-border);
+  border-radius: 2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+}
+
+.ic-rte-tblmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ic-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ic-rte-tblmenu__item:hover {
+  background-color: var(--ic-muted);
+}
+
+.ic-rte-tblmenu__item--danger {
+  color: var(--ic-destructive);
+}
+
+.ic-rte-tblmenu__item--danger:hover {
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.ic-rte-tblmenu__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.ic-rte-tblmenu__sep {
+  height: 1px;
+  background-color: var(--ic-border);
+  margin: 3px 4px;
 }
 
 /* ── Images ──────────────────────────────────────────────────────────── */
