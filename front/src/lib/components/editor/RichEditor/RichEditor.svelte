@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Editor } from '@tiptap/core';
+  import { Editor, InputRule } from '@tiptap/core';
   import { StarterKit } from '@tiptap/starter-kit';
   import { Underline } from '@tiptap/extension-underline';
   import { Link } from '@tiptap/extension-link';
@@ -43,6 +43,7 @@
   import TOCSidebar from './TOCSidebar.svelte';
   import ImageDialog from './ImageDialog.svelte';
   import LinkDialog from './LinkDialog.svelte';
+  import LinkPreview from './LinkPreview.svelte';
   import ColorPicker from './ColorPicker.svelte';
   import GripMenu from './GripMenu.svelte';
 
@@ -186,7 +187,25 @@
               dropcursor: false, // MATLAB blocks drag events
             }),
             Underline,
-            Link.configure({
+            Link.extend({
+              addInputRules() {
+                // Markdown link: [text](url)
+                return [
+                  new InputRule({
+                    find: /\[([^\]]+)\]\(([^)]+)\)\s$/,
+                    handler: ({ state, range, match }) => {
+                      const [, text, url] = match;
+                      const { tr } = state;
+                      const start = range.from;
+                      const end = range.to;
+                      tr.delete(start, end);
+                      const linkMark = state.schema.marks.link.create({ href: url });
+                      tr.insert(start, state.schema.text(text, [linkMark]));
+                    },
+                  }),
+                ];
+              },
+            }).configure({
               openOnClick: false,
               autolink: true,
               HTMLAttributes: { rel: 'noopener noreferrer nofollow' },
@@ -570,8 +589,8 @@
   });
 
   // ─── Link click interception ────────────────────────
-  // Read-only: any click opens the link.
-  // Edit mode: Ctrl/Cmd+click opens the link (standard editor UX).
+  // Read-only: any click opens the link directly.
+  // Edit mode: link preview popup handles opening (via "Open" button).
   function handleEditorClick(e: MouseEvent) {
     const link = (e.target as HTMLElement).closest('a');
     if (!link) return;
@@ -579,15 +598,23 @@
     const href = link.getAttribute('href') ?? '';
     if (href.startsWith('#')) return;
 
-    // In edit mode, only open on Ctrl/Cmd+click
-    if (!readOnly && !(e.ctrlKey || e.metaKey)) return;
-
+    // Always prevent default navigation
     e.preventDefault();
-    e.stopPropagation();
 
-    if (request && (href.startsWith('http://') || href.startsWith('https://'))) {
-      request('openLink', { url: href });
+    // Read-only: open immediately
+    if (readOnly) {
+      e.stopPropagation();
+      openLinkUrl(href);
     }
+    // Edit mode: cursor positions on click, link preview popup provides "Open"
+  }
+
+  function openLinkUrl(href: string) {
+    if (!request || !href) return;
+    if (!/^https?:\/\//i.test(href)) {
+      href = 'https://' + href;
+    }
+    request('openLink', { url: href });
   }
 
   // ─── Image resolution (URLs → MATLAB → base64) ────
@@ -673,10 +700,27 @@
     imageDialogVisible = true;
   }
   function openLinkDialog(e: MouseEvent) {
-    const btn = (e.target as HTMLElement).closest('button');
-    const rect = btn?.getBoundingClientRect();
-    const ax = rect ? rect.left : e.clientX;
-    const ay = rect ? rect.bottom + 4 : e.clientY + 4;
+    // If cursor is on a link, anchor dialog to the link element in the editor
+    let ax = e.clientX;
+    let ay = e.clientY + 4;
+    if (editor?.isActive('link')) {
+      const { from } = editor.state.selection;
+      const resolved = editor.view.domAtPos(from);
+      const domNode = resolved.node as HTMLElement;
+      const linkEl =
+        domNode.nodeType === Node.ELEMENT_NODE
+          ? (domNode as HTMLElement).closest('a')
+          : domNode.parentElement?.closest('a');
+      if (linkEl) {
+        const linkRect = linkEl.getBoundingClientRect();
+        ax = linkRect.left;
+        ay = linkRect.bottom + 4;
+      }
+    } else {
+      const btn = (e.target as HTMLElement).closest('button');
+      const rect = btn?.getBoundingClientRect();
+      if (rect) { ax = rect.left; ay = rect.bottom + 4; }
+    }
     const pos = clampPopup(ax, ay, 260, 150);
     linkDialogX = pos.x;
     linkDialogY = pos.y;
@@ -885,6 +929,13 @@
     x={linkDialogX}
     y={linkDialogY}
   />
+  {#if editor && !disabled}
+    <LinkPreview
+      {editor}
+      onOpen={openLinkUrl}
+      onEdit={(e) => openLinkDialog(e)}
+    />
+  {/if}
   <ColorPicker
     {editor}
     bind:visible={colorPickerVisible}

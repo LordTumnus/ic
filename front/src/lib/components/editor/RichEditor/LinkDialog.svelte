@@ -18,6 +18,10 @@
   let text = $state('');
   let dialogEl = $state<HTMLDivElement>();
 
+  // Saved selection range — captured on open, restored on apply
+  let savedFrom = 0;
+  let savedTo = 0;
+
   const icX = resolveIcon('x', 14);
   const icUnlink = resolveIcon('unlink', 14);
 
@@ -26,15 +30,17 @@
   // Pre-fill when opening on an existing link
   $effect(() => {
     if (visible && editor) {
+      // Snapshot the selection before anything can blur it
+      const { from, to } = editor.state.selection;
+      savedFrom = from;
+      savedTo = to;
+
       if (isLink) {
         const attrs = editor.getAttributes('link');
         url = attrs.href || '';
       } else {
-        // Check clipboard for URL
         url = '';
       }
-      // Get selected text
-      const { from, to } = editor.state.selection;
       text = editor.state.doc.textBetween(from, to, ' ');
     }
   });
@@ -48,18 +54,31 @@
   function setLink() {
     if (!editor || !url.trim()) return;
 
+    // Normalize: auto-prepend https:// if no protocol
+    let href = url.trim();
+    if (!/^https?:\/\//i.test(href)) {
+      href = 'https://' + href;
+    }
+
+    // Restore the saved selection, then apply the link
     editor
       .chain()
       .focus()
-      .extendMarkRange('link')
-      .setLink({ href: url.trim() })
+      .setTextSelection({ from: savedFrom, to: savedTo })
+      .setLink({ href })
       .run();
     close();
   }
 
   function unlink() {
     if (!editor) return;
-    editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: savedFrom, to: savedTo })
+      .extendMarkRange('link')
+      .unsetLink()
+      .run();
     close();
   }
 
