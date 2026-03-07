@@ -179,11 +179,15 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     description: 'LaTeX math expression',
     group: 'Insert',
     command: (editor, range) => {
-      editor.chain().focus().deleteRange(range).run();
-      editor.commands.insertContent({
-        type: 'inlineMath',
-        attrs: { latex: 'E = mc^2', display: 'yes', evaluate: 'no' },
-      });
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: 'inlineMath',
+          attrs: { latex: '\\dot{x} = Ax + Bu', display: 'yes', evaluate: 'no' },
+        })
+        .run();
     },
   },
 ];

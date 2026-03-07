@@ -23,6 +23,8 @@
   import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
   import { Markdown } from 'tiptap-markdown';
   import MathExtension, { InlineMathNode } from '@aarkue/tiptap-math-extension';
+  import katex from 'katex';
+  import 'katex/dist/katex.min.css';
   import type { Resolution, RequestFn } from '$lib/types';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
@@ -250,6 +252,117 @@
                     },
                     parse: {},
                   },
+                };
+              },
+              addNodeView() {
+                return ({ node, getPos, editor, HTMLAttributes }) => {
+                  const katexLib = katex;
+                  const outerSpan = document.createElement('span');
+                  outerSpan.classList.add('tiptap-math', 'latex');
+
+                  // KaTeX render target
+                  const mathSpan = document.createElement('span');
+                  outerSpan.appendChild(mathSpan);
+
+                  // Inline LaTeX editor (hidden by default)
+                  const inputEl = document.createElement('input');
+                  inputEl.type = 'text';
+                  inputEl.className = 'ic-rte-math-input';
+                  inputEl.spellcheck = false;
+                  inputEl.style.display = 'none';
+                  outerSpan.appendChild(inputEl);
+
+                  let isEditing = false;
+                  let currentLatex = node.attrs.latex || '';
+                  let displayMode = node.attrs.display === 'yes';
+
+                  function renderKatex() {
+                    try {
+                      katexLib.render(currentLatex || '\\text{empty}', mathSpan, {
+                        displayMode,
+                        throwOnError: false,
+                      });
+                    } catch {
+                      mathSpan.textContent = currentLatex;
+                    }
+                  }
+
+                  function openEditor() {
+                    if (isEditing || !editor.isEditable) return;
+                    isEditing = true;
+                    inputEl.value = currentLatex;
+                    mathSpan.style.display = 'none';
+                    inputEl.style.display = '';
+                    inputEl.focus();
+                    inputEl.select();
+                  }
+
+                  function closeEditor(apply: boolean) {
+                    if (!isEditing) return;
+                    isEditing = false;
+                    inputEl.style.display = 'none';
+                    mathSpan.style.display = '';
+                    if (apply && typeof getPos === 'function') {
+                      const newLatex = inputEl.value.trim() || 'x';
+                      if (newLatex !== currentLatex) {
+                        const pos = getPos();
+                        if (pos != null) {
+                          editor.commands.command(({ tr }) => {
+                            tr.setNodeMarkup(pos, undefined, {
+                              ...node.attrs,
+                              latex: newLatex,
+                            });
+                            return true;
+                          });
+                        }
+                      }
+                    }
+                    editor.commands.focus();
+                  }
+
+                  renderKatex();
+
+                  // Double-click to edit
+                  outerSpan.addEventListener('dblclick', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openEditor();
+                  });
+
+                  // Enter to apply, Escape to cancel
+                  inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      closeEditor(true);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      closeEditor(false);
+                    }
+                    e.stopPropagation();
+                  });
+
+                  // Blur to apply
+                  inputEl.addEventListener('blur', () => closeEditor(true));
+
+                  // Prevent ProseMirror from handling clicks inside the input
+                  inputEl.addEventListener('mousedown', (e) => e.stopPropagation());
+
+                  return {
+                    dom: outerSpan,
+                    ignoreMutation: () => true,
+                    stopEvent: (e: Event) => {
+                      // Let the input handle all events when editing
+                      if (isEditing && outerSpan.contains(e.target as HTMLElement)) return true;
+                      return false;
+                    },
+                    update(updatedNode) {
+                      if (updatedNode.type.name !== 'inlineMath') return false;
+                      currentLatex = updatedNode.attrs.latex || '';
+                      displayMode = updatedNode.attrs.display === 'yes';
+                      if (!isEditing) renderKatex();
+                      return true;
+                    },
+                  };
                 };
               },
             }),
