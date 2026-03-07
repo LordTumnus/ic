@@ -1,0 +1,804 @@
+<script lang="ts">
+  import { untrack } from 'svelte';
+  import { Editor } from '@tiptap/core';
+  import { StarterKit } from '@tiptap/starter-kit';
+  import { Underline } from '@tiptap/extension-underline';
+  import { Link } from '@tiptap/extension-link';
+  import { Image } from '@tiptap/extension-image';
+  import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
+  import { TaskList } from '@tiptap/extension-task-list';
+  import { TaskItem } from '@tiptap/extension-task-item';
+  import { TextAlign } from '@tiptap/extension-text-align';
+  import { Placeholder } from '@tiptap/extension-placeholder';
+  import { CharacterCount } from '@tiptap/extension-character-count';
+  import { Highlight } from '@tiptap/extension-highlight';
+  import { Subscript } from '@tiptap/extension-subscript';
+  import { Superscript } from '@tiptap/extension-superscript';
+  import { Color } from '@tiptap/extension-color';
+  import { TextStyle } from '@tiptap/extension-text-style';
+  import { Typography } from '@tiptap/extension-typography';
+  import { BubbleMenu } from '@tiptap/extension-bubble-menu';
+  import { Focus } from '@tiptap/extension-focus';
+  import { FontFamily } from '@tiptap/extension-font-family';
+  import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
+  import type { Resolution, RequestFn } from '$lib/types';
+  import type { CssSize } from '$lib/utils/css';
+  import { toSize } from '$lib/utils/css';
+  import logger from '$lib/core/logger';
+
+  import { CalloutNode } from './CalloutNode';
+  import { DetailsNode, DetailsSummary, DetailsContent } from './DetailsNode';
+  import { SlashCommands, filterCommands } from './slash-commands';
+  import { createBlockGripPlugin, type GripMenuEvent } from './BlockGrip';
+  import { CodeBlockLanguageSelector } from './CodeBlockLangSelector';
+
+  import Toolbar from './Toolbar.svelte';
+  import BubbleToolbar from './BubbleToolbar.svelte';
+  import SlashMenu from './SlashMenu.svelte';
+  import TOCSidebar from './TOCSidebar.svelte';
+  import ImageDialog from './ImageDialog.svelte';
+  import LinkDialog from './LinkDialog.svelte';
+  import ColorPicker from './ColorPicker.svelte';
+  import GripMenu from './GripMenu.svelte';
+
+  // Import editor theme CSS
+  import './editor-theme.css';
+
+  // ─── Props ───────────────────────────────────────────
+  let {
+    // Data props
+    value = $bindable(''),
+    height = $bindable<CssSize>('100%'),
+    readOnly = $bindable(false),
+    placeholder: placeholderText = $bindable(''),
+    disabled = $bindable(false),
+    showToolbar = $bindable(true),
+    showToc = $bindable(true),
+    focusMode = $bindable(false),
+    maxLength = $bindable<number | null>(null),
+
+    // Read-only props (frontend → MATLAB)
+    wordCount = $bindable(0),
+    characterCount = $bindable(0),
+    isFocused = $bindable(false),
+
+    // Events
+    valueChanged,
+    focusChanged,
+    submitted,
+
+    // Methods
+    focus: focusFn = $bindable((): Resolution => ({ success: true, data: null })),
+    blur: blurFn = $bindable((): Resolution => ({ success: true, data: null })),
+    clear: clearFn = $bindable((): Resolution => ({ success: true, data: null })),
+    insertContent: insertContentFn = $bindable(
+      (_html: string): Resolution => ({ success: true, data: null }),
+    ),
+    getMarkdown: getMarkdownFn = $bindable((): Resolution => ({ success: true, data: '' })),
+
+    // Request function (for MATLAB-side image fetching)
+    request,
+  }: {
+    value?: string;
+    height?: CssSize;
+    readOnly?: boolean;
+    placeholder?: string;
+    disabled?: boolean;
+    showToolbar?: boolean;
+    showToc?: boolean;
+    focusMode?: boolean;
+    maxLength?: number | null;
+    wordCount?: number;
+    characterCount?: number;
+    isFocused?: boolean;
+    valueChanged?: (data?: unknown) => void;
+    focusChanged?: (data?: unknown) => void;
+    submitted?: (data?: unknown) => void;
+    focus?: () => Resolution;
+    blur?: () => Resolution;
+    clear?: () => Resolution;
+    insertContent?: (html: string) => Resolution;
+    getMarkdown?: () => Resolution;
+    request?: RequestFn;
+  } = $props();
+
+  // ─── Internal state ──────────────────────────────────
+  let containerEl: HTMLDivElement;
+  let editorEl: HTMLDivElement;
+  let bubbleMenuEl: HTMLDivElement;
+  let editor: Editor | null = $state(null);
+  let updatingFromProp = false;
+
+  // Debounce timer for valueChanged
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Slash menu state
+  let slashMenuEl: HTMLDivElement;
+  let slashMenuVisible = $state(false);
+  let slashMenuItems = $state<import('./slash-commands').SlashCommand[]>([]);
+  let slashMenuComponent = $state<SlashMenu | null>(null);
+  let slashCommandFn: ((props: { command: (item: import('./slash-commands').SlashCommand) => void }) => void) | null = null;
+
+  // Dialog state
+  let imageDialogVisible = $state(false);
+  let imageDialogX = $state(0);
+  let imageDialogY = $state(0);
+  let linkDialogVisible = $state(false);
+  let linkDialogX = $state(0);
+  let linkDialogY = $state(0);
+  let colorPickerVisible = $state(false);
+  let colorPickerX = $state(0);
+  let colorPickerY = $state(0);
+
+  // Grip menu state
+  let gripMenuVisible = $state(false);
+  let gripMenuEvent = $state<GripMenuEvent | null>(null);
+
+  // TOC component ref
+  let tocComponent = $state<TOCSidebar | null>(null);
+
+  // ── Computed ──────────────────────────────────────────
+  const readingTime = $derived(Math.max(1, Math.ceil(wordCount / 200)));
+  const selectedWordCount = $derived.by(() => {
+    void txCount; // re-evaluate on transactions
+    if (!editor) return 0;
+    const { from, to } = editor.state.selection;
+    if (from === to) return 0;
+    const text = editor.state.doc.textBetween(from, to, ' ');
+    return text.split(/\s+/).filter(Boolean).length;
+  });
+
+  // ── Lowlight setup (reuse existing highlight.js) ────
+  let lowlightInstance: unknown = null;
+
+  async function getLowlight() {
+    if (lowlightInstance) return lowlightInstance;
+    const { createLowlight, common } = await import('lowlight');
+    lowlightInstance = createLowlight(common);
+    return lowlightInstance;
+  }
+
+  // ─── Editor mount ────────────────────────────────────
+  $effect(() => {
+    const el = editorEl;
+    if (!el) return;
+
+    return untrack(() => {
+      // Build lowlight then mount editor
+      getLowlight().then((lowlight) => {
+        const editorInstance = new Editor({
+          element: el,
+          content: value || '',
+          editable: !readOnly && !disabled,
+
+          extensions: [
+            StarterKit.configure({
+              codeBlock: false, // Replaced by CodeBlockLowlight
+              dropcursor: false, // MATLAB blocks drag events
+            }),
+            Underline,
+            Link.configure({
+              openOnClick: false,
+              autolink: true,
+              HTMLAttributes: { rel: 'noopener noreferrer nofollow' },
+            }),
+            Image.configure({
+              allowBase64: true,
+            }),
+            Table.configure({ resizable: true }),
+            TableRow,
+            TableCell,
+            TableHeader,
+            TaskList,
+            TaskItem.configure({ nested: true }),
+            TextAlign.configure({
+              types: ['heading', 'paragraph'],
+            }),
+            Placeholder.configure({
+              placeholder: placeholderText,
+            }),
+            CharacterCount.configure({
+              limit: maxLength,
+            }),
+            Highlight.configure({ multicolor: true }),
+            Subscript,
+            Superscript,
+            Color,
+            TextStyle,
+            Typography,
+            BubbleMenu.configure({
+              element: bubbleMenuEl,
+              tippyOptions: {
+                duration: [150, 100],
+                placement: 'top',
+              },
+            }),
+            Focus.configure({ className: 'has-focus', mode: 'deepest' }),
+            FontFamily,
+            CodeBlockLowlight.configure({ lowlight: lowlight as any }),
+            CodeBlockLanguageSelector,
+
+            // Custom nodes
+            CalloutNode,
+            DetailsNode,
+            DetailsSummary,
+            DetailsContent,
+
+            // Slash commands
+            SlashCommands.configure({
+              suggestion: {
+                items: ({ query }: { query: string }) => {
+                  return filterCommands(query);
+                },
+                render: () => {
+                  /** Position slash menu with viewport-aware flipping */
+                  function positionSlashMenu(rect: DOMRect) {
+                    if (!slashMenuEl) return;
+                    slashMenuEl.style.position = 'fixed';
+                    slashMenuEl.style.left = `${rect.left}px`;
+
+                    // Menu max-height is 300px (see SlashMenu.svelte)
+                    const menuMaxH = 300;
+                    const gap = 4;
+                    const spaceBelow = window.innerHeight - rect.bottom - gap;
+                    const spaceAbove = rect.top - gap;
+
+                    if (spaceBelow >= menuMaxH || spaceBelow >= spaceAbove) {
+                      // Below: anchor top edge to bottom of cursor
+                      slashMenuEl.style.top = `${rect.bottom + gap}px`;
+                      slashMenuEl.style.bottom = 'auto';
+                      slashMenuEl.style.maxHeight = `${Math.min(menuMaxH, spaceBelow)}px`;
+                    } else {
+                      // Above: anchor bottom edge to top of cursor
+                      // so popup hugs the slash regardless of content height
+                      slashMenuEl.style.top = 'auto';
+                      slashMenuEl.style.bottom = `${window.innerHeight - rect.top + gap}px`;
+                      slashMenuEl.style.maxHeight = `${Math.min(menuMaxH, spaceAbove)}px`;
+                    }
+                  }
+
+                  return {
+                    onStart: (props: any) => {
+                      slashMenuItems = props.items;
+                      slashMenuVisible = true;
+                      slashCommandFn = props.command;
+
+                      if (props.clientRect) {
+                        const rect = props.clientRect();
+                        if (rect) positionSlashMenu(rect);
+                      }
+                    },
+                    onUpdate: (props: any) => {
+                      slashMenuItems = props.items;
+                      slashCommandFn = props.command;
+
+                      if (props.clientRect) {
+                        const rect = props.clientRect();
+                        if (rect) positionSlashMenu(rect);
+                      }
+                    },
+                    onKeyDown: (props: any) => {
+                      if (props.event.key === 'Escape') {
+                        slashMenuVisible = false;
+                        return true;
+                      }
+                      return slashMenuComponent?.onKeyDown?.(props.event) ?? false;
+                    },
+                    onExit: () => {
+                      slashMenuVisible = false;
+                      slashCommandFn = null;
+                    },
+                  };
+                },
+              },
+            }),
+          ],
+
+          onUpdate: ({ editor: ed }) => {
+            if (updatingFromProp) return;
+
+            const html = ed.getHTML();
+            value = html;
+
+            // Update counts
+            const storage = ed.storage.characterCount;
+            wordCount = storage?.words?.() ?? 0;
+            characterCount = storage?.characters?.() ?? 0;
+
+            // Debounced valueChanged event
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              valueChanged?.({ value: html });
+            }, 300);
+          },
+
+          onFocus: () => {
+            isFocused = true;
+            focusChanged?.({ focused: true });
+          },
+
+          onBlur: () => {
+            isFocused = false;
+            focusChanged?.({ focused: false });
+          },
+
+          editorProps: {
+            handleKeyDown: (_view, event) => {
+              // Ctrl/Cmd+Enter → submitted
+              if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                submitted?.({ value: value });
+                return true;
+              }
+              return false;
+            },
+
+            // Clipboard paste → blob to base64 for images
+            handlePaste: (_view, event) => {
+              const items = event.clipboardData?.items;
+              if (!items) return false;
+
+              for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                  event.preventDefault();
+                  const file = item.getAsFile();
+                  if (!file) continue;
+
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const dataUri = reader.result as string;
+                    editorInstance.chain().focus().setImage({ src: dataUri }).run();
+                  };
+                  reader.readAsDataURL(file);
+                  return true;
+                }
+              }
+              return false;
+            },
+          },
+        });
+
+        // Add block grip plugin
+        const gripPlugin = createBlockGripPlugin((event) => {
+          gripMenuEvent = event;
+          gripMenuVisible = true;
+        });
+        // Register the plugin via the editor's plugin API
+        const { state } = editorInstance;
+        const newState = state.reconfigure({ plugins: [...state.plugins, gripPlugin] });
+        editorInstance.view.updateState(newState);
+
+        editor = editorInstance;
+
+        // Initial counts
+        const storage = editorInstance.storage.characterCount;
+        wordCount = storage?.words?.() ?? 0;
+        characterCount = storage?.characters?.() ?? 0;
+
+        logger.debug('RichEditor', 'mounted');
+      });
+
+      return () => {
+        // Flush pending debounce
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          if (editor) {
+            valueChanged?.({ value: editor.getHTML() });
+          }
+        }
+        editor?.destroy();
+        editor = null;
+        logger.debug('RichEditor', 'destroyed');
+      };
+    });
+  });
+
+  // ─── Value sync (MATLAB → editor) ───────────────────
+  $effect(() => {
+    const v = value;
+    if (!editor) return;
+    const current = editor.getHTML();
+    if (v === current) return;
+
+    updatingFromProp = true;
+    editor.commands.setContent(v, false);
+    updatingFromProp = false;
+  });
+
+  // ─── ReadOnly sync ──────────────────────────────────
+  $effect(() => {
+    editor?.setEditable(!readOnly && !disabled);
+  });
+
+  // ─── Placeholder sync ──────────────────────────────
+  $effect(() => {
+    if (!editor) return;
+    // TipTap placeholder doesn't support dynamic reconfiguration easily,
+    // so we update the data attribute on the element directly
+    const pm = editor.view.dom as HTMLElement;
+    if (pm) {
+      pm.setAttribute('data-placeholder', placeholderText);
+    }
+  });
+
+  // ─── Link click interception ────────────────────────
+  // Read-only: any click opens the link.
+  // Edit mode: Ctrl/Cmd+click opens the link (standard editor UX).
+  function handleEditorClick(e: MouseEvent) {
+    const link = (e.target as HTMLElement).closest('a');
+    if (!link) return;
+
+    const href = link.getAttribute('href') ?? '';
+    if (href.startsWith('#')) return;
+
+    // In edit mode, only open on Ctrl/Cmd+click
+    if (!readOnly && !(e.ctrlKey || e.metaKey)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (request && (href.startsWith('http://') || href.startsWith('https://'))) {
+      request('openLink', { url: href });
+    }
+  }
+
+  // ─── Image resolution (URLs → MATLAB → base64) ────
+  const imageCache = new Map<string, string>();
+  const pendingImages = new Set<string>();
+
+  function needsResolve(src: string): boolean {
+    if (src.startsWith('http://') || src.startsWith('https://')) return true;
+    if (src.startsWith('/')) return true;
+    if (/^[A-Za-z]:[/\\]/.test(src)) return true;
+    return false;
+  }
+
+  $effect(() => {
+    // Re-run when editor mounts (async) or when value changes from MATLAB
+    void editor;
+    value;
+    if (!editor || !editorEl || !request) return;
+    requestAnimationFrame(() => {
+      const imgs = editorEl.querySelectorAll<HTMLImageElement>('img[src]');
+      for (const img of imgs) {
+        const src = img.getAttribute('src') ?? '';
+        if (!needsResolve(src)) continue;
+        if (imageCache.has(src)) { img.src = imageCache.get(src)!; continue; }
+        if (pendingImages.has(src)) continue;
+        pendingImages.add(src);
+
+        request!('fetchImage', { url: src })
+          .then((res) => {
+            if (res.success && res.data) {
+              const dataUri = (res.data as { dataUri: string }).dataUri;
+              imageCache.set(src, dataUri);
+              editorEl?.querySelectorAll<HTMLImageElement>(`img[src="${CSS.escape(src)}"]`)
+                .forEach((el) => { el.src = dataUri; });
+            }
+          })
+          .catch(() => {})
+          .finally(() => { pendingImages.delete(src); });
+      }
+    });
+  });
+
+  // ─── Editor scroll tracking (for TOC) ──────────────
+  function handleEditorScroll(e: Event) {
+    tocComponent?.handleEditorScroll?.(e);
+  }
+
+  // ─── Popup viewport clamping ────────────────────
+  /** Clamp popup to viewport, flipping above anchor when it overflows bottom */
+  function clampPopup(
+    anchorX: number, anchorY: number,
+    popupW: number, popupH: number,
+    gap = 4,
+  ): { x: number; y: number } {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let x = anchorX;
+    let y = anchorY;
+
+    // Clamp horizontal
+    if (x + popupW > vw - gap) x = vw - popupW - gap;
+    if (x < gap) x = gap;
+
+    // Clamp vertical — flip above anchor if insufficient space below
+    if (y + popupH > vh - gap) {
+      const flipped = anchorY - popupH - gap * 2;
+      y = flipped >= gap ? flipped : Math.max(gap, vh - popupH - gap);
+    }
+
+    return { x, y };
+  }
+
+  // ─── Dialog handlers ──────────────────────────────
+  function openImageDialog(e: MouseEvent) {
+    const btn = (e.target as HTMLElement).closest('button');
+    const rect = btn?.getBoundingClientRect();
+    const ax = rect ? rect.left : e.clientX;
+    const ay = rect ? rect.bottom + 4 : e.clientY + 4;
+    const pos = clampPopup(ax, ay, 280, 220);
+    imageDialogX = pos.x;
+    imageDialogY = pos.y;
+    imageDialogVisible = true;
+  }
+  function openLinkDialog(e: MouseEvent) {
+    const btn = (e.target as HTMLElement).closest('button');
+    const rect = btn?.getBoundingClientRect();
+    const ax = rect ? rect.left : e.clientX;
+    const ay = rect ? rect.bottom + 4 : e.clientY + 4;
+    const pos = clampPopup(ax, ay, 260, 150);
+    linkDialogX = pos.x;
+    linkDialogY = pos.y;
+    linkDialogVisible = true;
+  }
+  function openColorPicker(e: MouseEvent) {
+    const btn = (e.target as HTMLElement).closest('button');
+    const rect = btn?.getBoundingClientRect();
+    const ax = rect ? rect.left : e.clientX;
+    const ay = rect ? rect.bottom + 4 : e.clientY + 4;
+    const pos = clampPopup(ax, ay, 200, 280);
+    colorPickerX = pos.x;
+    colorPickerY = pos.y;
+    colorPickerVisible = true;
+  }
+  function toggleFocusMode() { focusMode = !focusMode; }
+
+  // ─── Block type for status bar ────────────────────
+  const currentBlockType = $derived.by(() => {
+    void txCount; // re-evaluate on transactions
+    if (!editor) return 'P';
+    for (let i = 1; i <= 6; i++) {
+      if (editor.isActive('heading', { level: i })) return `H${i}`;
+    }
+    if (editor.isActive('bulletList')) return 'UL';
+    if (editor.isActive('orderedList')) return 'OL';
+    if (editor.isActive('taskList')) return 'TASK';
+    if (editor.isActive('blockquote')) return 'QUOTE';
+    if (editor.isActive('codeBlock')) return 'CODE';
+    if (editor.isActive('callout')) return 'CALL';
+    return 'P';
+  });
+
+  // ─── Slash menu command execution ─────────────────
+  function executeSlashCommand(item: import('./slash-commands').SlashCommand) {
+    if (slashCommandFn) {
+      slashCommandFn({ command: () => {} } as any);
+      // The actual command is executed by the suggestion plugin
+    }
+  }
+
+  // ─── Method implementations ────────────────────────
+  $effect(() => {
+    focusFn = (): Resolution => {
+      editor?.commands.focus();
+      return { success: true, data: null };
+    };
+
+    blurFn = (): Resolution => {
+      editor?.commands.blur();
+      return { success: true, data: null };
+    };
+
+    clearFn = (): Resolution => {
+      editor?.commands.clearContent();
+      value = '';
+      return { success: true, data: null };
+    };
+
+    insertContentFn = (html: string): Resolution => {
+      if (!editor) return { success: false, data: 'Editor not mounted' };
+      editor.commands.insertContent(html);
+      return { success: true, data: null };
+    };
+
+    getMarkdownFn = (): Resolution => {
+      if (!editor) return { success: false, data: 'Editor not mounted' };
+      try {
+        // tiptap-markdown adds getMarkdown() to the editor
+        const md = (editor as any).storage?.markdown?.getMarkdown?.() ??
+                   (editor as any).getMarkdown?.() ?? '';
+        return { success: true, data: md };
+      } catch {
+        return { success: false, data: 'Markdown conversion unavailable' };
+      }
+    };
+  });
+
+  // ─── Force transaction-based UI refresh ───────────
+  // Incremented on every editor transaction so derived state
+  // that reads it (selectedWordCount, currentBlockType) re-evaluates.
+  let txCount = $state(0);
+  $effect(() => {
+    if (!editor) return;
+    const handler = () => { txCount++; };
+    editor.on('transaction', handler);
+    return () => { editor!.off('transaction', handler); };
+  });
+</script>
+
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="ic-rte"
+  class:ic-rte--focus-mode={focusMode}
+  class:ic-rte--disabled={disabled}
+  class:ic-rte--readonly={readOnly}
+  style:height={toSize(height)}
+  bind:this={containerEl}
+>
+  <!-- Toolbar -->
+  {#if showToolbar && !readOnly && !disabled}
+    <Toolbar
+      {editor}
+      {focusMode}
+      onImageClick={openImageDialog}
+      onLinkClick={openLinkDialog}
+      onColorClick={openColorPicker}
+      onFocusModeToggle={toggleFocusMode}
+    />
+  {/if}
+
+  <!-- Editor area + TOC -->
+  <div class="ic-rte__body">
+    <div
+      class="ic-rte__editor"
+      bind:this={editorEl}
+      onclick={handleEditorClick}
+      onscroll={handleEditorScroll}
+    ></div>
+
+    <!-- TOC sidebar -->
+    {#if showToc}
+      <TOCSidebar
+        {editor}
+        visible={showToc}
+        bind:this={tocComponent}
+      />
+    {/if}
+  </div>
+
+  <!-- Bubble menu (anchor element for TipTap BubbleMenu extension) -->
+  <div bind:this={bubbleMenuEl} style="position: absolute; visibility: hidden;">
+    {#if editor && !readOnly && !disabled}
+      <BubbleToolbar
+        {editor}
+        onLinkClick={openLinkDialog}
+        onColorClick={openColorPicker}
+      />
+    {/if}
+  </div>
+
+  <!-- Slash menu (positioned by suggestion plugin) -->
+  <div bind:this={slashMenuEl} style="position: fixed; z-index: 50;" class:ic-rte-slash-hidden={!slashMenuVisible}>
+    {#if slashMenuVisible}
+      <SlashMenu
+        items={slashMenuItems}
+        command={(item) => {
+          if (slashCommandFn) {
+            (slashCommandFn as any)(item);
+          }
+        }}
+        bind:this={slashMenuComponent}
+      />
+    {/if}
+  </div>
+
+  <!-- Status bar -->
+  <div class="ic-rte__status">
+    <span class="ic-rte__status-item ic-rte__status-block">{currentBlockType}</span>
+    <span class="ic-rte__status-spacer"></span>
+    {#if selectedWordCount > 0}
+      <span class="ic-rte__status-item">{selectedWordCount} words selected</span>
+    {:else}
+      <span class="ic-rte__status-item">
+        {wordCount} words &middot; {characterCount} chars &middot; ~{readingTime} min read
+      </span>
+    {/if}
+    <span class="ic-rte__status-spacer"></span>
+  </div>
+
+  <!-- Dialog popovers -->
+  <ImageDialog
+    {editor}
+    {request}
+    bind:visible={imageDialogVisible}
+    x={imageDialogX}
+    y={imageDialogY}
+  />
+  <LinkDialog
+    {editor}
+    bind:visible={linkDialogVisible}
+    x={linkDialogX}
+    y={linkDialogY}
+  />
+  <ColorPicker
+    {editor}
+    bind:visible={colorPickerVisible}
+    x={colorPickerX}
+    y={colorPickerY}
+  />
+  <GripMenu
+    {editor}
+    bind:visible={gripMenuVisible}
+    bind:event={gripMenuEvent}
+  />
+</div>
+
+<style>
+  .ic-rte {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--ic-border);
+    border-radius: 2px;
+    overflow: clip;
+    background-color: var(--ic-background);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .ic-rte--disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .ic-rte__body {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .ic-rte__editor {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: clip;
+    min-height: 0;
+    position: relative;
+  }
+
+  /* Ensure ProseMirror fills the editor */
+  .ic-rte__editor :global(.ProseMirror) {
+    min-height: 100%;
+  }
+
+  /* ── Status bar ──────────────────────────────── */
+  .ic-rte__status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 2px 8px;
+    border-top: 1px solid var(--ic-border);
+    background-color: var(--ic-secondary);
+    color: var(--ic-muted-foreground);
+    font-size: 0.75em;
+    line-height: 1.6;
+    user-select: none;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ic-rte__status-item {
+    white-space: nowrap;
+  }
+
+  .ic-rte__status-block {
+    font-weight: 600;
+    min-width: 36px;
+    text-align: center;
+    padding: 0 4px;
+    border-radius: 2px;
+    background-color: var(--ic-muted);
+  }
+
+  .ic-rte__status-spacer {
+    flex: 1;
+  }
+
+  /* Hide slash menu when not visible */
+  .ic-rte-slash-hidden {
+    display: none;
+  }
+</style>

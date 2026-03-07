@@ -33,6 +33,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
 
   // Editor components
   'ic.CodeEditor': modules['../components/editor/codeEditor/CodeEditor.svelte'],
+  'ic.RichEditor': modules['../components/editor/RichEditor/RichEditor.svelte'],
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],
