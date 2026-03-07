@@ -166,4 +166,25 @@ export interface DomNode {
 }
 
 /** Tab identifiers */
-export type TabId = 'properties' | 'events' | 'methods' | 'styles' | 'dom';
+export type TabId = 'properties' | 'events' | 'methods' | 'styles' | 'dom' | 'console';
+
+// --- Console types ---
+
+import type { LogLevel } from '$lib/core/logger';
+
+export type ConsoleEntryKind = 'log' | 'command' | 'result' | 'error';
+
+export interface ConsoleEntry {
+	/** Unique incrementing ID for keyed rendering */
+	id: number;
+	/** What kind of entry this is */
+	kind: ConsoleEntryKind;
+	/** Timestamp (Date.now()) */
+	timestamp: number;
+	/** Display text */
+	text: string;
+	/** Only for 'log' kind: the log level */
+	level?: LogLevel;
+	/** Only for 'log' kind: the source module */
+	source?: string;
+}

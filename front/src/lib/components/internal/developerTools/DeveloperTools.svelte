@@ -19,6 +19,7 @@
 	import MethodsPanel from './panels/MethodsPanel.svelte';
 	import StylesPanel from './panels/StylesPanel.svelte';
 	import DomPanel from './panels/DomPanel.svelte';
+	import ConsolePanel from './panels/ConsolePanel.svelte';
 
 	let {
 		staticChildren = new Map() as StaticChildrenMap,
@@ -68,7 +69,8 @@
 		{ id: 'events', label: 'Events' },
 		{ id: 'methods', label: 'Methods' },
 		{ id: 'styles', label: 'Styles' },
-		{ id: 'dom', label: 'DOM' }
+		{ id: 'dom', label: 'DOM' },
+		{ id: 'console', label: 'Console' }
 	];
 
 	// --- Resizable split ---
@@ -229,6 +231,11 @@
 						onhover={handleDomHover}
 					/>
 				{/if}
+
+				<!-- ConsolePanel: always mounted to preserve state across tab switches -->
+				<div class="ic-dt__persist" style:display={activeTab === 'console' ? '' : 'none'}>
+					<ConsolePanel {request} />
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -369,5 +376,9 @@
 		min-height: 0;
 		overflow: auto;
 		padding: 0;
+	}
+
+	.ic-dt__persist {
+		height: 100%;
 	}
 </style>

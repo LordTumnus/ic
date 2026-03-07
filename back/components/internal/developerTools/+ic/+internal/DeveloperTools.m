@@ -9,6 +9,11 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         InspectedComponent  ic.core.ComponentBase
     end
 
+    properties (Access = private)
+        % > CONSOLEWORKSPACE persists user variables across console eval calls
+        ConsoleWorkspace struct = struct()
+    end
+
     methods
         function this = DeveloperTools(component, props)
             arguments
@@ -24,10 +29,26 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             this.onRequest("getComponentInfo", @(comp, ~) comp.handleGetComponentInfo());
             this.onRequest("setNestedProp", @(comp, data) comp.handleSetNestedProp(data));
             this.onRequest("setStyle", @(comp, data) comp.handleSetStyle(data));
+            this.onRequest("eval", @(comp, data) comp.handleEval(data));
         end
     end
 
     methods (Access = private)
+        function result = handleEval(this, data)
+            % > HANDLEEVAL evaluate a MATLAB command in the console workspace.
+            command = string(data.command);
+            try
+                [output, this.ConsoleWorkspace] = ic.internal.evalConsole( ...
+                    command, this.InspectedComponent, this.ConsoleWorkspace);
+                % Strip MATLAB hyperlinks: <a href="matlab:...">text</a> → text
+                output = regexprep(output, '<a\s[^>]*>', '');
+                output = strrep(output, '</a>', '');
+                result = struct('output', char(strtrim(output)), 'isError', false);
+            catch ex
+                result = struct('output', char(ex.message), 'isError', true);
+            end
+        end
+
         function result = handleGetComponentInfo(this)
             result = this.getInfoForComponent(this.InspectedComponent);
         end

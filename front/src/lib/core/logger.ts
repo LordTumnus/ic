@@ -41,6 +41,7 @@ class Logger {
     consoleOutput: false
   };
   private _publisher: ((entry: LogEntry) => void) | null = null;
+  private _listeners: Set<(entry: LogEntry) => void> = new Set();
 
   /**
    * Enable logging to MATLAB.
@@ -58,6 +59,15 @@ class Logger {
   disable(): void {
     this._enabled = false;
     this._publisher = null;
+  }
+
+  /**
+   * Add a listener that receives log entries regardless of enabled state.
+   * Returns an unsubscribe function.
+   */
+  addListener(cb: (entry: LogEntry) => void): () => void {
+    this._listeners.add(cb);
+    return () => { this._listeners.delete(cb); };
   }
 
   /**
@@ -118,6 +128,9 @@ class Logger {
       timestamp: Date.now()
     };
 
+    // Notify listeners regardless of enabled state (Console tab, etc.)
+    for (const cb of this._listeners) cb(entry);
+
     if (this._enabled) {
       this._publish(entry);
     } else if (this._config.consoleOutput) {
@@ -151,6 +164,7 @@ class Logger {
   _reset(): void {
     this._enabled = false;
     this._publisher = null;
+    this._listeners.clear();
     this._config = {
       minLevel: 'debug',
       consoleOutput: false
