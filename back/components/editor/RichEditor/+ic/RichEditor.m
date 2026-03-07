@@ -75,6 +75,7 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
             this.onRequest("FetchImage",  @(comp, data) comp.handleFetchImage(data));
             this.onRequest("OpenLink",    @(comp, data) comp.handleOpenLink(data));
             this.onRequest("BrowseImage", @(comp, ~)    comp.handleBrowseImage());
+            this.onRequest("SavePdf",     @(comp, data) comp.handleSavePdf(data));
         end
     end
 
@@ -106,6 +107,17 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
         function out = getMarkdown(this)
             % > GETMARKDOWN convert current content to Markdown
             out = this.publish("getMarkdown", []);
+        end
+
+        function out = exportPdf(this, filepath)
+            % > EXPORTPDF export editor content as a PDF file
+            %   exportPdf()          — opens a save dialog
+            %   exportPdf(filepath)  — writes directly to the given path
+            arguments
+                this
+                filepath (1,1) string = ""
+            end
+            out = this.publish("exportPdf", filepath);
         end
     end
 
@@ -151,6 +163,32 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
 
             b64 = matlab.net.base64encode(bytes);
             result = struct('dataUri', "data:" + mime + ";base64," + b64);
+        end
+
+        function result = handleSavePdf(~, data)
+            filepath = string(data.filepath);
+
+            % No filepath provided — open save dialog
+            if filepath == ""
+                [f, p] = uiputfile('*.pdf', 'Export as PDF');
+                if isequal(f, 0)
+                    result = struct('saved', false);
+                    return
+                end
+                filepath = fullfile(p, f);
+            end
+
+            % Decode base64 and write to file
+            bytes = matlab.net.base64decode(string(data.base64));
+            fid = fopen(filepath, 'wb');
+            if fid == -1
+                error('ic:RichEditor:FileError', ...
+                    'Cannot open file for writing: %s', filepath);
+            end
+            cleanup = onCleanup(@() fclose(fid));
+            fwrite(fid, bytes);
+
+            result = struct('saved', true, 'filepath', filepath);
         end
 
         function result = handleFetchImage(~, data)

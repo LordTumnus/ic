@@ -82,6 +82,8 @@
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
     "highlight.js": "^11.11.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.0",
     "katex": "^0.16.33",
     "lowlight": "^3.3.0",
     "lucide-static": "^0.563.0",

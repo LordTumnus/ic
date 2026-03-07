@@ -181,8 +181,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     command: (editor, range) => {
       editor.chain().focus().deleteRange(range).run();
       editor.commands.insertContent({
-        type: 'math_display',
-        attrs: { latex: 'E = mc^2' },
+        type: 'inlineMath',
+        attrs: { latex: 'E = mc^2', display: 'yes', evaluate: 'no' },
       });
     },
   },

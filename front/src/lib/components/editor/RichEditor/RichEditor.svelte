@@ -21,10 +21,13 @@
   import { Focus } from '@tiptap/extension-focus';
   import { FontFamily } from '@tiptap/extension-font-family';
   import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
+  import { Markdown } from 'tiptap-markdown';
+  import MathExtension, { InlineMathNode } from '@aarkue/tiptap-math-extension';
   import type { Resolution, RequestFn } from '$lib/types';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
   import logger from '$lib/core/logger';
+  import { htmlToPdfBase64 } from '$lib/utils/html2pdf';
 
   import { CalloutNode } from './CalloutNode';
   import { DetailsNode, DetailsSummary, DetailsContent } from './DetailsNode';
@@ -75,6 +78,9 @@
       (_html: string): Resolution => ({ success: true, data: null }),
     ),
     getMarkdown: getMarkdownFn = $bindable((): Resolution => ({ success: true, data: '' })),
+    exportPdf: exportPdfFn = $bindable(
+      (_filepath: string): Resolution => ({ success: true, data: null }),
+    ),
 
     // Request function (for MATLAB-side image fetching)
     request,
@@ -99,6 +105,7 @@
     clear?: () => Resolution;
     insertContent?: (html: string) => Resolution;
     getMarkdown?: () => Resolution;
+    exportPdf?: (filepath: string) => Resolution;
     request?: RequestFn;
   } = $props();
 
@@ -217,6 +224,35 @@
             FontFamily,
             CodeBlockLowlight.configure({ lowlight: lowlight as any }),
             CodeBlockLanguageSelector,
+            Markdown.configure({
+              html: true,
+              transformPastedText: false,
+              transformCopiedText: false,
+            }),
+            MathExtension.configure({
+              evaluation: false,
+              delimiters: 'dollar',
+              addInlineMath: false, // We register our extended version below
+            }),
+            InlineMathNode.extend({
+              addStorage() {
+                return {
+                  ...this.parent?.(),
+                  markdown: {
+                    serialize(state: any, node: any) {
+                      const latex = node.attrs.latex || '';
+                      if (node.attrs.display === 'yes') {
+                        state.write(`$$${latex}$$`);
+                        state.closeBlock(node);
+                      } else {
+                        state.write(`$${latex}$`);
+                      }
+                    },
+                    parse: {},
+                  },
+                };
+              },
+            }),
 
             // Custom nodes
             CalloutNode,
@@ -604,7 +640,30 @@
         return { success: false, data: 'Markdown conversion unavailable' };
       }
     };
+
+    exportPdfFn = (filepath: string): Resolution => {
+      doExportPdf(filepath ?? '');
+      return { success: true, data: null };
+    };
   });
+
+  // ─── PDF Export (async, uses request to send base64 to MATLAB) ────
+  async function doExportPdf(filepath: string) {
+    if (!editor) return;
+    const proseMirrorEl = editorEl?.querySelector('.ProseMirror') as HTMLElement;
+    if (!proseMirrorEl) return;
+
+    try {
+      const base64 = await htmlToPdfBase64(proseMirrorEl, {
+        title: 'RichEditor Export',
+      });
+      if (request) {
+        await request('savePdf', { base64, filepath });
+      }
+    } catch (err) {
+      logger.warn('RichEditor', 'PDF export error', { error: String(err) });
+    }
+  }
 
   // ─── Force transaction-based UI refresh ───────────
   // Incremented on every editor transaction so derived state

@@ -27,11 +27,34 @@ const CALLOUT_ICONS: Record<CalloutType, string> = {
   danger: 'alert-octagon',
 };
 
+/** Map callout types to GitHub-style admonition keywords */
+const CALLOUT_MD: Record<CalloutType, string> = {
+  info: 'NOTE',
+  warning: 'WARNING',
+  tip: 'TIP',
+  danger: 'CAUTION',
+};
+
 export const CalloutNode = Node.create({
   name: 'callout',
   group: 'block',
   content: 'block+',
   defining: true,
+
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: any, node: any) {
+          const type = (node.attrs.type as CalloutType) || 'info';
+          const keyword = CALLOUT_MD[type] || 'NOTE';
+          state.write(`> [!${keyword}]\n`);
+          state.wrapBlock('> ', null, node, () => state.renderContent(node));
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
 
   addAttributes() {
     return {

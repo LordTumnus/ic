@@ -25,6 +25,19 @@ export const DetailsSummary = Node.create({
   content: 'inline*',
   defining: true,
 
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: any, node: any) {
+          state.write('<summary>');
+          state.renderInline(node);
+          state.write('</summary>\n\n');
+        },
+        parse: {},
+      },
+    };
+  },
+
   parseHTML() {
     return [
       { tag: 'summary' },
@@ -50,6 +63,17 @@ export const DetailsContent = Node.create({
   content: 'block+',
   defining: true,
 
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: any, node: any) {
+          state.renderContent(node);
+        },
+        parse: {},
+      },
+    };
+  },
+
   parseHTML() {
     return [{ tag: 'div[data-details-content]' }];
   },
@@ -71,6 +95,20 @@ export const DetailsNode = Node.create({
   group: 'block',
   content: 'detailsSummary detailsContent',
   defining: true,
+
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: any, node: any) {
+          state.write('<details>\n');
+          state.renderContent(node);
+          state.write('</details>');
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
 
   addAttributes() {
     return {
