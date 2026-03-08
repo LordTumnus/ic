@@ -93,6 +93,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Internal components
   'ic.internal.DeveloperTools': modules['../components/internal/developerTools/DeveloperTools.svelte'],
   'ic.internal.WorkerTest': modules['../components/internal/workerTest/WorkerTest.svelte'],
+  'ic.internal.DragDropTest': modules['../components/internal/dragDropTest/DragDropTest.svelte'],
 
 };
 
