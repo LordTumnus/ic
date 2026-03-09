@@ -32,16 +32,13 @@
     myTarget = ctx.registerTab();
   });
 
-  // Push config updates to parent whenever reactive props change
   $effect(() => {
     if (myTarget) {
       ctx.updateTab(myTarget, { label, closable, disabled, editable, icon });
     }
   });
 
-  // Watch for rename signals from the parent container.
-  // The assignment to `label` happens inside this component's own scope,
-  // so Svelte's compiler correctly tracks the $bindable prop write.
+  // Pick up rename from parent (must assign label inside this component's scope)
   $effect(() => {
     const rp = ctx.lastRename;
     if (rp && myTarget && rp.target === myTarget) {

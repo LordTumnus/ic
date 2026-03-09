@@ -165,8 +165,6 @@
     closeMenu();
   }
 
-  // --- Keyboard navigation ---
-
   function handleKeyDown(e: KeyboardEvent) {
     if (disabled) return;
 
@@ -220,8 +218,6 @@
     }
   }
 
-  // --- Menu overflow mode ---
-
   const CHEVRON_WIDTH = 32;
 
   let barEl: HTMLDivElement;
@@ -235,7 +231,7 @@
 
   let isMeasuring = false;
 
-  /** Full re-measure: show all tabs, measure widths, then recompute hidden set. */
+  /** Show all tabs, measure widths, then recompute hidden set. */
   function measureAndCompute() {
     if (tabOverflow !== 'menu' || !barEl || isMeasuring) {
       if (!isMeasuring && tabOverflow !== 'menu') hiddenTargets = new Set();
@@ -243,9 +239,8 @@
     }
     isMeasuring = true;
 
-    // Temporarily force hidden tabs visible via inline style (overrides the
-    // CSS class display:none). We DON'T clear hiddenTargets — that would
-    // reactively remove the chevron and cause a visible flash.
+    // Force hidden tabs visible via inline style (don't clear hiddenTargets
+    // or the chevron flashes away during measurement)
     for (const t of tabTargets) {
       const el = tabElMap[t];
       if (el) el.style.display = 'inline-flex';
@@ -267,12 +262,11 @@
     });
   }
 
-  /** Recompute which tabs are hidden using cached widths. */
+  /** Recompute hidden set from cached widths. */
   function recomputeHidden() {
     if (!barEl || Object.keys(cachedWidths).length === 0) return;
 
-    // Spot-check: if first tab's actual width differs from cached, widths are stale
-    // (happens when tab snippets render AFTER initial measurement)
+    // Spot-check: stale widths → re-measure (snippets render after initial measure)
     const probe = tabTargets[0];
     if (probe && tabElMap[probe]) {
       const actual = tabElMap[probe].offsetWidth;
@@ -285,17 +279,14 @@
     const barWidth = barEl.clientWidth;
     const totalWidth = tabTargets.reduce((sum, t) => sum + (cachedWidths[t] ?? 0), 0);
 
-    // Everything fits — no chevron needed
     if (totalWidth <= barWidth) {
       hiddenTargets = new Set();
       return;
     }
 
-    // Budget = bar width minus chevron button
     const available = barWidth - CHEVRON_WIDTH;
     const hidden = new Set<string>();
 
-    // Pass 1: greedily fit tabs left-to-right
     let used = 0;
     for (const t of tabTargets) {
       const w = cachedWidths[t] ?? 0;
@@ -306,11 +297,10 @@
       }
     }
 
-    // Pass 2: ensure selected tab is visible
+    // Ensure selected tab stays visible
     if (selectedTab && hidden.has(selectedTab)) {
       hidden.delete(selectedTab);
       used += cachedWidths[selectedTab] ?? 0;
-      // Hide rightmost visible tabs until budget fits
       for (let i = tabTargets.length - 1; i >= 0 && used > available; i--) {
         const t = tabTargets[i];
         if (t === selectedTab || hidden.has(t)) continue;
@@ -322,13 +312,8 @@
     hiddenTargets = hidden;
   }
 
-  // Re-measure when tab set, configs, or size changes
   $effect(() => {
-    void tabTargets;
-    void tabConfigMap;
-    void size;
-    void tabOverflow;
-
+    void tabTargets; void tabConfigMap; void size; void tabOverflow;
     if (tabOverflow === 'menu') {
       measureAndCompute();
     } else {
@@ -336,7 +321,6 @@
     }
   });
 
-  // Re-allocate (no re-measure) when selection changes
   $effect(() => {
     void selectedTab;
     if (tabOverflow === 'menu' && Object.keys(cachedWidths).length > 0) {
@@ -344,7 +328,7 @@
     }
   });
 
-  // ResizeObserver on bar — catches parent sizing, window resize, and layout shifts.
+  // ResizeObserver: recompute on bar resize
   $effect(() => {
     if (tabOverflow !== 'menu' || !barEl) return;
     let lastWidth = 0;
@@ -363,10 +347,7 @@
     return () => ro.disconnect();
   });
 
-  // MutationObserver — tab snippets render AFTER the initial measurement (their
-  // content arrives via Tab.svelte's $effect → updateTab → snippet render).
-  // When content appears, tab widths change but the bar's own size doesn't,
-  // so ResizeObserver won't fire. Spot-check and re-measure if stale.
+  // MutationObserver: re-measure when snippet content arrives after initial layout
   $effect(() => {
     if (tabOverflow !== 'menu' || !barEl) return;
     let pending = false;
@@ -386,8 +367,6 @@
     mo.observe(barEl, { childList: true, subtree: true, characterData: true });
     return () => mo.disconnect();
   });
-
-  // --- Tab editing (double-click to rename) ---
 
   let editingTarget = $state<string | null>(null);
   let editValue = $state('');
@@ -422,8 +401,6 @@
       cancelEdit();
     }
   }
-
-  // --- Menu popup open/close ---
 
   function openMenu() {
     if (menuOpen) return;
