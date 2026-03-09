@@ -60,6 +60,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.GridContainer': modules['../components/layout/gridContainer/GridContainer.svelte'],
   'ic.Splitter': modules['../components/layout/splitter/Splitter.svelte'],
   'ic.SplitterPane': modules['../components/layout/splitter/SplitterPane.svelte'],
+  'ic.TabContainer': modules['../components/layout/tabContainer/TabContainer.svelte'],
+  'ic.tab.Tab': modules['../components/layout/tabContainer/Tab.svelte'],
+  'ic.tab.TabPanel': modules['../components/layout/tabContainer/TabPanel.svelte'],
 
   // Panel components
   'ic.Panel': modules['../components/panel/panel/Panel.svelte'],
