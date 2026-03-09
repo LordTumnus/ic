@@ -9,7 +9,7 @@
   z-index 8000 (below Toast at 9000).
 -->
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import { resolveIcon } from '$lib/utils/icons';
 
   let {
@@ -20,7 +20,7 @@
     closable = $bindable(true),
     overlay = $bindable(true),
     closeOnBackdropClick = $bindable(true),
-    snippets = { body: [], header: [] } as Snippets,
+    childEntries = { body: [], header: [] } as ChildEntries,
     closed,
   }: {
     title?: string;
@@ -30,7 +30,7 @@
     closable?: boolean;
     overlay?: boolean;
     closeOnBackdropClick?: boolean;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     closed?: (data?: unknown) => void;
   } = $props();
 
@@ -38,7 +38,7 @@
 
   const closeSvg = resolveIcon('x', 14);
 
-  const hasCustomHeader = $derived((snippets.header?.length ?? 0) > 0);
+  const hasCustomHeader = $derived((childEntries.header?.length ?? 0) > 0);
   const isHorizontal = $derived(side === 'left' || side === 'right');
 
   // Focus the panel when opened
@@ -108,8 +108,8 @@
     <!-- Header -->
     {#if hasCustomHeader}
       <div class="ic-drawer__header">
-        {#each snippets.header ?? [] as child (child)}
-          {@render child()}
+        {#each childEntries.header ?? [] as child (child)}
+          {@render child.snippet()}
         {/each}
       </div>
     {:else if title || closable}
@@ -131,8 +131,8 @@
 
     <!-- Body -->
     <div class="ic-drawer__body">
-      {#each snippets.body ?? [] as child (child)}
-        {@render child()}
+      {#each childEntries.body ?? [] as child (child)}
+        {@render child.snippet()}
       {/each}
     </div>
   </div>

@@ -8,7 +8,7 @@
   z-index 8000 (below Toast at 9000).
 -->
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import { resolveIcon } from '$lib/utils/icons';
 
   let {
@@ -19,7 +19,7 @@
     closeOnBackdropClick = $bindable(true),
     submitLabel = $bindable('OK'),
     cancelLabel = $bindable('Cancel'),
-    snippets = { body: [], footer: [] } as Snippets,
+    childEntries = { body: [], footer: [] } as ChildEntries,
     submitted,
     closed,
   }: {
@@ -30,7 +30,7 @@
     closeOnBackdropClick?: boolean;
     submitLabel?: string;
     cancelLabel?: string;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     submitted?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
   } = $props();
@@ -39,7 +39,7 @@
 
   const closeSvg = resolveIcon('x', 14);
 
-  const hasCustomFooter = $derived((snippets.footer?.length ?? 0) > 0);
+  const hasCustomFooter = $derived((childEntries.footer?.length ?? 0) > 0);
   const showSubmit = $derived(!hasCustomFooter && submitLabel !== '');
   const showCancel = $derived(!hasCustomFooter && cancelLabel !== '');
   const showDefaultFooter = $derived(showSubmit || showCancel);
@@ -121,16 +121,16 @@
 
       <!-- Body -->
       <div class="ic-dialog__body">
-        {#each snippets.body ?? [] as child (child)}
-          {@render child()}
+        {#each childEntries.body ?? [] as child (child)}
+          {@render child.snippet()}
         {/each}
       </div>
 
       <!-- Footer: custom children OR default buttons -->
       {#if hasCustomFooter}
         <div class="ic-dialog__footer">
-          {#each snippets.footer ?? [] as child (child)}
-            {@render child()}
+          {#each childEntries.footer ?? [] as child (child)}
+            {@render child.snippet()}
           {/each}
         </div>
       {:else if showDefaultFooter}

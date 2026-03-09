@@ -1,25 +1,88 @@
 /**
- * Container - Event handlers for @insert, @remove, @reparent.
+ * Container - Event handlers for @insert, @remove, @reparent, @reorder.
  *
  * This module exports handlers that orchestrate Factory, Registry, and Component
  * to manage parent-child relationships. Separated from Component to avoid
  * circular dependencies (Component ↔ Factory).
+ *
+ * Each dynamic child is stored as a `ChildEntry` in the parent's `_childEntries`
+ * record (keyed by target slot). The entry includes the renderable snippet plus
+ * reactive proxy objects for props, events, and methods — the same mechanism
+ * used by static children.
  */
 
 import { flushSync } from 'svelte';
 import type {
+  ChildEntry,
   ComponentDefinition,
   InsertEventData,
   RemoveEventData,
   ReorderEventData,
   ReparentEventData,
-  StaticChild,
   StaticChildrenMap
 } from '../types';
 import type Component from './component.svelte';
 import Factory from './factory';
 import Registry from './registry';
 import logger from './logger';
+
+// ============================================================================
+// Shared proxy builder
+// ============================================================================
+
+/**
+ * Build reactive proxy objects for a child component's props, events, and methods.
+ *
+ * Each proxy delegates get/set to the child's svelteProps, which in turn
+ * reads/writes from `$state`-backed storage. This makes child data reactive
+ * from the parent's Svelte template without mounting the child component.
+ */
+function buildChildProxies(child: Component): Omit<ChildEntry, 'snippet'> {
+  const props: Record<string, any> = {};
+  for (const name of child.propNames) {
+    Object.defineProperty(props, name, {
+      get: () => child.svelteProps[name],
+      set: (v: any) => { child.svelteProps[name] = v; },
+      enumerable: true, configurable: true
+    });
+  }
+
+  const events: Record<string, any> = {};
+  for (const name of child.eventNames) {
+    Object.defineProperty(events, name, {
+      get: () => child.svelteProps[name],
+      set: (v: any) => { child.svelteProps[name] = v; },
+      enumerable: true, configurable: true
+    });
+  }
+
+  const methods: Record<string, any> = {};
+  for (const name of child.methodNames) {
+    Object.defineProperty(methods, name, {
+      get: () => child.svelteProps[name],
+      set: (v: any) => { child.svelteProps[name] = v; },
+      enumerable: true, configurable: true
+    });
+  }
+
+  return {
+    id: child.id,
+    type: child.type,
+    props,
+    events,
+    methods,
+    meta: {
+      propNames: child.propNames,
+      eventNames: child.eventNames,
+      methodNames: child.methodNames,
+      mixins: child.mixins
+    }
+  };
+}
+
+// ============================================================================
+// Event handlers
+// ============================================================================
 
 /**
  * Handle @insert event - create and add a child component.
@@ -46,14 +109,18 @@ export async function handleInsert(
     child.svelteProps.staticChildren = await createStaticChildren(child, definition.staticChildren);
   }
 
-  // Create snippet and add to slots
+  // Create snippet
   const snippet = child.createSnippet();
   child._snippet = snippet;
 
-  if (!parent._snippets[target]) {
+  if (!parent._childEntries[target]) {
     throw new Error(`[Component] @insert: Target slot "${target}" not defined in component "${parent.id}"`);
   }
-  parent._snippets[target].push(snippet);
+
+  // Build ChildEntry with reactive proxies and add to parent
+  const childEntry: ChildEntry = { snippet, ...buildChildProxies(child) };
+  parent._childEntries[target].push(childEntry);
+  child._childEntry = childEntry;
   parent.children.push(child);
 
   flushSync();
@@ -85,11 +152,11 @@ export async function handleRemove(
   // Recursively deregister all descendants (handles nested static children)
   deregisterTree(child);
 
-  // Remove snippet from slots (triggers Svelte cleanup via snippet's destroy)
-  for (const slotName of Object.keys(parent._snippets)) {
-    const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
-    if (snippetIndex !== -1) {
-      parent._snippets[slotName].splice(snippetIndex, 1);
+  // Remove entry from parent's child entries
+  for (const slotName of Object.keys(parent._childEntries)) {
+    const entryIndex = parent._childEntries[slotName].findIndex(e => e.id === childId);
+    if (entryIndex !== -1) {
+      parent._childEntries[slotName].splice(entryIndex, 1);
       break;
     }
   }
@@ -102,7 +169,7 @@ export async function handleRemove(
 
 /**
  * Recursively deregister a component and all its descendants.
- * Handles both dynamic children (in _snippets) and static children (in children array).
+ * Handles both dynamic children (in _childEntries) and static children (in children array).
  */
 function deregisterTree(component: Component): void {
   for (const child of component.children) {
@@ -137,41 +204,37 @@ export async function handleReparent(
 
   // Same parent case - check if this is a no-op or a slot change
   if (newParentId === parent.id) {
-    // Find current slot
-    for (const slotName of Object.keys(parent._snippets)) {
-      const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
-      if (snippetIndex !== -1) {
+    for (const slotName of Object.keys(parent._childEntries)) {
+      const entryIndex = parent._childEntries[slotName].findIndex(e => e.id === childId);
+      if (entryIndex !== -1) {
         if (slotName === targetSlot) {
-          // Same parent, same slot - nothing to do
-          return;
+          return; // Same parent, same slot - nothing to do
         }
-        // Same parent, different slot - move snippet without recreating
-        parent._snippets[slotName].splice(snippetIndex, 1);
-        if (!parent._snippets[targetSlot]) {
-          parent._snippets[targetSlot] = [];
+        // Same parent, different slot - move entry without recreating
+        const [movedEntry] = parent._childEntries[slotName].splice(entryIndex, 1);
+        if (!parent._childEntries[targetSlot]) {
+          parent._childEntries[targetSlot] = [];
         }
-        parent._snippets[targetSlot].push(child._snippet!);
+        parent._childEntries[targetSlot].push(movedEntry);
         flushSync();
         return;
       }
     }
-    // Snippet not found in any slot - shouldn't happen, but nothing to do
-    return;
+    return; // Entry not found - shouldn't happen
   }
 
   // Different parent - full reparenting
 
-  // Remove snippet from current parent's slots
-  for (const slotName of Object.keys(parent._snippets)) {
-    const snippetIndex = parent._snippets[slotName].indexOf(child._snippet!);
-    if (snippetIndex !== -1) {
-      parent._snippets[slotName].splice(snippetIndex, 1);
+  // Remove entry from current parent's slots
+  for (const slotName of Object.keys(parent._childEntries)) {
+    const entryIndex = parent._childEntries[slotName].findIndex(e => e.id === childId);
+    if (entryIndex !== -1) {
+      parent._childEntries[slotName].splice(entryIndex, 1);
       break;
     }
   }
 
   // Flush to ensure old snippet cleanup completes before creating new one
-  // This prevents race conditions with _svelteInstance
   flushSync();
 
   // Remove from current parent's children
@@ -187,18 +250,18 @@ export async function handleReparent(
     return;
   }
 
-  // Create fresh snippet for new parent
+  // Create fresh snippet and entry for new parent
   const newSnippet = child.createSnippet();
   child._snippet = newSnippet;
   child._parentComponent = newParent;
 
-  // Add to new parent's slots
-  if (!newParent._snippets[targetSlot]) {
-    newParent._snippets[targetSlot] = [];
+  if (!newParent._childEntries[targetSlot]) {
+    newParent._childEntries[targetSlot] = [];
   }
-  newParent._snippets[targetSlot].push(newSnippet);
+  const newEntry: ChildEntry = { snippet: newSnippet, ...buildChildProxies(child) };
+  newParent._childEntries[targetSlot].push(newEntry);
+  child._childEntry = newEntry;
 
-  // Add to new parent's children
   newParent.children.push(child);
 
   flushSync();
@@ -222,15 +285,15 @@ export async function handleReorder(
     return;
   }
 
-  // Get the snippet array for this target
-  const snippets = parent._snippets[target];
-  if (!snippets) {
+  // Get the entries array for this target
+  const entries = parent._childEntries[target];
+  if (!entries) {
     logger.warn('Container', '@reorder: Target not found', { target });
     return;
   }
 
   // Find current position
-  const fromIndex = snippets.indexOf(child._snippet);
+  const fromIndex = entries.findIndex(e => e.id === childId);
   if (fromIndex === -1 || fromIndex === index) {
     return; // Not found or already at position
   }
@@ -238,24 +301,28 @@ export async function handleReorder(
   logger.debug('Container', '@reorder', { childId, target, from: fromIndex, to: index });
 
   // Simple array reorder: remove from old position, insert at new position
-  const newArray = [...snippets];
+  const newArray = [...entries];
   const [moved] = newArray.splice(fromIndex, 1);
   newArray.splice(index, 0, moved);
-  parent._snippets[target] = newArray;
+  parent._childEntries[target] = newArray;
 
   flushSync();
 }
+
+// ============================================================================
+// Static children
+// ============================================================================
 
 /**
  * Create Component instances for static children.
  *
  * Static children are declared in MATLAB constructor and included in the
- * parent's @insert payload. They're full Component instances with snippets,
- * just rendered in fixed template locations instead of dynamic slots.
+ * parent's @insert payload. They're full Component instances with ChildEntry
+ * objects, just rendered in fixed template locations instead of dynamic slots.
  *
  * @param parent - Parent component to attach children to
  * @param defs - Array of static child component definitions
- * @returns Map keyed by target name, each containing an array of children for that target
+ * @returns Map keyed by target name, each containing an array of ChildEntry for that target
  */
 export async function createStaticChildren(
   parent: Component,
@@ -274,57 +341,17 @@ export async function createStaticChildren(
 
     parent.children.push(child);
 
-    // Push to target array (multiple children can share the same target)
     if (!result.has(def.target)) {
       result.set(def.target, []);
     }
-    // Build filtered proxy objects for props, events, and methods.
-    // Each delegates to the underlying svelteProps but only exposes
-    // the relevant subset of names — no framework internals leak.
-    const props: Record<string, any> = {};
-    for (const name of child.propNames) {
-      Object.defineProperty(props, name, {
-        get: () => child.svelteProps[name],
-        set: (v: any) => { child.svelteProps[name] = v; },
-        enumerable: true, configurable: true
-      });
-    }
 
-    const events: Record<string, any> = {};
-    for (const name of child.eventNames) {
-      Object.defineProperty(events, name, {
-        get: () => child.svelteProps[name],
-        set: (v: any) => { child.svelteProps[name] = v; },
-        enumerable: true, configurable: true
-      });
-    }
-
-    const methods: Record<string, any> = {};
-    for (const name of child.methodNames) {
-      Object.defineProperty(methods, name, {
-        get: () => child.svelteProps[name],
-        set: (v: any) => { child.svelteProps[name] = v; },
-        enumerable: true, configurable: true
-      });
-    }
-
-    result.get(def.target)!.push({
-      snippet,
-      props,
-      events,
-      methods,
-      meta: {
-        propNames: child.propNames,
-        eventNames: child.eventNames,
-        methodNames: child.methodNames,
-        mixins: child.mixins
-      }
-    });
+    const childEntry: ChildEntry = { snippet, ...buildChildProxies(child) };
+    child._childEntry = childEntry;
+    result.get(def.target)!.push(childEntry);
 
     // Recurse for nested static children
     if (def.component.staticChildren?.length) {
       const nested = await createStaticChildren(child, def.component.staticChildren);
-      // Merge nested results (concatenate arrays for same targets)
       nested.forEach((children, key) => {
         if (!result.has(key)) {
           result.set(key, []);

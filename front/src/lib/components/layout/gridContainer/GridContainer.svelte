@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import type { CssGridTemplate, CssSpacing } from '$lib/utils/css';
   import { toGridTemplate, toSpacing } from '$lib/utils/css';
 
@@ -11,7 +11,7 @@
     justifyItems = $bindable('stretch'),
     autoFlow = $bindable('row'),
     padding = $bindable<CssSpacing>(0),
-    snippets = { default: [] } as Snippets,
+    childEntries = { default: [] } as ChildEntries,
   }: {
     columns?: CssGridTemplate;
     rows?: CssGridTemplate;
@@ -20,7 +20,7 @@
     justifyItems?: 'start' | 'center' | 'end' | 'stretch';
     autoFlow?: 'row' | 'column' | 'dense' | 'row-dense' | 'column-dense';
     padding?: CssSpacing;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
   } = $props();
 </script>
 
@@ -34,8 +34,8 @@
   style:grid-auto-flow={autoFlow}
   style:padding={toSpacing(padding)}
 >
-  {#each snippets.default ?? [] as child (child)}
-    {@render child()}
+  {#each childEntries.default ?? [] as child (child)}
+    {@render child.snippet()}
   {/each}
 </div>
 

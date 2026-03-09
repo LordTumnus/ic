@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import type { CssSpacing } from '$lib/utils/css';
   import { toSpacing } from '$lib/utils/css';
 
@@ -10,7 +10,7 @@
     alignItems = $bindable('stretch'),
     gap = $bindable<CssSpacing>(8),
     padding = $bindable<CssSpacing>(0),
-    snippets = { default: [] } as Snippets,
+    childEntries = { default: [] } as ChildEntries,
   }: {
     direction?: 'row' | 'column' | 'row-reverse' | 'column-reverse';
     wrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
@@ -18,7 +18,7 @@
     alignItems?: 'start' | 'center' | 'end' | 'stretch' | 'baseline';
     gap?: CssSpacing;
     padding?: CssSpacing;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
   } = $props();
 
   // Map shorthand values to CSS values
@@ -49,8 +49,8 @@
   style:gap={toSpacing(gap)}
   style:padding={toSpacing(padding)}
 >
-  {#each snippets.default ?? [] as child (child)}
-    {@render child()}
+  {#each childEntries.default ?? [] as child (child)}
+    {@render child.snippet()}
   {/each}
 </div>
 

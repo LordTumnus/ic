@@ -3,15 +3,15 @@
   Bare container that renders its children via snippets.
 -->
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
 
   let {
-    snippets = {} as Snippets,
+    childEntries = {} as ChildEntries,
   }: {
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
   } = $props();
 </script>
 
-{#each snippets.default ?? [] as child (child)}
-  {@render child()}
+{#each childEntries.default ?? [] as child (child)}
+  {@render child.snippet()}
 {/each}

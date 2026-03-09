@@ -5,18 +5,18 @@
   shadow) lives here; positioning/transitions are on the parent Popover.
 -->
 <script lang="ts">
-  import type { Snippets } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
 
   let {
-    snippets = { default: [] } as Snippets,
+    childEntries = { default: [] } as ChildEntries,
   }: {
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
   } = $props();
 </script>
 
 <div class="ic-po-panel">
-  {#each snippets.default ?? [] as child (child)}
-    {@render child()}
+  {#each childEntries.default ?? [] as child (child)}
+    {@render child.snippet()}
   {/each}
 </div>
 

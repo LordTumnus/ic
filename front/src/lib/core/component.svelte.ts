@@ -5,7 +5,7 @@
  * - Reactive props that sync with MATLAB
  * - Event subscriptions and dispatch
  * - Svelte component mounting/unmounting
- * - Parent-child relationships via snippets
+ * - Parent-child relationships via child entries
  *
  * Must be in a .svelte.ts file for $state rune to work!
  */
@@ -21,7 +21,8 @@ import type {
   MethodDefinition,
   Resolution,
   RequestPayload,
-  Snippets,
+  ChildEntry,
+  ChildEntries,
   StyleEventData,
   ClearStyleEventData,
   JsEffectEventData,
@@ -68,10 +69,11 @@ class Component implements Registrable {
   children: Component[] = $state([]);
 
   /**
-   * Child snippets organized by target slot name.
+   * Child entries organized by target slot name.
+   * Each entry wraps a snippet plus reactive proxies for props/events/methods.
    * @internal Used by container.ts
    */
-  _snippets: Snippets = $state({ default: [] });
+  _childEntries: ChildEntries = $state({});
 
   /**
    * Reference to parent component (for reparenting).
@@ -81,9 +83,15 @@ class Component implements Registrable {
 
   /**
    * This component's snippet (created lazily, used when inserted into a parent).
-   * @internal Used by container-logic.ts
+   * @internal Used by container.ts
    */
   _snippet: Snippet | null = null;
+
+  /**
+   * This component's ChildEntry in its parent's _childEntries.
+   * @internal Used by container.ts for reparenting
+   */
+  _childEntry: ChildEntry | null = null;
 
   /**
    * Flag indicating this is a static child (pre-rendered in Svelte template).
@@ -218,21 +226,21 @@ class Component implements Registrable {
       });
     }
 
-    // Initialize snippet arrays from targets prop
+    // Initialize child entry arrays from targets prop
     const targetsProp = propDefinitions.find(p => p.name === 'targets');
-    this._snippets = {} as Snippets;
+    this._childEntries = {} as ChildEntries;
     for (const target of normalizeTargets(targetsProp?.value)) {
-      this._snippets[target] = [];
+      this._childEntries[target] = [];
     }
     // Always create the "overlay" slot — used by AllowsOverlay.addOverlay().
     // Separated from Targets so addChild() can't route children here.
-    if (!this._snippets['overlay']) {
-      this._snippets['overlay'] = [];
+    if (!this._childEntries['overlay']) {
+      this._childEntries['overlay'] = [];
     }
 
-    // Expose all snippets as a single 'snippets' prop
-    Object.defineProperty(stateObj, 'snippets', {
-      get: () => this._snippets,
+    // Expose child entries as 'childEntries' prop
+    Object.defineProperty(stateObj, 'childEntries', {
+      get: () => this._childEntries,
       enumerable: true,
       configurable: true
     });
@@ -330,7 +338,7 @@ class Component implements Registrable {
   }
 
   /**
-   * Set up handler to sync targets prop changes to _snippets structure.
+   * Set up handler to sync targets prop changes to _childEntries structure.
    */
   private _setupTargetsHandler(): void {
     this.subscribe('@prop/targets', (_id, _name, data) => {
@@ -338,17 +346,17 @@ class Component implements Registrable {
 
       // Add new target slots
       for (const target of newTargets) {
-        if (!this._snippets[target]) {
-          this._snippets[target] = [];
+        if (!this._childEntries[target]) {
+          this._childEntries[target] = [];
         }
       }
 
-      // Remove old target slots (Svelte auto-unmounts snippets)
+      // Remove old target slots (Svelte auto-unmounts snippets via cleanup)
       // Preserve "overlay" — it's managed by AllowsOverlay, not Targets.
       const newTargetSet = new Set(newTargets);
-      for (const target of Object.keys(this._snippets)) {
+      for (const target of Object.keys(this._childEntries)) {
         if (target !== 'overlay' && !newTargetSet.has(target)) {
-          delete this._snippets[target];
+          delete this._childEntries[target];
         }
       }
     });

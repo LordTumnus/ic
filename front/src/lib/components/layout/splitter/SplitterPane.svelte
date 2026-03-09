@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext, onMount, onDestroy } from 'svelte';
-	import type { Snippets } from '$lib/types';
+	import type { ChildEntries } from '$lib/types';
 	import type { SplitterContext } from './splitter-types';
 
 	let {
@@ -8,13 +8,13 @@
 		minSize = $bindable(0),
 		maxSize = $bindable(100),
 		snapSize = $bindable(0),
-		snippets = { default: [] } as Snippets
+		childEntries = { default: [] } as ChildEntries
 	}: {
 		size?: number | null;
 		minSize?: number;
 		maxSize?: number;
 		snapSize?: number;
-		snippets?: Snippets;
+		childEntries?: ChildEntries;
 	} = $props();
 
 	const ctx = getContext<SplitterContext>('ic-splitter');
@@ -40,6 +40,6 @@
 	});
 </script>
 
-{#each snippets.default ?? [] as child (child)}
-	{@render child()}
+{#each childEntries.default ?? [] as child (child)}
+	{@render child.snippet()}
 {/each}

@@ -1,7 +1,6 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import { setContext } from 'svelte';
-	import type { Resolution, Snippets } from '$lib/types';
+	import type { Resolution, ChildEntries, ChildEntry } from '$lib/types';
 	import type { PaneConfig, PaneHandle } from './splitter-types';
 	import logger from '$lib/core/logger';
 
@@ -12,7 +11,7 @@
 		targets = $bindable<string[]>([]),
 		collapsePane = $bindable((_data: { index: number; direction: string }): Resolution => ({ success: true, data: null })),
 		resized,
-		snippets = {} as Snippets
+		childEntries = {} as ChildEntries
 	}: {
 		direction?: 'horizontal' | 'vertical';
 		gutterSize?: number;
@@ -20,7 +19,7 @@
 		targets?: string[];
 		collapsePane?: (data: { index: number; direction: string }) => Resolution;
 		resized?: (data: { sizes: number[] }) => void;
-		snippets?: Snippets;
+		childEntries?: ChildEntries;
 	} = $props();
 
 	// --- Container & measurement ---
@@ -137,9 +136,9 @@
 
 	// --- Helpers ---
 
-	function getPaneSnippet(index: number): Snippet | undefined {
+	function getPaneEntry(index: number): ChildEntry | undefined {
 		const target = `pane-${index}`;
-		return snippets[target]?.[0];
+		return childEntries[target]?.[0];
 	}
 
 	function getAvailableSize(): number {
@@ -357,11 +356,11 @@
 	bind:this={containerEl}
 >
 	{#each targets as target, i (target)}
-		{@const paneSnippet = getPaneSnippet(i)}
+		{@const paneEntry = getPaneEntry(i)}
 		<!-- Pane -->
 		<div class="ic-splitter-pane" style={paneStyles[i] ?? ''}>
-			{#if paneSnippet}
-				{@render paneSnippet()}
+			{#if paneEntry}
+				{@render paneEntry.snippet()}
 			{/if}
 		</div>
 		<!-- Gutter (between panes, not after last) -->

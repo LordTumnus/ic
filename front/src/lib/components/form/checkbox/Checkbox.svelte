@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Resolution, Snippets } from '$lib/types';
+  import type { Resolution, ChildEntries } from '$lib/types';
 
   let {
     value = $bindable('off'),
@@ -9,7 +9,7 @@
     disabled = $bindable(false),
     indeterminate = $bindable(false),
     labelPosition = $bindable('right'),
-    snippets = { default: [], icon: [] } as Snippets,
+    childEntries = {} as ChildEntries,
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
@@ -20,7 +20,7 @@
     disabled?: boolean;
     indeterminate?: boolean;
     labelPosition?: string;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
@@ -29,7 +29,7 @@
   let focused = $state(false);
 
   const isOn = $derived(value === 'on');
-  const hasIcon = $derived((snippets.icon?.length ?? 0) > 0);
+  const hasIcon = $derived((childEntries.icon?.length ?? 0) > 0);
 
   $effect(() => {
     focus = (): Resolution => {
@@ -90,8 +90,8 @@
     {:else if isOn}
       {#if hasIcon}
         <span class="ic-checkbox__icon">
-          {#each snippets.icon ?? [] as iconSnippet (iconSnippet)}
-            {@render iconSnippet()}
+          {#each childEntries.icon ?? [] as iconSnippet (iconSnippet)}
+            {@render iconSnippet.snippet()}
           {/each}
         </span>
       {:else}

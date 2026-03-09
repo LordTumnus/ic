@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Resolution, Snippets } from '$lib/types';
+  import type { Resolution, ChildEntries } from '$lib/types';
 
   let {
     items = $bindable<string[] | string>([]),
@@ -9,7 +9,7 @@
     size = $bindable('md'),
     disabled = $bindable(false),
     splitDirection = $bindable('right'),
-    snippets = { default: [], icon: [] } as Snippets,
+    childEntries = {} as ChildEntries,
     itemSelected,
     opened,
     closed,
@@ -22,7 +22,7 @@
     size?: string;
     disabled?: boolean;
     splitDirection?: string;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     itemSelected?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
@@ -45,11 +45,11 @@
   );
   const mainLabel = $derived(itemList[0] ?? '');
   const bodyFocused = $derived(mainFocused || triggerFocused);
-  const hasMainIcon = $derived((snippets.icon?.length ?? 0) > 0);
+  const hasMainIcon = $derived((childEntries.icon?.length ?? 0) > 0);
   const chevronSize = $derived(size === 'sm' ? 10 : size === 'lg' ? 14 : 12);
 
   function hasItemIcon(item: string): boolean {
-    return (snippets[item]?.length ?? 0) > 0;
+    return (childEntries[item]?.length ?? 0) > 0;
   }
 
   // --- Focus method ---
@@ -156,8 +156,8 @@
     >
       {#if hasMainIcon}
         <span class="ic-split-btn__icon">
-          {#each snippets.icon ?? [] as iconSnippet (iconSnippet)}
-            {@render iconSnippet()}
+          {#each childEntries.icon ?? [] as iconSnippet (iconSnippet)}
+            {@render iconSnippet.snippet()}
           {/each}
         </span>
       {/if}
@@ -205,8 +205,8 @@
         >
           {#if hasItemIcon(item)}
             <span class="ic-split-btn__item-icon">
-              {#each snippets[item] ?? [] as s (s)}
-                {@render s()}
+              {#each childEntries[item] ?? [] as s (s)}
+                {@render s.snippet()}
               {/each}
             </span>
           {/if}

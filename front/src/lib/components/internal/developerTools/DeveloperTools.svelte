@@ -9,13 +9,12 @@
   The single $effect is for the one-time async componentInfo fetch from MATLAB.
 -->
 <script lang="ts">
-	import type { StaticChildrenMap, RequestFn } from '$lib/types';
+	import { entry, type StaticChildrenMap, type RequestFn } from '$lib/types';
 	import type { ComponentInfo } from './devtools-types';
 	import logger from '$lib/core/logger';
 	import { showHighlight, hideHighlight } from './panels/dom/dom-utils';
 
 	import TabContainer from '$lib/components/layout/tabContainer/TabContainer.svelte';
-	import Tab from '$lib/components/layout/tabContainer/Tab.svelte';
 	import PropertiesPanel from './panels/PropertiesPanel.svelte';
 	import EventsPanel from './panels/EventsPanel.svelte';
 	import MethodsPanel from './panels/MethodsPanel.svelte';
@@ -200,13 +199,6 @@
 			<div class="ic-dt__status ic-dt__status--loading">Loading...</div>
 		{/if}
 
-		{#snippet tabProperties()}<Tab label="Properties" icon="sliders-horizontal" />{/snippet}
-		{#snippet tabEvents()}<Tab label="Events" icon="zap" />{/snippet}
-		{#snippet tabMethods()}<Tab label="Methods" icon="play" />{/snippet}
-		{#snippet tabStyles()}<Tab label="Styles" icon="paintbrush" />{/snippet}
-		{#snippet tabDom()}<Tab label="DOM" icon="code-xml" />{/snippet}
-		{#snippet tabConsole()}<Tab label="Console" icon="terminal" />{/snippet}
-
 		{#snippet panelProperties()}
 			{#if componentInfo && child}
 				<PropertiesPanel {child} {componentInfo} {request} />
@@ -249,13 +241,21 @@
 			tabOverflow="menu"
 			dragEnabled={true}
 			size="lg"
-			snippets={{
-				'tab-0': [tabProperties],   'panel-0': [panelProperties],
-				'tab-1': [tabEvents],       'panel-1': [panelEvents],
-				'tab-2': [tabMethods],      'panel-2': [panelMethods],
-				'tab-3': [tabStyles],       'panel-3': [panelStyles],
-				'tab-4': [tabDom],          'panel-4': [panelDom],
-				'tab-5': [tabConsole],      'panel-5': [panelConsole],
+			tabConfigs={{
+				'tab-0': { label: 'Properties', closable: false, disabled: false, editable: false, icon: 'sliders-horizontal' },
+				'tab-1': { label: 'Events', closable: false, disabled: false, editable: false, icon: 'zap' },
+				'tab-2': { label: 'Methods', closable: false, disabled: false, editable: false, icon: 'play' },
+				'tab-3': { label: 'Styles', closable: false, disabled: false, editable: false, icon: 'paintbrush' },
+				'tab-4': { label: 'DOM', closable: false, disabled: false, editable: false, icon: 'code-xml' },
+				'tab-5': { label: 'Console', closable: false, disabled: false, editable: false, icon: 'terminal' },
+			}}
+			childEntries={{
+				'panel-0': [entry(panelProperties)],
+				'panel-1': [entry(panelEvents)],
+				'panel-2': [entry(panelMethods)],
+				'panel-3': [entry(panelStyles)],
+				'panel-4': [entry(panelDom)],
+				'panel-5': [entry(panelConsole)],
 			}}
 		/>
 	</div>

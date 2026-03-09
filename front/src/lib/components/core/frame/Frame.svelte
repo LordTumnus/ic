@@ -2,20 +2,20 @@
   Frame.svelte - Root container component.
 
   This is the top-level container that mirrors MATLAB's ic.Frame.
-  It receives child components as snippets in the `snippets` prop and
+  It receives child components as childEntries and
   renders them using {@render}.
 -->
 <script lang="ts">
-  import type { Snippets, ThemeEventData } from '$lib/types';
+  import type { ChildEntries, ThemeEventData } from '$lib/types';
 
   interface Props {
-    snippets: Snippets;
+    childEntries: ChildEntries;
     theme?: ThemeEventData;
     colorScheme?: 'light' | 'dark';
   }
 
   let {
-    snippets,
+    childEntries,
     theme = {},
     colorScheme = $bindable('light'),
   }: Props = $props();
@@ -36,18 +36,18 @@
     return styles.join('; ');
   });
 
-  const children = $derived(snippets.default ?? []);
-  const overlays = $derived(snippets.overlay ?? []);
+  const children = $derived(childEntries.default ?? []);
+  const overlays = $derived(childEntries.overlay ?? []);
 </script>
 
 <div id="ic-frame" class="ic-frame" style={themeStyle}>
   {#each children as child (child)}
-    {@render child()}
+    {@render child.snippet()}
   {/each}
 
   <!-- Overlay layer — renders at root level, above normal content -->
   {#each overlays as overlay (overlay)}
-    {@render overlay()}
+    {@render overlay.snippet()}
   {/each}
 </div>
 

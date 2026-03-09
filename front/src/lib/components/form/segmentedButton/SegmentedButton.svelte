@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Resolution, Snippets } from '$lib/types';
+  import type { Resolution, ChildEntries } from '$lib/types';
   import logger from '$lib/core/logger';
 
   let {
@@ -11,7 +11,7 @@
     size = $bindable('md'),
     disabled = $bindable(false),
     iconPosition = $bindable('left'),
-    snippets = { default: [] } as Snippets,
+    childEntries = {} as ChildEntries,
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
@@ -23,7 +23,7 @@
     size?: string;
     disabled?: boolean;
     iconPosition?: string;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
@@ -48,7 +48,7 @@
   });
 
   function hasIcon(item: string): boolean {
-    return (snippets[item]?.length ?? 0) > 0;
+    return (childEntries[item]?.length ?? 0) > 0;
   }
 
   function handleClick(item: string) {
@@ -99,8 +99,8 @@
     >
       {#if hasIcon(item)}
         <span class="ic-seg-btn__icon" class:ic-seg-btn__icon--right={iconPosition === 'right'}>
-          {#each snippets[item] ?? [] as iconSnippet (iconSnippet)}
-            {@render iconSnippet()}
+          {#each childEntries[item] ?? [] as iconSnippet (iconSnippet)}
+            {@render iconSnippet.snippet()}
           {/each}
         </span>
       {/if}

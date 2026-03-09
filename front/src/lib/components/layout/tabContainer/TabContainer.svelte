@@ -1,12 +1,12 @@
 <!--
   TabContainer.svelte — Tabbed container with closable, draggable tabs.
 
-  Both Tab and TabPanel are direct children inserted into separate targets.
-  Tab bar renders wrapper divs for each "tab-*" target with snippet inside.
-  Content area renders show/hide divs for each "panel-*" target.
+  Tab config is derived from the ChildEntry system:
+  - IC framework: Tab components are inserted as children, their reactive props
+    (label, closable, disabled, editable, icon) are accessed via childEntries proxy.
+  - Standalone Svelte: tabConfigs prop provides static config directly.
 
   Selection is target-based (e.g. "tab-0") and stable across deletes.
-  Configs are keyed by target string for order-independent lookup.
 
   TabOverflow modes:
     - "scroll": horizontal scrollbar when tabs overflow
@@ -16,12 +16,14 @@
   DnD: svelte-dnd-action on the tab bar for reordering.
 -->
 <script lang="ts">
-  import { setContext, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, SHADOW_PLACEHOLDER_ITEM_ID } from 'svelte-dnd-action';
-  import type { Snippets } from '$lib/types';
-  import type { TabConfig, TabContainerContext } from './tab-types';
-  import { resolveIcon } from '$lib/utils/icons';
+  import type { ChildEntries } from '$lib/types';
+  import type { TabConfig } from './tab-types';
+  import { resolveIcon, type IconSource } from '$lib/utils/icons';
+
+  const ICON_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };
 
   let {
     selectedTab = $bindable(''),
@@ -34,7 +36,8 @@
     tabClosed,
     tabReordered,
     tabRenamed,
-    snippets = {} as Snippets
+    childEntries = {} as ChildEntries,
+    tabConfigs,
   }: {
     selectedTab?: string;
     tabOverflow?: 'scroll' | 'wrap' | 'menu';
@@ -46,69 +49,35 @@
     tabClosed?: (data: { value: string }) => void;
     tabReordered?: (data: { value: string[] }) => void;
     tabRenamed?: (data: { value: { target: string; label: string } }) => void;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
+    tabConfigs?: Record<string, TabConfig>;
   } = $props();
 
-  let tabConfigMap = $state<Record<string, TabConfig>>({});
-  let lastRename = $state<{ target: string; label: string } | null>(null);
+  // --- Tab config resolution ---
+
+  /**
+   * Get tab config from IC ChildEntry proxy or standalone tabConfigs.
+   * IC-backed entries have reactive props (label, icon, etc.) via proxy.
+   * Standalone usage provides static config via tabConfigs prop.
+   */
+  function getConfig(target: string): TabConfig | undefined {
+    const entry = childEntries[target]?.[0];
+    if (entry && entry.props.label !== undefined) {
+      return {
+        label: (entry.props.label as string) ?? '',
+        closable: (entry.props.closable as boolean) ?? false,
+        disabled: (entry.props.disabled as boolean) ?? false,
+        editable: (entry.props.editable as boolean) ?? false,
+        icon: (entry.props.icon as IconSource) ?? null,
+      };
+    }
+    return tabConfigs?.[target];
+  }
 
   const tabTargets = $derived(targets.filter((t) => t.startsWith('tab-')));
   const panelTargets = $derived(targets.filter((t) => t.startsWith('panel-')));
 
-  // Context for Tab children
-  const context: TabContainerContext = {
-    registerTab(): string {
-      // Find the first target not yet registered (mounts in {#each} order)
-      for (const t of tabTargets) {
-        if (!(t in tabConfigMap)) {
-          tabConfigMap[t] = { label: '', closable: false, disabled: false, editable: false, icon: null };
-          return t;
-        }
-      }
-      return '';
-    },
-
-    updateTab(target: string, config: TabConfig) {
-      tabConfigMap[target] = { ...config };
-    },
-
-    deregisterTab(target: string) {
-      if (target in tabConfigMap) {
-        const copy = { ...tabConfigMap };
-        delete copy[target];
-        tabConfigMap = copy;
-      }
-    },
-
-    get selectedTarget() {
-      return selectedTab;
-    },
-
-    get containerDisabled() {
-      return disabled;
-    },
-
-    get containerSize() {
-      return size;
-    },
-
-    closeTab(target: string) {
-      if (target) tabClosed?.({ value: target });
-    },
-
-    renameTab(target: string, newLabel: string) {
-      if (!target || !newLabel.trim()) return;
-      const trimmed = newLabel.trim();
-      lastRename = { target, label: trimmed };
-      tabRenamed?.({ value: { target, label: trimmed } });
-    },
-
-    get lastRename() {
-      return lastRename;
-    }
-  };
-
-  setContext('ic-tab-container', context);
+  // --- DnD ---
 
   interface DndTabItem {
     id: string;
@@ -116,7 +85,7 @@
   }
 
   let dndItems = $state<DndTabItem[]>([]);
-  let isDragging = false;
+  let isDragging = $state(false);
   const FLIP_MS = 150;
 
   $effect(() => {
@@ -133,10 +102,13 @@
       barEl.style.minHeight = '';
       barEl.style.minWidth = '';
     }
+    // Set on :root so the cloned drag ghost (outside barEl) also inherits it
+    document.documentElement.style.setProperty('--_tc-cursor', 'grabbing');
   }
 
   function handleFinalize(e: CustomEvent<{ items: DndTabItem[] }>) {
     isDragging = false;
+    document.documentElement.style.removeProperty('--_tc-cursor');
     dndItems = e.detail.items;
     const newTargets: string[] = [];
     for (const item of dndItems) {
@@ -157,12 +129,19 @@
     }
   }
 
+  // --- Tab interaction ---
+
   function handleTabClick(target: string) {
-    const config = tabConfigMap[target];
+    const config = getConfig(target);
     if (disabled || config?.disabled) return;
     selectedTab = target;
     valueChanged?.({ value: target });
     closeMenu();
+  }
+
+  function handleClose(e: MouseEvent, target: string) {
+    e.stopPropagation();
+    tabClosed?.({ value: target });
   }
 
   function handleKeyDown(e: KeyboardEvent) {
@@ -183,7 +162,7 @@
       e.preventDefault();
       let next = (current + 1) % n;
       for (let tries = 0; tries < n; tries++) {
-        if (!tabConfigMap[tabTargets[next]]?.disabled) break;
+        if (!getConfig(tabTargets[next])?.disabled) break;
         next = (next + 1) % n;
       }
       selectedTab = tabTargets[next];
@@ -192,7 +171,7 @@
       e.preventDefault();
       let prev = (current - 1 + n) % n;
       for (let tries = 0; tries < n; tries++) {
-        if (!tabConfigMap[tabTargets[prev]]?.disabled) break;
+        if (!getConfig(tabTargets[prev])?.disabled) break;
         prev = (prev - 1 + n) % n;
       }
       selectedTab = tabTargets[prev];
@@ -200,7 +179,7 @@
     } else if (e.key === 'Home') {
       e.preventDefault();
       for (let i = 0; i < n; i++) {
-        if (!tabConfigMap[tabTargets[i]]?.disabled) {
+        if (!getConfig(tabTargets[i])?.disabled) {
           selectedTab = tabTargets[i];
           valueChanged?.({ value: selectedTab });
           break;
@@ -209,7 +188,7 @@
     } else if (e.key === 'End') {
       e.preventDefault();
       for (let i = n - 1; i >= 0; i--) {
-        if (!tabConfigMap[tabTargets[i]]?.disabled) {
+        if (!getConfig(tabTargets[i])?.disabled) {
           selectedTab = tabTargets[i];
           valueChanged?.({ value: selectedTab });
           break;
@@ -217,6 +196,8 @@
       }
     }
   }
+
+  // --- Overflow menu ---
 
   const CHEVRON_WIDTH = 32;
 
@@ -254,7 +235,7 @@
           const el = tabElMap[t];
           if (el) {
             cachedWidths[t] = el.offsetWidth;
-            el.style.display = ''; // clear inline override → CSS class takes effect
+            el.style.display = ''; // clear inline override
           }
         }
         recomputeHidden();
@@ -266,7 +247,7 @@
   function recomputeHidden() {
     if (!barEl || Object.keys(cachedWidths).length === 0) return;
 
-    // Spot-check: stale widths → re-measure (snippets render after initial measure)
+    // Spot-check: stale widths -> re-measure
     const probe = tabTargets[0];
     if (probe && tabElMap[probe]) {
       const actual = tabElMap[probe].offsetWidth;
@@ -313,7 +294,7 @@
   }
 
   $effect(() => {
-    void tabTargets; void tabConfigMap; void size; void tabOverflow;
+    void tabTargets; void size; void tabOverflow;
     if (tabOverflow === 'menu') {
       measureAndCompute();
     } else {
@@ -347,7 +328,7 @@
     return () => ro.disconnect();
   });
 
-  // MutationObserver: re-measure when snippet content arrives after initial layout
+  // MutationObserver: re-measure when content changes
   $effect(() => {
     if (tabOverflow !== 'menu' || !barEl) return;
     let pending = false;
@@ -368,11 +349,13 @@
     return () => mo.disconnect();
   });
 
+  // --- Inline editing ---
+
   let editingTarget = $state<string | null>(null);
   let editValue = $state('');
 
   function startEditing(target: string) {
-    const config = tabConfigMap[target];
+    const config = getConfig(target);
     if (!config?.editable || disabled || config.disabled) return;
     editingTarget = target;
     editValue = config.label;
@@ -383,8 +366,13 @@
     const target = editingTarget;
     editingTarget = null;
     const trimmed = editValue.trim();
-    if (trimmed && trimmed !== tabConfigMap[target]?.label) {
-      context.renameTab(target, trimmed);
+    if (trimmed && trimmed !== getConfig(target)?.label) {
+      // Update via ChildEntry proxy for instant reactivity
+      const entry = childEntries[target]?.[0];
+      if (entry && entry.props.label !== undefined) {
+        entry.props.label = trimmed;
+      }
+      tabRenamed?.({ value: { target, label: trimmed } });
     }
   }
 
@@ -401,6 +389,8 @@
       cancelEdit();
     }
   }
+
+  // --- Menu ---
 
   function openMenu() {
     if (menuOpen) return;
@@ -466,10 +456,9 @@
       {#each dndItems as item (item.id)}
         {@const target = item.id}
         {@const isShadow = item[SHADOW_ITEM_MARKER_PROPERTY_NAME]}
-        {@const config = tabConfigMap[target]}
+        {@const config = getConfig(target)}
         {@const active = target === selectedTab}
         {@const isHidden = tabOverflow === 'menu' && hiddenTargets.has(target)}
-        {@const tabSnippet = snippets[target]?.[0]}
         {@const isEditing = editingTarget === target}
         <div
           bind:this={tabElMap[target]}
@@ -506,8 +495,27 @@
               onmousedown={(e) => e.stopPropagation()}
               autofocus
             />
-          {:else if tabSnippet}
-            {@render tabSnippet()}
+          {:else if config}
+            {#if config.icon}
+              {@const iconSvg = resolveIcon(config.icon, ICON_SIZES[size] ?? 14)}
+              {#if iconSvg}
+                <span class="ic-tc__icon">{@html iconSvg}</span>
+              {/if}
+            {/if}
+            <span class="ic-tc__label">{config.label}</span>
+            {#if config.closable && !disabled}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <button
+                class="ic-tc__close"
+                tabindex={-1}
+                aria-label="Close {config.label}"
+                onmousedown={(e) => handleClose(e, target)}
+              >
+                <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                  <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </button>
+            {/if}
           {/if}
         </div>
       {/each}
@@ -536,7 +544,7 @@
     {#if tabOverflow === 'menu' && menuOpen}
       <div class="ic-tc__menu" role="menu">
         {#each hiddenTargetsList as target (target)}
-          {@const config = tabConfigMap[target]}
+          {@const config = getConfig(target)}
           {@const active = target === selectedTab}
           <div
             class="ic-tc__menu-item"
@@ -570,15 +578,15 @@
     {#each panelTargets as target (target)}
       {@const tabTarget = 'tab-' + target.replace('panel-', '')}
       {@const active = tabTarget === selectedTab}
-      {@const panelSnippet = snippets[target]?.[0]}
+      {@const panelEntry = childEntries[target]?.[0]}
       <div
         class="ic-tc__panel"
         class:ic-tc__panel--active={active}
         role="tabpanel"
         aria-hidden={!active}
       >
-        {#if panelSnippet}
-          {@render panelSnippet()}
+        {#if panelEntry}
+          {@render panelEntry.snippet()}
         {/if}
       </div>
     {/each}
@@ -586,7 +594,7 @@
 </div>
 
 <style>
-  /* ── Container ── */
+  /* -- Container -- */
   .ic-tc {
     display: flex;
     flex-direction: column;
@@ -602,14 +610,14 @@
     pointer-events: none;
   }
 
-  /* ── Bar wrapper ── */
+  /* -- Bar wrapper -- */
   .ic-tc__bar-wrap {
     position: relative;
     flex-shrink: 0;
     min-width: 0;
   }
 
-  /* ── Tab bar ── */
+  /* -- Tab bar -- */
   .ic-tc__bar {
     display: flex;
     align-items: stretch;
@@ -644,7 +652,7 @@
     overflow: clip;
   }
 
-  /* ── Tab button ── */
+  /* -- Tab button -- */
   .ic-tc__tab {
     position: relative;
     display: inline-flex;
@@ -654,7 +662,7 @@
     border-radius: 0;
     background: transparent;
     color: var(--ic-muted-foreground);
-    cursor: pointer;
+    cursor: var(--_tc-cursor, pointer) !important;
     white-space: nowrap;
     flex-shrink: 0;
     transition: background-color 0.12s ease, color 0.12s ease;
@@ -703,7 +711,7 @@
     background: var(--ic-secondary);
   }
 
-  /* Editing state — prevent drag while renaming */
+  /* Editing state */
   .ic-tc__tab--editing {
     cursor: text;
   }
@@ -723,7 +731,7 @@
     line-height: 1.2;
   }
 
-  /* ── Left indicator ── */
+  /* -- Left indicator -- */
   .ic-tc__indicator {
     position: absolute;
     left: 0;
@@ -739,8 +747,8 @@
     background-color: var(--ic-primary);
   }
 
-  /* ── Icon (rendered by Tab.svelte) ── */
-  .ic-tc__tab :global(.ic-tc__icon) {
+  /* -- Icon -- */
+  .ic-tc__icon {
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
@@ -748,16 +756,16 @@
     line-height: 0;
   }
 
-  /* ── Label (rendered by Tab.svelte) ── */
-  .ic-tc__tab :global(.ic-tc__label) {
+  /* -- Label -- */
+  .ic-tc__label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.2;
   }
 
-  /* ── Close button (rendered by Tab.svelte) ── */
-  .ic-tc__tab :global(.ic-tc__close) {
+  /* -- Close button -- */
+  .ic-tc__close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -774,21 +782,21 @@
     transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
     line-height: 0;
   }
-  .ic-tc__tab :global(.ic-tc__close svg) { width: 8px; height: 8px; }
+  .ic-tc__close svg { width: 8px; height: 8px; }
 
   /* Show close button on tab hover */
-  .ic-tc__tab:hover :global(.ic-tc__close),
-  .ic-tc__tab--active :global(.ic-tc__close) {
+  .ic-tc__tab:hover .ic-tc__close,
+  .ic-tc__tab--active .ic-tc__close {
     opacity: 0.7;
   }
 
-  .ic-tc__tab :global(.ic-tc__close:hover) {
+  .ic-tc__close:hover {
     opacity: 1;
     background-color: rgba(220, 50, 50, 0.15);
     color: var(--ic-destructive);
   }
 
-  /* ── Chevron >> button ── */
+  /* -- Chevron >> button -- */
   .ic-tc__chevron {
     position: absolute;
     right: 0;
@@ -818,7 +826,7 @@
     color: var(--ic-foreground);
   }
 
-  /* ── Menu popup ── */
+  /* -- Menu popup -- */
   .ic-tc__menu {
     position: absolute;
     z-index: 50;
@@ -877,7 +885,7 @@
     min-width: 0;
   }
 
-  /* ── Content area ── */
+  /* -- Content area -- */
   .ic-tc__content {
     flex: 1;
     overflow: auto;

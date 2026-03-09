@@ -123,27 +123,21 @@ export interface MethodDefinition {
 }
 
 /**
- * Snippets record passed to Svelte components.
- * Keys are target names defined in MATLAB's Targets property.
- */
-export type Snippets = Record<string, Snippet[]>;
-
-/** Subscription callback. Receives event name and data. May be async. */
-export type EventCallback = (id: string, name: string, data: unknown) => void | Promise<void>;
-
-/** Unsubscribe function returned by subscribe(). */
-export type Unsubscribe = () => void;
-
-/**
- * Static child -> renderable snippet, props, events, methods, and metadata.
+ * A child component entry: renderable snippet + reactive metadata.
  *
- * `props` is a live reactive reference to the child's svelteProps (data state).
+ * `props` is a live reactive proxy into the child's data state.
  * `events` is a proxy into the child's event state — set a handler to intercept.
  * `methods` is a proxy into the child's method state — call to invoke.
  * `meta` provides name lists for building inspector UIs.
+ *
+ * Used for both dynamic children (via @insert) and static children
+ * (declared in MATLAB constructor). For standalone Svelte usage
+ * without an IC Component backing, use the `entry()` helper.
  */
-export interface StaticChild {
+export interface ChildEntry {
   snippet: Snippet;
+  id: string;
+  type: string;
   props: Record<string, unknown>;
   events: Record<string, ((data?: unknown) => void) | undefined>;
   methods: Record<string, ((data?: unknown) => Resolution | Promise<Resolution>) | undefined>;
@@ -156,10 +150,34 @@ export interface StaticChild {
 }
 
 /**
- * Map of static child targets to arrays of their snippets and props.
+ * Children organized by target slot name.
+ * Keys are target names defined in MATLAB's Targets property.
+ */
+export type ChildEntries = Record<string, ChildEntry[]>;
+
+/**
+ * Map of static child targets to arrays of child entries.
  * Multiple children can share the same target slot.
  */
-export type StaticChildrenMap = Map<string, StaticChild[]>;
+export type StaticChildrenMap = Map<string, ChildEntry[]>;
+
+/**
+ * Create a minimal ChildEntry wrapping a raw Svelte snippet.
+ * Use this for standalone Svelte usage (no IC Component backing).
+ */
+export function entry(snippet: Snippet): ChildEntry {
+  return {
+    snippet, id: '', type: '',
+    props: {}, events: {}, methods: {},
+    meta: { propNames: [], eventNames: [], methodNames: [], mixins: [] }
+  };
+}
+
+/** Subscription callback. Receives event name and data. May be async. */
+export type EventCallback = (id: string, name: string, data: unknown) => void | Promise<void>;
+
+/** Unsubscribe function returned by subscribe(). */
+export type Unsubscribe = () => void;
 
 /**
  * Minimal interface for components that can be registered in the Registry.

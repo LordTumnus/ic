@@ -8,12 +8,12 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { Resolution, Snippets, StaticChildrenMap } from '$lib/types';
+  import type { Resolution, ChildEntries, StaticChildrenMap } from '$lib/types';
 
   let {
     title = $bindable('Static Container'),
     childCounter = $bindable(0),
-    snippets = { default: [] } as Snippets,
+    childEntries = { default: [] } as ChildEntries,
     staticChildren = new Map() as StaticChildrenMap,
 
     // Method handler (MATLAB calls this, we provide implementation)
@@ -21,7 +21,7 @@
   }: {
     title?: string;
     childCounter?: number;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     staticChildren?: StaticChildrenMap;
     getState?: () => Resolution;
   } = $props();
@@ -80,8 +80,8 @@
   </div>
 
   <div class="dynamic-slot" data-testid="dynamic-slot">
-    {#each snippets.default ?? [] as dynamicChild}
-      {@render dynamicChild()}
+    {#each childEntries.default ?? [] as dynamicChild}
+      {@render dynamicChild.snippet()}
     {/each}
   </div>
 </div>

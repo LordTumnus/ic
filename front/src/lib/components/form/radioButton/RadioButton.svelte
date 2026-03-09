@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Resolution, Snippets } from '$lib/types';
+  import type { Resolution, ChildEntries } from '$lib/types';
   import logger from '$lib/core/logger';
 
   let {
@@ -11,7 +11,7 @@
     disabled = $bindable(false),
     labelPosition = $bindable('right'),
     orientation = $bindable('vertical'),
-    snippets = { default: [] } as Snippets,
+    childEntries = {} as ChildEntries,
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
@@ -23,7 +23,7 @@
     disabled?: boolean;
     labelPosition?: string;
     orientation?: string;
-    snippets?: Snippets;
+    childEntries?: ChildEntries;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
   } = $props();
@@ -45,7 +45,7 @@
   });
 
   function hasIcon(item: string): boolean {
-    return (snippets[item]?.length ?? 0) > 0;
+    return (childEntries[item]?.length ?? 0) > 0;
   }
 
   function handleSelect(item: string) {
@@ -82,8 +82,8 @@
         <span class="ic-radio__item-content">
           {#if hasIcon(item)}
             <span class="ic-radio__icon">
-              {#each snippets[item] ?? [] as iconSnippet (iconSnippet)}
-                {@render iconSnippet()}
+              {#each childEntries[item] ?? [] as iconSnippet (iconSnippet)}
+                {@render iconSnippet.snippet()}
               {/each}
             </span>
           {/if}
@@ -118,8 +118,8 @@
         <span class="ic-radio__item-content">
           {#if hasIcon(item)}
             <span class="ic-radio__icon">
-              {#each snippets[item] ?? [] as iconSnippet (iconSnippet)}
-                {@render iconSnippet()}
+              {#each childEntries[item] ?? [] as iconSnippet (iconSnippet)}
+                {@render iconSnippet.snippet()}
               {/each}
             </span>
           {/if}
