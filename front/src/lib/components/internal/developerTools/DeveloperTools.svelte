@@ -10,10 +10,12 @@
 -->
 <script lang="ts">
 	import type { StaticChildrenMap, RequestFn } from '$lib/types';
-	import type { ComponentInfo, TabId } from './devtools-types';
+	import type { ComponentInfo } from './devtools-types';
 	import logger from '$lib/core/logger';
 	import { showHighlight, hideHighlight } from './panels/dom/dom-utils';
 
+	import TabContainer from '$lib/components/layout/tabContainer/TabContainer.svelte';
+	import Tab from '$lib/components/layout/tabContainer/Tab.svelte';
 	import PropertiesPanel from './panels/PropertiesPanel.svelte';
 	import EventsPanel from './panels/EventsPanel.svelte';
 	import MethodsPanel from './panels/MethodsPanel.svelte';
@@ -60,18 +62,17 @@
 		});
 	});
 
-	// --- Tab state ---
+	// --- Tab state (TabContainer uses target-based selection) ---
 
-	let activeTab = $state<TabId>('properties');
-
-	const tabs: { id: TabId; label: string }[] = [
-		{ id: 'properties', label: 'Properties' },
-		{ id: 'events', label: 'Events' },
-		{ id: 'methods', label: 'Methods' },
-		{ id: 'styles', label: 'Styles' },
-		{ id: 'dom', label: 'DOM' },
-		{ id: 'console', label: 'Console' }
+	const TAB_TARGETS = [
+		'tab-0', 'panel-0',   // Properties
+		'tab-1', 'panel-1',   // Events
+		'tab-2', 'panel-2',   // Methods
+		'tab-3', 'panel-3',   // Styles
+		'tab-4', 'panel-4',   // DOM
+		'tab-5', 'panel-5',   // Console
 	];
+	let selectedTab = $state('tab-0');
 
 	// --- Resizable split ---
 
@@ -193,51 +194,70 @@
 
 	<!-- Right: inspector -->
 	<div class="ic-dt__inspector" style="width: {100 - splitPercent}%;">
-		<!-- Tab bar -->
-		<div class="ic-dt__tabs">
-			{#each tabs as tab (tab.id)}
-				<button
-					class="ic-dt__tab"
-					class:ic-dt__tab--active={activeTab === tab.id}
-					onclick={() => (activeTab = tab.id)}
-				>
-					{tab.label}
-				</button>
-			{/each}
+		{#if infoError}
+			<div class="ic-dt__status ic-dt__status--error">{infoError}</div>
+		{:else if !componentInfo}
+			<div class="ic-dt__status ic-dt__status--loading">Loading...</div>
+		{/if}
 
-			{#if infoError}
-				<span class="ic-dt__error">{infoError}</span>
-			{:else if !componentInfo}
-				<span class="ic-dt__loading">Loading...</span>
-			{/if}
-		</div>
+		{#snippet tabProperties()}<Tab label="Properties" icon="sliders-horizontal" />{/snippet}
+		{#snippet tabEvents()}<Tab label="Events" icon="zap" />{/snippet}
+		{#snippet tabMethods()}<Tab label="Methods" icon="play" />{/snippet}
+		{#snippet tabStyles()}<Tab label="Styles" icon="paintbrush" />{/snippet}
+		{#snippet tabDom()}<Tab label="DOM" icon="code-xml" />{/snippet}
+		{#snippet tabConsole()}<Tab label="Console" icon="terminal" />{/snippet}
 
-		<!-- Tab content -->
-		<div class="ic-dt__content">
+		{#snippet panelProperties()}
 			{#if componentInfo && child}
-				{#if activeTab === 'properties'}
-					<PropertiesPanel {child} {componentInfo} {request} />
-				{:else if activeTab === 'events'}
-					<EventsPanel {child} {componentInfo} />
-				{:else if activeTab === 'methods'}
-					<MethodsPanel {child} {componentInfo} />
-				{:else if activeTab === 'styles'}
-					<StylesPanel {componentInfo} {request} />
-				{:else if activeTab === 'dom'}
-					<DomPanel
-						{componentInfo}
-						bind:pickerActive
-						bind:reveal={domReveal}
-						onhover={handleDomHover}
-					/>
-				{/if}
-
-				<!-- ConsolePanel: always mounted to preserve state across tab switches -->
-				<div class="ic-dt__persist" style:display={activeTab === 'console' ? '' : 'none'}>
-					<ConsolePanel {request} />
-				</div>
+				<PropertiesPanel {child} {componentInfo} {request} />
 			{/if}
-		</div>
+		{/snippet}
+		{#snippet panelEvents()}
+			{#if componentInfo && child}
+				<EventsPanel {child} {componentInfo} />
+			{/if}
+		{/snippet}
+		{#snippet panelMethods()}
+			{#if componentInfo && child}
+				<MethodsPanel {child} {componentInfo} />
+			{/if}
+		{/snippet}
+		{#snippet panelStyles()}
+			{#if componentInfo && child}
+				<StylesPanel {componentInfo} {request} />
+			{/if}
+		{/snippet}
+		{#snippet panelDom()}
+			{#if componentInfo && child}
+				<DomPanel
+					{componentInfo}
+					bind:pickerActive
+					bind:reveal={domReveal}
+					onhover={handleDomHover}
+				/>
+			{/if}
+		{/snippet}
+		{#snippet panelConsole()}
+			{#if componentInfo && child}
+				<ConsolePanel {request} />
+			{/if}
+		{/snippet}
+
+		<TabContainer
+			targets={TAB_TARGETS}
+			bind:selectedTab
+			tabOverflow="menu"
+			dragEnabled={true}
+			size="lg"
+			snippets={{
+				'tab-0': [tabProperties],   'panel-0': [panelProperties],
+				'tab-1': [tabEvents],       'panel-1': [panelEvents],
+				'tab-2': [tabMethods],      'panel-2': [panelMethods],
+				'tab-3': [tabStyles],       'panel-3': [panelStyles],
+				'tab-4': [tabDom],          'panel-4': [panelDom],
+				'tab-5': [tabConsole],      'panel-5': [panelConsole],
+			}}
+		/>
 	</div>
 </div>
 
@@ -325,60 +345,20 @@
 		border-left: 1px solid var(--ic-border);
 	}
 
-	.ic-dt__error {
-		color: var(--ic-destructive);
-		margin-left: auto;
-		font-size: 0.85em;
+	.ic-dt__status {
+		flex-shrink: 0;
+		padding: 3px 10px;
+		font-size: 0.8em;
+		border-bottom: 1px solid var(--ic-border);
+		background: var(--ic-secondary);
 	}
 
-	.ic-dt__loading {
+	.ic-dt__status--error {
+		color: var(--ic-destructive);
+	}
+
+	.ic-dt__status--loading {
 		color: var(--ic-muted-foreground);
 		font-style: italic;
-		margin-left: auto;
-		font-size: 0.85em;
-	}
-
-	/* --- Tab bar --- */
-
-	.ic-dt__tabs {
-		display: flex;
-		background: var(--ic-secondary);
-		border-bottom: 1px solid var(--ic-border);
-		padding: 0 4px;
-		gap: 0;
-	}
-
-	.ic-dt__tab {
-		all: unset;
-		padding: 5px 12px;
-		cursor: pointer;
-		color: var(--ic-muted-foreground);
-		font-size: var(--ic-font-size);
-		font-family: var(--ic-font-family);
-		border-bottom: 2px solid transparent;
-		transition: color 0.15s, border-color 0.15s;
-		white-space: nowrap;
-	}
-
-	.ic-dt__tab:hover {
-		color: var(--ic-foreground);
-	}
-
-	.ic-dt__tab--active {
-		color: var(--ic-primary);
-		border-bottom-color: var(--ic-primary);
-	}
-
-	/* --- Content area --- */
-
-	.ic-dt__content {
-		flex: 1;
-		min-height: 0;
-		overflow: auto;
-		padding: 0;
-	}
-
-	.ic-dt__persist {
-		height: 100%;
 	}
 </style>

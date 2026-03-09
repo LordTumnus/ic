@@ -165,9 +165,6 @@ export interface DomNode {
 	element?: Element | Text;
 }
 
-/** Tab identifiers */
-export type TabId = 'properties' | 'events' | 'methods' | 'styles' | 'dom' | 'console';
-
 // --- Console types ---
 
 import type { LogLevel } from '$lib/core/logger';
