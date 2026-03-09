@@ -15,11 +15,13 @@
     label = $bindable(''),
     closable = $bindable(false),
     disabled = $bindable(false),
+    editable = $bindable(false),
     icon = $bindable<IconSource>(null),
   }: {
     label?: string;
     closable?: boolean;
     disabled?: boolean;
+    editable?: boolean;
     icon?: IconSource;
   } = $props();
 
@@ -33,7 +35,17 @@
   // Push config updates to parent whenever reactive props change
   $effect(() => {
     if (myTarget) {
-      ctx.updateTab(myTarget, { label, closable, disabled, icon });
+      ctx.updateTab(myTarget, { label, closable, disabled, editable, icon });
+    }
+  });
+
+  // Watch for rename signals from the parent container.
+  // The assignment to `label` happens inside this component's own scope,
+  // so Svelte's compiler correctly tracks the $bindable prop write.
+  $effect(() => {
+    const rp = ctx.lastRename;
+    if (rp && myTarget && rp.target === myTarget) {
+      label = rp.label;
     }
   });
 
@@ -41,8 +53,6 @@
     if (myTarget) ctx.deregisterTab(myTarget);
   });
 
-  // Derived state from context
-  const isActive = $derived(myTarget === ctx.selectedTarget);
   const size = $derived(ctx.containerSize);
 
   const iconSvg = $derived.by(() => {

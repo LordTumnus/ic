@@ -17,6 +17,9 @@ classdef Tab < ic.core.Component
 
         % > ICON icon displayed before the label (Lucide name, .svg file, or URL)
         Icon ic.asset.Asset = ic.asset.Asset.empty
+
+        % > EDITABLE allow double-click to rename the tab label
+        Editable (1,1) logical = false
     end
 
     properties (SetAccess = ?ic.TabContainer)

@@ -22,46 +22,46 @@
   import type { Snippets } from '$lib/types';
   import type { TabConfig, TabContainerContext } from './tab-types';
   import { resolveIcon } from '$lib/utils/icons';
-  import logger from '$lib/core/logger';
 
   let {
     selectedTab = $bindable(''),
     tabOverflow = $bindable<'scroll' | 'wrap' | 'menu'>('scroll'),
     disabled = $bindable(false),
+    dragEnabled = $bindable(true),
     size = $bindable<'sm' | 'md' | 'lg'>('md'),
     targets = $bindable<string[]>([]),
     valueChanged,
     tabClosed,
     tabReordered,
+    tabRenamed,
     snippets = {} as Snippets
   }: {
     selectedTab?: string;
     tabOverflow?: 'scroll' | 'wrap' | 'menu';
     disabled?: boolean;
+    dragEnabled?: boolean;
     size?: 'sm' | 'md' | 'lg';
     targets?: string[];
     valueChanged?: (data: { value: string }) => void;
     tabClosed?: (data: { value: string }) => void;
     tabReordered?: (data: { value: string[] }) => void;
+    tabRenamed?: (data: { value: { target: string; label: string } }) => void;
     snippets?: Snippets;
   } = $props();
 
-  // --- Tab registration via context (target-keyed) ---
-
   let tabConfigMap = $state<Record<string, TabConfig>>({});
+  let lastRename = $state<{ target: string; label: string } | null>(null);
 
-  // Derived: split targets into tab targets and panel targets
   const tabTargets = $derived(targets.filter((t) => t.startsWith('tab-')));
   const panelTargets = $derived(targets.filter((t) => t.startsWith('panel-')));
 
-  // Context for Tab children — all methods are target-based
+  // Context for Tab children
   const context: TabContainerContext = {
     registerTab(): string {
-      // Tab.svelte mounts in {#each} order = tabTargets order.
-      // Find the first target not yet in the config map.
+      // Find the first target not yet registered (mounts in {#each} order)
       for (const t of tabTargets) {
         if (!(t in tabConfigMap)) {
-          tabConfigMap[t] = { label: '', closable: false, disabled: false, icon: null };
+          tabConfigMap[t] = { label: '', closable: false, disabled: false, editable: false, icon: null };
           return t;
         }
       }
@@ -69,8 +69,6 @@
     },
 
     updateTab(target: string, config: TabConfig) {
-      // Pure write — no reactive reads! Reading `target in tabConfigMap`
-      // inside an $effect creates a has→set cycle (effect_update_depth_exceeded).
       tabConfigMap[target] = { ...config };
     },
 
@@ -96,12 +94,21 @@
 
     closeTab(target: string) {
       if (target) tabClosed?.({ value: target });
+    },
+
+    renameTab(target: string, newLabel: string) {
+      if (!target || !newLabel.trim()) return;
+      const trimmed = newLabel.trim();
+      lastRename = { target, label: trimmed };
+      tabRenamed?.({ value: { target, label: trimmed } });
+    },
+
+    get lastRename() {
+      return lastRename;
     }
   };
 
   setContext('ic-tab-container', context);
-
-  // --- DnD state ---
 
   interface DndTabItem {
     id: string;
@@ -112,7 +119,6 @@
   let isDragging = false;
   const FLIP_MS = 150;
 
-  // Sync dndItems from tabTargets when not dragging
   $effect(() => {
     if (!isDragging) {
       dndItems = tabTargets.map(t => ({ id: t }));
@@ -122,8 +128,7 @@
   function handleConsider(e: CustomEvent<{ items: DndTabItem[] }>) {
     isDragging = true;
     dndItems = e.detail.items;
-    // svelte-dnd-action's preventShrinking() locks min-height/min-width on the
-    // zone via inline styles. Undo it — our shadow element preserves bar height.
+    // Undo preventShrinking() inline styles set by svelte-dnd-action
     if (barEl) {
       barEl.style.minHeight = '';
       barEl.style.minWidth = '';
@@ -133,15 +138,6 @@
   function handleFinalize(e: CustomEvent<{ items: DndTabItem[] }>) {
     isDragging = false;
     dndItems = e.detail.items;
-    logger.debug('TabContainer', 'handleFinalize', {
-      clientWidth: barEl?.clientWidth,
-      scrollWidth: barEl?.scrollWidth,
-      parentWidth: barEl?.parentElement?.clientWidth,
-      inlineMinWidth: barEl?.style.minWidth,
-      inlineMinHeight: barEl?.style.minHeight,
-    });
-
-    // Rebuild full targets array (interleave tab + panel pairs)
     const newTargets: string[] = [];
     for (const item of dndItems) {
       if (item.id === SHADOW_PLACEHOLDER_ITEM_ID) continue;
@@ -156,13 +152,10 @@
         .map(it => it.id)
     });
 
-    // Re-measure after reorder in menu mode
     if (tabOverflow === 'menu') {
       measureAndCompute();
     }
   }
-
-  // --- Tab click ---
 
   function handleTabClick(target: string) {
     const config = tabConfigMap[target];
@@ -240,33 +233,34 @@
 
   const hasHidden = $derived(hiddenTargets.size > 0);
 
+  let isMeasuring = false;
+
   /** Full re-measure: show all tabs, measure widths, then recompute hidden set. */
   function measureAndCompute() {
-    if (tabOverflow !== 'menu' || !barEl) {
-      hiddenTargets = new Set();
+    if (tabOverflow !== 'menu' || !barEl || isMeasuring) {
+      if (!isMeasuring && tabOverflow !== 'menu') hiddenTargets = new Set();
       return;
     }
-    // Clear hidden so all tabs are in the DOM for measurement.
-    // overflow:clip on the bar prevents visual flash.
-    hiddenTargets = new Set();
+    isMeasuring = true;
+
+    // Temporarily force hidden tabs visible via inline style (overrides the
+    // CSS class display:none). We DON'T clear hiddenTargets — that would
+    // reactively remove the chevron and cause a visible flash.
+    for (const t of tabTargets) {
+      const el = tabElMap[t];
+      if (el) el.style.display = 'inline-flex';
+    }
 
     tick().then(() => {
       requestAnimationFrame(() => {
-        const cs = window.getComputedStyle(barEl);
-        logger.debug('TabContainer', 'measureAndCompute rAF', {
-          clientWidth: barEl.clientWidth,
-          scrollWidth: barEl.scrollWidth,
-          offsetWidth: barEl.offsetWidth,
-          parentClientWidth: barEl.parentElement?.clientWidth,
-          computedOverflow: cs.overflow,
-          computedMinWidth: cs.minWidth,
-          computedWidth: cs.width,
-          inlineMinWidth: barEl.style.minWidth,
-          childCount: barEl.children.length,
-        });
+        isMeasuring = false;
         cachedWidths = {};
         for (const t of tabTargets) {
-          cachedWidths[t] = tabElMap[t]?.offsetWidth ?? 0;
+          const el = tabElMap[t];
+          if (el) {
+            cachedWidths[t] = el.offsetWidth;
+            el.style.display = ''; // clear inline override → CSS class takes effect
+          }
         }
         recomputeHidden();
       });
@@ -277,13 +271,18 @@
   function recomputeHidden() {
     if (!barEl || Object.keys(cachedWidths).length === 0) return;
 
+    // Spot-check: if first tab's actual width differs from cached, widths are stale
+    // (happens when tab snippets render AFTER initial measurement)
+    const probe = tabTargets[0];
+    if (probe && tabElMap[probe]) {
+      const actual = tabElMap[probe].offsetWidth;
+      if (Math.abs(actual - (cachedWidths[probe] ?? 0)) > 2) {
+        measureAndCompute();
+        return;
+      }
+    }
+
     const barWidth = barEl.clientWidth;
-    logger.debug('TabContainer', 'recomputeHidden', {
-      barWidth,
-      scrollWidth: barEl.scrollWidth,
-      parentWidth: barEl.parentElement?.clientWidth,
-      totalTabWidth: tabTargets.reduce((s, t) => s + (cachedWidths[t] ?? 0), 0),
-    });
     const totalWidth = tabTargets.reduce((sum, t) => sum + (cachedWidths[t] ?? 0), 0);
 
     // Everything fits — no chevron needed
@@ -346,23 +345,11 @@
   });
 
   // ResizeObserver on bar — catches parent sizing, window resize, and layout shifts.
-  // The initial tick+rAF measurement can miss the final size when the uihtml panel
-  // hasn't finished sizing yet. The observer re-measures when the bar's width changes.
   $effect(() => {
     if (tabOverflow !== 'menu' || !barEl) return;
     let lastWidth = 0;
-    const ro = new ResizeObserver((entries) => {
+    const ro = new ResizeObserver(() => {
       const w = barEl.clientWidth;
-      const entry = entries[0];
-      logger.debug('TabContainer', 'ResizeObserver fired', {
-        clientWidth: w,
-        scrollWidth: barEl.scrollWidth,
-        parentWidth: barEl.parentElement?.clientWidth,
-        borderBoxWidth: entry?.borderBoxSize?.[0]?.inlineSize,
-        contentBoxWidth: entry?.contentBoxSize?.[0]?.inlineSize,
-        lastWidth,
-        changed: w !== lastWidth,
-      });
       if (w !== lastWidth && w > 0) {
         lastWidth = w;
         if (Object.keys(cachedWidths).length > 0) {
@@ -375,6 +362,66 @@
     ro.observe(barEl);
     return () => ro.disconnect();
   });
+
+  // MutationObserver — tab snippets render AFTER the initial measurement (their
+  // content arrives via Tab.svelte's $effect → updateTab → snippet render).
+  // When content appears, tab widths change but the bar's own size doesn't,
+  // so ResizeObserver won't fire. Spot-check and re-measure if stale.
+  $effect(() => {
+    if (tabOverflow !== 'menu' || !barEl) return;
+    let pending = false;
+    const mo = new MutationObserver(() => {
+      if (pending || isMeasuring) return;
+      const probe = tabTargets[0];
+      if (!probe || !tabElMap[probe] || cachedWidths[probe] === undefined) return;
+      const actual = tabElMap[probe].offsetWidth;
+      if (Math.abs(actual - cachedWidths[probe]) > 2) {
+        pending = true;
+        requestAnimationFrame(() => {
+          pending = false;
+          measureAndCompute();
+        });
+      }
+    });
+    mo.observe(barEl, { childList: true, subtree: true, characterData: true });
+    return () => mo.disconnect();
+  });
+
+  // --- Tab editing (double-click to rename) ---
+
+  let editingTarget = $state<string | null>(null);
+  let editValue = $state('');
+
+  function startEditing(target: string) {
+    const config = tabConfigMap[target];
+    if (!config?.editable || disabled || config.disabled) return;
+    editingTarget = target;
+    editValue = config.label;
+  }
+
+  function commitEdit() {
+    if (!editingTarget) return;
+    const target = editingTarget;
+    editingTarget = null;
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== tabConfigMap[target]?.label) {
+      context.renameTab(target, trimmed);
+    }
+  }
+
+  function cancelEdit() {
+    editingTarget = null;
+  }
+
+  function handleEditKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  }
 
   // --- Menu popup open/close ---
 
@@ -404,14 +451,6 @@
     }
   }
 
-  function handleMenuTabClick(target: string) {
-    const config = tabConfigMap[target];
-    if (disabled || config?.disabled) return;
-    selectedTab = target;
-    valueChanged?.({ value: target });
-    closeMenu();
-  }
-
   // Ordered list of hidden targets for the menu dropdown (preserves tab order)
   const hiddenTargetsList = $derived(
     tabTargets.filter(t => hiddenTargets.has(t))
@@ -438,8 +477,9 @@
         items: dndItems,
         flipDurationMs: FLIP_MS,
         type: 'ic-tab-reorder',
-        dragDisabled: disabled,
+        dragDisabled: disabled || !dragEnabled,
         dropTargetStyle: {},
+        morphDisabled: true,
         zoneTabIndex: -1,
         centreDraggedOnCursor: true,
       }}
@@ -453,6 +493,7 @@
         {@const active = target === selectedTab}
         {@const isHidden = tabOverflow === 'menu' && hiddenTargets.has(target)}
         {@const tabSnippet = snippets[target]?.[0]}
+        {@const isEditing = editingTarget === target}
         <div
           bind:this={tabElMap[target]}
           class="ic-tc__tab"
@@ -460,11 +501,13 @@
           class:ic-tc__tab--disabled={config?.disabled}
           class:ic-tc__tab--menu-hidden={isHidden}
           class:ic-tc__tab--shadow={isShadow}
+          class:ic-tc__tab--editing={isEditing}
           role="tab"
           aria-selected={active}
           aria-disabled={config?.disabled}
           tabindex={active ? 0 : -1}
           onclick={() => handleTabClick(target)}
+          ondblclick={() => startEditing(target)}
           onkeydown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -474,7 +517,19 @@
           animate:flip={{ duration: FLIP_MS }}
         >
           <span class="ic-tc__indicator" class:ic-tc__indicator--active={active}></span>
-          {#if tabSnippet}
+          {#if isEditing}
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class="ic-tc__edit-input"
+              type="text"
+              bind:value={editValue}
+              onblur={commitEdit}
+              onkeydown={handleEditKeyDown}
+              onclick={(e) => e.stopPropagation()}
+              onmousedown={(e) => e.stopPropagation()}
+              autofocus
+            />
+          {:else if tabSnippet}
             {@render tabSnippet()}
           {/if}
         </div>
@@ -512,11 +567,11 @@
             class:ic-tc__menu-item--disabled={config?.disabled}
             role="menuitem"
             tabindex={-1}
-            onclick={() => handleMenuTabClick(target)}
+            onclick={() => handleTabClick(target)}
             onkeydown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleMenuTabClick(target);
+                handleTabClick(target);
               }
             }}
           >
@@ -618,13 +673,12 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: none;
+    border: 1px solid transparent;
     border-radius: 0;
     background: transparent;
     color: var(--ic-muted-foreground);
-    cursor: grab;
+    cursor: pointer;
     white-space: nowrap;
-    user-select: none;
     flex-shrink: 0;
     transition: background-color 0.12s ease, color 0.12s ease;
     font-family: inherit;
@@ -645,7 +699,6 @@
   .ic-tc__tab--active {
     background-color: var(--ic-background);
     color: var(--ic-foreground);
-    cursor: grab;
   }
 
   /* Focus */
@@ -669,7 +722,28 @@
   .ic-tc__tab--shadow {
     opacity: 0.4;
     border-style: dashed;
+    border-color: var(--ic-border);
     background: var(--ic-secondary);
+  }
+
+  /* Editing state — prevent drag while renaming */
+  .ic-tc__tab--editing {
+    cursor: text;
+  }
+
+  /* Inline rename input */
+  .ic-tc__edit-input {
+    all: unset;
+    font: inherit;
+    color: var(--ic-foreground);
+    background: var(--ic-background);
+    border: 1px solid var(--ic-primary);
+    border-radius: 1px;
+    padding: 0 2px;
+    min-width: 40px;
+    max-width: 160px;
+    box-sizing: border-box;
+    line-height: 1.2;
   }
 
   /* ── Left indicator ── */

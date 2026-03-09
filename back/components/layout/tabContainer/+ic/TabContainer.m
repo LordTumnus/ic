@@ -13,6 +13,9 @@ classdef TabContainer < ic.core.ComponentContainer
         % > DISABLED disable all tab interactions when true
         Disabled (1,1) logical = false
 
+        % > DRAGENABLED enable drag-and-drop tab reordering
+        DragEnabled (1,1) logical = true
+
         % > SIZE tab header size: 'sm', 'md', or 'lg'
         Size (1,1) string {mustBeMember(Size, ...
             ["sm", "md", "lg"])} = "md"
@@ -52,6 +55,9 @@ classdef TabContainer < ic.core.ComponentContainer
 
         % > TABREORDERED fires when tabs are reordered via drag-and-drop
         TabReordered
+
+        % > TABRENAMED fires when a tab label is edited via double-click
+        TabRenamed
     end
 
     methods
