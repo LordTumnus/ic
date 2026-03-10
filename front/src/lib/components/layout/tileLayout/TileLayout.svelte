@@ -302,7 +302,7 @@
         e.clientY <= rect.bottom
       ) {
         foundGroupId = gId;
-        foundZone = computeDropZone(e.clientX, e.clientY, rect);
+        foundZone = computeDropZone(e.clientX, e.clientY, rect, BAR_HEIGHTS[size] ?? 21);
         break;
       }
     }
@@ -311,10 +311,17 @@
     dragState.targetZone = foundZone;
   }
 
-  function computeDropZone(x: number, y: number, rect: DOMRect): DropZone {
+  function computeDropZone(x: number, y: number, rect: DOMRect, barHeight: number): DropZone {
     if (rect.width <= 0 || rect.height <= 0) return 'center';
+
+    // Zones are relative to the CONTENT area (below the tab bar).
+    // Mouse in the tab bar strip → always 'center' (reorder territory).
+    const contentTop = rect.top + barHeight;
+    const contentHeight = rect.height - barHeight;
+    if (y < contentTop || contentHeight <= 0) return 'center';
+
     const relX = (x - rect.left) / rect.width;
-    const relY = (y - rect.top) / rect.height;
+    const relY = (y - contentTop) / contentHeight;
 
     // Edge zones: 20% on each edge; center is the remaining 60%
     const EDGE = 0.20;
@@ -451,12 +458,10 @@
       tabMoved?.({ value: { tab: tabTarget, fromGroup: sourceGroupId, toGroup: targetGroupId } });
       fireLayoutChanged();
     } else {
-      // Within-group reorder — but verify the dragged tab wasn't lost.
-      // When dropped on a gutter or outside any group, dndzone returns
-      // items WITHOUT the dragged tab. Ignore dndzone's items in that case.
+      // Within-group reorder or tab dropped on gutter/outside.
+      // If dndzone's items don't include the dragged tab, it was dropped
+      // outside any tab bar — no-op, the tree already has correct state.
       if (tabTarget && !finalTabs.includes(tabTarget)) {
-        // Tab was dragged out but not dropped on a valid target — no-op,
-        // the tree already has the correct state.
         return;
       }
       tree = mapLeafTabs(tree, groupId, finalTabs);
