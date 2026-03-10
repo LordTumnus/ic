@@ -99,6 +99,26 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.internal.WorkerTest': modules['../components/internal/workerTest/WorkerTest.svelte'],
   'ic.internal.DragDropTest': modules['../components/internal/dragDropTest/DragDropTest.svelte'],
 
+  // Tweakpane components
+  'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],
+  'ic.tp.Slider': modules['../components/tweakpane/blades/TpSlider.svelte'],
+  'ic.tp.Checkbox': modules['../components/tweakpane/blades/TpCheckbox.svelte'],
+  'ic.tp.Text': modules['../components/tweakpane/blades/TpText.svelte'],
+  'ic.tp.Color': modules['../components/tweakpane/blades/TpColor.svelte'],
+  'ic.tp.Point': modules['../components/tweakpane/blades/TpPoint.svelte'],
+  'ic.tp.List': modules['../components/tweakpane/blades/TpList.svelte'],
+  'ic.tp.Button': modules['../components/tweakpane/blades/TpButton.svelte'],
+  'ic.tp.Separator': modules['../components/tweakpane/blades/TpSeparator.svelte'],
+  'ic.tp.Monitor': modules['../components/tweakpane/blades/TpMonitor.svelte'],
+  'ic.tp.Folder': modules['../components/tweakpane/blades/TpFolder.svelte'],
+  'ic.tp.TabGroup': modules['../components/tweakpane/blades/TpTabGroup.svelte'],
+  'ic.tp.TabPage': modules['../components/tweakpane/blades/TpTabPage.svelte'],
+  'ic.tp.IntervalSlider': modules['../components/tweakpane/blades/TpIntervalSlider.svelte'],
+  'ic.tp.FpsGraph': modules['../components/tweakpane/blades/TpFpsGraph.svelte'],
+  'ic.tp.RadioGrid': modules['../components/tweakpane/blades/TpRadioGrid.svelte'],
+  'ic.tp.ButtonGrid': modules['../components/tweakpane/blades/TpButtonGrid.svelte'],
+  'ic.tp.CubicBezier': modules['../components/tweakpane/blades/TpCubicBezier.svelte'],
+
 };
 
 export default componentMap;
