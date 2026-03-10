@@ -22,12 +22,12 @@ classdef Tab < ic.core.Component
         Editable (1,1) logical = false
     end
 
-    properties (SetAccess = ?ic.TabContainer)
+    properties (SetAccess = {?ic.TabContainer, ?ic.TileLayout})
         % > PANEL reference to the paired TabPanel (set by addTab)
         Panel
     end
 
-    methods (Access = ?ic.TabContainer)
+    methods (Access = {?ic.TabContainer, ?ic.TileLayout})
         function this = Tab(props)
             arguments
                 props.?ic.tab.Tab

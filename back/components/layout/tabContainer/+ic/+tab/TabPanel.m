@@ -3,7 +3,7 @@ classdef TabPanel < ic.core.ComponentContainer
     %
     % Users add children to the panel returned by addTab().
 
-    methods (Access = ?ic.TabContainer)
+    methods (Access = {?ic.TabContainer, ?ic.TileLayout})
         function this = TabPanel(props)
             arguments
                 props.?ic.tab.TabPanel
