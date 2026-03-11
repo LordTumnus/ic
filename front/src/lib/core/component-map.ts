@@ -118,7 +118,11 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.tp.RadioGrid': modules['../components/tweakpane/blades/TpRadioGrid.svelte'],
   'ic.tp.ButtonGrid': modules['../components/tweakpane/blades/TpButtonGrid.svelte'],
   'ic.tp.CubicBezier': modules['../components/tweakpane/blades/TpCubicBezier.svelte'],
-
+  'ic.tp.Ring': modules['../components/tweakpane/blades/TpRing.svelte'],
+  'ic.tp.Wheel': modules['../components/tweakpane/blades/TpWheel.svelte'],
+  'ic.tp.Rotation': modules['../components/tweakpane/blades/TpRotation.svelte'],
+  'ic.tp.Textarea': modules['../components/tweakpane/blades/TpTextarea.svelte'],
+  'ic.tp.Image': modules['../components/tweakpane/blades/TpImage.svelte'],
 };
 
 export default componentMap;

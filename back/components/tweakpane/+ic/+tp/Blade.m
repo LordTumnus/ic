@@ -3,7 +3,7 @@ classdef (Abstract) Blade < ic.core.Component
     %
     % Subclasses: Slider, Checkbox, Text, Color, Point, List, Button,
     % Separator, Monitor, IntervalSlider, FpsGraph, RadioGrid, ButtonGrid,
-    % CubicBezier.
+    % CubicBezier, Ring, Wheel, Rotation, Textarea, Image.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > LABEL display label for this blade

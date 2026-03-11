@@ -11,6 +11,9 @@
 <script lang="ts">
   import { Pane, type FolderApi, type TabPageApi } from 'tweakpane';
   import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
+  import * as CamerakitPlugin from '@tweakpane/plugin-camerakit';
+  import * as RotationPlugin from '@0b5vr/tweakpane-plugin-rotation';
+  import * as TextareaPlugin from '@pangenerator/tweakpane-textarea-plugin';
   import { setContext } from 'svelte';
   import type { ChildEntries } from '$lib/types';
   import { applyIcTheme } from './tp-theme';
@@ -50,6 +53,9 @@
       expanded,
     });
     pane.registerPlugin(EssentialsPlugin);
+    pane.registerPlugin(CamerakitPlugin);
+    pane.registerPlugin(RotationPlugin);
+    pane.registerPlugin(TextareaPlugin);
     applyIcTheme(containerEl);
 
     ctx.container = pane;

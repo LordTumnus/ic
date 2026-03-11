@@ -31,6 +31,7 @@
     "vite": "npm:rolldown-vite@7.2.5"
   },
   "dependencies": {
+    "@0b5vr/tweakpane-plugin-rotation": "^0.2.0",
     "@aarkue/tiptap-math-extension": "^1.4.0",
     "@codemirror/autocomplete": "^6.20.1",
     "@codemirror/commands": "^6.10.2",
@@ -50,6 +51,7 @@
     "@myriaddreamin/typst-ts-renderer": "^0.7.0-rc2",
     "@myriaddreamin/typst-ts-web-compiler": "^0.7.0-rc2",
     "@myriaddreamin/typst.ts": "^0.7.0-rc2",
+    "@pangenerator/tweakpane-textarea-plugin": "^2.0.0",
     "@tiptap/core": "^3.20.1",
     "@tiptap/extension-bubble-menu": "^3.20.1",
     "@tiptap/extension-character-count": "^3.20.1",
@@ -77,6 +79,7 @@
     "@tiptap/pm": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
     "@tiptap/suggestion": "^3.20.1",
+    "@tweakpane/plugin-camerakit": "^0.3.0",
     "@tweakpane/plugin-essentials": "^0.2.1",
     "codemirror-lang-latex": "^0.2.0",
     "codemirror-lang-typst": "^0.4.0",

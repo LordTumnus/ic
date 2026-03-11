@@ -10,7 +10,8 @@ classdef TweakPane < ic.core.ComponentContainer
     %
     % Supports all ic.tp.* blade types: Slider, Checkbox, Text, Color,
     % Point, List, Button, Separator, Monitor, Folder, TabGroup,
-    % IntervalSlider, FpsGraph, RadioGrid, ButtonGrid, CubicBezier.
+    % IntervalSlider, FpsGraph, RadioGrid, ButtonGrid, CubicBezier,
+    % Ring, Wheel, Rotation, Textarea, Image.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > TITLE optional title displayed at the top of the pane
@@ -211,6 +212,61 @@ classdef TweakPane < ic.core.ComponentContainer
             end
             args = namedargs2cell(props);
             blade = ic.tp.CubicBezier(args{:});
+            this.insertBlade(blade);
+        end
+
+        function blade = addRing(this, props)
+            % > ADDRING add a radial dial blade (plugin-camerakit)
+            arguments
+                this
+                props.?ic.tp.Ring
+            end
+            args = namedargs2cell(props);
+            blade = ic.tp.Ring(args{:});
+            this.insertBlade(blade);
+        end
+
+        function blade = addWheel(this, props)
+            % > ADDWHEEL add a jog wheel blade (plugin-camerakit)
+            arguments
+                this
+                props.?ic.tp.Wheel
+            end
+            args = namedargs2cell(props);
+            blade = ic.tp.Wheel(args{:});
+            this.insertBlade(blade);
+        end
+
+        function blade = addRotation(this, props)
+            % > ADDROTATION add a 3D rotation input blade (plugin-rotation)
+            arguments
+                this
+                props.?ic.tp.Rotation
+            end
+            args = namedargs2cell(props);
+            blade = ic.tp.Rotation(args{:});
+            this.insertBlade(blade);
+        end
+
+        function blade = addTextarea(this, props)
+            % > ADDTEXTAREA add a multi-line text input blade (plugin-textarea)
+            arguments
+                this
+                props.?ic.tp.Textarea
+            end
+            args = namedargs2cell(props);
+            blade = ic.tp.Textarea(args{:});
+            this.insertBlade(blade);
+        end
+
+        function blade = addImage(this, props)
+            % > ADDIMAGE add a read-only image display blade
+            arguments
+                this
+                props.?ic.tp.Image
+            end
+            args = namedargs2cell(props);
+            blade = ic.tp.Image(args{:});
             this.insertBlade(blade);
         end
     end
