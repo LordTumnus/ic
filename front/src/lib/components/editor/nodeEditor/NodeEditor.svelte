@@ -10,6 +10,8 @@
   import { untrack } from 'svelte';
   import {
     SvelteFlow,
+    Background,
+    BackgroundVariant,
     type Node as FlowNode,
     type Edge as FlowEdge,
   } from '@xyflow/svelte';
@@ -53,6 +55,8 @@
         inputs: asArray<PortDef>(p.inputs),
         outputs: asArray<PortDef>(p.outputs),
         disabled: (p.disabled as boolean) ?? false,
+        color: (p.color as string) ?? '',
+        icon: p.icon ?? null,
       };
     }),
   );
@@ -69,6 +73,8 @@
         inputs: nd.inputs,
         outputs: nd.outputs,
         disabled: nd.disabled,
+        color: nd.color,
+        icon: nd.icon,
       };
       return prev
         ? { ...prev, position, data: nodeData }
@@ -117,12 +123,25 @@
     {nodeTypes}
     fitView
     onnodedragstop={handleNodeDragStop}
-  />
+  >
+    <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />
+  </SvelteFlow>
 </div>
 
 <style>
   .ic-ne {
     width: 100%;
     overflow: clip;
+
+    /* Override Svelte Flow theme to match Industrial Flat */
+    --xy-background-color-default: var(--ic-background);
+    --xy-background-pattern-color-default: var(--ic-border);
+    --xy-edge-stroke-default: var(--ic-muted-foreground);
+    --xy-edge-stroke-selected-default: var(--ic-primary);
+    --xy-node-border-default: none;
+    --xy-node-boxshadow-hover-default: none;
+    --xy-node-boxshadow-selected-default: none;
+    --xy-handle-background-color-default: transparent;
+    --xy-handle-border-color-default: transparent;
   }
 </style>
