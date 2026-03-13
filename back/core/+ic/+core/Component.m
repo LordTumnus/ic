@@ -7,11 +7,14 @@ classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames & ...
                      ic.mixin.Stylable & ...
                      ic.mixin.Effectable
 
-    properties (Access = {?ic.core.Container, ?ic.mixin.Registrable}, Hidden)
+    properties (SetAccess = {?ic.core.Container, ?ic.mixin.Registrable})
         % > PARENT: backing property for Parent
         Parent = [] % ic.core.Container
         % > TARGET: backing property for Target
         Target string = string.empty()
+    end
+
+    properties (SetAccess = {?ic.core.Container, ?ic.mixin.Registrable}, Hidden)
         % > ISSTATIC: true if pre-rendered in Svelte
         IsStatic logical = false
     end

@@ -81,6 +81,7 @@
     "@tiptap/suggestion": "^3.20.1",
     "@tweakpane/plugin-camerakit": "^0.3.0",
     "@tweakpane/plugin-essentials": "^0.2.1",
+    "@xyflow/svelte": "^1.5.1",
     "codemirror-lang-latex": "^0.2.0",
     "codemirror-lang-typst": "^0.4.0",
     "d3-selection": "^3.0.0",
