@@ -76,16 +76,16 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Latex': modules['../components/renderer/latex/Latex.svelte'],
 
   // Table components
-  'ic.Table': modules['../components/display/table/Table.svelte'],
-  'ic.VirtualTable': modules['../components/display/virtualTable/VirtualTable.svelte'],
+  'ic.Table': modules['../components/table/table/Table.svelte'],
+  'ic.VirtualTable': modules['../components/table/virtualTable/VirtualTable.svelte'],
 
   // Tree components
-  'ic.Tree': modules['../components/display/tree/Tree.svelte'],
-  'ic.VirtualTree': modules['../components/display/virtualTree/VirtualTree.svelte'],
-  'ic.FilterTree': modules['../components/display/filterTree/FilterTree.svelte'],
-  'ic.VirtualFilterTree': modules['../components/display/virtualFilterTree/VirtualFilterTree.svelte'],
-  'ic.TreeTable': modules['../components/display/treeTable/TreeTable.svelte'],
-  'ic.VirtualTreeTable': modules['../components/display/virtualTreeTable/VirtualTreeTable.svelte'],
+  'ic.Tree': modules['../components/tree/tree/Tree.svelte'],
+  'ic.VirtualTree': modules['../components/tree/virtualTree/VirtualTree.svelte'],
+  'ic.FilterTree': modules['../components/tree/filterTree/FilterTree.svelte'],
+  'ic.VirtualFilterTree': modules['../components/tree/virtualFilterTree/VirtualFilterTree.svelte'],
+  'ic.TreeTable': modules['../components/tree/treeTable/TreeTable.svelte'],
+  'ic.VirtualTreeTable': modules['../components/tree/virtualTreeTable/VirtualTreeTable.svelte'],
 
   // Overlay components
   'ic.Toast': modules['../components/overlay/toast/Toast.svelte'],

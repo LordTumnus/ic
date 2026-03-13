@@ -83,15 +83,23 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
          end
       end
 
-      function onReceive(this, data)
-         if isempty(data)
+      function onReceive(this, raw)
+         if isempty(raw)
             return;
+         end
+
+         if isstring(raw) || ischar(raw)
+            data = jsondecode(raw);
+         else
+            data = raw;
          end
 
          if iscell(data)
             events = data;
-         else
+         elseif isstruct(data)
             events = num2cell(data);
+         else
+            return;
          end
 
          for ii = 1:numel(events)

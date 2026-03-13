@@ -46,7 +46,7 @@ class Bridge {
     if (!this.matlabElement) {
       throw new Error('Bridge.send() called before setup().');
     }
-    this.matlabElement.sendEventToMATLAB('ic', events);
+    this.matlabElement.sendEventToMATLAB('ic', JSON.stringify(events));
   }
 
   get isReady(): boolean {
