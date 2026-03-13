@@ -1,34 +1,27 @@
 /**
- * Bridge - Handles bidirectional communication with MATLAB.
+ * Bridge — Bidirectional MATLAB ↔ JS communication via dedicated event channels.
  *
- * Class singleton pattern. Access via `Bridge.instance`.
+ * MATLAB → JS:  sendEventToHTMLSource(h, "ic", event)  →  addEventListener("ic")
+ * JS → MATLAB:  sendEventToMATLAB("ic", events)        →  HTMLEventReceivedFcn
+ *
+ * Singleton. Access via `Bridge.instance`.
  */
 
 import type { JsEvent, MatlabHTML } from '../types';
 import logger from './logger';
 
-/** Callback type for dispatching events (typically to Registry). */
 type Dispatcher = (event: JsEvent) => Promise<void>;
 
-/**
- * Bridge class - singleton that manages MATLAB ↔ JS communication.
- *
- * The Bridge is a thin communication layer:
- * - Receives events from MATLAB via DataChanged listener
- * - Sends events to MATLAB by setting the Data property
- * - Delegates event routing to a dispatcher (set by main.ts to call Registry)
- */
 class Bridge {
   private static _instance: Bridge | null = null;
 
   private matlabElement: MatlabHTML | null = null;
   private dispatcher: Dispatcher | null = null;
+  private queue: JsEvent[] = [];
+  private processing = false;
 
-  private constructor() {
-    // Private constructor enforces singleton
-  }
+  private constructor() {}
 
-  /** Get the singleton instance. */
   static get instance(): Bridge {
     if (!Bridge._instance) {
       Bridge._instance = new Bridge();
@@ -36,90 +29,75 @@ class Bridge {
     return Bridge._instance;
   }
 
-  /**
-   * Initialize the Bridge with the MATLAB HTML element.
-   *
-   * @param element - The HTML element MATLAB uses for communication
-   * @throws Error if setup is called more than once
-   */
   setup(element: MatlabHTML): void {
     if (this.matlabElement) {
       throw new Error('Bridge.setup() called more than once.');
     }
-
     this.matlabElement = element;
-    this.matlabElement.addEventListener('DataChanged', this.handleDataChanged);
+    this.matlabElement.addEventListener('ic', this.onEvent);
+    this.matlabElement.sendEventToMATLAB('ic-ready');
   }
 
-  /**
-   * Set the dispatcher function that routes events to components.
-   *
-   * @param dispatcher - Function to call for each incoming event
-   */
   setDispatcher(dispatcher: Dispatcher): void {
     this.dispatcher = dispatcher;
   }
 
-  /**
-   * Send events to MATLAB.
-   *
-   * @param events - The events to send to MATLAB
-   * @throws Error if Bridge has not been set up
-   */
   send(events: JsEvent[]): void {
     if (!this.matlabElement) {
       throw new Error('Bridge.send() called before setup().');
     }
-
-    this.matlabElement.Data = events;
+    this.matlabElement.sendEventToMATLAB('ic', events);
   }
 
-  /**
-   * Check if the Bridge has been set up.
-   */
   get isReady(): boolean {
     return this.matlabElement !== null;
   }
 
-  /**
-   * Reset the Bridge state. Used for testing.
-   *
-   * @internal
-   */
+  /** @internal */
   _reset(): void {
     if (this.matlabElement) {
-      this.matlabElement.removeEventListener('DataChanged', this.handleDataChanged);
+      this.matlabElement.removeEventListener('ic', this.onEvent);
     }
     this.matlabElement = null;
     this.dispatcher = null;
+    this.queue = [];
+    this.processing = false;
   }
 
   /**
-   * Handle MATLAB's DataChanged events.
-   *
-   * Events are processed sequentially with await to ensure proper ordering.
-   * This prevents race conditions where a component receives events before
-   * it finishes being created (e.g., @insert followed by @prop).
-   *
-   * Arrow function to preserve `this` binding when used as event listener.
+   * Receives individual events from MATLAB and queues them.
+   * Kicks off sequential processing if not already running.
    */
-  private handleDataChanged = async (): Promise<void> => {
-    if (!this.matlabElement || !this.dispatcher) return;
+  private onEvent = (event: Event): void => {
+    const raw = (event as any).Data;
+    if (raw == null) return;
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    this.queue.push(data);
+    if (!this.processing) this.processQueue();
+  };
 
-    const data = this.matlabElement.Data;
-    if (!Array.isArray(data)) return;
+  /**
+   * Drains the queue sequentially. Awaiting each dispatch guarantees
+   * that @insert completes (dynamic import) before subsequent @prop
+   * events targeting the newly created component.
+   */
+  private processQueue = async (): Promise<void> => {
+    if (!this.dispatcher) return;
 
-    for (const event of data) {
+    this.processing = true;
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()!;
       try {
-        await this.dispatcher(event);
+        await this.dispatcher(item);
       } catch (error) {
-        logger.error('Bridge', 'Error dispatching event', {
+        logger.error('Bridge', 'dispatch failed', {
           error: error instanceof Error ? error.message : String(error),
-          eventName: event.name,
-          componentId: event.component
+          eventName: item.name,
+          componentId: item.component,
         });
       }
     }
+    this.processing = false;
   };
 }
 

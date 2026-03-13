@@ -1,24 +1,17 @@
-% > JSEVENT is a JavaScript event that can be used to communicate with the view
-
-% > EVENT object containing the information transferred between the model and the view
 classdef JsEvent < handle & matlab.mixin.Heterogeneous
+
     properties (Access = public)
-        % > COMPONENT the component throwing the event
         ComponentID string
-        % > NAME name of the event
         Name string
-        % > DATA any information transferred in the event
         Data % any
     end
 
     properties (SetAccess = private)
-        % > ID the identifier of the event
         Id string
     end
 
     methods
         function this = JsEvent(componentId, name, data)
-            % > JSEVENT constructs a JavaScript event
             arguments
                 componentId (1,1) string
                 name (1,1) string
@@ -31,13 +24,11 @@ classdef JsEvent < handle & matlab.mixin.Heterogeneous
         end
 
         function json = jsonencode(this, varargin)
-            % > JSONENCODE converts the event into a JSON text object that can be shared with the view
-            data = this.Data;
-            obj = struct(...
+            obj = struct( ...
                 "component", this.ComponentID, ...
                 "name", this.Name, ...
                 "id", this.Id);
-            obj.data = data;
+            obj.data = this.Data;
             json = jsonencode(obj, varargin{:});
         end
     end

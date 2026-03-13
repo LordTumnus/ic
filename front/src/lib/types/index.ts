@@ -5,9 +5,9 @@
 import type { Snippet } from 'svelte';
 
 
-/** HTML connector from MATLAB. */
+/** HTML connector from MATLAB (uihtml htmlComponent object). */
 export interface MatlabHTML extends EventTarget {
-  Data: JsEvent[]
+  sendEventToMATLAB(eventName: string, eventData?: unknown): void;
 }
 
 /** Event received from / sent to MATLAB. */
