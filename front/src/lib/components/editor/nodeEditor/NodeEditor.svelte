@@ -14,10 +14,11 @@
     BackgroundVariant,
     type Node as FlowNode,
     type Edge as FlowEdge,
+    type Connection,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/base.css';
 
-  import type { ChildEntries } from '$lib/types';
+  import type { ChildEntries, RequestFn } from '$lib/types';
   import type { PortDef } from '$lib/utils/node-editor-types';
   import EditorNode from './EditorNode.svelte';
 
@@ -25,10 +26,15 @@
     height = $bindable('100%'),
     gridSize = $bindable(20),
     childEntries = {} as ChildEntries,
+    request,
+    // Events
+    nodeMoved,
   }: {
     height?: string;
     gridSize?: number;
     childEntries?: ChildEntries;
+    request?: RequestFn;
+    nodeMoved?: (data?: unknown) => void;
   } = $props();
 
   const nodeTypes = { editorNode: EditorNode } as Record<string, any>;
@@ -103,7 +109,50 @@
     flowEdges = icEdges;
   });
 
-  // -- Position writeback: SF drag → IC child → MATLAB -----------------------
+  // -- Connection: optimistic temp edge + request → MATLAB creates real edge ---
+
+  function handleBeforeConnect(connection: Connection): Connection {
+    // Fire-and-forget: MATLAB creates the real Edge child via @insert.
+    request?.('connect', {
+      source: connection.source,
+      sourcePort: connection.sourceHandle ?? '',
+      target: connection.target,
+      targetPort: connection.targetHandle ?? '',
+    });
+    // Return connection → SF adds temp edge instantly (no flash).
+    // When MATLAB's @insert arrives, $effect replaces flowEdges with icEdges,
+    // swapping the temp edge for the real IC-owned edge.
+    return connection;
+  }
+
+  // -- Deletion: prevent SF deletion, request MATLAB to handle ----------------
+
+  async function handleBeforeDelete({
+    nodes,
+    edges,
+  }: {
+    nodes: FlowNode[];
+    edges: FlowEdge[];
+  }): Promise<false> {
+    const deletedNodeIds = new Set(nodes.map((n) => n.id));
+
+    if (nodes.length > 0) {
+      request?.('deleteNodes', { nodeIds: nodes.map((n) => n.id) });
+    }
+
+    // Only request disconnect for edges NOT connected to deleted nodes
+    // (those will be cascade-deleted by MATLAB's removeNode).
+    const standaloneEdges = edges.filter(
+      (e) => !deletedNodeIds.has(e.source) && !deletedNodeIds.has(e.target),
+    );
+    for (const edge of standaloneEdges) {
+      request?.('disconnect', { edgeId: edge.id });
+    }
+
+    return false;
+  }
+
+  // -- Position writeback + NodeMoved event -----------------------------------
 
   function handleNodeDragStop({ targetNode }: { targetNode: FlowNode | null }) {
     if (!targetNode) return;
@@ -111,7 +160,9 @@
       (c) => c.id === targetNode.id,
     );
     if (child) {
-      child.props.position = [targetNode.position.x, targetNode.position.y];
+      const pos = [targetNode.position.x, targetNode.position.y];
+      child.props.position = pos;
+      nodeMoved?.({ value: { nodeId: targetNode.id, position: pos } });
     }
   }
 </script>
@@ -122,6 +173,9 @@
     bind:edges={flowEdges}
     {nodeTypes}
     fitView
+    deleteKey={['Backspace', 'Delete']}
+    onbeforeconnect={handleBeforeConnect}
+    onbeforedelete={handleBeforeDelete}
     onnodedragstop={handleNodeDragStop}
   >
     <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />

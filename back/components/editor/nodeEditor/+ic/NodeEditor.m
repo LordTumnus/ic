@@ -1,4 +1,4 @@
-classdef NodeEditor < ic.core.ComponentContainer
+classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
     % > NODEEDITOR Canvas for draggable nodes connected by edges.
     %
     %   editor = ic.NodeEditor(Height="500px");
@@ -9,6 +9,22 @@ classdef NodeEditor < ic.core.ComponentContainer
     %   editor.addNode(n1);
     %   editor.addNode(n2);
     %   e = n1.connect(n2);
+
+    events (Description = "Reactive")
+        % > NODEMOVED fires when user finishes dragging a node
+        NodeMoved
+    end
+
+    events
+        % > CONNECTED fires after a connection is created from the UI
+        Connected
+
+        % > DISCONNECTED fires after an edge is removed from the UI
+        Disconnected
+
+        % > NODEDELETED fires after node(s) are deleted from the UI
+        NodeDeleted
+    end
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > HEIGHT container height (CSS value)
@@ -45,6 +61,7 @@ classdef NodeEditor < ic.core.ComponentContainer
             end
             this@ic.core.ComponentContainer(props);
             this.Targets = ["nodes", "edges"];
+            this.setupEventHandlers();
         end
 
         % --- Dependent getters ---
@@ -111,6 +128,65 @@ classdef NodeEditor < ic.core.ComponentContainer
     end
 
     methods (Access = private)
+        function setupEventHandlers(this)
+            % Request handlers: frontend calls request('connect', data) etc.
+            this.onRequest("Connect",     @(comp, data) comp.handleConnect(data));
+            this.onRequest("Disconnect",  @(comp, data) comp.handleDisconnect(data));
+            this.onRequest("DeleteNodes", @(comp, data) comp.handleDeleteNodes(data));
+        end
+
+        function result = handleConnect(this, data)
+            % Frontend drew a connection — create an Edge child.
+            srcNode = this.findNodeById(data.source);
+            tgtNode = this.findNodeById(data.target);
+            edge = srcNode.connect(tgtNode, string(data.sourcePort), string(data.targetPort));
+            notify(this, 'Connected', ic.event.MEvent(struct( ...
+                'Edge', edge, ...
+                'SourceNode', srcNode, 'TargetNode', tgtNode)));
+            result = edge.ID;
+        end
+
+        function result = handleDeleteNodes(this, data)
+            % Frontend deleted node(s) — cascade-remove and destroy.
+            ids = string(data.nodeIds);
+            for ii = 1:numel(ids)
+                node = this.findNodeById(ids(ii));
+                this.removeNode(node);
+                delete(node);
+            end
+            notify(this, 'NodeDeleted', ic.event.MEvent(struct('NodeIds', ids)));
+            result = true;
+        end
+
+        function result = handleDisconnect(this, data)
+            % Frontend deleted a standalone edge.
+            edgeId = string(data.edgeId);
+            edges = this.Edges;
+            for ii = 1:numel(edges)
+                if edges(ii).ID == edgeId
+                    edge = edges(ii);
+                    this.removeChild(edge);
+                    delete(edge);
+                    notify(this, 'Disconnected', ic.event.MEvent(struct('EdgeId', edgeId)));
+                    result = true;
+                    return
+                end
+            end
+            result = false;
+        end
+
+        function node = findNodeById(this, id)
+            nodes = this.Nodes;
+            for ii = 1:numel(nodes)
+                if nodes(ii).ID == string(id)
+                    node = nodes(ii);
+                    return
+                end
+            end
+            error("ic:NodeEditor:NodeNotFound", ...
+                "Node with ID '%s' not found.", id);
+        end
+
         function handleNodeDestroyed(this, node)
             % Called via ObjectBeingDestroyed listener on each Node.
             % Two cases:
