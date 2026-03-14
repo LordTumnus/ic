@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
   import logger from '$lib/core/logger';
 
@@ -79,7 +80,7 @@
   });
 
   // Methods
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       textareaEl?.focus();
       return { success: true, data: null };

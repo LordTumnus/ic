@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
   import logger from '$lib/core/logger';
 
@@ -39,7 +40,7 @@
     new Set(Array.isArray(value) ? value : value ? [value] : [])
   );
 
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       const btn = containerEl?.querySelector('button:not(:disabled)') as HTMLButtonElement | null;
       btn?.focus();

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import '$lib/utils/polyfills';
   import { getDocument } from 'pdfjs-dist';
   import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
@@ -247,7 +248,7 @@
   }
 
   // ─── Method overrides ─────────────────────────────────────────────────
-  $effect(() => {
+  onMount(() => {
     nextPage = () => {
       goToPage(page + 1);
       return { success: true, data: null };

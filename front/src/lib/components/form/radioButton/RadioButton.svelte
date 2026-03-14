@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
   import logger from '$lib/core/logger';
 
@@ -36,7 +37,7 @@
     Array.isArray(items) ? items : items ? [items] : []
   );
 
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       const input = groupEl?.querySelector('input:not(:disabled)') as HTMLInputElement | null;
       input?.focus();

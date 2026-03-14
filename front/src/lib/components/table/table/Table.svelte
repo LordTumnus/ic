@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { PublishFn, Resolution } from '$lib/types';
   import type { TableColumn, TableRow as TRow, FilterState, IndexedRow, CellActionPayload } from '$lib/utils/table-utils';
   import type { PinnedInfo, CellSelection, SelectionState, EditingCell } from '$lib/utils/table-utils';
@@ -419,7 +420,7 @@
   }
 
   // ── Methods ───────────────────────────────────────────
-  $effect(() => {
+  onMount(() => {
   focus = (): Resolution => {
     containerEl?.focus();
     return { success: true, data: null };

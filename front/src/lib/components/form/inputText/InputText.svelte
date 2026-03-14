@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
   import logger from '$lib/core/logger';
 
@@ -61,7 +62,7 @@
   const isNearLimit = $derived(maxLength > 0 && charCount >= maxLength * 0.9);
 
   // Methods
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       inputEl?.focus();
       return { success: true, data: null };

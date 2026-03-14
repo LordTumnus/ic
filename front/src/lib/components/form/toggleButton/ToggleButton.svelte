@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
   import logger from '$lib/core/logger';
 
@@ -22,7 +23,7 @@
 
   let buttonEl: HTMLButtonElement;
 
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       buttonEl?.focus();
       return { success: true, data: null };

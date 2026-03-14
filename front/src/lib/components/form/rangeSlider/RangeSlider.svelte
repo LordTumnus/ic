@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
 
   let {
@@ -186,7 +187,7 @@
     updateThumb(which, newValue);
   }
 
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       thumbLowEl?.focus();
       return { success: true, data: null };

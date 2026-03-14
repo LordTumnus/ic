@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
   import logger from '$lib/core/logger';
   import eyeRaw from 'lucide-static/icons/eye.svg?raw';
@@ -58,7 +59,7 @@
   let focused = $state(false);
 
   // Methods
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       inputEl?.focus();
       return { success: true, data: null };

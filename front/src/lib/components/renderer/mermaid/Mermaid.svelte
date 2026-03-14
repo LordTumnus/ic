@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { renderMermaid } from '$lib/utils/mermaid-renderer';
   import type { RenderOptions } from '$lib/utils/mermaid-renderer';
   import { resolveIcon } from '$lib/utils/icons';
@@ -204,7 +205,7 @@
   }
 
   // ─── Method overrides ─────────────────────────────────────────────────
-  $effect(() => {
+  onMount(() => {
     zoomIn = () => {
       doZoomIn();
       return { success: true, data: null };

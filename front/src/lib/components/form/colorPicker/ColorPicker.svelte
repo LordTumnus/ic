@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { Resolution } from '$lib/types';
   import { parseColor, formatColor, hslToHsv, hsvToHsl } from '$lib/utils/color';
   import SaturationValuePad from './SaturationValuePad.svelte';
@@ -233,7 +233,7 @@
   }
 
   // --- Focus management ---
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       swatchEl?.focus();
       return { success: true, data: null };

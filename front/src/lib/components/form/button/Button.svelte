@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
 
   let {
@@ -30,7 +31,7 @@
   const hasIcon = $derived((childEntries.icon?.length ?? 0) > 0);
   const iconOnly = $derived(hasIcon && !label);
 
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       buttonEl?.focus();
       return { success: true, data: null };

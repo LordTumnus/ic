@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
   import { toSize } from '$lib/utils/css';
   import Tag from '$lib/components/shared/Tag.svelte';
@@ -387,7 +388,7 @@
   }
 
   // --- Methods ---
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       inputEl?.focus();
       return { success: true, data: null };

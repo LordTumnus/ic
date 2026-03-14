@@ -16,7 +16,7 @@
   import { toSize } from '$lib/utils/css';
   import type { Resolution, SubscribeFn, RequestFn } from '$lib/types';
   import logger from '$lib/core/logger';
-  import { tick, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
 
   import { initPdfWorker } from '$lib/utils/pdf-worker-init';
 
@@ -586,7 +586,7 @@
   }
 
   // ─── Method overrides ────────────────────────────────────────────────
-  $effect(() => {
+  onMount(() => {
     zoomIn = () => {
       doZoomIn();
       return { success: true, data: null };

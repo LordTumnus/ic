@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
 
   let {
@@ -235,7 +236,7 @@
   }
 
   // --- Method binding ---
-  $effect(() => {
+  onMount(() => {
     focus = (): Resolution => {
       knobEl?.focus();
       return { success: true, data: null };
