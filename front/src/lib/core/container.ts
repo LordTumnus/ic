@@ -47,6 +47,12 @@ function buildChildProxies(child: Component): Omit<ChildEntry, 'snippet'> {
     });
   }
 
+  // Expose childEntries for container children (e.g. Node → ports accessible from NodeEditor)
+  Object.defineProperty(props, 'childEntries', {
+    get: () => child._childEntries,
+    enumerable: true, configurable: true
+  });
+
   const events: Record<string, any> = {};
   for (const name of child.eventNames) {
     Object.defineProperty(events, name, {

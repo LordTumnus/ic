@@ -2,10 +2,8 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
     % > NODEEDITOR Canvas for draggable nodes connected by edges.
     %
     %   editor = ic.NodeEditor(Height="500px");
-    %   n1 = ic.node.Node(Label="Source", Position=[100 150], ...
-    %       Outputs=ic.node.Port("out", Type="signal"));
-    %   n2 = ic.node.Node(Label="Filter", Position=[400 150], ...
-    %       Inputs=ic.node.Port("in", Type="signal"));
+    %   n1 = ic.node.Transform(Label="Source", Position=[100 150]);
+    %   n2 = ic.node.Transform(Label="Sink", Position=[400 150]);
     %   editor.addNode(n1);
     %   editor.addNode(n2);
     %   e = n1.connect(n2);
@@ -50,6 +48,10 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         % Guard flag: prevents handleNodeDestroyed from duplicating
         % cleanup that removeNode already handles.
         IsRemovingNode (1,1) logical = false
+
+        % Guard flag: prevents handleEdgeDestroyed from duplicating
+        % cleanup that removeChild already handles.
+        IsRemovingEdge (1,1) logical = false
     end
 
     methods
@@ -60,7 +62,7 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = ["nodes", "edges"];
+            this.Targets = ["nodes", "edges", "toolbar"];
             this.setupEventHandlers();
         end
 
@@ -99,29 +101,51 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             this.IsRemovingNode = true;
 
             % Cascade-delete connected edges first
+            % (must delete edges before removing node so port refs are still valid)
             edges = this.Edges;
             for ii = numel(edges):-1:1
-                if edges(ii).SourceNode == node.ID || edges(ii).TargetNode == node.ID
-                    this.removeChild(edges(ii));
+                e = edges(ii);
+                if e.SourceNode == node || e.TargetNode == node
+                    this.removeEdge(e);
                 end
             end
 
-            % Remove the node
+            % Remove the node (framework deregisters nested port children)
             this.removeChild(node);
 
             this.IsRemovingNode = false;
         end
 
+        function removeEdge(this, edge)
+            % > REMOVEEDGE Remove an edge and clean up port references.
+            arguments
+                this (1,1) ic.NodeEditor
+                edge (1,1) ic.node.Edge
+            end
+            this.IsRemovingEdge = true;
+            this.removeChild(edge);
+            delete(edge);  % Edge destructor unregisters from ports
+            this.IsRemovingEdge = false;
+        end
+
         function validateChild(this, child, target)
-            % > VALIDATECHILD only Node and Edge allowed as children
+            % > VALIDATECHILD enforce type constraints per target
             if target == "nodes"
                 assert(isa(child, "ic.node.Node"), ...
                     "ic:NodeEditor:InvalidChild", ...
-                    "Only ic.node.Node can be added to the 'nodes' target.");
+                    "Only ic.node.Node subclasses can be added to 'nodes'.");
             elseif target == "edges"
                 assert(isa(child, "ic.node.Edge"), ...
                     "ic:NodeEditor:InvalidChild", ...
-                    "Only ic.node.Edge can be added to the 'edges' target.");
+                    "Only ic.node.Edge subclasses can be added to 'edges'.");
+
+                % Listen for direct delete(edge) — remove from view
+                addlistener(child, 'ObjectBeingDestroyed', ...
+                    @(src, ~) this.handleEdgeDestroyed(src));
+            elseif target == "toolbar"
+                assert(isa(child, "ic.core.Component"), ...
+                    "ic:NodeEditor:InvalidChild", ...
+                    "Only ic.core.Component can be added to 'toolbar'.");
             end
             validateChild@ic.core.ComponentContainer(this, child, target);
         end
@@ -129,17 +153,21 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
     methods (Access = private)
         function setupEventHandlers(this)
-            % Request handlers: frontend calls request('connect', data) etc.
             this.onRequest("Connect",     @(comp, data) comp.handleConnect(data));
             this.onRequest("Disconnect",  @(comp, data) comp.handleDisconnect(data));
             this.onRequest("DeleteNodes", @(comp, data) comp.handleDeleteNodes(data));
         end
 
         function result = handleConnect(this, data)
-            % Frontend drew a connection — create an Edge child.
+            % Frontend drew a connection — create a StaticEdge.
             srcNode = this.findNodeById(data.source);
             tgtNode = this.findNodeById(data.target);
-            edge = srcNode.connect(tgtNode, string(data.sourcePort), string(data.targetPort));
+
+            edge = ic.node.StaticEdge();
+            edge.setEndpoints(srcNode, string(data.sourcePort), ...
+                              tgtNode, string(data.targetPort));
+            this.addChild(edge, "edges");
+
             notify(this, 'Connected', ic.event.MEvent(struct( ...
                 'Edge', edge, ...
                 'SourceNode', srcNode, 'TargetNode', tgtNode)));
@@ -147,7 +175,6 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function result = handleDeleteNodes(this, data)
-            % Frontend deleted node(s) — cascade-remove and destroy.
             ids = string(data.nodeIds);
             for ii = 1:numel(ids)
                 node = this.findNodeById(ids(ii));
@@ -159,14 +186,12 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function result = handleDisconnect(this, data)
-            % Frontend deleted a standalone edge.
             edgeId = string(data.edgeId);
             edges = this.Edges;
             for ii = 1:numel(edges)
                 if edges(ii).ID == edgeId
                     edge = edges(ii);
-                    this.removeChild(edge);
-                    delete(edge);
+                    this.removeEdge(edge);
                     notify(this, 'Disconnected', ic.event.MEvent(struct('EdgeId', edgeId)));
                     result = true;
                     return
@@ -188,20 +213,28 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function handleNodeDestroyed(this, node)
-            % Called via ObjectBeingDestroyed listener on each Node.
-            % Two cases:
-            %   1. removeNode called → IsRemovingNode=true → skip.
-            %   2. User called delete(node) directly → cascade edges.
             if ~isvalid(this), return; end
             if this.IsRemovingNode, return; end
 
-            % Cascade-delete connected edges
+            % Cascade-delete connected edges (must happen before
+            % the node/ports become invalid)
             edges = this.Edges;
             for ii = numel(edges):-1:1
-                if edges(ii).SourceNode == node.ID || edges(ii).TargetNode == node.ID
-                    this.removeChild(edges(ii));
+                e = edges(ii);
+                if e.SourceNode == node || e.TargetNode == node
+                    this.removeEdge(e);
                 end
             end
+        end
+
+        function handleEdgeDestroyed(this, edge)
+            if ~isvalid(this), return; end
+            if this.IsRemovingEdge, return; end
+
+            % Remove edge from view (triggered by direct delete(edge))
+            this.IsRemovingEdge = true;
+            this.removeChild(edge);
+            this.IsRemovingEdge = false;
         end
     end
 end

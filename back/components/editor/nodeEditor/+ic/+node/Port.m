@@ -1,23 +1,34 @@
-classdef Port
+classdef Port < ic.core.Component
     % > PORT Connection point on a node.
-    %   Immutable value class — defined at node creation, never changes.
+    %   Port is a Component child of a Node (ComponentContainer).
+    %   Ports live in the node's "inputs" or "outputs" target slot.
+    %   Each port tracks its connected edges for graph traversal.
     %
-    %   p = ic.node.Port("in")
-    %   p = ic.node.Port("out", Label="Signal", Color="#3b82f6")
-    %   p = ic.node.Port("data", MaxConnections=1)
+    %   p = ic.node.Port("data")
+    %   p = ic.node.Port("signal", Label="Audio", Color="#3b82f6")
+    %   p = ic.node.Port("in", MaxConnections=1)
+    %
+    %   % Traversal: port → edges → other port
+    %   p.Edges              % all edges connected to this port
+    %   p.Edges(1).TargetPort  % the port on the other end
 
-    properties (SetAccess = immutable)
+    properties (SetObservable, AbortSet, Description = "Reactive")
         % > NAME unique identifier within the node (e.g. "in", "out")
-        Name (1,1) string
+        Name (1,1) string = ""
 
         % > LABEL display text (empty → falls back to Name)
         Label (1,1) string = ""
 
-        % > COLOR dot color (CSS value, e.g. "#3b82f6"; empty → default gray)
+        % > COLOR dot color (CSS value; empty → default)
         Color (1,1) string = ""
 
         % > MAXCONNECTIONS maximum simultaneous connections (Inf = unlimited)
         MaxConnections (1,1) double = Inf
+    end
+
+    properties (SetAccess = {?ic.node.Edge})
+        % > EDGES edges connected to this port (managed by Edge)
+        Edges ic.node.Edge
     end
 
     methods
@@ -25,28 +36,41 @@ classdef Port
             % > PORT Construct a port with a required name.
             arguments
                 name (1,1) string
-                props.Label (1,1) string = ""
-                props.Color (1,1) string = ""
-                props.MaxConnections (1,1) double = Inf
+                props.?ic.node.Port
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
-            this.Name = name;
-            this.Label = props.Label;
-            this.Color = props.Color;
-            this.MaxConnections = props.MaxConnections;
+            props.Name = name;
+            this@ic.core.Component(props);
+            this.Edges = ic.node.Edge.empty(1, 0);
         end
 
-        function json = jsonencode(this, varargin)
-            % > JSONENCODE Encode port array as JSON.
-            if isempty(this)
-                json = "[]";
-                return
+        function addEdge(this, edge)
+            % > ADDEDGE Register an edge on this port (called by Edge.setEndpoints).
+            arguments
+                this (1,1) ic.node.Port
+                edge (1,1) ic.node.Edge
             end
-            arr = arrayfun(@(p) struct( ...
-                'name', p.Name, ...
-                'label', p.Label, ...
-                'color', p.Color, ...
-                'maxConnections', p.MaxConnections), this);
-            json = jsonencode(arr, varargin{:});
+            this.Edges(end+1) = edge;
+        end
+
+        function removeEdge(this, edge)
+            % > REMOVEEDGE Unregister an edge from this port (called by Edge destructor).
+            arguments
+                this (1,1) ic.node.Port
+                edge (1,1) ic.node.Edge
+            end
+            mask = this.Edges ~= edge;
+            this.Edges = this.Edges(mask);
+        end
+
+        function delete(this)
+            % > DELETE Destructor — cascade-delete connected edges.
+            edges = this.Edges;
+            for ii = numel(edges):-1:1
+                if isvalid(edges(ii))
+                    delete(edges(ii));
+                end
+            end
         end
     end
 end

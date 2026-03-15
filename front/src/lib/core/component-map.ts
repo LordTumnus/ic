@@ -35,8 +35,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.CodeEditor': modules['../components/editor/codeEditor/CodeEditor.svelte'],
   'ic.RichEditor': modules['../components/editor/RichEditor/RichEditor.svelte'],
   'ic.NodeEditor': modules['../components/editor/nodeEditor/NodeEditor.svelte'],
-  'ic.node.Node': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
-  'ic.node.Edge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
+  'ic.node.Port': modules['../components/editor/nodeEditor/PortProxy.svelte'],
+  'ic.node.Transform': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
+  'ic.node.StaticEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
 
   // Form components
   'ic.Button': modules['../components/form/button/Button.svelte'],
