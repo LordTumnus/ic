@@ -109,7 +109,22 @@
     ),
   );
 
-  $effect(() => {
+  // Stable key that changes only when port handles appear/disappear/rename.
+  // Used to re-trigger edge reconciliation after handles register in the DOM.
+  const nodeHandleKey = $derived(
+    icNodes
+      .map((n) => {
+        const ins = n.inputs.map((p) => p.name).join(',');
+        const outs = n.outputs.map((p) => p.name).join(',');
+        return `${n.id}:${ins}:${outs}`;
+      })
+      .join('|'),
+  );
+
+  // Use $effect.pre so nodes (and their Handle components) are set BEFORE
+  // the DOM update. Handles register during the DOM update, and the edge
+  // $effect (post-DOM) then finds them already registered.
+  $effect.pre(() => {
     const data = icNodes;
     const existing = new Map(untrack(() => flowNodes).map((n) => [n.id, n]));
 
@@ -195,8 +210,12 @@
   // - MATLAB edges always win (add new, update existing)
   // - SF-only edges (user-created, not yet confirmed) are kept
   // - Edges removed from MATLAB are removed from SF
+  //
+  // Also depends on nodeHandleKey: when port data arrives (handles register),
+  // edges must be re-set so Svelte Flow can resolve the handle positions.
   $effect(() => {
     const matlab = icEdges;
+    const _handles = nodeHandleKey; // re-run when port handles change
     const matlabIds = new Set(matlab.map((e) => e.id));
     const current = untrack(() => flowEdges);
 

@@ -60,11 +60,13 @@
             {#if data.inputs?.[i]}
               {@const port = data.inputs[i]}
               <div class="ic-ne-node__port ic-ne-node__port--input">
-                <Handle
-                  type="target"
-                  position={Position.Left}
-                  id={port.name}
-                />
+                {#key port.name}
+                  <Handle
+                    type="target"
+                    position={Position.Left}
+                    id={port.name}
+                  />
+                {/key}
                 <span
                   class="ic-ne-node__port-dot"
                   style:background-color={getPortColor(port)}
@@ -85,11 +87,13 @@
                   class="ic-ne-node__port-dot"
                   style:background-color={getPortColor(port)}
                 ></span>
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={port.name}
-                />
+                {#key port.name}
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={port.name}
+                  />
+                {/key}
               </div>
             {/if}
           </div>
