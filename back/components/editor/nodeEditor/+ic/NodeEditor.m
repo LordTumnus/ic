@@ -153,17 +153,21 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
     methods (Access = private)
         function setupEventHandlers(this)
-            this.onRequest("Connect",     @(comp, data) comp.handleConnect(data));
-            this.onRequest("Disconnect",  @(comp, data) comp.handleDisconnect(data));
-            this.onRequest("DeleteNodes", @(comp, data) comp.handleDeleteNodes(data));
+            this.onRequest("Connect",      @(comp, data) comp.handleConnect(data));
+            this.onRequest("Disconnect",   @(comp, data) comp.handleDisconnect(data));
+            this.onRequest("DeleteNodes",  @(comp, data) comp.handleDeleteNodes(data));
         end
 
         function result = handleConnect(this, data)
-            % Frontend drew a connection — create a StaticEdge.
+            % Frontend drew a connection — edge type from source port.
             srcNode = this.findNodeById(data.source);
             tgtNode = this.findNodeById(data.target);
+            srcPort = srcNode.findPort(string(data.sourcePort), "outputs");
 
-            edge = ic.node.StaticEdge();
+            typeMap = dictionary("static", "ic.node.StaticEdge", ...
+                                 "flow",   "ic.node.FlowEdge", ...
+                                 "signal", "ic.node.SignalEdge");
+            edge = feval(typeMap(srcPort.Type));
             edge.setEndpoints(srcNode, string(data.sourcePort), ...
                               tgtNode, string(data.targetPort));
             this.addChild(edge, "edges");

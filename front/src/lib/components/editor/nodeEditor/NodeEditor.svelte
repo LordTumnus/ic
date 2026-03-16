@@ -9,8 +9,13 @@
   Edge lifecycle (optimistic):
     1. User drags connection → onbeforeconnect returns edge → SF shows it immediately
     2. onconnect fires → request sent to MATLAB
-    3. MATLAB creates StaticEdge, adds via @insert, responds with real edge ID
+    3. MATLAB creates edge (type from source port's Type), responds with real edge ID
     4. reconcileEdges() swaps the SF temp edge for the MATLAB-sourced real edge
+
+  Edge types:
+    - StaticEdge: simple line with optional arrow markers
+    - FlowEdge: animated particles traveling source → target
+    - SignalEdge: waveform overlay with math expression evaluation
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -28,9 +33,15 @@
 
   import type { ChildEntries, RequestFn } from '$lib/types';
   import { extractPorts } from '$lib/utils/node-editor-types';
+  import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
 
   // Node type components — one per concrete MATLAB class
   import TransformNode from './nodes/TransformNode.svelte';
+
+  // Edge type components — one per concrete MATLAB edge class
+  import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
+  import FlowEdgeRenderer from './edges/FlowEdgeRenderer.svelte';
+  import SignalEdgeRenderer from './edges/SignalEdgeRenderer.svelte';
 
   let {
     height = $bindable('100%'),
@@ -53,6 +64,14 @@
 
   const nodeTypes = {
     'ic.node.Transform': TransformNode,
+  } as Record<string, any>;
+
+  // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
+
+  const edgeTypes = {
+    static: StaticEdgeRenderer,
+    flow: FlowEdgeRenderer,
+    signal: SignalEdgeRenderer,
   } as Record<string, any>;
 
   // -- Svelte Flow state ------------------------------------------------------
@@ -79,6 +98,15 @@
         nodeProps: p,
       };
     }),
+  );
+
+  // Build lookup: "nodeId:portName" → PortDef (for source port behavior on edges)
+  const portBehaviorMap = $derived(
+    new Map(
+      icNodes.flatMap((n) =>
+        n.outputs.map((p) => [`${n.id}:${p.name}`, p] as const),
+      ),
+    ),
   );
 
   $effect(() => {
@@ -115,20 +143,50 @@
     });
   });
 
-  // -- Edges: MATLAB-sourced edges --------------------------------------------
+  // -- Edges: MATLAB-sourced edges with type mapping and data injection --------
+
+  // Props to exclude from the edge data pass-through (handled separately)
+  const EDGE_META_KEYS = new Set([
+    'sourceNodeId',
+    'targetNodeId',
+    'sourcePortName',
+    'targetPortName',
+    'label',
+  ]);
 
   const icEdges = $derived(
     (childEntries['edges'] ?? []).map((c) => {
       const p = c.props;
+      const sourceId = p.sourceNodeId as string;
+      const sourcePortName = (p.sourcePortName as string) || '';
+
+      // Build edge data: display props + editor geometry + source port behavior
+      const data: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p)) {
+        if (!EDGE_META_KEYS.has(k)) {
+          data[k] = v;
+        }
+      }
+      data.editorGeometry = edgeGeometry;
+
+      // Inject source port behavior props
+      const srcPort = portBehaviorMap.get(`${sourceId}:${sourcePortName}`);
+      if (srcPort) {
+        data.sourceOutputRate = srcPort.outputRate;
+        data.sourceSpeed = srcPort.speed;
+        data.sourceExpression = srcPort.expression;
+        data.sourceFrequency = srcPort.frequency;
+      }
+
       return {
         id: c.id,
-        type: 'default',
-        source: p.sourceNodeId as string,
+        type: EDGE_TYPE_MAP[c.type] ?? 'default',
+        source: sourceId,
         target: p.targetNodeId as string,
-        sourceHandle: (p.sourcePortName as string) || undefined,
+        sourceHandle: sourcePortName || undefined,
         targetHandle: (p.targetPortName as string) || undefined,
         label: (p.label as string) || undefined,
-        animated: (p.animated as boolean) ?? false,
+        data,
       } satisfies FlowEdge;
     }),
   );
@@ -243,6 +301,7 @@
   // -- Toolbar: user slot entries ---------------------------------------------
 
   const toolbarEntries = $derived(childEntries['toolbar'] ?? []);
+
 </script>
 
 <div class="ic-ne" style:height>
@@ -259,6 +318,7 @@
       bind:nodes={flowNodes}
       bind:edges={flowEdges}
       {nodeTypes}
+      {edgeTypes}
       fitView
       deleteKey={['Backspace', 'Delete']}
       onbeforeconnect={handleBeforeConnect}
@@ -270,17 +330,60 @@
       <Panel position="top-right">
         <ToolbarControls />
       </Panel>
+
+      <!-- SVG marker definitions for StaticEdge arrow types -->
+      <svg class="ic-ne__defs" width="0" height="0">
+        <defs>
+          <!-- Arrow marker (triangle) -->
+          <marker
+            id="ic-marker-arrow"
+            viewBox="0 0 10 10"
+            refX="10"
+            refY="5"
+            markerWidth="8"
+            markerHeight="8"
+            orient="auto-start-reverse"
+          >
+            <path d="M0 0 L10 5 L0 10 Z" fill="var(--ic-muted-foreground)" />
+          </marker>
+          <!-- Diamond marker -->
+          <marker
+            id="ic-marker-diamond"
+            viewBox="0 0 10 10"
+            refX="5"
+            refY="5"
+            markerWidth="10"
+            markerHeight="10"
+            orient="auto-start-reverse"
+          >
+            <path d="M5 0 L10 5 L5 10 L0 5 Z" fill="var(--ic-muted-foreground)" />
+          </marker>
+          <!-- Circle marker -->
+          <marker
+            id="ic-marker-circle"
+            viewBox="0 0 10 10"
+            refX="5"
+            refY="5"
+            markerWidth="8"
+            markerHeight="8"
+            orient="auto"
+          >
+            <circle cx="5" cy="5" r="4" fill="var(--ic-muted-foreground)" />
+          </marker>
+        </defs>
+      </svg>
     </SvelteFlow>
   </div>
 </div>
 
 <!--
   ToolbarControls — must be a child of SvelteFlow to access useSvelteFlow().
-  Renders built-in viewport controls (fit view, zoom in/out).
+  Renders built-in viewport controls.
 -->
 {#snippet ToolbarControls()}
   {@const flow = useSvelteFlow()}
   <div class="ic-ne__controls">
+    <!-- Viewport controls -->
     <button
       class="ic-ne__control-btn"
       title="Fit view"
@@ -345,9 +448,15 @@
     min-height: 0;
   }
 
-  /* ── Built-in viewport controls ─────────────── */
+  .ic-ne__defs {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* ── Built-in controls (edge mode + viewport) ─── */
   .ic-ne__controls {
     display: flex;
+    align-items: center;
     gap: 2px;
     background: var(--ic-background);
     border: 1px solid var(--ic-border);
@@ -378,4 +487,5 @@
   .ic-ne__control-btn:active {
     background: var(--ic-border);
   }
+
 </style>

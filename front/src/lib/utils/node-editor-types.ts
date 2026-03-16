@@ -6,6 +6,12 @@ export interface PortDef {
 	label: string;
 	color: string;
 	maxConnections: number;
+	// Behavior props (only meaningful on output ports)
+	type: 'static' | 'flow' | 'signal';
+	outputRate: number;
+	speed: number;
+	expression: string;
+	frequency: number;
 }
 
 /** Default port dot color when no color is specified. */
@@ -30,5 +36,10 @@ export function extractPorts(
 		label: (pe.props.label as string) ?? '',
 		color: (pe.props.color as string) ?? '',
 		maxConnections: (pe.props.maxConnections as number) ?? Infinity,
+		type: ((pe.props.type as string) ?? 'static') as PortDef['type'],
+		outputRate: (pe.props.outputRate as number) ?? 3,
+		speed: (pe.props.speed as number) ?? 1,
+		expression: (pe.props.expression as string) ?? 'sin(2*pi*t)',
+		frequency: (pe.props.frequency as number) ?? 2,
 	}));
 }

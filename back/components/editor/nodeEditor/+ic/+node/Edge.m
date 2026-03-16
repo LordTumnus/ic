@@ -103,4 +103,10 @@ classdef (Abstract) Edge < ic.core.Component
             end
         end
     end
+
+    methods (Abstract)
+        % > COPYDISPLAYPROPS Copy display-only props from another edge of the same class.
+        %   Used by Node.connect() to forward Edge= display props.
+        copyDisplayProps(this, source)
+    end
 end

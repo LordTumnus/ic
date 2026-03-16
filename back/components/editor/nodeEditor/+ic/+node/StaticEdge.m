@@ -27,5 +27,11 @@ classdef StaticEdge < ic.node.Edge
             end
             this@ic.node.Edge(props);
         end
+
+        function copyDisplayProps(this, source)
+            this.Animated = source.Animated;
+            this.StartArrow = source.StartArrow;
+            this.EndArrow = source.EndArrow;
+        end
     end
 end

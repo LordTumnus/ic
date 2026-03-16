@@ -131,18 +131,83 @@ classdef (Abstract) Node < ic.core.ComponentContainer
                 "Port '%s' not found in %s of node '%s'.", name, side, this.ID);
         end
 
+        function port = outputFlow(this, portName, props)
+            % > OUTPUTFLOW Configure an output port as flow type.
+            %
+            %   node.outputFlow("data", OutputRate=5, Speed=2)
+            arguments
+                this (1,1) ic.node.Node
+                portName (1,1) string
+                props.OutputRate
+                props.Speed
+                props.Label
+                props.Color
+                props.MaxConnections
+            end
+            port = this.findPort(portName, "outputs");
+            port.Type = "flow";
+            if isfield(props, 'OutputRate'), port.OutputRate = props.OutputRate; end
+            if isfield(props, 'Speed'), port.Speed = props.Speed; end
+            if isfield(props, 'Label'), port.Label = props.Label; end
+            if isfield(props, 'Color'), port.Color = props.Color; end
+            if isfield(props, 'MaxConnections'), port.MaxConnections = props.MaxConnections; end
+        end
+
+        function port = outputSignal(this, portName, props)
+            % > OUTPUTSIGNAL Configure an output port as signal type.
+            %
+            %   node.outputSignal("data", Expression="sin(2*pi*t)", Frequency=3)
+            arguments
+                this (1,1) ic.node.Node
+                portName (1,1) string
+                props.Expression
+                props.Frequency
+                props.Speed
+                props.Label
+                props.Color
+                props.MaxConnections
+            end
+            port = this.findPort(portName, "outputs");
+            port.Type = "signal";
+            if isfield(props, 'Expression'), port.Expression = props.Expression; end
+            if isfield(props, 'Frequency'), port.Frequency = props.Frequency; end
+            if isfield(props, 'Speed'), port.Speed = props.Speed; end
+            if isfield(props, 'Label'), port.Label = props.Label; end
+            if isfield(props, 'Color'), port.Color = props.Color; end
+            if isfield(props, 'MaxConnections'), port.MaxConnections = props.MaxConnections; end
+        end
+
+        function port = outputStatic(this, portName, props)
+            % > OUTPUTSTATIC Configure an output port as static type (default).
+            %
+            %   node.outputStatic("data", Label="Out")
+            arguments
+                this (1,1) ic.node.Node
+                portName (1,1) string
+                props.Label
+                props.Color
+                props.MaxConnections
+            end
+            port = this.findPort(portName, "outputs");
+            port.Type = "static";
+            if isfield(props, 'Label'), port.Label = props.Label; end
+            if isfield(props, 'Color'), port.Color = props.Color; end
+            if isfield(props, 'MaxConnections'), port.MaxConnections = props.MaxConnections; end
+        end
+
         function edge = connect(this, targetNode, sourcePort, targetPort, props)
             % > CONNECT Create an edge from this node to targetNode.
+            %   Edge type is determined by the source port's Type property.
             %
-            %   edge = n1.connect(n2)                             % auto-match ports
-            %   edge = n1.connect(n2, "out", "in")                % explicit ports
-            %   edge = n1.connect(n2, Edge=ic.node.StaticEdge())  % custom edge
+            %   edge = n1.connect(n2)                                      % auto-match
+            %   edge = n1.connect(n2, "out", "in")                         % explicit ports
+            %   edge = n1.connect(n2, Edge=ic.node.SignalEdge(Color="#f00")) % display props
             arguments
                 this (1,1) ic.node.Node
                 targetNode (1,1) ic.node.Node
                 sourcePort (1,1) string = ""
                 targetPort (1,1) string = ""
-                props.Edge (1,1) ic.node.Edge = ic.node.StaticEdge()
+                props.Edge ic.node.Edge
             end
 
             % Validate both nodes are attached to a NodeEditor
@@ -172,8 +237,24 @@ classdef (Abstract) Node < ic.core.ComponentContainer
                 targetPort = inputs(1).Name;
             end
 
+            % Create edge from source port type
+            srcPortHandle = this.findPort(sourcePort, "outputs");
+            typeMap = dictionary("static", "ic.node.StaticEdge", ...
+                                 "flow",   "ic.node.FlowEdge", ...
+                                 "signal", "ic.node.SignalEdge");
+            edge = feval(typeMap(srcPortHandle.Type));
+
+            % Forward display props from Edge= if provided
+            if isfield(props, 'Edge')
+                userEdge = props.Edge;
+                if userEdge.Label ~= "", edge.Label = userEdge.Label; end
+                if userEdge.Geometry ~= "", edge.Geometry = userEdge.Geometry; end
+                if class(userEdge) == class(edge)
+                    edge.copyDisplayProps(userEdge);
+                end
+            end
+
             % Configure edge endpoints and add to editor
-            edge = props.Edge;
             edge.setEndpoints(this, sourcePort, targetNode, targetPort);
             this.Parent.addChild(edge, "edges");
         end

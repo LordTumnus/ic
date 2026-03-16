@@ -5,8 +5,8 @@ classdef Port < ic.core.Component
     %   Each port tracks its connected edges for graph traversal.
     %
     %   p = ic.node.Port("data")
-    %   p = ic.node.Port("signal", Label="Audio", Color="#3b82f6")
-    %   p = ic.node.Port("in", MaxConnections=1)
+    %   p = ic.node.Port("out", Type="flow", OutputRate=5, Speed=2)
+    %   p = ic.node.Port("out", Type="signal", Expression="sin(2*pi*t)")
     %
     %   % Traversal: port → edges → other port
     %   p.Edges              % all edges connected to this port
@@ -24,6 +24,23 @@ classdef Port < ic.core.Component
 
         % > MAXCONNECTIONS maximum simultaneous connections (Inf = unlimited)
         MaxConnections (1,1) double = Inf
+
+        % > TYPE edge type created from this port: static | flow | signal
+        %   Only meaningful on output ports. Input port type is ignored.
+        Type (1,1) string {mustBeMember(Type, ...
+            ["static","flow","signal"])} = "static"
+
+        % > OUTPUTRATE particles per outgoing FlowEdge (flow behavior)
+        OutputRate (1,1) double {mustBePositive} = 3
+
+        % > SPEED animation speed multiplier (flow/signal behavior)
+        Speed (1,1) double {mustBeNonnegative} = 1
+
+        % > EXPRESSION waveform math expression f(t) for signal edges
+        Expression (1,1) string = "sin(2*pi*t)"
+
+        % > FREQUENCY number of waveform cycles visible (signal behavior)
+        Frequency (1,1) double {mustBePositive} = 2
     end
 
     properties (SetAccess = {?ic.node.Edge})
@@ -59,8 +76,11 @@ classdef Port < ic.core.Component
                 this (1,1) ic.node.Port
                 edge (1,1) ic.node.Edge
             end
-            mask = this.Edges ~= edge;
-            this.Edges = this.Edges(mask);
+            % Cannot use ~= on heterogeneous Edge arrays (ne is not sealed).
+            % Compare by ID string instead.
+            edgeId = edge.ID;
+            keep = arrayfun(@(e) e.ID ~= edgeId, this.Edges);
+            this.Edges = this.Edges(find(keep));
         end
 
         function delete(this)
