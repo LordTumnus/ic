@@ -22,6 +22,9 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
         % > NODEDELETED fires after node(s) are deleted from the UI
         NodeDeleted
+
+        % > SELECTIONCHANGED fires when user changes node/edge selection
+        SelectionChanged
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive")
@@ -34,6 +37,18 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         % > EDGEGEOMETRY default edge type: bezier | straight | smoothstep | step
         EdgeGeometry (1,1) string {mustBeMember(EdgeGeometry, ...
             ["bezier", "straight", "smoothstep", "step"])} = "bezier"
+
+        % > SHOWMINIMAP show/hide the minimap overlay
+        ShowMiniMap (1,1) logical = false
+    end
+
+    properties (SetObservable, Description = "Reactive", ...
+            SetAccess = {?ic.NodeEditor, ?ic.mixin.Reactive}, Hidden)
+        % > SELECTEDNODEIDS IDs of currently selected nodes (Svelte bridge)
+        SelectedNodeIds (1,:) string = string.empty
+
+        % > SELECTEDEDGEIDS IDs of currently selected edges (Svelte bridge)
+        SelectedEdgeIds (1,:) string = string.empty
     end
 
     properties (Dependent, SetAccess = private)
@@ -42,6 +57,12 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
         % > EDGES array of Edge children (read-only)
         Edges
+
+        % > SELECTEDNODES currently selected Node children (read-only)
+        SelectedNodes
+
+        % > SELECTEDEDGES currently selected Edge children (read-only)
+        SelectedEdges
     end
 
     properties (Access = private)
@@ -64,6 +85,12 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             this@ic.core.ComponentContainer(props);
             this.Targets = ["nodes", "edges", "toolbar"];
             this.setupEventHandlers();
+
+            % Fire SelectionChanged when frontend writes selection IDs
+            addlistener(this, 'SelectedNodeIds', 'PostSet', ...
+                @(~, ~) this.fireSelectionChanged());
+            addlistener(this, 'SelectedEdgeIds', 'PostSet', ...
+                @(~, ~) this.fireSelectionChanged());
         end
 
         % --- Dependent getters ---
@@ -74,6 +101,54 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
         function edges = get.Edges(this)
             edges = this.getChildrenInTarget("edges");
+        end
+
+        function nodes = get.SelectedNodes(this)
+            ids = this.SelectedNodeIds;
+            if isempty(ids)
+                nodes = ic.node.Node.empty;
+                return
+            end
+            all = this.Nodes;
+            mask = arrayfun(@(n) ismember(n.ID, ids), all);
+            nodes = all(find(mask)); %#ok<FNDSB>
+        end
+
+        function edges = get.SelectedEdges(this)
+            ids = this.SelectedEdgeIds;
+            if isempty(ids)
+                edges = ic.node.Edge.empty;
+                return
+            end
+            all = this.Edges;
+            mask = arrayfun(@(e) ismember(e.ID, ids), all);
+            edges = all(find(mask)); %#ok<FNDSB>
+        end
+    end
+
+    methods (Description = "Reactive")
+        function out = fitView(this)
+            % > FITVIEW Fit all nodes into the viewport.
+            out = this.publish("fitView", []);
+        end
+
+        function out = zoomTo(this, level)
+            % > ZOOMTO Zoom to a specific level (1 = 100%).
+            arguments
+                this
+                level (1,1) double
+            end
+            out = this.publish("zoomTo", struct('level', level));
+        end
+
+        function out = selectAll(this)
+            % > SELECTALL Select all nodes and edges.
+            out = this.publish("selectAll", []);
+        end
+
+        function out = clearSelection(this)
+            % > CLEARSELECTION Deselect all nodes and edges.
+            out = this.publish("clearSelection", []);
         end
     end
 
@@ -152,6 +227,12 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
     end
 
     methods (Access = private)
+        function fireSelectionChanged(this)
+            notify(this, 'SelectionChanged', ic.event.MEvent(struct( ...
+                'SelectedNodes', this.SelectedNodes, ...
+                'SelectedEdges', this.SelectedEdges)));
+        end
+
         function setupEventHandlers(this)
             this.onRequest("Connect",      @(comp, data) comp.handleConnect(data));
             this.onRequest("Disconnect",   @(comp, data) comp.handleDisconnect(data));

@@ -23,6 +23,7 @@
     SvelteFlow,
     Background,
     BackgroundVariant,
+    MiniMap,
     Panel,
     useSvelteFlow,
     type Node as FlowNode,
@@ -31,7 +32,7 @@
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/base.css';
 
-  import type { ChildEntries, RequestFn } from '$lib/types';
+  import type { ChildEntries, RequestFn, Resolution } from '$lib/types';
   import { extractPorts } from '$lib/utils/node-editor-types';
   import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
 
@@ -43,21 +44,41 @@
   import FlowEdgeRenderer from './edges/FlowEdgeRenderer.svelte';
   import SignalEdgeRenderer from './edges/SignalEdgeRenderer.svelte';
 
+  const OK: Resolution = { success: true, data: null };
+
   let {
     height = $bindable('100%'),
     gridSize = $bindable(20),
     edgeGeometry = $bindable('bezier'),
+    showMiniMap = $bindable(false),
     childEntries = {} as ChildEntries,
     request,
+    // Selection state (written back to MATLAB)
+    selectedNodeIds = $bindable<string[]>([]),
+    selectedEdgeIds = $bindable<string[]>([]),
     // Events
     nodeMoved,
+    selectionChanged,
+    // Methods
+    fitView: fitViewMethod = $bindable((): Resolution => OK),
+    zoomTo = $bindable((_data: { level: number }): Resolution => OK),
+    selectAll: selectAllMethod = $bindable((): Resolution => OK),
+    clearSelection: clearSelectionMethod = $bindable((): Resolution => OK),
   }: {
     height?: string;
     gridSize?: number;
     edgeGeometry?: string;
+    showMiniMap?: boolean;
     childEntries?: ChildEntries;
     request?: RequestFn;
+    selectedNodeIds?: string[];
+    selectedEdgeIds?: string[];
     nodeMoved?: (data?: unknown) => void;
+    selectionChanged?: (data?: unknown) => void;
+    fitView?: () => Resolution;
+    zoomTo?: (data: { level: number }) => Resolution;
+    selectAll?: () => Resolution;
+    clearSelection?: () => Resolution;
   } = $props();
 
   // -- Node type registry: MATLAB class name → Svelte Flow component ----------
@@ -131,6 +152,7 @@
     flowNodes = data.map((nd) => {
       const prev = existing.get(nd.id);
       const position = { x: nd.position[0], y: nd.position[1] };
+
       const nodeData = {
         label: (nd.nodeProps.label as string) ?? '',
         expression: (nd.nodeProps.expression as string) ?? '',
@@ -305,21 +327,100 @@
 
   // -- Position writeback + NodeMoved event -----------------------------------
 
-  function handleNodeDragStop({ targetNode }: { targetNode: FlowNode | null }) {
-    if (!targetNode) return;
-    const child = (childEntries['nodes'] ?? []).find(
-      (c) => c.id === targetNode.id,
-    );
-    if (child) {
-      const pos = [targetNode.position.x, targetNode.position.y];
-      child.props.position = pos;
-      nodeMoved?.({ value: { nodeId: targetNode.id, position: pos } });
+  /** Write back positions for an array of flow nodes to MATLAB childEntries. */
+  function writeBackPositions(nodes: FlowNode[]) {
+    const entries = childEntries['nodes'] ?? [];
+    for (const fn of nodes) {
+      const child = entries.find((c) => c.id === fn.id);
+      if (child) {
+        child.props.position = [fn.position.x, fn.position.y];
+      }
     }
+  }
+
+  /** Single-node drag stop. */
+  function handleNodeDragStop({ targetNode, nodes: draggedNodes }: { targetNode: FlowNode | null; nodes: FlowNode[] }) {
+    if (!targetNode) return;
+    writeBackPositions(draggedNodes);
+    nodeMoved?.({ value: { nodeId: targetNode.id, position: [targetNode.position.x, targetNode.position.y] } });
+  }
+
+  /** Multi-node (selection) drag stop — fires instead of onnodedragstop when dragging a selection. */
+  function handleSelectionDragStop(_event: MouseEvent, nodes: FlowNode[]) {
+    writeBackPositions(nodes);
+    nodeMoved?.({ value: { nodeIds: nodes.map((n) => n.id) } });
   }
 
   // -- Toolbar: user slot entries ---------------------------------------------
 
   const toolbarEntries = $derived(childEntries['toolbar'] ?? []);
+
+  // -- Flow API reference (captured from ToolbarControls snippet) -------------
+
+  let flowApi: ReturnType<typeof useSvelteFlow> | null = $state(null);
+
+  // -- Initial fit: one-time fitView after first nodes arrive ------------------
+
+  let initialFitDone = false;
+  $effect(() => {
+    if (initialFitDone || !flowApi || flowNodes.length === 0) return;
+    initialFitDone = true;
+    const flow = flowApi;
+    // Defer to next tick so SvelteFlow has measured node dimensions
+    queueMicrotask(() => flow.fitView({ duration: 0 }));
+  });
+
+  // -- Selection: bridge SvelteFlow → MATLAB ----------------------------------
+
+  function handleSelectionChange({ nodes, edges }: { nodes: FlowNode[]; edges: FlowEdge[] }) {
+    const nodeIds = nodes.map((n) => n.id);
+    const edgeIds = edges.map((e) => e.id);
+    selectedNodeIds = nodeIds;
+    selectedEdgeIds = edgeIds;
+    selectionChanged?.({ value: { nodeIds, edgeIds } });
+  }
+
+  // -- Keyboard: Ctrl+A (select all), Escape (clear selection) ----------------
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+      e.preventDefault();
+      flowNodes = flowNodes.map((n) => ({ ...n, selected: true }));
+      flowEdges = flowEdges.map((fe) => ({ ...fe, selected: true }));
+      return;
+    }
+    if (e.key === 'Escape') {
+      flowNodes = flowNodes.map((n) => ({ ...n, selected: false }));
+      flowEdges = flowEdges.map((fe) => ({ ...fe, selected: false }));
+      return;
+    }
+  }
+
+  // -- Methods: wire MATLAB → SvelteFlow via captured flow API ----------------
+
+  $effect(() => {
+    if (!flowApi) return;
+    const flow = flowApi;
+
+    fitViewMethod = (): Resolution => {
+      flow.fitView({ duration: 200 });
+      return OK;
+    };
+    zoomTo = (data: { level: number }): Resolution => {
+      flow.zoomTo(data.level, { duration: 200 });
+      return OK;
+    };
+    selectAllMethod = (): Resolution => {
+      flowNodes = flowNodes.map((n) => ({ ...n, selected: true }));
+      flowEdges = flowEdges.map((fe) => ({ ...fe, selected: true }));
+      return OK;
+    };
+    clearSelectionMethod = (): Resolution => {
+      flowNodes = flowNodes.map((n) => ({ ...n, selected: false }));
+      flowEdges = flowEdges.map((fe) => ({ ...fe, selected: false }));
+      return OK;
+    };
+  });
 
 </script>
 
@@ -332,18 +433,23 @@
     </div>
   {/if}
 
-  <div class="ic-ne__canvas">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="ic-ne__canvas" tabindex={-1} onkeydown={handleKeyDown}>
     <SvelteFlow
       bind:nodes={flowNodes}
       bind:edges={flowEdges}
       {nodeTypes}
       {edgeTypes}
-      fitView
       deleteKey={['Backspace', 'Delete']}
+      multiSelectionKeyCode="Meta"
+      selectionKeyCode="Shift"
       onbeforeconnect={handleBeforeConnect}
       onconnect={handleConnect}
       onbeforedelete={handleBeforeDelete}
       onnodedragstop={handleNodeDragStop}
+      onselectiondragstop={handleSelectionDragStop}
+      onselectionchange={handleSelectionChange}
     >
       <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />
       <Panel position="top-right">
@@ -391,6 +497,15 @@
           </marker>
         </defs>
       </svg>
+
+      {#if showMiniMap}
+        <MiniMap
+          nodeColor="var(--ic-muted)"
+          nodeStrokeColor="var(--ic-foreground)"
+          maskColor="rgba(0, 0, 0, 0.08)"
+          position="bottom-left"
+        />
+      {/if}
     </SvelteFlow>
   </div>
 </div>
@@ -401,6 +516,7 @@
 -->
 {#snippet ToolbarControls()}
   {@const flow = useSvelteFlow()}
+  {@const _ = flowApi !== flow && queueMicrotask(() => { flowApi = flow; })}
   <div class="ic-ne__controls">
     <!-- Viewport controls -->
     <button
@@ -505,6 +621,13 @@
 
   .ic-ne__control-btn:active {
     background: var(--ic-border);
+  }
+
+  /* ── MiniMap ─── */
+  .ic-ne :global(.svelte-flow__minimap) {
+    border: 1px solid var(--ic-border);
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
 </style>
