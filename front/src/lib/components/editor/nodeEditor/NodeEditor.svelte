@@ -58,6 +58,7 @@
     showMiniMap = $bindable(false),
     layout = $bindable('horizontal'),
     snapToGrid = $bindable(false),
+    gridVariant: gridVariantProp = $bindable('dots'),
     childEntries = {} as ChildEntries,
     request,
     // Selection state (written back to MATLAB)
@@ -79,6 +80,7 @@
     showMiniMap?: boolean;
     layout?: string;
     snapToGrid?: boolean;
+    gridVariant?: string;
     childEntries?: ChildEntries;
     request?: RequestFn;
     selectedNodeIds?: string[];
@@ -95,6 +97,16 @@
   // -- Snap grid: when enabled, nodes snap to gridSize intervals ---------------
   const snapGrid = $derived<[number, number] | undefined>(
     snapToGrid ? [gridSize, gridSize] : undefined,
+  );
+
+  // -- Background variant: map MATLAB string → SvelteFlow enum ----------------
+  const BG_VARIANT_MAP: Record<string, BackgroundVariant> = {
+    dots: BackgroundVariant.Dots,
+    lines: BackgroundVariant.Lines,
+    cross: BackgroundVariant.Cross,
+  };
+  const bgVariant = $derived(
+    BG_VARIANT_MAP[gridVariantProp] ?? BackgroundVariant.Dots,
   );
 
   // -- Node type registry: MATLAB class name → Svelte Flow component ----------
@@ -1143,7 +1155,7 @@
       onnodecontextmenu={({ event, node }) => handleNodeContextMenu(event, node)}
       onpanecontextmenu={({ event }) => event.preventDefault()}
     >
-      <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />
+      <Background variant={bgVariant} gap={gridSize} size={1} />
       <Panel position="top-right">
         <ToolbarControls />
       </Panel>

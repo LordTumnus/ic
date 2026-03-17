@@ -47,6 +47,10 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
         % > SNAPTOGRID snap nodes to grid when dragging
         SnapToGrid (1,1) logical = false
+
+        % > GRIDVARIANT background grid pattern: dots | lines | cross
+        GridVariant (1,1) string {mustBeMember(GridVariant, ...
+            ["dots", "lines", "cross"])} = "dots"
     end
 
     properties (SetObservable, Description = "Reactive", ...

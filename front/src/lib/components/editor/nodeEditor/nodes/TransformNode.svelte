@@ -23,6 +23,8 @@
 
   let { data, selected, dragging }: NodeProps<TransformNodeType> = $props();
 
+  let hovered = $state(false);
+
   const accentColor = $derived(data.color || 'var(--ic-primary)');
   const maxPorts = $derived(
     Math.max(data.inputs?.length ?? 0, data.outputs?.length ?? 0),
@@ -32,9 +34,12 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="ic-ne-node"
+  class:ic-ne-node--hovered={hovered && !selected && !dragging}
   class:ic-ne-node--selected={selected}
   class:ic-ne-node--dragging={dragging}
   class:ic-ne-node--disabled={data.disabled}
+  onpointerenter={() => (hovered = true)}
+  onpointerleave={() => (hovered = false)}
 >
   <div class="ic-ne-node__header" style:--accent={accentColor}>
     {#if data.icon}
@@ -113,7 +118,15 @@
     color: var(--ic-foreground);
     font-family: var(--ic-font-family);
     font-size: 12px;
-    transition: border-color 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .ic-ne-node--hovered {
+    border-color: var(--ic-muted-foreground);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   }
 
   .ic-ne-node--selected {
@@ -121,7 +134,8 @@
   }
 
   .ic-ne-node--dragging {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+    transform: scale(1.01);
   }
 
   .ic-ne-node--disabled {
@@ -213,6 +227,11 @@
     position: relative;
     min-height: 22px;
     padding: 2px 0;
+    transition: background-color 0.1s ease;
+  }
+
+  .ic-ne-node__port-row:hover {
+    background-color: rgba(128, 128, 128, 0.08);
   }
 
   .ic-ne-node__port {
@@ -231,6 +250,14 @@
     border-radius: 2px;
     border: 1px solid rgba(0, 0, 0, 0.2);
     flex-shrink: 0;
+    transition:
+      transform 0.12s ease,
+      border-color 0.12s ease;
+  }
+
+  .ic-ne-node__port:hover .ic-ne-node__port-dot {
+    transform: scale(1.35);
+    border-color: rgba(0, 0, 0, 0.4);
   }
 
   .ic-ne-node__port-label {
