@@ -549,13 +549,76 @@
     selectionChanged?.({ value: { nodeIds, edgeIds } });
   }
 
-  // -- Keyboard: Ctrl+A (select all), Escape (clear selection) ----------------
+  // -- Clipboard: copy/paste/duplicate nodes ----------------------------------
+
+  /** Stored node IDs from last copy. */
+  let clipboardIds: string[] | null = null;
+
+  /** Get IDs of currently selected nodes. */
+  function getSelectedIds(): string[] {
+    return flowNodes.filter((n) => n.selected).map((n) => n.id);
+  }
+
+  /** Send duplication request to MATLAB (just IDs + offset). */
+  async function duplicateNodes(nodeIds: string[], offset: number[]) {
+    logger.debug('NE', `duplicateNodes: request=${!!request} count=${nodeIds.length}`);
+    if (!request || nodeIds.length === 0) return;
+    try {
+      logger.debug('NE', 'sending duplicateNodes request to MATLAB...');
+      const result = await request('duplicateNodes', { nodeIds, offset });
+      logger.debug('NE', `duplicateNodes result: ${JSON.stringify(result)}`);
+      if (result?.success && result.data?.nodeIds) {
+        const newIds = new Set(result.data.nodeIds as string[]);
+        setTimeout(() => {
+          flowNodes = flowNodes.map((n) => ({
+            ...n,
+            selected: newIds.has(n.id),
+          }));
+          flowEdges = flowEdges.map((fe) => ({ ...fe, selected: false }));
+        }, 150);
+      }
+    } catch (err) {
+      logger.error('NE', `duplicateNodes error: ${String(err)}`);
+    }
+  }
+
+  // -- Keyboard: Ctrl+A, Escape, Ctrl+C/V/D ---------------------------------
+
+  let canvasEl: HTMLDivElement | undefined = $state();
 
   function handleKeyDown(e: KeyboardEvent) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+    const contains = canvasEl?.contains(e.target as Node);
+    logger.debug('NE', `keydown: ${e.key} meta=${e.metaKey} ctrl=${e.ctrlKey} contains=${contains}`);
+    // Only handle shortcuts when the event originates inside the editor canvas
+    if (!contains) return;
+    // Don't intercept typing in inputs / textareas
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key === 'a') {
       e.preventDefault();
       flowNodes = flowNodes.map((n) => ({ ...n, selected: true }));
       flowEdges = flowEdges.map((fe) => ({ ...fe, selected: true }));
+      return;
+    }
+    if (mod && e.key === 'c') {
+      e.preventDefault();
+      clipboardIds = getSelectedIds();
+      logger.debug('NE', `copy: ${clipboardIds.length} nodes`);
+      return;
+    }
+    if (mod && e.key === 'v') {
+      e.preventDefault();
+      logger.debug('NE', `paste: clipboard has ${clipboardIds?.length ?? 0} nodes`);
+      if (clipboardIds && clipboardIds.length > 0) duplicateNodes(clipboardIds, [30, 30]);
+      return;
+    }
+    if (mod && e.key === 'd') {
+      e.preventDefault();
+      const ids = getSelectedIds();
+      logger.debug('NE', `duplicate: ${ids.length} nodes`);
+      if (ids.length > 0) duplicateNodes(ids, [30, 30]);
       return;
     }
     if (e.key === 'Escape') {
@@ -1123,6 +1186,8 @@
 
 </script>
 
+<svelte:window onkeydown={handleKeyDown} />
+
 <div class="ic-ne" style:height>
   {#if toolbarEntries.length > 0}
     <div class="ic-ne__toolbar">
@@ -1132,9 +1197,7 @@
     </div>
   {/if}
 
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="ic-ne__canvas" tabindex={-1} onkeydown={handleKeyDown}>
+  <div class="ic-ne__canvas" bind:this={canvasEl}>
     <SvelteFlow
       bind:nodes={flowNodes}
       bind:edges={flowEdges}

@@ -227,6 +227,57 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             this.IsRemovingEdge = false;
         end
 
+        function removeNodes(this, nodes)
+            % > REMOVENODES Remove multiple nodes and their connected edges.
+            arguments
+                this (1,1) ic.NodeEditor
+                nodes (1,:) ic.node.Node
+            end
+            for ii = numel(nodes):-1:1
+                this.removeNode(nodes(ii));
+                delete(nodes(ii));
+            end
+        end
+
+        function edges = connectAll(this, pairs)
+            % > CONNECTALL Connect multiple node pairs at once.
+            %   pairs is an N-by-2 cell array: {srcNode, tgtNode; ...}
+            arguments
+                this (1,1) ic.NodeEditor
+                pairs (:,2) cell
+            end
+            edges = ic.node.Edge.empty(1, 0);
+            for ii = 1:size(pairs, 1)
+                edges(end+1) = pairs{ii,1}.connect(pairs{ii,2}); %#ok<AGROW>
+            end
+        end
+
+        function node = findNodeById(this, id)
+            % > FINDNODEBYID Look up a node by its ID string.
+            nodes = this.Nodes;
+            for ii = 1:numel(nodes)
+                if nodes(ii).ID == string(id)
+                    node = nodes(ii);
+                    return
+                end
+            end
+            error("ic:NodeEditor:NodeNotFound", ...
+                "Node with ID '%s' not found.", id);
+        end
+
+        function edge = findEdgeById(this, id)
+            % > FINDEDGEBYID Look up an edge by its ID string.
+            edges = this.Edges;
+            for ii = 1:numel(edges)
+                if edges(ii).ID == string(id)
+                    edge = edges(ii);
+                    return
+                end
+            end
+            error("ic:NodeEditor:EdgeNotFound", ...
+                "Edge with ID '%s' not found.", id);
+        end
+
         function validateChild(this, child, target)
             % > VALIDATECHILD enforce type constraints per target
             if target == "nodes"
@@ -258,9 +309,10 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function setupEventHandlers(this)
-            this.onRequest("Connect",      @(comp, data) comp.handleConnect(data));
-            this.onRequest("Disconnect",   @(comp, data) comp.handleDisconnect(data));
-            this.onRequest("DeleteNodes",  @(comp, data) comp.handleDeleteNodes(data));
+            this.onRequest("Connect",         @(comp, data) comp.handleConnect(data));
+            this.onRequest("Disconnect",      @(comp, data) comp.handleDisconnect(data));
+            this.onRequest("DeleteNodes",     @(comp, data) comp.handleDeleteNodes(data));
+            this.onRequest("DuplicateNodes",  @(comp, data) comp.handleDuplicateNodes(data));
         end
 
         function result = handleConnect(this, data)
@@ -322,16 +374,69 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             result = false;
         end
 
-        function node = findNodeById(this, id)
-            nodes = this.Nodes;
-            for ii = 1:numel(nodes)
-                if nodes(ii).ID == string(id)
-                    node = nodes(ii);
-                    return
+        function result = handleDuplicateNodes(this, data)
+            % Frontend sends node IDs; MATLAB clones from actual objects.
+            %   data.nodeIds: string array of node IDs to duplicate
+            %   data.offset:  [dx, dy] position offset
+            fprintf("[NE-MATLAB] handleDuplicateNodes called\n");
+            fprintf("[NE-MATLAB] data fields: %s\n", strjoin(string(fieldnames(data)), ", "));
+            fprintf("[NE-MATLAB] data.nodeIds class=%s size=%s\n", class(data.nodeIds), mat2str(size(data.nodeIds)));
+            disp(data.nodeIds);
+            nodeIds = string(data.nodeIds);
+            offset  = reshape(double(data.offset), 1, []);
+
+            oldToNew = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            newNodeIds = {};
+
+            % Clone each node
+            for ii = 1:numel(nodeIds)
+                orig = this.findNodeById(nodeIds(ii));
+                if isempty(orig), continue; end
+
+                % Instantiate same class (constructor sets defaults + ports)
+                newNode = feval(class(orig));
+
+                % Copy all reactive properties via metaclass introspection
+                mc = metaclass(orig);
+                for jj = 1:numel(mc.PropertyList)
+                    mp = mc.PropertyList(jj);
+                    if mp.Description ~= "Reactive", continue; end
+                    if mp.Dependent,                  continue; end
+                    if ~strcmp(mp.SetAccess, 'public'), continue; end
+                    val = orig.(mp.Name);
+                    if mp.Name == "Position"
+                        val = val + offset;
+                    end
+                    newNode.(mp.Name) = val;
+                end
+
+                % Clone port configuration (reactive props on each port)
+                ic.NodeEditor.clonePorts(orig.Outputs, newNode.Outputs);
+                ic.NodeEditor.clonePorts(orig.Inputs,  newNode.Inputs);
+
+                this.addNode(newNode);
+                oldToNew(char(nodeIds(ii))) = newNode;
+                newNodeIds{end+1} = newNode.ID; %#ok<AGROW>
+            end
+
+            % Recreate internal edges (both endpoints in the cloned set)
+            edges = this.Edges;
+            for ii = 1:numel(edges)
+                e = edges(ii);
+                srcKey = char(e.SourceNode.ID);
+                tgtKey = char(e.TargetNode.ID);
+                if oldToNew.isKey(srcKey) && oldToNew.isKey(tgtKey)
+                    try
+                        newSrc = oldToNew(srcKey);
+                        newTgt = oldToNew(tgtKey);
+                        newSrc.connect(newTgt, e.SourcePortName, e.TargetPortName);
+                    catch
+                        % Skip edges that can't be recreated
+                    end
                 end
             end
-            error("ic:NodeEditor:NodeNotFound", ...
-                "Node with ID '%s' not found.", id);
+
+            result = struct('nodeIds', {newNodeIds});
         end
 
         function handleNodeDestroyed(this, node)
@@ -357,6 +462,22 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             this.IsRemovingEdge = true;
             this.removeChild(edge);
             this.IsRemovingEdge = false;
+        end
+    end
+
+    methods (Static, Access = private)
+        function clonePorts(origPorts, newPorts)
+            % Copy all reactive properties from original ports to new ports.
+            for jj = 1:min(numel(origPorts), numel(newPorts))
+                mc = metaclass(origPorts(jj));
+                for kk = 1:numel(mc.PropertyList)
+                    mp = mc.PropertyList(kk);
+                    if mp.Description ~= "Reactive",  continue; end
+                    if mp.Dependent,                   continue; end
+                    if ~strcmp(mp.SetAccess, 'public'), continue; end
+                    newPorts(jj).(mp.Name) = origPorts(jj).(mp.Name);
+                end
+            end
         end
     end
 end

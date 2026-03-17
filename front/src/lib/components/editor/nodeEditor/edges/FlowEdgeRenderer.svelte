@@ -10,7 +10,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { EdgeProps } from '@xyflow/svelte';
-  import { computeEdgePath, createPathSampler, markerUrl } from '$lib/utils/edge-utils';
+  import { computeEdgePath, createPathSampler, registerAnimationCallback, markerUrl } from '$lib/utils/edge-utils';
   import EdgeMarkerDefs from './EdgeMarkerDefs.svelte';
 
   let {
@@ -69,22 +69,17 @@
   // Particle positions (updated each frame)
   let particles: { x: number; y: number }[] = $state([]);
 
-  // Animation loop
+  // Animation via shared coordinator (one rAF for all animated edges)
   onMount(() => {
     const sampler = createPathSampler();
-    let rafId: number;
-    let startTime = performance.now();
+    const startTime = performance.now();
 
-    function animate() {
+    const unregister = registerAnimationCallback((timestamp) => {
       sampler.setPath(path);
       const totalLength = sampler.getTotalLength();
-      if (totalLength <= 0) {
-        rafId = requestAnimationFrame(animate);
-        return;
-      }
+      if (totalLength <= 0) return;
 
-      const elapsed = (performance.now() - startTime) / 1000;
-      // Fraction of path traversed (0→1), then scaled to pixel offset
+      const elapsed = (timestamp - startTime) / 1000;
       const frac = (elapsed * BASE_SPEED * speed) % 1;
       const offset = frac * totalLength;
       const count = particleCount;
@@ -97,14 +92,10 @@
         pts.push({ x: pt.x, y: pt.y });
       }
       particles = pts;
-
-      rafId = requestAnimationFrame(animate);
-    }
-
-    rafId = requestAnimationFrame(animate);
+    });
 
     return () => {
-      cancelAnimationFrame(rafId);
+      unregister();
       sampler.destroy();
     };
   });

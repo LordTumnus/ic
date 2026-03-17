@@ -133,6 +133,45 @@ export function evaluateExpression(expression: string, t: number): number {
   }
 }
 
+// ── Shared animation coordinator ────────────────────────────────────────
+
+/**
+ * Single rAF loop shared by all animated edges (FlowEdge + SignalEdge).
+ * Each edge registers a callback; one rAF drives them all.
+ * This eliminates N independent rAF loops (one per edge) which is the
+ * primary performance bottleneck with many animated edges.
+ */
+type AnimationCallback = (timestamp: number) => void;
+
+const animationCallbacks = new Set<AnimationCallback>();
+let rafId: number | null = null;
+
+function animationLoop(timestamp: number) {
+  for (const cb of animationCallbacks) {
+    cb(timestamp);
+  }
+  if (animationCallbacks.size > 0) {
+    rafId = requestAnimationFrame(animationLoop);
+  } else {
+    rafId = null;
+  }
+}
+
+/** Register a per-frame callback. Returns an unregister function. */
+export function registerAnimationCallback(cb: AnimationCallback): () => void {
+  animationCallbacks.add(cb);
+  if (rafId === null) {
+    rafId = requestAnimationFrame(animationLoop);
+  }
+  return () => {
+    animationCallbacks.delete(cb);
+    if (animationCallbacks.size === 0 && rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  };
+}
+
 // ── Edge type map ───────────────────────────────────────────────────────
 
 /** Maps MATLAB class names to SvelteFlow edge type keys. */

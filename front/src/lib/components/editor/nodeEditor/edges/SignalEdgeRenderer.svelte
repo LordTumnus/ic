@@ -16,6 +16,7 @@
     computeEdgePath,
     createPathSampler,
     evaluateExpression,
+    registerAnimationCallback,
     markerUrl,
   } from '$lib/utils/edge-utils';
   import EdgeMarkerDefs from './EdgeMarkerDefs.svelte';
@@ -33,7 +34,6 @@
     label,
   }: EdgeProps = $props();
 
-  const SAMPLE_COUNT = 200;
   const BASE_SPEED = 0.5; // path-traversals per second at speed=1
 
   const geometry = $derived(
@@ -74,29 +74,25 @@
   // Waveform path (updated each frame)
   let waveformPath: string = $state('');
 
+  // Animation via shared coordinator (one rAF for all animated edges)
   onMount(() => {
     const sampler = createPathSampler();
-    let rafId: number;
-    let startTime = performance.now();
+    const startTime = performance.now();
 
-    function animate() {
+    const unregister = registerAnimationCallback((timestamp) => {
       sampler.setPath(path);
       const totalLength = sampler.getTotalLength();
-      if (totalLength <= 0) {
-        rafId = requestAnimationFrame(animate);
-        return;
-      }
+      if (totalLength <= 0) return;
 
-      const elapsed = (performance.now() - startTime) / 1000;
-      // Phase offset: moves the waveform from source toward target
-      // Time-based (not distance-based) so speed is consistent regardless of path length
+      const elapsed = (timestamp - startTime) / 1000;
       const timeOffset = elapsed * BASE_SPEED * speed;
 
-      // Sample points along the edge path
+      // Dynamic sample count: scale with edge length, clamp to [30, 200]
+      const sampleCount = Math.min(200, Math.max(30, Math.round(totalLength / 3)));
       const points: { x: number; y: number }[] = [];
 
-      for (let i = 0; i <= SAMPLE_COUNT; i++) {
-        const frac = i / SAMPLE_COUNT;
+      for (let i = 0; i <= sampleCount; i++) {
+        const frac = i / sampleCount;
         const len = frac * totalLength;
         const pt = sampler.getPointAtLength(len);
 
@@ -110,13 +106,9 @@
         const dy = ptAfter.y - ptBefore.y;
         const mag = Math.sqrt(dx * dx + dy * dy) || 1;
 
-        // Perpendicular normal (rotated 90° CCW)
         const nx = -dy / mag;
         const ny = dx / mag;
 
-        // Adding timeOffset keeps t ≥ 0 (stable for exp-decay expressions).
-        // Using (1 - frac) flips the spatial axis so the pattern travels
-        // source → target while t stays non-negative.
         const t = (1 - frac) * frequency + timeOffset;
         const value = evaluateExpression(expression, t);
         const displacement = amplitude * value;
@@ -135,14 +127,10 @@
         }
         waveformPath = d;
       }
-
-      rafId = requestAnimationFrame(animate);
-    }
-
-    rafId = requestAnimationFrame(animate);
+    });
 
     return () => {
-      cancelAnimationFrame(rafId);
+      unregister();
       sampler.destroy();
     };
   });
