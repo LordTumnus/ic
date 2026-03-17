@@ -45,7 +45,8 @@ classdef (Abstract) Edge < ic.core.Component
 
         % > GEOMETRY per-edge override: bezier | straight | smoothstep | step
         %   Empty string means use the editor's default EdgeGeometry.
-        Geometry (1,1) string = ""
+        Geometry (1,1) string {mustBeMember(Geometry, ...
+            ["", "bezier", "straight", "smoothstep", "step"])} = ""
     end
 
     properties (Access = private)
