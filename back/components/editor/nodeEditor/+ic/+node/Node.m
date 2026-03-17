@@ -201,7 +201,7 @@ classdef (Abstract) Node < ic.core.ComponentContainer
             %
             %   edge = n1.connect(n2)                                      % auto-match
             %   edge = n1.connect(n2, "out", "in")                         % explicit ports
-            %   edge = n1.connect(n2, Edge=ic.node.SignalEdge(Color="#f00")) % display props
+            %   edge = n1.connect(n2, Edge=ic.node.SignalEdge(SignalColor="#f00")) % display props
             arguments
                 this (1,1) ic.node.Node
                 targetNode (1,1) ic.node.Node

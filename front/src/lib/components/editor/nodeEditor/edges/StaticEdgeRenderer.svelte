@@ -59,6 +59,21 @@
   const markerStart = $derived(arrowMarker(data?.startArrow as string));
   const markerEnd = $derived(arrowMarker(data?.endArrow as string));
   const animated = $derived((data?.animated as boolean) ?? false);
+
+  const edgeColor = $derived((data?.color as string) || '');
+  const thickness = $derived((data?.thickness as number) ?? 1);
+
+  const style = $derived.by(() => {
+    const parts: string[] = [];
+    if (selected) {
+      parts.push('stroke: var(--ic-primary)');
+      parts.push(`stroke-width: ${Math.max(thickness, 2)}`);
+    } else {
+      if (edgeColor) parts.push(`stroke: ${edgeColor}`);
+      if (thickness !== 1) parts.push(`stroke-width: ${thickness}`);
+    }
+    return parts.join('; ');
+  });
 </script>
 
 <BaseEdge
@@ -71,5 +86,5 @@
   {markerEnd}
   {interactionWidth}
   class={animated ? 'animated' : ''}
-  style={selected ? 'stroke: var(--ic-primary); stroke-width: 2;' : ''}
+  {style}
 />

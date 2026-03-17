@@ -38,6 +38,20 @@
   const edgeColor = $derived(
     (data?.color as string) || 'var(--ic-muted-foreground)',
   );
+  const thickness = $derived((data?.thickness as number) ?? 1);
+
+  // Arrow markers (from base Edge)
+  function arrowMarker(type: string | undefined): string | undefined {
+    switch (type) {
+      case 'arrow': return 'url(#ic-marker-arrow)';
+      case 'diamond': return 'url(#ic-marker-diamond)';
+      case 'circle': return 'url(#ic-marker-circle)';
+      default: return undefined;
+    }
+  }
+  const markerStart = $derived(arrowMarker(data?.startArrow as string));
+  const markerEnd = $derived(arrowMarker(data?.endArrow as string));
+
   const particleCount = $derived(
     Math.max(1, Math.round((data?.sourceOutputRate as number) ?? 3)),
   );
@@ -109,7 +123,9 @@
     d={path}
     fill="none"
     stroke={strokeColor}
-    stroke-width={selected ? 2 : 1}
+    stroke-width={selected ? Math.max(thickness, 2) : thickness}
+    marker-start={markerStart}
+    marker-end={markerEnd}
     class="ic-ne-flow-edge__path"
   />
 

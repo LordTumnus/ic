@@ -41,8 +41,24 @@
   const amplitude = $derived((data?.amplitude as number) ?? 8);
   const frequency = $derived((data?.sourceFrequency as number) ?? 2);
   const speed = $derived((data?.sourceSpeed as number) ?? 1);
-  const waveColor = $derived((data?.color as string) || 'var(--ic-primary)');
-  const strokeWidth = $derived((data?.strokeWidth as number) ?? 2);
+  const waveColor = $derived((data?.signalColor as string) || 'var(--ic-primary)');
+  const signalThickness = $derived((data?.signalThickness as number) ?? 2);
+
+  // Base Edge props (guide line)
+  const guideEdgeColor = $derived((data?.color as string) || '');
+  const guideThickness = $derived((data?.thickness as number) ?? 1);
+
+  // Arrow markers (from base Edge — rendered on guide line)
+  function arrowMarker(type: string | undefined): string | undefined {
+    switch (type) {
+      case 'arrow': return 'url(#ic-marker-arrow)';
+      case 'diamond': return 'url(#ic-marker-diamond)';
+      case 'circle': return 'url(#ic-marker-circle)';
+      default: return undefined;
+    }
+  }
+  const markerStart = $derived(arrowMarker(data?.startArrow as string));
+  const markerEnd = $derived(arrowMarker(data?.endArrow as string));
 
   const pathResult = $derived(
     computeEdgePath(geometry, {
@@ -136,7 +152,7 @@
   });
 
   const guideColor = $derived(
-    selected ? 'var(--ic-primary)' : 'var(--ic-muted-foreground)',
+    selected ? 'var(--ic-primary)' : (guideEdgeColor || 'var(--ic-muted-foreground)'),
   );
 </script>
 
@@ -146,8 +162,10 @@
     d={path}
     fill="none"
     stroke={guideColor}
-    stroke-width="1"
+    stroke-width={selected ? Math.max(guideThickness, 2) : guideThickness}
     stroke-opacity="0.2"
+    marker-start={markerStart}
+    marker-end={markerEnd}
     class="ic-ne-signal-edge__guide"
   />
 
@@ -157,7 +175,7 @@
       d={waveformPath}
       fill="none"
       stroke={selected ? 'var(--ic-primary)' : waveColor}
-      stroke-width={strokeWidth}
+      stroke-width={signalThickness}
       stroke-linecap="round"
       stroke-linejoin="round"
       class="ic-ne-signal-edge__waveform"

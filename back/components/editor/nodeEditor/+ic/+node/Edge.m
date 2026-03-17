@@ -47,6 +47,20 @@ classdef (Abstract) Edge < ic.core.Component
         %   Empty string means use the editor's default EdgeGeometry.
         Geometry (1,1) string {mustBeMember(Geometry, ...
             ["", "bezier", "straight", "smoothstep", "step"])} = ""
+
+        % > COLOR edge stroke color (empty = theme default)
+        Color (1,1) string = ""
+
+        % > THICKNESS edge stroke width in pixels
+        Thickness (1,1) double {mustBePositive} = 1
+
+        % > STARTARROW arrowhead at source end: none | arrow | diamond | circle
+        StartArrow (1,1) string {mustBeMember(StartArrow, ...
+            ["none", "arrow", "diamond", "circle"])} = "none"
+
+        % > ENDARROW arrowhead at target end: none | arrow | diamond | circle
+        EndArrow (1,1) string {mustBeMember(EndArrow, ...
+            ["none", "arrow", "diamond", "circle"])} = "none"
     end
 
     properties (Access = private)

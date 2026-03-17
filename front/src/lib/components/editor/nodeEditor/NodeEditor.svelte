@@ -37,6 +37,8 @@
   import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
   import dagre from '@dagrejs/dagre';
   import logger from '$lib/core/logger';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
+  import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
 
   // Node type components — one per concrete MATLAB class
   import TransformNode from './nodes/TransformNode.svelte';
@@ -523,6 +525,159 @@
     };
   });
 
+  // -- Context menu state -----------------------------------------------------
+
+  let ctxMenu = $state<{
+    entries: ContextMenuEntry[];
+    x: number;
+    y: number;
+    context: { type: 'edge' | 'node' | 'port'; id: string; data?: any };
+  } | null>(null);
+
+  function closeCtxMenu() {
+    ctxMenu = null;
+  }
+
+  // -- Edge context menu ------------------------------------------------------
+
+  function buildEdgeContextMenu(edge: FlowEdge): ContextMenuEntry[] {
+    const geom = (edge.data?.geometry as string) || edgeGeometry;
+    const startArrow = (edge.data?.startArrow as string) || 'none';
+    const endArrow = (edge.data?.endArrow as string) || 'none';
+    const edgeType = edge.type || 'static';
+    const arrowOptions = ['none', 'arrow', 'diamond', 'circle'] as const;
+
+    // Shared base-edge entries
+    const entries: ContextMenuEntry[] = [
+      {
+        type: 'folder', label: 'Geometry', icon: 'spline',
+        children: (['bezier', 'straight', 'smoothstep', 'step'] as const).map((g) => ({
+          type: 'item' as const,
+          key: `geometry:${g}`,
+          label: g.charAt(0).toUpperCase() + g.slice(1),
+          icon: geom === g ? 'check' : undefined,
+        })),
+      },
+      {
+        type: 'folder', label: 'Start Arrow', icon: 'arrow-left',
+        children: arrowOptions.map((a) => ({
+          type: 'item' as const,
+          key: `startArrow:${a}`,
+          label: a.charAt(0).toUpperCase() + a.slice(1),
+          icon: startArrow === a ? 'check' : undefined,
+        })),
+      },
+      {
+        type: 'folder', label: 'End Arrow', icon: 'arrow-right',
+        children: arrowOptions.map((a) => ({
+          type: 'item' as const,
+          key: `endArrow:${a}`,
+          label: a.charAt(0).toUpperCase() + a.slice(1),
+          icon: endArrow === a ? 'check' : undefined,
+        })),
+      },
+    ];
+
+    // Edge-type-specific entries
+    entries.push({ type: 'separator' });
+
+    if (edgeType === 'static') {
+      const animated = (edge.data?.animated as boolean) ?? false;
+      entries.push({
+        type: 'item', key: 'toggle-animated',
+        label: animated ? 'Disable Animation' : 'Enable Animation',
+        icon: animated ? 'pause' : 'play',
+      });
+    } else if (edgeType === 'flow') {
+      const pSize = (edge.data?.particleSize as number) ?? 3;
+      entries.push({
+        type: 'folder', label: `Particle Size (${pSize})`, icon: 'circle-dot',
+        children: [1, 2, 3, 4, 5, 6].map((s) => ({
+          type: 'item' as const,
+          key: `particleSize:${s}`,
+          label: `${s}px`,
+          icon: pSize === s ? 'check' : undefined,
+        })),
+      });
+    } else if (edgeType === 'signal') {
+      const amp = (edge.data?.amplitude as number) ?? 8;
+      entries.push({
+        type: 'folder', label: `Amplitude (${amp})`, icon: 'activity',
+        children: [4, 6, 8, 12, 16, 24].map((a) => ({
+          type: 'item' as const,
+          key: `amplitude:${a}`,
+          label: `${a}px`,
+          icon: amp === a ? 'check' : undefined,
+        })),
+      });
+      const sigThick = (edge.data?.signalThickness as number) ?? 2;
+      entries.push({
+        type: 'folder', label: `Signal Width (${sigThick})`, icon: 'pen-line',
+        children: [1, 2, 3, 4, 5].map((w) => ({
+          type: 'item' as const,
+          key: `signalThickness:${w}`,
+          label: `${w}px`,
+          icon: sigThick === w ? 'check' : undefined,
+        })),
+      });
+    }
+
+    entries.push({ type: 'separator' });
+    entries.push({ type: 'item', key: 'delete-edge', label: 'Delete Edge', icon: 'trash-2' });
+
+    return entries;
+  }
+
+  function handleEdgeContextMenu(event: MouseEvent, edge: FlowEdge) {
+    event.preventDefault();
+    ctxMenu = {
+      entries: buildEdgeContextMenu(edge),
+      x: event.clientX,
+      y: event.clientY,
+      context: { type: 'edge', id: edge.id, data: edge },
+    };
+  }
+
+  /** Update a single prop on a flow edge + write back to childEntries. */
+  function updateEdgeProp(edgeId: string, prop: string, value: unknown) {
+    flowEdges = flowEdges.map((e) =>
+      e.id === edgeId ? { ...e, data: { ...e.data, [prop]: value } } : e,
+    );
+    const edgeEntries = childEntries['edges'] ?? [];
+    const entry = edgeEntries.find((c) => c.id === edgeId);
+    if (entry) entry.props[prop] = value;
+  }
+
+  function handleCtxAction(key: string) {
+    const ctx = ctxMenu?.context;
+    if (!ctx) return;
+    closeCtxMenu();
+
+    if (ctx.type === 'edge') {
+      if (key === 'delete-edge') {
+        if (!ctx.id.startsWith('sf-')) {
+          request?.('disconnect', { edgeId: ctx.id });
+        }
+        flowEdges = flowEdges.filter((e) => e.id !== ctx.id);
+      } else if (key === 'toggle-animated') {
+        const edge = flowEdges.find((e) => e.id === ctx.id);
+        const current = (edge?.data?.animated as boolean) ?? false;
+        updateEdgeProp(ctx.id, 'animated', !current);
+      } else {
+        // Generic key:value pattern (geometry, startArrow, endArrow, particleSize, amplitude, signalThickness)
+        const colonIdx = key.indexOf(':');
+        if (colonIdx > 0) {
+          const prop = key.slice(0, colonIdx);
+          const raw = key.slice(colonIdx + 1);
+          // Numeric props: parse to number
+          const numericProps = new Set(['particleSize', 'amplitude', 'signalThickness']);
+          const value = numericProps.has(prop) ? Number(raw) : raw;
+          updateEdgeProp(ctx.id, prop, value);
+        }
+      }
+    }
+  }
+
 </script>
 
 <div class="ic-ne" style:height>
@@ -553,6 +708,8 @@
       onnodedragstop={handleNodeDragStop}
       onselectiondragstop={handleSelectionDragStop}
       onselectionchange={handleSelectionChange}
+      onedgecontextmenu={({ event, edge }) => handleEdgeContextMenu(event, edge)}
+      onpanecontextmenu={({ event }) => event.preventDefault()}
     >
       <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />
       <Panel position="top-right">
@@ -611,6 +768,16 @@
       {/if}
     </SvelteFlow>
   </div>
+
+  {#if ctxMenu}
+    <ContextMenu
+      entries={ctxMenu.entries}
+      x={ctxMenu.x}
+      y={ctxMenu.y}
+      onaction={handleCtxAction}
+      onclose={closeCtxMenu}
+    />
+  {/if}
 </div>
 
 <!--

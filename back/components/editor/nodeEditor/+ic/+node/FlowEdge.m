@@ -3,7 +3,8 @@ classdef FlowEdge < ic.node.Edge
     %
     %   Particle count and speed are controlled by the source port's
     %   OutputRate and Speed properties. The edge controls only display:
-    %   particle size, particle color, and edge stroke color.
+    %   particle size and particle color. Stroke color and thickness
+    %   come from the base Edge class.
     %
     %   e = ic.node.FlowEdge()
     %   e = ic.node.FlowEdge(ParticleColor="#3b82f6", ParticleSize=4)
@@ -14,9 +15,6 @@ classdef FlowEdge < ic.node.Edge
 
         % > PARTICLECOLOR CSS color for particles (empty = --ic-primary)
         ParticleColor (1,1) string = ""
-
-        % > COLOR edge stroke color (empty = --ic-muted-foreground)
-        Color (1,1) string = ""
     end
 
     methods
@@ -32,7 +30,6 @@ classdef FlowEdge < ic.node.Edge
         function copyDisplayProps(this, source)
             this.ParticleSize = source.ParticleSize;
             this.ParticleColor = source.ParticleColor;
-            this.Color = source.Color;
         end
     end
 end

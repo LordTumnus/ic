@@ -3,20 +3,22 @@ classdef SignalEdge < ic.node.Edge
     %
     %   Waveform shape, frequency, and speed are controlled by the source
     %   port's Expression, Frequency, and Speed properties. The edge controls
-    %   only display: amplitude, color, and stroke width.
+    %   only display: amplitude, signal color, and signal thickness.
+    %   Stroke color and thickness from the base Edge class apply to the
+    %   guide line.
     %
     %   e = ic.node.SignalEdge()
-    %   e = ic.node.SignalEdge(Color="#22c55e", Amplitude=10)
+    %   e = ic.node.SignalEdge(SignalColor="#22c55e", Amplitude=10)
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > AMPLITUDE perpendicular displacement in pixels (half peak-to-peak)
         Amplitude (1,1) double {mustBePositive} = 8
 
-        % > COLOR waveform stroke color (empty = --ic-primary)
-        Color (1,1) string = ""
+        % > SIGNALCOLOR waveform stroke color (empty = --ic-primary)
+        SignalColor (1,1) string = ""
 
-        % > STROKEWIDTH waveform line width in pixels
-        StrokeWidth (1,1) double {mustBePositive} = 2
+        % > SIGNALTHICKNESS waveform line width in pixels
+        SignalThickness (1,1) double {mustBePositive} = 2
     end
 
     methods
@@ -31,8 +33,8 @@ classdef SignalEdge < ic.node.Edge
 
         function copyDisplayProps(this, source)
             this.Amplitude = source.Amplitude;
-            this.Color = source.Color;
-            this.StrokeWidth = source.StrokeWidth;
+            this.SignalColor = source.SignalColor;
+            this.SignalThickness = source.SignalThickness;
         end
     end
 end
