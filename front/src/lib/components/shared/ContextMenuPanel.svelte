@@ -197,6 +197,30 @@
           </div>
         </div>
       {/if}
+    {:else if entry.type === 'text'}
+      <div class="ic-ctx__text-entry">
+        {#if entry.label}
+          <span class="ic-ctx__text-label">{entry.label}</span>
+        {/if}
+        <input
+          class="ic-ctx__text-input"
+          type="text"
+          value={entry.value}
+          placeholder={entry.placeholder || ''}
+          spellcheck={false}
+          autocomplete="off"
+          onclick={(e: MouseEvent) => e.stopPropagation()}
+          onkeydown={(e: KeyboardEvent) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+              onaction(`${entry.key}:${(e.currentTarget as HTMLInputElement).value}`);
+            }
+          }}
+          onblur={(e: FocusEvent) => {
+            onaction(`${entry.key}:${(e.currentTarget as HTMLInputElement).value}`);
+          }}
+        />
+      </div>
     {/if}
   {/each}
 </div>
@@ -296,5 +320,39 @@
 
   .ic-ctx__color-controls {
     padding-top: 6px;
+  }
+
+  /* ── Text entry ───────────────────────── */
+
+  .ic-ctx__text-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  .ic-ctx__text-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ic-muted-foreground);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ic-ctx__text-input {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: var(--ic-foreground);
+    background: var(--ic-background);
+    border: 1px solid rgba(128, 128, 128, 0.15);
+    border-radius: 2px;
+    padding: 2px 5px;
+    outline: none;
+  }
+
+  .ic-ctx__text-input:focus {
+    border-color: var(--ic-primary);
   }
 </style>

@@ -35,5 +35,14 @@ export interface ContextMenuColorEntry {
   value: string;
 }
 
+/** An inline text input entry. */
+export interface ContextMenuTextEntry {
+  type: 'text';
+  key: string;
+  label?: string;
+  value: string;
+  placeholder?: string;
+}
+
 /** Union of all context menu entry types. */
-export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuFolder | ContextMenuColorEntry;
+export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuFolder | ContextMenuColorEntry | ContextMenuTextEntry;

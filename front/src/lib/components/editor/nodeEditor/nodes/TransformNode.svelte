@@ -59,7 +59,7 @@
           <div class="ic-ne-node__port-row">
             {#if data.inputs?.[i]}
               {@const port = data.inputs[i]}
-              <div class="ic-ne-node__port ic-ne-node__port--input">
+              <div class="ic-ne-node__port ic-ne-node__port--input" data-port-name={port.name} data-port-side="input">
                 {#key port.name}
                   <Handle
                     type="target"
@@ -79,7 +79,7 @@
 
             {#if data.outputs?.[i]}
               {@const port = data.outputs[i]}
-              <div class="ic-ne-node__port ic-ne-node__port--output">
+              <div class="ic-ne-node__port ic-ne-node__port--output" data-port-name={port.name} data-port-side="output">
                 <span class="ic-ne-node__port-label"
                   >{port.label || port.name}</span
                 >

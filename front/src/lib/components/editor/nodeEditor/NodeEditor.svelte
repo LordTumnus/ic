@@ -33,7 +33,7 @@
   import '@xyflow/svelte/dist/base.css';
 
   import type { ChildEntries, RequestFn, Resolution } from '$lib/types';
-  import { extractPorts } from '$lib/utils/node-editor-types';
+  import { extractPorts, type PortDef } from '$lib/utils/node-editor-types';
   import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
   import dagre from '@dagrejs/dagre';
   import logger from '$lib/core/logger';
@@ -669,17 +669,250 @@
     if (entry) entry.props[prop] = value;
   }
 
-  // Color prop keys — actions from inline color pickers should NOT close the menu
-  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor']);
+  // -- Node context menu ------------------------------------------------------
+
+  function buildNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    const entries: ContextMenuEntry[] = [
+      // Node-specific editable props
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'expression', label: 'f(x)', value: (node.data?.expression as string) || '', placeholder: 'e.g. x + 1' },
+      { type: 'color', key: 'nodeColor', label: 'Node Color', value: (node.data?.color as string) || '' },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'toggle-lock',
+        label: locked ? 'Unlock Node' : 'Lock Node',
+        icon: locked ? 'unlock' : 'lock',
+      },
+      {
+        type: 'item',
+        key: 'toggle-disabled',
+        label: disabled ? 'Enable Node' : 'Disable Node',
+        icon: disabled ? 'eye' : 'eye-off',
+      },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'disconnect-all',
+        label: `Disconnect All (${connectedEdgeCount})`,
+        icon: 'unplug',
+        disabled: connectedEdgeCount === 0,
+      },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'delete-node',
+        label: 'Delete Node',
+        icon: 'trash-2',
+        disabled: locked,
+      },
+    ];
+
+    return entries;
+  }
+
+  // -- Port context menu ------------------------------------------------------
+
+  function buildPortContextMenu(
+    node: FlowNode,
+    portName: string,
+    portSide: 'input' | 'output',
+  ): ContextMenuEntry[] {
+    const ports = (portSide === 'input' ? node.data?.inputs : node.data?.outputs) as PortDef[] | undefined;
+    const port = ports?.find((p) => p.name === portName);
+    if (!port) return [];
+
+    const portEdges = flowEdges.filter((e) =>
+      portSide === 'input'
+        ? (e.target === node.id && e.targetHandle === portName)
+        : (e.source === node.id && e.sourceHandle === portName),
+    );
+
+    const entries: ContextMenuEntry[] = [
+      {
+        type: 'item',
+        key: 'port-info',
+        label: `${port.label || port.name} (${port.type})`,
+        disabled: true,
+      },
+      { type: 'separator' },
+      { type: 'text', key: 'port-label', label: 'Label', value: port.label || '' },
+      { type: 'separator' },
+    ];
+
+    // Output port props — type, rate, speed, expression, frequency
+    if (portSide === 'output') {
+      entries.push({
+        type: 'folder',
+        label: 'Port Type',
+        icon: 'cable',
+        children: (['static', 'flow', 'signal'] as const).map((t) => ({
+          type: 'item' as const,
+          key: `port-type:${t}`,
+          label: t.charAt(0).toUpperCase() + t.slice(1),
+          icon: port.type === t ? 'check' : undefined,
+        })),
+      });
+
+      // Flow props: output rate + speed
+      if (port.type === 'flow' || port.type === 'signal') {
+        entries.push({
+          type: 'folder',
+          label: `Speed (${port.speed})`,
+          icon: 'gauge',
+          children: [0.25, 0.5, 1, 2, 3, 5].map((s) => ({
+            type: 'item' as const,
+            key: `port-speed:${s}`,
+            label: `${s}x`,
+            icon: port.speed === s ? 'check' : undefined,
+          })),
+        });
+      }
+
+      if (port.type === 'flow') {
+        entries.push({
+          type: 'folder',
+          label: `Output Rate (${port.outputRate})`,
+          icon: 'rows-3',
+          children: [1, 2, 3, 5, 8, 12].map((r) => ({
+            type: 'item' as const,
+            key: `port-outputRate:${r}`,
+            label: `${r}`,
+            icon: port.outputRate === r ? 'check' : undefined,
+          })),
+        });
+      }
+
+      // Signal props: expression + frequency
+      if (port.type === 'signal') {
+        entries.push(
+          { type: 'text', key: 'port-expression', label: 'f(t)', value: port.expression || 'sin(2*pi*t)', placeholder: 'e.g. sin(2*pi*t)' },
+          {
+            type: 'folder',
+            label: `Frequency (${port.frequency})`,
+            icon: 'audio-waveform',
+            children: [1, 2, 3, 4, 6, 8].map((f) => ({
+              type: 'item' as const,
+              key: `port-frequency:${f}`,
+              label: `${f}`,
+              icon: port.frequency === f ? 'check' : undefined,
+            })),
+          },
+        );
+      }
+
+      entries.push({ type: 'separator' });
+    }
+
+    entries.push({
+      type: 'item',
+      key: 'disconnect-port',
+      label: `Disconnect (${portEdges.length})`,
+      icon: 'unplug',
+      disabled: portEdges.length === 0,
+    });
+
+    return entries;
+  }
+
+  function handleNodeContextMenu(event: MouseEvent, node: FlowNode) {
+    event.preventDefault();
+
+    // Check if the right-click was on a port dot
+    const target = event.target as HTMLElement;
+    const portEl = target.closest('[data-port-name]') as HTMLElement | null;
+
+    if (portEl) {
+      const portName = portEl.dataset.portName!;
+      const portSide = portEl.dataset.portSide as 'input' | 'output';
+      ctxMenu = {
+        entries: buildPortContextMenu(node, portName, portSide),
+        x: event.clientX,
+        y: event.clientY,
+        context: { type: 'port', id: node.id, data: { portName, portSide } },
+      };
+    } else {
+      ctxMenu = {
+        entries: buildNodeContextMenu(node),
+        x: event.clientX,
+        y: event.clientY,
+        context: { type: 'node', id: node.id, data: node },
+      };
+    }
+  }
+
+  /** Update a single prop on a node + write back to childEntries. */
+  function updateNodeProp(nodeId: string, prop: string, value: unknown) {
+    flowNodes = flowNodes.map((n) =>
+      n.id === nodeId ? { ...n, data: { ...n.data, [prop]: value } } : n,
+    );
+    const nodeEntries = childEntries['nodes'] ?? [];
+    const entry = nodeEntries.find((c) => c.id === nodeId);
+    if (entry) entry.props[prop] = value;
+  }
+
+  /** Map output port props to edge data keys. */
+  const PORT_TO_EDGE_KEY: Record<string, string> = {
+    outputRate: 'sourceOutputRate',
+    speed: 'sourceSpeed',
+    expression: 'sourceExpression',
+    frequency: 'sourceFrequency',
+  };
+
+  /** Update a single prop on a port + write back to childEntries + propagate to edges. */
+  function updatePortProp(nodeId: string, portName: string, portSide: 'input' | 'output', prop: string, value: unknown) {
+    const portsKey = portSide === 'input' ? 'inputs' : 'outputs';
+    // Update childEntries
+    const nodeEntries = childEntries['nodes'] ?? [];
+    const nodeEntry = nodeEntries.find((c) => c.id === nodeId);
+    if (nodeEntry) {
+      const portEntries = (nodeEntry.props.childEntries as any)?.[portsKey] ?? [];
+      const portEntry = portEntries.find((p: any) => p.props.name === portName);
+      if (portEntry) portEntry.props[prop] = value;
+    }
+    // Update flowNodes data
+    flowNodes = flowNodes.map((n) => {
+      if (n.id !== nodeId) return n;
+      const ports = (n.data?.[portsKey] as PortDef[]) ?? [];
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          [portsKey]: ports.map((p) =>
+            p.name === portName ? { ...p, [prop]: value } : p,
+          ),
+        },
+      };
+    });
+    // Propagate behavior props to connected edges
+    const edgeDataKey = PORT_TO_EDGE_KEY[prop];
+    if (edgeDataKey && portSide === 'output') {
+      flowEdges = flowEdges.map((e) =>
+        (e.source === nodeId && e.sourceHandle === portName)
+          ? { ...e, data: { ...e.data, [edgeDataKey]: value } }
+          : e,
+      );
+    }
+  }
+
+  // Keys whose actions should NOT close the menu (live preview / inline editing)
+  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor']);
+  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression']);
 
   function handleCtxAction(key: string) {
     const ctx = ctxMenu?.context;
     if (!ctx) return;
 
-    // Check if this is a live color picker update (key = "color:#hex")
     const colonIdx0 = key.indexOf(':');
-    const isColorAction = colonIdx0 > 0 && COLOR_PROPS.has(key.slice(0, colonIdx0));
-    if (!isColorAction) closeCtxMenu();
+    const propKey = colonIdx0 > 0 ? key.slice(0, colonIdx0) : '';
+    const isLiveAction = COLOR_PROPS.has(propKey) || TEXT_PROPS.has(propKey);
+    if (!isLiveAction) closeCtxMenu();
 
     if (ctx.type === 'edge') {
       if (key === 'delete-edge') {
@@ -697,11 +930,84 @@
         if (colonIdx > 0) {
           const prop = key.slice(0, colonIdx);
           const raw = key.slice(colonIdx + 1);
-          // Numeric props: parse to number
           const numericProps = new Set(['thickness', 'particleSize', 'amplitude', 'signalThickness']);
           const value = numericProps.has(prop) ? Number(raw) : raw;
           updateEdgeProp(ctx.id, prop, value);
         }
+      }
+    } else if (ctx.type === 'node') {
+      if (key.startsWith('nodeColor:')) {
+        updateNodeProp(ctx.id, 'color', key.slice('nodeColor:'.length));
+      } else if (key.startsWith('label:')) {
+        updateNodeProp(ctx.id, 'label', key.slice('label:'.length));
+      } else if (key.startsWith('expression:')) {
+        updateNodeProp(ctx.id, 'expression', key.slice('expression:'.length));
+      } else if (key === 'toggle-lock') {
+        const node = flowNodes.find((n) => n.id === ctx.id);
+        const current = (node?.data?.locked as boolean) ?? false;
+        updateNodeProp(ctx.id, 'locked', !current);
+      } else if (key === 'toggle-disabled') {
+        const node = flowNodes.find((n) => n.id === ctx.id);
+        const current = (node?.data?.disabled as boolean) ?? false;
+        updateNodeProp(ctx.id, 'disabled', !current);
+      } else if (key === 'disconnect-all') {
+        const connected = flowEdges.filter(
+          (e) => e.source === ctx.id || e.target === ctx.id,
+        );
+        for (const edge of connected) {
+          if (!edge.id.startsWith('sf-')) {
+            request?.('disconnect', { edgeId: edge.id });
+          }
+        }
+        flowEdges = flowEdges.filter(
+          (e) => e.source !== ctx.id && e.target !== ctx.id,
+        );
+      } else if (key === 'delete-node') {
+        const node = flowNodes.find((n) => n.id === ctx.id);
+        if (node && !node.data?.locked) {
+          request?.('deleteNodes', { nodeIds: [ctx.id] });
+          // Also disconnect all edges connected to this node
+          const connected = flowEdges.filter(
+            (e) => e.source === ctx.id || e.target === ctx.id,
+          );
+          for (const edge of connected) {
+            if (!edge.id.startsWith('sf-')) {
+              request?.('disconnect', { edgeId: edge.id });
+            }
+          }
+          flowEdges = flowEdges.filter(
+            (e) => e.source !== ctx.id && e.target !== ctx.id,
+          );
+          flowNodes = flowNodes.filter((n) => n.id !== ctx.id);
+        }
+      }
+    } else if (ctx.type === 'port') {
+      const { portName, portSide } = ctx.data as { portName: string; portSide: 'input' | 'output' };
+      if (key.startsWith('port-label:')) {
+        const newLabel = key.slice('port-label:'.length);
+        updatePortProp(ctx.id, portName, portSide, 'label', newLabel);
+      } else if (key === 'disconnect-port') {
+        const portEdges = flowEdges.filter((e) =>
+          portSide === 'input'
+            ? (e.target === ctx.id && e.targetHandle === portName)
+            : (e.source === ctx.id && e.sourceHandle === portName),
+        );
+        for (const edge of portEdges) {
+          if (!edge.id.startsWith('sf-')) {
+            request?.('disconnect', { edgeId: edge.id });
+          }
+        }
+        flowEdges = flowEdges.filter((e) => !portEdges.includes(e));
+      } else if (key.startsWith('port-type:')) {
+        updatePortProp(ctx.id, portName, portSide, 'type', key.slice('port-type:'.length));
+      } else if (key.startsWith('port-speed:')) {
+        updatePortProp(ctx.id, portName, portSide, 'speed', Number(key.slice('port-speed:'.length)));
+      } else if (key.startsWith('port-outputRate:')) {
+        updatePortProp(ctx.id, portName, portSide, 'outputRate', Number(key.slice('port-outputRate:'.length)));
+      } else if (key.startsWith('port-expression:')) {
+        updatePortProp(ctx.id, portName, portSide, 'expression', key.slice('port-expression:'.length));
+      } else if (key.startsWith('port-frequency:')) {
+        updatePortProp(ctx.id, portName, portSide, 'frequency', Number(key.slice('port-frequency:'.length)));
       }
     }
   }
@@ -737,6 +1043,7 @@
       onselectiondragstop={handleSelectionDragStop}
       onselectionchange={handleSelectionChange}
       onedgecontextmenu={({ event, edge }) => handleEdgeContextMenu(event, edge)}
+      onnodecontextmenu={({ event, node }) => handleNodeContextMenu(event, node)}
       onpanecontextmenu={({ event }) => event.preventDefault()}
     >
       <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />
