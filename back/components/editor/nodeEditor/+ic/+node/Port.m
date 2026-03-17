@@ -48,7 +48,43 @@ classdef Port < ic.core.Component
         Edges ic.node.Edge
     end
 
+    properties (Dependent, SetAccess = private)
+        % > CONNECTEDPORTS ports at the other end of each edge
+        ConnectedPorts
+
+        % > CONNECTEDNODES nodes at the other end of each edge
+        ConnectedNodes
+
+        % > ISCONNECTED true if any edges are connected
+        IsConnected
+    end
+
     methods
+        function ports = get.ConnectedPorts(this)
+            % > GET.CONNECTEDPORTS Ports at the opposite end of each edge.
+            edges = this.Edges;
+            if isempty(edges)
+                ports = ic.node.Port.empty(1, 0);
+                return
+            end
+            ports = arrayfun(@(e) this.otherPort(e), edges);
+        end
+
+        function nodes = get.ConnectedNodes(this)
+            % > GET.CONNECTEDNODES Nodes at the opposite end of each edge.
+            edges = this.Edges;
+            if isempty(edges)
+                nodes = ic.node.Node.empty;
+                return
+            end
+            nodes = arrayfun(@(e) this.otherNode(e), edges);
+        end
+
+        function tf = get.IsConnected(this)
+            % > GET.ISCONNECTED True if any edges are connected.
+            tf = ~isempty(this.Edges);
+        end
+
         function this = Port(name, props)
             % > PORT Construct a port with a required name.
             arguments
@@ -90,6 +126,26 @@ classdef Port < ic.core.Component
                 if isvalid(edges(ii))
                     delete(edges(ii));
                 end
+            end
+        end
+    end
+
+    methods (Access = private)
+        function p = otherPort(this, edge)
+            % > OTHERPORT Return the port on the opposite end of an edge.
+            if edge.SourcePort == this
+                p = edge.TargetPort;
+            else
+                p = edge.SourcePort;
+            end
+        end
+
+        function n = otherNode(this, edge)
+            % > OTHERNODE Return the node on the opposite end of an edge.
+            if edge.SourcePort == this
+                n = edge.TargetNode;
+            else
+                n = edge.SourceNode;
             end
         end
     end

@@ -130,6 +130,15 @@
     ),
   );
 
+  // Build lookup: "nodeId:portName" → PortDef (all ports, for connection validation)
+  const allPortMap = $derived(
+    new Map(
+      icNodes.flatMap((n) =>
+        [...n.inputs, ...n.outputs].map((p) => [`${n.id}:${p.name}`, p] as const),
+      ),
+    ),
+  );
+
   // Stable key that changes only when port handles appear/disappear/rename.
   // Used to re-trigger edge reconciliation after handles register in the DOM.
   const nodeHandleKey = $derived(
@@ -257,6 +266,33 @@
 
     flowEdges = [...matlab, ...sfOnly];
   });
+
+  // -- Connection validation: MaxConnections enforcement ----------------------
+
+  function isValidConnection(connection: Connection): boolean {
+    const { source, target, sourceHandle, targetHandle } = connection;
+    if (!source || !target) return false;
+
+    // No self-connections
+    if (source === target) return false;
+
+    const srcPort = allPortMap.get(`${source}:${sourceHandle ?? ''}`);
+    const tgtPort = allPortMap.get(`${target}:${targetHandle ?? ''}`);
+    if (!srcPort || !tgtPort) return false;
+
+    // Count existing edges on each port
+    const srcCount = flowEdges.filter(
+      (e) => e.source === source && e.sourceHandle === sourceHandle,
+    ).length;
+    const tgtCount = flowEdges.filter(
+      (e) => e.target === target && e.targetHandle === targetHandle,
+    ).length;
+
+    if (srcCount >= srcPort.maxConnections) return false;
+    if (tgtCount >= tgtPort.maxConnections) return false;
+
+    return true;
+  }
 
   // -- Connection: SF shows edge instantly, MATLAB confirms -------------------
 
@@ -444,6 +480,7 @@
       deleteKey={['Backspace', 'Delete']}
       multiSelectionKeyCode="Meta"
       selectionKeyCode="Shift"
+      {isValidConnection}
       onbeforeconnect={handleBeforeConnect}
       onconnect={handleConnect}
       onbeforedelete={handleBeforeDelete}

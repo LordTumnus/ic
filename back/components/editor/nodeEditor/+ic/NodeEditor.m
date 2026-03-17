@@ -244,6 +244,19 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             srcNode = this.findNodeById(data.source);
             tgtNode = this.findNodeById(data.target);
             srcPort = srcNode.findPort(string(data.sourcePort), "outputs");
+            tgtPort = tgtNode.findPort(string(data.targetPort), "inputs");
+
+            % Validate MaxConnections on both ports
+            if numel(srcPort.Edges) >= srcPort.MaxConnections
+                error("ic:NodeEditor:MaxConnections", ...
+                    "Source port '%s' already has %d/%d connections.", ...
+                    srcPort.Name, numel(srcPort.Edges), srcPort.MaxConnections);
+            end
+            if numel(tgtPort.Edges) >= tgtPort.MaxConnections
+                error("ic:NodeEditor:MaxConnections", ...
+                    "Target port '%s' already has %d/%d connections.", ...
+                    tgtPort.Name, numel(tgtPort.Edges), tgtPort.MaxConnections);
+            end
 
             typeMap = dictionary("static", "ic.node.StaticEdge", ...
                                  "flow",   "ic.node.FlowEdge", ...
