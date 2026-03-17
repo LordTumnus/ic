@@ -32,13 +32,14 @@
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/base.css';
 
-  import type { ChildEntries, RequestFn, Resolution } from '$lib/types';
+  import type { ChildEntries, ChildEntry, RequestFn, Resolution } from '$lib/types';
   import { extractPorts, type PortDef } from '$lib/utils/node-editor-types';
   import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
   import dagre from '@dagrejs/dagre';
   import logger from '$lib/core/logger';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
   import type { ContextMenuEntry } from '$lib/utils/context-menu-types';
+  import StoreCapture from './StoreCapture.svelte';
 
   // Node type components — one per concrete MATLAB class
   import TransformNode from './nodes/TransformNode.svelte';
@@ -113,95 +114,141 @@
   // -- Svelte Flow state ------------------------------------------------------
 
   let flowNodes: FlowNode[] = $state.raw([]);
-  let flowEdges: FlowEdge[] = $state([]);
+  let flowEdges: FlowEdge[] = $state.raw([]);
 
-  // -- Nodes: extract from IC childEntries with nested port data ---------------
+  // -- Nodes: per-node reactive isolation ----------------------------------------
+  //
+  // Each node gets its own $derived that tracks ONLY its proxy properties.
+  // A property change on node1 does NOT cause node2's $derived to re-run.
+  // This prevents the cascade where every property change on any node/port
+  // would rebuild all nodes, all maps, and all edges.
 
-  const icNodes = $derived(
-    (childEntries['nodes'] ?? []).map((c) => {
-      const p = c.props;
-      const inputs = extractPorts(c, 'inputs');
-      const outputs = extractPorts(c, 'outputs');
+  const nodeEntries = $derived(childEntries['nodes'] ?? []);
+
+  class NodeState {
+    entry: ChildEntry;
+
+    readonly data = $derived.by(() => {
+      const e = this.entry;
+      const p = e.props;
       return {
-        id: c.id,
-        type: c.type,
+        id: e.id,
+        type: e.type,
         position: (p.position as number[]) ?? [0, 0],
         disabled: (p.disabled as boolean) ?? false,
         locked: (p.locked as boolean) ?? false,
         parentNodeId: (p.parentNodeId as string) || undefined,
-        inputs,
-        outputs,
-        nodeProps: p,
+        label: (p.label as string) ?? '',
+        expression: (p.expression as string) ?? '',
+        color: (p.color as string) ?? '',
+        icon: p.icon ?? null,
+        inputs: extractPorts(e, 'inputs'),
+        outputs: extractPorts(e, 'outputs'),
       };
-    }),
-  );
+    });
+
+    constructor(entry: ChildEntry) {
+      this.entry = entry;
+    }
+  }
+
+  // Maintain per-node state objects. Only re-runs on structural changes
+  // (add/remove/reorder), NOT on property changes within existing nodes.
+  const nodeStateMap = new Map<string, NodeState>();
+
+  const nodeStates = $derived.by(() => {
+    const entries = nodeEntries;
+    const next = new Map<string, NodeState>();
+    for (const entry of entries) {
+      const existing = nodeStateMap.get(entry.id);
+      if (existing) {
+        existing.entry = entry;
+        next.set(entry.id, existing);
+      } else {
+        next.set(entry.id, new NodeState(entry));
+      }
+    }
+    nodeStateMap.clear();
+    for (const [k, v] of next) nodeStateMap.set(k, v);
+    return [...next.values()];
+  });
 
   // Build lookup: "nodeId:portName" → PortDef (for source port behavior on edges)
-  const portBehaviorMap = $derived(
-    new Map(
-      icNodes.flatMap((n) =>
-        n.outputs.map((p) => [`${n.id}:${p.name}`, p] as const),
-      ),
-    ),
-  );
+  const portBehaviorMap = $derived.by(() => {
+    const map = new Map<string, PortDef>();
+    for (const ns of nodeStates) {
+      for (const p of ns.data.outputs) map.set(`${ns.data.id}:${p.name}`, p);
+    }
+    return map;
+  });
 
   // Build lookup: "nodeId:portName" → PortDef (all ports, for connection validation)
-  const allPortMap = $derived(
-    new Map(
-      icNodes.flatMap((n) =>
-        [...n.inputs, ...n.outputs].map((p) => [`${n.id}:${p.name}`, p] as const),
-      ),
-    ),
-  );
+  const allPortMap = $derived.by(() => {
+    const map = new Map<string, PortDef>();
+    for (const ns of nodeStates) {
+      const d = ns.data;
+      for (const p of [...d.inputs, ...d.outputs]) map.set(`${d.id}:${p.name}`, p);
+    }
+    return map;
+  });
 
   // Stable key that changes only when port handles appear/disappear/rename.
   // Used to re-trigger edge reconciliation after handles register in the DOM.
   const nodeHandleKey = $derived(
-    icNodes
-      .map((n) => {
-        const ins = n.inputs.map((p) => p.name).join(',');
-        const outs = n.outputs.map((p) => p.name).join(',');
-        return `${n.id}:${ins}:${outs}`;
+    nodeStates
+      .map((ns) => {
+        const d = ns.data;
+        return `${d.id}:${d.inputs.map((p) => p.name).join(',')}:${d.outputs.map((p) => p.name).join(',')}`;
       })
       .join('|'),
   );
 
-  // Use $effect.pre so nodes (and their Handle components) are set BEFORE
-  // the DOM update. Handles register during the DOM update, and the edge
-  // $effect (post-DOM) then finds them already registered.
+  // Map nodeStates → SvelteFlow FlowNode[]. Uses $effect.pre so nodes are set
+  // BEFORE the DOM update (handles register during DOM update, edge $effect
+  // runs after). When ns.data is the same reference (unchanged $derived),
+  // the previous FlowNode is reused — preserving SvelteFlow's handleBounds.
   $effect.pre(() => {
-    const data = icNodes;
+    const states = nodeStates;
     const existing = new Map(untrack(() => flowNodes).map((n) => [n.id, n]));
+    let changed = false;
 
-    flowNodes = data.map((nd) => {
-      const prev = existing.get(nd.id);
-      const position = { x: nd.position[0], y: nd.position[1] };
+    const mapped = states.map((ns) => {
+      const d = ns.data;
+      const prev = existing.get(d.id);
 
-      const nodeData = {
-        label: (nd.nodeProps.label as string) ?? '',
-        expression: (nd.nodeProps.expression as string) ?? '',
-        color: (nd.nodeProps.color as string) ?? '',
-        icon: nd.nodeProps.icon ?? null,
-        disabled: nd.disabled,
-        locked: nd.locked,
-        inputs: nd.inputs,
-        outputs: nd.outputs,
+      // $derived returns the same object when dependencies haven't changed.
+      // Reuse previous FlowNode to prevent SvelteFlow's adoptUserNodes from
+      // re-processing it (which can wipe handleBounds before measurement).
+      if (prev && (prev as any).__nsData === d) return prev;
+
+      changed = true;
+      const node: any = {
+        id: d.id,
+        type: d.type,
+        position: { x: d.position[0], y: d.position[1] },
+        data: {
+          label: d.label,
+          expression: d.expression,
+          color: d.color,
+          icon: d.icon,
+          disabled: d.disabled,
+          locked: d.locked,
+          inputs: d.inputs,
+          outputs: d.outputs,
+        },
       };
-
-      const base = prev
-        ? { ...prev, position, data: nodeData }
-        : { id: nd.id, type: nd.type, position, data: nodeData };
-
-      if (nd.parentNodeId) {
-        (base as any).parentId = nd.parentNodeId;
-        (base as any).extent = 'parent';
+      if (d.parentNodeId) {
+        node.parentId = d.parentNodeId;
+        node.extent = 'parent';
       }
-      if (nd.locked) {
-        (base as any).draggable = false;
-      }
-
-      return base;
+      if (d.locked) node.draggable = false;
+      node.__nsData = d;
+      return node;
     });
+
+    if (changed || mapped.length !== untrack(() => flowNodes).length) {
+      flowNodes = mapped;
+    }
   });
 
   // -- Edges: MATLAB-sourced edges with type mapping and data injection --------
@@ -259,9 +306,24 @@
   //
   // Also depends on nodeHandleKey: when port data arrives (handles register),
   // edges must be re-set so Svelte Flow can resolve the handle positions.
+  //
+  // IMPORTANT: The timer variable lives OUTSIDE the effect so we can cancel
+  // it at the START of the next run. MATLAB sends edge updates as separate
+  // postMessage events; the browser processes timer callbacks between them,
+  // so Svelte's cleanup (which runs at next-effect-start) fires AFTER the
+  // timer has already executed with a stale closure.
+  let edgeRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
   $effect(() => {
     const matlab = icEdges;
     const _handles = nodeHandleKey; // re-run when port handles change
+
+    // Cancel any pending retry FIRST — before it fires with stale data
+    if (edgeRetryTimer !== null) {
+      clearTimeout(edgeRetryTimer);
+      edgeRetryTimer = null;
+    }
+
     const matlabIds = new Set(matlab.map((e) => e.id));
     const current = untrack(() => flowEdges);
 
@@ -279,7 +341,51 @@
       );
     });
 
-    flowEdges = [...matlab, ...sfOnly];
+    const merged = [...matlab, ...sfOnly];
+    flowEdges = merged;
+
+    // Deferred retry: after all edges arrive and ResizeObserver registers
+    // handle bounds, check if any edges failed to render. SvelteFlow skips
+    // edges when getEdgePosition() can't find handleBounds (race condition
+    // during initial load). Fix: force updateNodeInternals for affected
+    // nodes, then re-apply edges with new references.
+    if (matlab.length > 0) {
+      edgeRetryTimer = setTimeout(() => {
+        edgeRetryTimer = null;
+        const current = flowEdges;
+        const domEdges = document.querySelectorAll('.svelte-flow__edge').length;
+        if (domEdges < current.length) {
+          const store = sfRefs.store;
+          if (store) {
+            const domEdgeIds = new Set(
+              Array.from(document.querySelectorAll('.svelte-flow__edge'))
+                .map(el => el.getAttribute('data-id'))
+            );
+            const missing = current.filter(e => !domEdgeIds.has(e.id));
+
+            // Force updateNodeInternals for nodes with missing handleBounds
+            const nodeIdsToFix = new Set<string>();
+            for (const e of missing) {
+              const srcHB = store.nodeLookup.get(e.source)?.internals?.handleBounds;
+              const tgtHB = store.nodeLookup.get(e.target)?.internals?.handleBounds;
+              if (!srcHB?.source?.length) nodeIdsToFix.add(e.source);
+              if (!tgtHB?.target?.length) nodeIdsToFix.add(e.target);
+            }
+            if (nodeIdsToFix.size > 0) {
+              const updates = new Map<string, { id: string; nodeElement: HTMLDivElement; force: boolean }>();
+              for (const nodeId of nodeIdsToFix) {
+                const el = document.querySelector(`[data-id="${nodeId}"]`) as HTMLDivElement;
+                if (el) updates.set(nodeId, { id: nodeId, nodeElement: el, force: true });
+              }
+              if (updates.size > 0) store.updateNodeInternals(updates);
+            }
+          }
+
+          // Re-apply edges with new refs to force visible re-derivation
+          flowEdges = current.map((e) => ({ ...e }));
+        }
+      }, 200);
+    }
   });
 
   // -- Connection validation: MaxConnections enforcement ----------------------
@@ -406,22 +512,18 @@
 
   const toolbarEntries = $derived(childEntries['toolbar'] ?? []);
 
-  // -- Flow API reference (captured from ToolbarControls snippet) -------------
-
-  let flowApi: ReturnType<typeof useSvelteFlow> | null = $state(null);
-
-  function captureFlowApi(api: ReturnType<typeof useSvelteFlow>) {
-    if (flowApi !== api) flowApi = api;
-  }
+  // -- Flow API + store references -----------------------------------------------
+  // Both captured by child components inside SvelteFlow (where getContext works).
+  // Plain object — NOT $state — because these are set during render (snippet/mount).
+  const sfRefs: { flow: any; store: any } = { flow: null, store: null };
 
   // -- Initial fit: one-time fitView after first nodes arrive ------------------
 
   let initialFitDone = false;
   $effect(() => {
-    if (initialFitDone || !flowApi || flowNodes.length === 0) return;
+    if (initialFitDone || !sfRefs.flow || flowNodes.length === 0) return;
     initialFitDone = true;
-    const flow = flowApi;
-    // Defer to next tick so SvelteFlow has measured node dimensions
+    const flow = sfRefs.flow;
     queueMicrotask(() => flow.fitView({ duration: 0 }));
   });
 
@@ -510,20 +612,15 @@
     return OK;
   };
 
-  // Methods that NEED the flow API — wire when available
-  $effect(() => {
-    if (!flowApi) return;
-    const flow = flowApi;
-
-    fitViewMethod = (): Resolution => {
-      flow.fitView({ duration: 200 });
-      return OK;
-    };
-    zoomTo = (data: { level: number }): Resolution => {
-      flow.zoomTo(data.level, { duration: 200 });
-      return OK;
-    };
-  });
+  // Methods that NEED the flow API — check sfRefs.flow at call time
+  fitViewMethod = (): Resolution => {
+    sfRefs.flow?.fitView({ duration: 200 });
+    return OK;
+  };
+  zoomTo = (data: { level: number }): Resolution => {
+    sfRefs.flow?.zoomTo(data.level, { duration: 200 });
+    return OK;
+  };
 
   // -- Context menu state -----------------------------------------------------
 
@@ -1051,8 +1148,8 @@
         <ToolbarControls />
       </Panel>
 
-      <!-- SVG marker definitions for StaticEdge arrow types -->
-      <!-- Edge marker defs are rendered per-edge inside each renderer -->
+      <!-- Capture SvelteFlow's internal store (getContext only works during component init) -->
+      <StoreCapture onstore={(s) => { sfRefs.store = s; }} />
 
       {#if showMiniMap}
         <MiniMap
@@ -1081,7 +1178,7 @@
   Renders built-in viewport controls.
 -->
 {#snippet ToolbarControls()}
-  {@const flow = (() => { const f = useSvelteFlow(); setTimeout(() => captureFlowApi(f), 0); return f; })()}
+  {@const flow = (() => { const f = useSvelteFlow(); sfRefs.flow = f; return f; })()}
   <div class="ic-ne__controls">
     <!-- Viewport controls -->
     <button
