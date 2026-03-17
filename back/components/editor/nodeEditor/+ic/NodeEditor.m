@@ -40,6 +40,10 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
 
         % > SHOWMINIMAP show/hide the minimap overlay
         ShowMiniMap (1,1) logical = false
+
+        % > LAYOUT auto-layout direction: horizontal | vertical
+        Layout (1,1) string {mustBeMember(Layout, ...
+            ["horizontal", "vertical"])} = "horizontal"
     end
 
     properties (SetObservable, Description = "Reactive", ...
@@ -149,6 +153,19 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         function out = clearSelection(this)
             % > CLEARSELECTION Deselect all nodes and edges.
             out = this.publish("clearSelection", []);
+        end
+
+        function out = relayout(this, direction)
+            % > RELAYOUT Auto-layout nodes using dagre algorithm.
+            arguments
+                this
+                direction (1,1) string {mustBeMember(direction, ...
+                    ["", "horizontal", "vertical"])} = ""
+            end
+            if direction ~= ""
+                this.Layout = direction;
+            end
+            out = this.publish("relayout", []);
         end
     end
 

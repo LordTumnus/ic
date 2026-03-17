@@ -35,6 +35,8 @@
   import type { ChildEntries, RequestFn, Resolution } from '$lib/types';
   import { extractPorts } from '$lib/utils/node-editor-types';
   import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
+  import dagre from '@dagrejs/dagre';
+  import logger from '$lib/core/logger';
 
   // Node type components — one per concrete MATLAB class
   import TransformNode from './nodes/TransformNode.svelte';
@@ -51,6 +53,7 @@
     gridSize = $bindable(20),
     edgeGeometry = $bindable('bezier'),
     showMiniMap = $bindable(false),
+    layout = $bindable('horizontal'),
     childEntries = {} as ChildEntries,
     request,
     // Selection state (written back to MATLAB)
@@ -64,11 +67,13 @@
     zoomTo = $bindable((_data: { level: number }): Resolution => OK),
     selectAll: selectAllMethod = $bindable((): Resolution => OK),
     clearSelection: clearSelectionMethod = $bindable((): Resolution => OK),
+    relayout: relayoutMethod = $bindable((_data?: unknown): Resolution => OK),
   }: {
     height?: string;
     gridSize?: number;
     edgeGeometry?: string;
     showMiniMap?: boolean;
+    layout?: string;
     childEntries?: ChildEntries;
     request?: RequestFn;
     selectedNodeIds?: string[];
@@ -79,6 +84,7 @@
     zoomTo?: (data: { level: number }) => Resolution;
     selectAll?: () => Resolution;
     clearSelection?: () => Resolution;
+    relayout?: (data?: unknown) => Resolution;
   } = $props();
 
   // -- Node type registry: MATLAB class name → Svelte Flow component ----------
@@ -395,6 +401,10 @@
 
   let flowApi: ReturnType<typeof useSvelteFlow> | null = $state(null);
 
+  function captureFlowApi(api: ReturnType<typeof useSvelteFlow>) {
+    if (flowApi !== api) flowApi = api;
+  }
+
   // -- Initial fit: one-time fitView after first nodes arrive ------------------
 
   let initialFitDone = false;
@@ -434,6 +444,64 @@
 
   // -- Methods: wire MATLAB → SvelteFlow via captured flow API ----------------
 
+  // Methods that DON'T need the flow API — wire immediately
+  selectAllMethod = (): Resolution => {
+    flowNodes = flowNodes.map((n) => ({ ...n, selected: true }));
+    flowEdges = flowEdges.map((fe) => ({ ...fe, selected: true }));
+    return OK;
+  };
+  clearSelectionMethod = (): Resolution => {
+    flowNodes = flowNodes.map((n) => ({ ...n, selected: false }));
+    flowEdges = flowEdges.map((fe) => ({ ...fe, selected: false }));
+    return OK;
+  };
+
+  /** Run dagre layout and update node positions. */
+  function runDagreLayout(direction: string) {
+    const dir = direction === 'vertical' ? 'TB' : 'LR';
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: dir, nodesep: 50, ranksep: 80 });
+
+    for (const node of flowNodes) {
+      const el = document.querySelector(`[data-id="${node.id}"]`);
+      const width = el?.clientWidth ?? 180;
+      const height = el?.clientHeight ?? 100;
+      g.setNode(node.id, { width, height });
+    }
+
+    for (const edge of flowEdges) {
+      g.setEdge(edge.source, edge.target);
+    }
+
+    dagre.layout(g);
+
+    const updated = flowNodes.map((node) => {
+      const dagreNode = g.node(node.id);
+      return {
+        ...node,
+        position: {
+          x: dagreNode.x - dagreNode.width / 2,
+          y: dagreNode.y - dagreNode.height / 2,
+        },
+      };
+    });
+
+    flowNodes = updated;
+    writeBackPositions(updated);
+    return updated;
+  }
+
+  relayoutMethod = (): Resolution => {
+    try {
+      runDagreLayout(layout);
+    } catch (e) {
+      logger.error('NodeEditor', 'relayout failed', { error: String(e) });
+    }
+    return OK;
+  };
+
+  // Methods that NEED the flow API — wire when available
   $effect(() => {
     if (!flowApi) return;
     const flow = flowApi;
@@ -444,16 +512,6 @@
     };
     zoomTo = (data: { level: number }): Resolution => {
       flow.zoomTo(data.level, { duration: 200 });
-      return OK;
-    };
-    selectAllMethod = (): Resolution => {
-      flowNodes = flowNodes.map((n) => ({ ...n, selected: true }));
-      flowEdges = flowEdges.map((fe) => ({ ...fe, selected: true }));
-      return OK;
-    };
-    clearSelectionMethod = (): Resolution => {
-      flowNodes = flowNodes.map((n) => ({ ...n, selected: false }));
-      flowEdges = flowEdges.map((fe) => ({ ...fe, selected: false }));
       return OK;
     };
   });
@@ -552,8 +610,7 @@
   Renders built-in viewport controls.
 -->
 {#snippet ToolbarControls()}
-  {@const flow = useSvelteFlow()}
-  {@const _ = flowApi !== flow && queueMicrotask(() => { flowApi = flow; })}
+  {@const flow = (() => { const f = useSvelteFlow(); setTimeout(() => captureFlowApi(f), 0); return f; })()}
   <div class="ic-ne__controls">
     <!-- Viewport controls -->
     <button
@@ -581,6 +638,19 @@
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35M8 11h6" />
+      </svg>
+    </button>
+    <div class="ic-ne__control-sep"></div>
+    <button
+      class="ic-ne__control-btn"
+      title="Auto layout"
+      onclick={() => runDagreLayout(layout)}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="8" y="14" width="7" height="7" rx="1" />
+        <path d="M6.5 10v2a2 2 0 002 2h1m8-4v2a2 2 0 01-2 2h-1" />
       </svg>
     </button>
   </div>
@@ -658,6 +728,14 @@
 
   .ic-ne__control-btn:active {
     background: var(--ic-border);
+  }
+
+  .ic-ne__control-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--ic-border);
+    margin: 0 2px;
+    flex-shrink: 0;
   }
 
   /* ── MiniMap ─── */
