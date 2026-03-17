@@ -44,6 +44,9 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         % > LAYOUT auto-layout direction: horizontal | vertical
         Layout (1,1) string {mustBeMember(Layout, ...
             ["horizontal", "vertical"])} = "horizontal"
+
+        % > SNAPTOGRID snap nodes to grid when dragging
+        SnapToGrid (1,1) logical = false
     end
 
     properties (SetObservable, Description = "Reactive", ...

@@ -54,6 +54,7 @@
     edgeGeometry = $bindable('bezier'),
     showMiniMap = $bindable(false),
     layout = $bindable('horizontal'),
+    snapToGrid = $bindable(false),
     childEntries = {} as ChildEntries,
     request,
     // Selection state (written back to MATLAB)
@@ -74,6 +75,7 @@
     edgeGeometry?: string;
     showMiniMap?: boolean;
     layout?: string;
+    snapToGrid?: boolean;
     childEntries?: ChildEntries;
     request?: RequestFn;
     selectedNodeIds?: string[];
@@ -86,6 +88,11 @@
     clearSelection?: () => Resolution;
     relayout?: (data?: unknown) => Resolution;
   } = $props();
+
+  // -- Snap grid: when enabled, nodes snap to gridSize intervals ---------------
+  const snapGrid = $derived<[number, number] | undefined>(
+    snapToGrid ? [gridSize, gridSize] : undefined,
+  );
 
   // -- Node type registry: MATLAB class name → Svelte Flow component ----------
 
@@ -535,6 +542,7 @@
       bind:edges={flowEdges}
       {nodeTypes}
       {edgeTypes}
+      {snapGrid}
       deleteKey={['Backspace', 'Delete']}
       multiSelectionKeyCode="Meta"
       selectionKeyCode="Shift"
@@ -653,6 +661,18 @@
         <path d="M6.5 10v2a2 2 0 002 2h1m8-4v2a2 2 0 01-2 2h-1" />
       </svg>
     </button>
+    <button
+      class="ic-ne__control-btn"
+      class:ic-ne__control-btn--active={snapToGrid}
+      title={snapToGrid ? 'Disable snap to grid' : 'Enable snap to grid'}
+      onclick={() => { snapToGrid = !snapToGrid; }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m12 15 4 4" />
+        <path d="M2.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l6.029-6.029a1 1 0 1 1 3 3l-6.029 6.029a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l6.365-6.367A1 1 0 0 0 8.716 4.282z" />
+        <path d="m5 8 4 4" />
+      </svg>
+    </button>
   </div>
 {/snippet}
 
@@ -728,6 +748,11 @@
 
   .ic-ne__control-btn:active {
     background: var(--ic-border);
+  }
+
+  .ic-ne__control-btn--active {
+    background: var(--ic-muted);
+    color: var(--ic-primary);
   }
 
   .ic-ne__control-sep {
