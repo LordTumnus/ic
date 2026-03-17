@@ -141,3 +141,17 @@ export const EDGE_TYPE_MAP: Record<string, string> = {
   'ic.node.FlowEdge': 'flow',
   'ic.node.SignalEdge': 'signal',
 };
+
+// ── Marker helpers ──────────────────────────────────────────────────────
+
+/** Valid arrow types for edge markers. */
+export const ARROW_TYPES = ['arrow', 'diamond', 'circle'] as const;
+
+/** Returns `url(#ic-marker-{type}-{edgeId})` or undefined for 'none'. */
+export function markerUrl(
+  edgeId: string,
+  arrowType: string | undefined,
+): string | undefined {
+  if (!arrowType || arrowType === 'none') return undefined;
+  return `url(#ic-marker-${arrowType}-${edgeId})`;
+}

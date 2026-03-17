@@ -7,7 +7,8 @@
 -->
 <script lang="ts">
   import { BaseEdge, type EdgeProps } from '@xyflow/svelte';
-  import { computeEdgePath } from '$lib/utils/edge-utils';
+  import { computeEdgePath, markerUrl } from '$lib/utils/edge-utils';
+  import EdgeMarkerDefs from './EdgeMarkerDefs.svelte';
 
   let {
     id,
@@ -42,26 +43,18 @@
   const labelX = $derived(pathResult[1]);
   const labelY = $derived(pathResult[2]);
 
-  // Map arrow type strings to marker URLs
-  function arrowMarker(type: string | undefined): string | undefined {
-    switch (type) {
-      case 'arrow':
-        return 'url(#ic-marker-arrow)';
-      case 'diamond':
-        return 'url(#ic-marker-diamond)';
-      case 'circle':
-        return 'url(#ic-marker-circle)';
-      default:
-        return undefined;
-    }
-  }
-
-  const markerStart = $derived(arrowMarker(data?.startArrow as string));
-  const markerEnd = $derived(arrowMarker(data?.endArrow as string));
+  const startArrow = $derived((data?.startArrow as string) || 'none');
+  const endArrow = $derived((data?.endArrow as string) || 'none');
+  const markerStart = $derived(markerUrl(id, startArrow));
+  const markerEnd = $derived(markerUrl(id, endArrow));
   const animated = $derived((data?.animated as boolean) ?? false);
 
   const edgeColor = $derived((data?.color as string) || '');
   const thickness = $derived((data?.thickness as number) ?? 1);
+
+  const resolvedColor = $derived(
+    selected ? 'var(--ic-primary)' : (edgeColor || 'var(--ic-muted-foreground)'),
+  );
 
   const style = $derived.by(() => {
     const parts: string[] = [];
@@ -76,6 +69,7 @@
   });
 </script>
 
+<EdgeMarkerDefs edgeId={id} color={resolvedColor} {startArrow} {endArrow} />
 <BaseEdge
   {id}
   {path}

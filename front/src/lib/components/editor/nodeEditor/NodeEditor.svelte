@@ -547,6 +547,9 @@
     const edgeType = edge.type || 'static';
     const arrowOptions = ['none', 'arrow', 'diamond', 'circle'] as const;
 
+    const edgeColor = (edge.data?.color as string) || '';
+    const thickness = (edge.data?.thickness as number) ?? 1;
+
     // Shared base-edge entries
     const entries: ContextMenuEntry[] = [
       {
@@ -576,6 +579,16 @@
           icon: endArrow === a ? 'check' : undefined,
         })),
       },
+      {
+        type: 'folder', label: `Thickness (${thickness})`, icon: 'minus',
+        children: [1, 2, 3, 4, 5, 6].map((t) => ({
+          type: 'item' as const,
+          key: `thickness:${t}`,
+          label: `${t}px`,
+          icon: thickness === t ? 'check' : undefined,
+        })),
+      },
+      { type: 'color', key: 'color', label: 'Edge Color', value: edgeColor },
     ];
 
     // Edge-type-specific entries
@@ -599,6 +612,10 @@
           icon: pSize === s ? 'check' : undefined,
         })),
       });
+      entries.push({
+        type: 'color', key: 'particleColor', label: 'Particle Color',
+        value: (edge.data?.particleColor as string) || '',
+      });
     } else if (edgeType === 'signal') {
       const amp = (edge.data?.amplitude as number) ?? 8;
       entries.push({
@@ -619,6 +636,10 @@
           label: `${w}px`,
           icon: sigThick === w ? 'check' : undefined,
         })),
+      });
+      entries.push({
+        type: 'color', key: 'signalColor', label: 'Signal Color',
+        value: (edge.data?.signalColor as string) || '',
       });
     }
 
@@ -648,10 +669,17 @@
     if (entry) entry.props[prop] = value;
   }
 
+  // Color prop keys — actions from inline color pickers should NOT close the menu
+  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor']);
+
   function handleCtxAction(key: string) {
     const ctx = ctxMenu?.context;
     if (!ctx) return;
-    closeCtxMenu();
+
+    // Check if this is a live color picker update (key = "color:#hex")
+    const colonIdx0 = key.indexOf(':');
+    const isColorAction = colonIdx0 > 0 && COLOR_PROPS.has(key.slice(0, colonIdx0));
+    if (!isColorAction) closeCtxMenu();
 
     if (ctx.type === 'edge') {
       if (key === 'delete-edge') {
@@ -670,7 +698,7 @@
           const prop = key.slice(0, colonIdx);
           const raw = key.slice(colonIdx + 1);
           // Numeric props: parse to number
-          const numericProps = new Set(['particleSize', 'amplitude', 'signalThickness']);
+          const numericProps = new Set(['thickness', 'particleSize', 'amplitude', 'signalThickness']);
           const value = numericProps.has(prop) ? Number(raw) : raw;
           updateEdgeProp(ctx.id, prop, value);
         }
@@ -717,46 +745,7 @@
       </Panel>
 
       <!-- SVG marker definitions for StaticEdge arrow types -->
-      <svg class="ic-ne__defs" width="0" height="0">
-        <defs>
-          <!-- Arrow marker (triangle) -->
-          <marker
-            id="ic-marker-arrow"
-            viewBox="0 0 10 10"
-            refX="10"
-            refY="5"
-            markerWidth="8"
-            markerHeight="8"
-            orient="auto-start-reverse"
-          >
-            <path d="M0 0 L10 5 L0 10 Z" fill="var(--ic-muted-foreground)" />
-          </marker>
-          <!-- Diamond marker -->
-          <marker
-            id="ic-marker-diamond"
-            viewBox="0 0 10 10"
-            refX="5"
-            refY="5"
-            markerWidth="10"
-            markerHeight="10"
-            orient="auto-start-reverse"
-          >
-            <path d="M5 0 L10 5 L5 10 L0 5 Z" fill="var(--ic-muted-foreground)" />
-          </marker>
-          <!-- Circle marker -->
-          <marker
-            id="ic-marker-circle"
-            viewBox="0 0 10 10"
-            refX="5"
-            refY="5"
-            markerWidth="8"
-            markerHeight="8"
-            orient="auto"
-          >
-            <circle cx="5" cy="5" r="4" fill="var(--ic-muted-foreground)" />
-          </marker>
-        </defs>
-      </svg>
+      <!-- Edge marker defs are rendered per-edge inside each renderer -->
 
       {#if showMiniMap}
         <MiniMap
@@ -875,11 +864,6 @@
   .ic-ne__canvas {
     flex: 1;
     min-height: 0;
-  }
-
-  .ic-ne__defs {
-    position: absolute;
-    pointer-events: none;
   }
 
   /* ── Built-in controls (edge mode + viewport) ─── */

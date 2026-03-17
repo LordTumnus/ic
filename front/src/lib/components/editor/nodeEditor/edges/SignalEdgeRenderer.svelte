@@ -16,7 +16,9 @@
     computeEdgePath,
     createPathSampler,
     evaluateExpression,
+    markerUrl,
   } from '$lib/utils/edge-utils';
+  import EdgeMarkerDefs from './EdgeMarkerDefs.svelte';
 
   let {
     id,
@@ -49,16 +51,10 @@
   const guideThickness = $derived((data?.thickness as number) ?? 1);
 
   // Arrow markers (from base Edge — rendered on guide line)
-  function arrowMarker(type: string | undefined): string | undefined {
-    switch (type) {
-      case 'arrow': return 'url(#ic-marker-arrow)';
-      case 'diamond': return 'url(#ic-marker-diamond)';
-      case 'circle': return 'url(#ic-marker-circle)';
-      default: return undefined;
-    }
-  }
-  const markerStart = $derived(arrowMarker(data?.startArrow as string));
-  const markerEnd = $derived(arrowMarker(data?.endArrow as string));
+  const startArrow = $derived((data?.startArrow as string) || 'none');
+  const endArrow = $derived((data?.endArrow as string) || 'none');
+  const markerStart = $derived(markerUrl(id, startArrow));
+  const markerEnd = $derived(markerUrl(id, endArrow));
 
   const pathResult = $derived(
     computeEdgePath(geometry, {
@@ -157,6 +153,7 @@
 </script>
 
 <g class="ic-ne-signal-edge">
+  <EdgeMarkerDefs edgeId={id} color={guideColor} {startArrow} {endArrow} />
   <!-- Faded guide line (always shows the connection route) -->
   <path
     d={path}

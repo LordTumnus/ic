@@ -27,5 +27,13 @@ export interface ContextMenuFolder {
   children?: ContextMenuEntry[];
 }
 
+/** An inline color picker entry. */
+export interface ContextMenuColorEntry {
+  type: 'color';
+  key: string;
+  label?: string;
+  value: string;
+}
+
 /** Union of all context menu entry types. */
-export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuFolder;
+export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuFolder | ContextMenuColorEntry;
