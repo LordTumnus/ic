@@ -98,8 +98,16 @@ classdef (Abstract) Edge < ic.core.Component
             this.TargetPortName = tgtPortName;
 
             % Look up and store port handles
-            this.SourcePort = srcNode.findPort(srcPortName, "outputs");
-            this.TargetPort = tgtNode.findPort(tgtPortName, "inputs");
+            % :int suffix = group interior handle — direction is reversed
+            % (an input port's interior acts as source, output's as target)
+            srcIsInt = endsWith(srcPortName, ":int");
+            tgtIsInt = endsWith(tgtPortName, ":int");
+            srcLookup = regexprep(srcPortName, ':int$', '');
+            tgtLookup = regexprep(tgtPortName, ':int$', '');
+            srcSide = "outputs"; if srcIsInt, srcSide = "inputs"; end
+            tgtSide = "inputs";  if tgtIsInt, tgtSide = "outputs"; end
+            this.SourcePort = srcNode.findPort(srcLookup, srcSide);
+            this.TargetPort = tgtNode.findPort(tgtLookup, tgtSide);
 
             % Register edge on both ports
             this.SourcePort.addEdge(this);

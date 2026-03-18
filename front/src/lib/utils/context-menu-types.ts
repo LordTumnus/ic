@@ -44,5 +44,16 @@ export interface ContextMenuTextEntry {
   placeholder?: string;
 }
 
+/** An inline range slider entry. */
+export interface ContextMenuRangeEntry {
+  type: 'range';
+  key: string;
+  label?: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
 /** Union of all context menu entry types. */
-export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuFolder | ContextMenuColorEntry | ContextMenuTextEntry;
+export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator | ContextMenuFolder | ContextMenuColorEntry | ContextMenuTextEntry | ContextMenuRangeEntry;

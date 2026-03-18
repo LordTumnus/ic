@@ -43,6 +43,7 @@
 
   // Node type components — one per concrete MATLAB class
   import TransformNode from './nodes/TransformNode.svelte';
+  import GroupNode from './nodes/GroupNode.svelte';
 
   // Edge type components — one per concrete MATLAB edge class
   import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
@@ -113,6 +114,7 @@
 
   const nodeTypes = {
     'ic.node.Transform': TransformNode,
+    'ic.node.Group': GroupNode,
   } as Record<string, any>;
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
@@ -127,6 +129,9 @@
 
   let flowNodes: FlowNode[] = $state.raw([]);
   let flowEdges: FlowEdge[] = $state.raw([]);
+
+  // IDs of nodes hidden due to group collapse — used to hide connected edges
+  let hiddenNodeIds: Set<string> = $state.raw(new Set());
 
   // -- Nodes: per-node reactive isolation ----------------------------------------
   //
@@ -154,6 +159,12 @@
         expression: (p.expression as string) ?? '',
         color: (p.color as string) ?? '',
         icon: p.icon ?? null,
+        width: (p.width as number) ?? 400,
+        height: (p.height as number) ?? 300,
+        collapsed: (p.collapsed as boolean) ?? false,
+        resizable: (p.resizable as boolean) ?? true,
+        backgroundColor: (p.backgroundColor as string) ?? '',
+        backgroundOpacity: (p.backgroundOpacity as number) ?? 0,
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -224,6 +235,14 @@
     const existing = new Map(untrack(() => flowNodes).map((n) => [n.id, n]));
     let changed = false;
 
+    // Pre-compute collapsed group IDs so child hidden state can be checked
+    // even when the child's own data reference hasn't changed.
+    const collapsedGroups = new Set(
+      states
+        .filter((s) => s.data.type === 'ic.node.Group' && s.data.collapsed)
+        .map((s) => s.data.id),
+    );
+
     const mapped = states.map((ns) => {
       const d = ns.data;
       const prev = existing.get(d.id);
@@ -231,7 +250,18 @@
       // $derived returns the same object when dependencies haven't changed.
       // Reuse previous FlowNode to prevent SvelteFlow's adoptUserNodes from
       // re-processing it (which can wipe handleBounds before measurement).
-      if (prev && (prev as any).__nsData === d) return prev;
+      if (prev && (prev as any).__nsData === d) {
+        // Even when reusing, update hidden state for children of groups
+        // whose collapsed state may have changed.
+        if (d.parentNodeId) {
+          const shouldHide = collapsedGroups.has(d.parentNodeId);
+          if ((prev.hidden ?? false) !== shouldHide) {
+            changed = true;
+            return { ...prev, hidden: shouldHide };
+          }
+        }
+        return prev;
+      }
 
       changed = true;
       const node: any = {
@@ -247,16 +277,60 @@
           locked: d.locked,
           inputs: d.inputs,
           outputs: d.outputs,
+          // Group-specific (ignored by non-group node components)
+          width: d.width,
+          height: d.height,
+          collapsed: d.collapsed,
+          resizable: d.resizable,
+          backgroundColor: d.backgroundColor,
+          backgroundOpacity: d.backgroundOpacity,
+          onGroupResize: handleGroupResize,
+          onGroupCollapse: handleGroupCollapse,
         },
       };
       if (d.parentNodeId) {
         node.parentId = d.parentNodeId;
-        node.extent = 'parent';
+        // Use coordinate extent with 30px top padding to keep children
+        // below the group header. Coordinates are relative to parent.
+        const parentData = states.find(
+          (s) => s.data.id === d.parentNodeId,
+        )?.data;
+        if (parentData?.width && parentData?.height) {
+          node.extent = [
+            [0, 30],
+            [parentData.width, parentData.height],
+          ];
+        } else {
+          node.extent = 'parent';
+        }
+        if (collapsedGroups.has(d.parentNodeId)) node.hidden = true;
+      }
+      // Group nodes need explicit dimensions and low zIndex
+      if (d.type === 'ic.node.Group') {
+        const h = d.collapsed ? groupCollapsedH(d) : d.height;
+        node.style = `width: ${d.width}px; height: ${h}px;`;
+        node.zIndex = -1;
       }
       if (d.locked) node.draggable = false;
       node.__nsData = d;
       return node;
     });
+
+    // SvelteFlow requires parent nodes before children in the array.
+    // Sort so nodes without parentId come first (stable sort preserves
+    // relative order within each group).
+    mapped.sort((a, b) => {
+      const aChild = a.parentId ? 1 : 0;
+      const bChild = b.parentId ? 1 : 0;
+      return aChild - bChild;
+    });
+
+    // Track which nodes are hidden (children of collapsed groups)
+    const newHidden = new Set(mapped.filter((n) => n.hidden).map((n) => n.id));
+    const oldHidden = untrack(() => hiddenNodeIds);
+    if (newHidden.size !== oldHidden.size || [...newHidden].some((id) => !oldHidden.has(id))) {
+      hiddenNodeIds = newHidden;
+    }
 
     if (changed || mapped.length !== untrack(() => flowNodes).length) {
       flowNodes = mapped;
@@ -353,7 +427,13 @@
       );
     });
 
-    const merged = [...matlab, ...sfOnly];
+    // Apply hidden flag to edges where BOTH endpoints are hidden
+    // (internal to a collapsed group). Cross-boundary edges stay visible.
+    const hidden = untrack(() => hiddenNodeIds);
+    const merged = [...matlab, ...sfOnly].map((e) => {
+      const anyHidden = hidden.has(e.source) || hidden.has(e.target);
+      return anyHidden ? { ...e, hidden: true } : e;
+    });
     flowEdges = merged;
 
     // Deferred retry: after all edges arrive and ResizeObserver registers
@@ -400,6 +480,91 @@
     }
   });
 
+  // -- Group: helpers ----------------------------------------------------------
+
+  /** Collapsed height for a group — grows with port count. */
+  function groupCollapsedH(d?: any): number {
+    const maxPorts = Math.max(d?.inputs?.length ?? 0, d?.outputs?.length ?? 0);
+    if (maxPorts === 0) return 30;
+    return 30 + maxPorts * 24 + 20;
+  }
+
+  // -- Group: resize and collapse handlers ------------------------------------
+
+  function handleGroupResize(nodeId: string, width: number, height: number) {
+    // Write back to MATLAB childEntries
+    const entries = childEntries['nodes'] ?? [];
+    const entry = entries.find((c) => c.id === nodeId);
+    if (entry) {
+      entry.props.width = width;
+      entry.props.height = height;
+    }
+    // Update flowNodes with new dimensions
+    flowNodes = flowNodes.map((n) =>
+      n.id === nodeId
+        ? {
+            ...n,
+            style: `width: ${width}px; height: ${height}px;`,
+            data: { ...n.data, width, height },
+          }
+        : n,
+    );
+  }
+
+  function handleGroupCollapse(nodeId: string, collapsed: boolean) {
+    // Write back to MATLAB childEntries
+    const entries = childEntries['nodes'] ?? [];
+    const entry = entries.find((c) => c.id === nodeId);
+    if (entry) entry.props.collapsed = collapsed;
+
+    // Find the group's current dimensions
+    const groupNode = flowNodes.find((n) => n.id === nodeId);
+    const w = groupNode?.data?.width ?? 400;
+    const h = collapsed ? groupCollapsedH(groupNode?.data) : (groupNode?.data?.height ?? 300);
+
+    // Collect child IDs for edge hiding
+    const childIds = new Set(
+      flowNodes.filter((n) => n.parentId === nodeId).map((n) => n.id),
+    );
+
+    // Update group + hide/show children
+    flowNodes = flowNodes.map((n) => {
+      if (n.id === nodeId) {
+        return {
+          ...n,
+          style: `width: ${w}px; height: ${h}px;`,
+          data: { ...n.data, collapsed },
+        };
+      }
+      if (n.parentId === nodeId) {
+        return { ...n, hidden: collapsed };
+      }
+      return n;
+    });
+
+    // Update hiddenNodeIds set and hide/show edges
+    if (collapsed) {
+      hiddenNodeIds = new Set([...hiddenNodeIds, ...childIds]);
+    } else {
+      const updated = new Set(hiddenNodeIds);
+      for (const id of childIds) updated.delete(id);
+      hiddenNodeIds = updated;
+    }
+
+    // Hide edges where ANY endpoint is a hidden child.
+    // Edges to the group's own exterior ports stay visible (group is not hidden).
+    flowEdges = flowEdges.map((e) => {
+      const touches = childIds.has(e.source) || childIds.has(e.target);
+      if (!touches && !e.hidden) return e;
+      if (touches && collapsed) return { ...e, hidden: true };
+      if (touches && !collapsed) {
+        const { hidden: _, ...rest } = e;
+        return rest;
+      }
+      return e;
+    });
+  }
+
   // -- Connection validation: MaxConnections enforcement ----------------------
 
   function isValidConnection(connection: Connection): boolean {
@@ -409,20 +574,43 @@
     // No self-connections
     if (source === target) return false;
 
-    const srcPort = allPortMap.get(`${source}:${sourceHandle ?? ''}`);
-    const tgtPort = allPortMap.get(`${target}:${targetHandle ?? ''}`);
-    if (!srcPort || !tgtPort) return false;
+    // :int handles are group interior tunnel ports — bypass port map validation
+    const isIntHandle =
+      sourceHandle?.endsWith(':int') || targetHandle?.endsWith(':int');
 
-    // Count existing edges on each port
-    const srcCount = flowEdges.filter(
-      (e) => e.source === source && e.sourceHandle === sourceHandle,
-    ).length;
-    const tgtCount = flowEdges.filter(
-      (e) => e.target === target && e.targetHandle === targetHandle,
-    ).length;
+    if (!isIntHandle) {
+      const srcPort = allPortMap.get(`${source}:${sourceHandle ?? ''}`);
+      const tgtPort = allPortMap.get(`${target}:${targetHandle ?? ''}`);
+      if (!srcPort || !tgtPort) return false;
 
-    if (srcCount >= srcPort.maxConnections) return false;
-    if (tgtCount >= tgtPort.maxConnections) return false;
+      const srcCount = flowEdges.filter(
+        (e) => e.source === source && e.sourceHandle === sourceHandle,
+      ).length;
+      const tgtCount = flowEdges.filter(
+        (e) => e.target === target && e.targetHandle === targetHandle,
+      ).length;
+
+      if (srcCount >= srcPort.maxConnections) return false;
+      if (tgtCount >= tgtPort.maxConnections) return false;
+    }
+
+    // Group boundary enforcement: connections cannot cross group boundaries
+    // unless going through a group's boundary port.
+    const srcNode = flowNodes.find((n) => n.id === source);
+    const tgtNode = flowNodes.find((n) => n.id === target);
+    if (srcNode && tgtNode) {
+      const srcScope = srcNode.parentId ?? null;
+      const tgtScope = tgtNode.parentId ?? null;
+      if (srcScope !== tgtScope) {
+        // Different scopes — only allowed through group boundary ports:
+        // - target IS a group and source is a child inside it
+        // - source IS a group and target is a child inside it
+        const allowed =
+          (tgtNode.type === 'ic.node.Group' && srcScope === target) ||
+          (srcNode.type === 'ic.node.Group' && tgtScope === source);
+        if (!allowed) return false;
+      }
+    }
 
     return true;
   }
@@ -470,6 +658,17 @@
     nodes: FlowNode[];
     edges: FlowEdge[];
   }): Promise<boolean> {
+    // Expand: include children of any group nodes being deleted
+    const groupIds = new Set(
+      nodes.filter((n) => n.type === 'ic.node.Group').map((n) => n.id),
+    );
+    if (groupIds.size > 0) {
+      const children = flowNodes.filter(
+        (n) => n.parentId && groupIds.has(n.parentId) && !nodes.some((dn) => dn.id === n.id),
+      );
+      nodes = [...nodes, ...children];
+    }
+
     const deletedNodeIds = new Set(nodes.map((n) => n.id));
     const deletableNodes = nodes.filter((n) => !n.data?.locked);
 
@@ -561,12 +760,22 @@
 
   /** Send duplication request to MATLAB (just IDs + offset). */
   async function duplicateNodes(nodeIds: string[], offset: number[]) {
-    logger.debug('NE', `duplicateNodes: request=${!!request} count=${nodeIds.length}`);
     if (!request || nodeIds.length === 0) return;
+
+    // Expand: include children of any group nodes being duplicated
+    const expanded = new Set(nodeIds);
+    for (const id of nodeIds) {
+      const node = flowNodes.find((n) => n.id === id);
+      if (node?.type === 'ic.node.Group') {
+        flowNodes
+          .filter((n) => n.parentId === id)
+          .forEach((n) => expanded.add(n.id));
+      }
+    }
+    nodeIds = [...expanded];
+
     try {
-      logger.debug('NE', 'sending duplicateNodes request to MATLAB...');
       const result = await request('duplicateNodes', { nodeIds, offset });
-      logger.debug('NE', `duplicateNodes result: ${JSON.stringify(result)}`);
       if (result?.success && result.data?.nodeIds) {
         const newIds = new Set(result.data.nodeIds as string[]);
         setTimeout(() => {
@@ -578,7 +787,7 @@
         }, 150);
       }
     } catch (err) {
-      logger.error('NE', `duplicateNodes error: ${String(err)}`);
+      logger.error('NodeEditor', `duplicateNodes failed: ${String(err)}`);
     }
   }
 
@@ -588,7 +797,6 @@
 
   function handleKeyDown(e: KeyboardEvent) {
     const contains = canvasEl?.contains(e.target as Node);
-    logger.debug('NE', `keydown: ${e.key} meta=${e.metaKey} ctrl=${e.ctrlKey} contains=${contains}`);
     // Only handle shortcuts when the event originates inside the editor canvas
     if (!contains) return;
     // Don't intercept typing in inputs / textareas
@@ -605,19 +813,16 @@
     if (mod && e.key === 'c') {
       e.preventDefault();
       clipboardIds = getSelectedIds();
-      logger.debug('NE', `copy: ${clipboardIds.length} nodes`);
       return;
     }
     if (mod && e.key === 'v') {
       e.preventDefault();
-      logger.debug('NE', `paste: clipboard has ${clipboardIds?.length ?? 0} nodes`);
       if (clipboardIds && clipboardIds.length > 0) duplicateNodes(clipboardIds, [30, 30]);
       return;
     }
     if (mod && e.key === 'd') {
       e.preventDefault();
       const ids = getSelectedIds();
-      logger.debug('NE', `duplicate: ${ids.length} nodes`);
       if (ids.length > 0) duplicateNodes(ids, [30, 30]);
       return;
     }
@@ -649,20 +854,38 @@
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: dir, nodesep: 50, ranksep: 80 });
 
-    for (const node of flowNodes) {
+    // Only layout top-level nodes (skip children inside groups)
+    const topLevel = flowNodes.filter((n) => !n.parentId);
+    const topIds = new Set(topLevel.map((n) => n.id));
+
+    for (const node of topLevel) {
+      const isGroup = node.type === 'ic.node.Group';
       const el = document.querySelector(`[data-id="${node.id}"]`);
-      const width = el?.clientWidth ?? 180;
-      const height = el?.clientHeight ?? 100;
+      const width = isGroup ? (node.data?.width as number ?? 400) : (el?.clientWidth ?? 180);
+      const height = isGroup ? (node.data?.height as number ?? 300) : (el?.clientHeight ?? 100);
       g.setNode(node.id, { width, height });
     }
 
+    // Map child nodes to their parent group for edge routing
+    const childToGroup = new Map<string, string>();
+    for (const n of flowNodes) {
+      if (n.parentId) childToGroup.set(n.id, n.parentId);
+    }
+
+    // Add edges between top-level nodes (mapping children to their groups)
     for (const edge of flowEdges) {
-      g.setEdge(edge.source, edge.target);
+      const src = childToGroup.get(edge.source) ?? edge.source;
+      const tgt = childToGroup.get(edge.target) ?? edge.target;
+      if (topIds.has(src) && topIds.has(tgt) && src !== tgt) {
+        g.setEdge(src, tgt);
+      }
     }
 
     dagre.layout(g);
 
+    // Update positions for top-level nodes only; children keep relative positions
     const updated = flowNodes.map((node) => {
+      if (node.parentId) return node;
       const dagreNode = g.node(node.id);
       return {
         ...node,
@@ -674,7 +897,7 @@
     });
 
     flowNodes = updated;
-    writeBackPositions(updated);
+    writeBackPositions(updated.filter((n) => !n.parentId));
     return updated;
   }
 
@@ -703,7 +926,7 @@
     entries: ContextMenuEntry[];
     x: number;
     y: number;
-    context: { type: 'edge' | 'node' | 'port'; id: string; data?: any };
+    context: { type: 'edge' | 'node' | 'port' | 'selection'; id: string; data?: any };
   } | null>(null);
 
   function closeCtxMenu() {
@@ -993,6 +1216,81 @@
     return entries;
   }
 
+  // -- Selection context menu --------------------------------------------------
+
+  function buildSelectionContextMenu(nodes: FlowNode[]): ContextMenuEntry[] {
+    return [
+      {
+        type: 'item',
+        key: 'group-selection',
+        label: `Group Selection (${nodes.length})`,
+        icon: 'group',
+      },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'delete-selection',
+        label: `Delete Selection (${nodes.length})`,
+        icon: 'trash-2',
+      },
+    ];
+  }
+
+  // -- Group context menu -----------------------------------------------------
+
+  function buildGroupContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const collapsed = (node.data?.collapsed as boolean) ?? false;
+    const locked = (node.data?.locked as boolean) ?? false;
+    const childCount = flowNodes.filter((n) => n.parentId === node.id).length;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'color', key: 'groupColor', label: 'Accent', value: (node.data?.color as string) || '' },
+      { type: 'color', key: 'groupBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
+      { type: 'range', key: 'groupBgOpacity', label: 'Opacity', value: (node.data?.backgroundOpacity as number) ?? 0.15 },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'toggle-collapse',
+        label: collapsed ? 'Expand Group' : 'Collapse Group',
+        icon: collapsed ? 'chevron-down' : 'chevron-up',
+      },
+      {
+        type: 'item',
+        key: 'ungroup',
+        label: `Ungroup (${childCount})`,
+        icon: 'unfold-horizontal',
+        disabled: childCount === 0,
+      },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'toggle-lock',
+        label: locked ? 'Unlock Group' : 'Lock Group',
+        icon: locked ? 'unlock' : 'lock',
+      },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'disconnect-all',
+        label: `Disconnect All (${connectedEdgeCount})`,
+        icon: 'unplug',
+        disabled: connectedEdgeCount === 0,
+      },
+      { type: 'separator' },
+      {
+        type: 'item',
+        key: 'delete-group',
+        label: 'Delete Group',
+        icon: 'trash-2',
+        disabled: locked,
+      },
+    ];
+  }
+
   function handleNodeContextMenu(event: MouseEvent, node: FlowNode) {
     event.preventDefault();
 
@@ -1010,13 +1308,58 @@
         context: { type: 'port', id: node.id, data: { portName, portSide } },
       };
     } else {
-      ctxMenu = {
-        entries: buildNodeContextMenu(node),
-        x: event.clientX,
-        y: event.clientY,
-        context: { type: 'node', id: node.id, data: node },
-      };
+      // Multi-selection: groupable top-level non-group nodes
+      const selIds = new Set(selectedNodeIds);
+      const selected = flowNodes.filter((n) => selIds.has(n.id));
+      const groupable = selected.filter(
+        (n) => n.type !== 'ic.node.Group' && !n.parentId,
+      );
+
+      if (selIds.has(node.id) && groupable.length >= 2) {
+        ctxMenu = {
+          entries: buildSelectionContextMenu(groupable),
+          x: event.clientX,
+          y: event.clientY,
+          context: { type: 'selection', id: '', data: { nodeIds: groupable.map((n) => n.id) } },
+        };
+      } else if (node.type === 'ic.node.Group') {
+        ctxMenu = {
+          entries: buildGroupContextMenu(node),
+          x: event.clientX,
+          y: event.clientY,
+          context: { type: 'node', id: node.id, data: node },
+        };
+      } else {
+        ctxMenu = {
+          entries: buildNodeContextMenu(node),
+          x: event.clientX,
+          y: event.clientY,
+          context: { type: 'node', id: node.id, data: node },
+        };
+      }
     }
+  }
+
+  function handlePaneContextMenu(event: MouseEvent) {
+    event.preventDefault();
+  }
+
+  /** SvelteFlow fires this when right-clicking the multi-selection overlay. */
+  function handleSelectionContextMenu({ nodes: selNodes, event }: { nodes: FlowNode[]; event: MouseEvent }) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const groupable = selNodes.filter(
+      (n) => n.type !== 'ic.node.Group' && !n.parentId,
+    );
+    if (groupable.length < 2) return;
+
+    ctxMenu = {
+      entries: buildSelectionContextMenu(groupable),
+      x: event.clientX,
+      y: event.clientY,
+      context: { type: 'selection', id: '', data: { nodeIds: groupable.map((n) => n.id) } },
+    };
   }
 
   /** Update a single prop on a node + write back to childEntries. */
@@ -1074,8 +1417,9 @@
   }
 
   // Keys whose actions should NOT close the menu (live preview / inline editing)
-  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor']);
+  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupColor', 'groupBgColor']);
   const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression']);
+  const RANGE_PROPS = new Set(['groupBgOpacity']);
 
   function handleCtxAction(key: string) {
     const ctx = ctxMenu?.context;
@@ -1083,7 +1427,7 @@
 
     const colonIdx0 = key.indexOf(':');
     const propKey = colonIdx0 > 0 ? key.slice(0, colonIdx0) : '';
-    const isLiveAction = COLOR_PROPS.has(propKey) || TEXT_PROPS.has(propKey);
+    const isLiveAction = COLOR_PROPS.has(propKey) || TEXT_PROPS.has(propKey) || RANGE_PROPS.has(propKey);
     if (!isLiveAction) closeCtxMenu();
 
     if (ctx.type === 'edge') {
@@ -1108,12 +1452,23 @@
         }
       }
     } else if (ctx.type === 'node') {
-      if (key.startsWith('nodeColor:')) {
-        updateNodeProp(ctx.id, 'color', key.slice('nodeColor:'.length));
+      if (key.startsWith('nodeColor:') || key.startsWith('groupColor:')) {
+        const value = key.includes(':') ? key.slice(key.indexOf(':') + 1) : '';
+        updateNodeProp(ctx.id, 'color', value);
+      } else if (key.startsWith('groupBgColor:')) {
+        updateNodeProp(ctx.id, 'backgroundColor', key.slice('groupBgColor:'.length));
+      } else if (key.startsWith('groupBgOpacity:')) {
+        updateNodeProp(ctx.id, 'backgroundOpacity', Number(key.slice('groupBgOpacity:'.length)));
       } else if (key.startsWith('label:')) {
         updateNodeProp(ctx.id, 'label', key.slice('label:'.length));
       } else if (key.startsWith('expression:')) {
         updateNodeProp(ctx.id, 'expression', key.slice('expression:'.length));
+      } else if (key === 'toggle-collapse') {
+        const node = flowNodes.find((n) => n.id === ctx.id);
+        const current = (node?.data?.collapsed as boolean) ?? false;
+        handleGroupCollapse(ctx.id, !current);
+      } else if (key === 'ungroup') {
+        request?.('ungroupNodes', { groupId: ctx.id });
       } else if (key === 'toggle-lock') {
         const node = flowNodes.find((n) => n.id === ctx.id);
         const current = (node?.data?.locked as boolean) ?? false;
@@ -1134,13 +1489,18 @@
         flowEdges = flowEdges.filter(
           (e) => e.source !== ctx.id && e.target !== ctx.id,
         );
-      } else if (key === 'delete-node') {
+      } else if (key === 'delete-node' || key === 'delete-group') {
         const node = flowNodes.find((n) => n.id === ctx.id);
         if (node && !node.data?.locked) {
           request?.('deleteNodes', { nodeIds: [ctx.id] });
-          // Also disconnect all edges connected to this node
+          // Collect all nodes to remove (include group children)
+          const idsToRemove = new Set([ctx.id]);
+          if (node.type === 'ic.node.Group') {
+            flowNodes.filter((n) => n.parentId === ctx.id).forEach((n) => idsToRemove.add(n.id));
+          }
+          // Disconnect all edges connected to removed nodes
           const connected = flowEdges.filter(
-            (e) => e.source === ctx.id || e.target === ctx.id,
+            (e) => idsToRemove.has(e.source) || idsToRemove.has(e.target),
           );
           for (const edge of connected) {
             if (!edge.id.startsWith('sf-')) {
@@ -1148,9 +1508,9 @@
             }
           }
           flowEdges = flowEdges.filter(
-            (e) => e.source !== ctx.id && e.target !== ctx.id,
+            (e) => !idsToRemove.has(e.source) && !idsToRemove.has(e.target),
           );
-          flowNodes = flowNodes.filter((n) => n.id !== ctx.id);
+          flowNodes = flowNodes.filter((n) => !idsToRemove.has(n.id));
         }
       }
     } else if (ctx.type === 'port') {
@@ -1180,6 +1540,18 @@
         updatePortProp(ctx.id, portName, portSide, 'expression', key.slice('port-expression:'.length));
       } else if (key.startsWith('port-frequency:')) {
         updatePortProp(ctx.id, portName, portSide, 'frequency', Number(key.slice('port-frequency:'.length)));
+      }
+    } else if (ctx.type === 'selection') {
+      const { nodeIds } = ctx.data as { nodeIds: string[] };
+      if (key === 'group-selection') {
+        request?.('groupSelection', { nodeIds });
+      } else if (key === 'delete-selection') {
+        request?.('deleteNodes', { nodeIds });
+        const idsToRemove = new Set(nodeIds);
+        flowEdges = flowEdges.filter(
+          (e) => !idsToRemove.has(e.source) && !idsToRemove.has(e.target),
+        );
+        flowNodes = flowNodes.filter((n) => !idsToRemove.has(n.id));
       }
     }
   }
@@ -1216,7 +1588,8 @@
       onselectionchange={handleSelectionChange}
       onedgecontextmenu={({ event, edge }) => handleEdgeContextMenu(event, edge)}
       onnodecontextmenu={({ event, node }) => handleNodeContextMenu(event, node)}
-      onpanecontextmenu={({ event }) => event.preventDefault()}
+      onpanecontextmenu={({ event }) => handlePaneContextMenu(event)}
+      onselectioncontextmenu={handleSelectionContextMenu}
     >
       <Background variant={bgVariant} gap={gridSize} size={1} />
       <Panel position="top-right">

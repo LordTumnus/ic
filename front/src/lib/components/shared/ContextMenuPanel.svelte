@@ -197,6 +197,29 @@
           </div>
         </div>
       {/if}
+    {:else if entry.type === 'range'}
+      <div class="ic-ctx__range-entry">
+        {#if entry.label}
+          <span class="ic-ctx__range-label">{entry.label}</span>
+        {/if}
+        <input
+          class="ic-ctx__range-input"
+          type="range"
+          value={entry.value}
+          min={entry.min ?? 0}
+          max={entry.max ?? 1}
+          step={entry.step ?? 0.01}
+          onclick={(e: MouseEvent) => e.stopPropagation()}
+          oninput={(e: Event) => {
+            const input = e.currentTarget as HTMLInputElement;
+            const val = input.value;
+            const display = input.nextElementSibling as HTMLElement;
+            if (display) display.textContent = Math.round(Number(val) * 100) + '%';
+            onaction(`${entry.key}:${val}`);
+          }}
+        />
+        <span class="ic-ctx__range-value">{Math.round((entry.value ?? 0) * 100)}%</span>
+      </div>
     {:else if entry.type === 'text'}
       <div class="ic-ctx__text-entry">
         {#if entry.label}
@@ -320,6 +343,39 @@
 
   .ic-ctx__color-controls {
     padding-top: 6px;
+  }
+
+  /* ── Range entry ──────────────────────── */
+
+  .ic-ctx__range-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  .ic-ctx__range-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ic-muted-foreground);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ic-ctx__range-input {
+    flex: 1;
+    min-width: 60px;
+    height: 4px;
+    accent-color: var(--ic-primary);
+    cursor: pointer;
+  }
+
+  .ic-ctx__range-value {
+    font-size: 0.7rem;
+    color: var(--ic-muted-foreground);
+    min-width: 28px;
+    text-align: right;
+    flex-shrink: 0;
   }
 
   /* ── Text entry ───────────────────────── */

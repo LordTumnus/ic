@@ -254,6 +254,13 @@ classdef (Abstract) Node < ic.core.ComponentContainer
                 end
             end
 
+            % Adjust handle for group boundary port (child → group)
+            if isa(targetNode, 'ic.node.Group') ...
+                    && ~isempty(this.ParentNode) && isvalid(this.ParentNode) ...
+                    && this.ParentNode == targetNode
+                targetPort = targetPort + ":int";
+            end
+
             % Configure edge endpoints and add to editor
             edge.setEndpoints(this, sourcePort, targetNode, targetPort);
             this.Parent.addChild(edge, "edges");
@@ -384,14 +391,22 @@ classdef (Abstract) Node < ic.core.ComponentContainer
 
         function setParentNode(this, groupNode)
             % > SETPARENTNODE Set the parent group node (for subflow grouping).
+            %   When grouping, converts Position from absolute to relative.
+            %   When ungrouping, converts Position from relative to absolute.
             arguments
                 this (1,1) ic.node.Node
                 groupNode ic.node.Node = ic.node.Node.empty
             end
             if isempty(groupNode)
+                % Ungrouping: convert relative → absolute
+                if ~isempty(this.ParentNode) && isvalid(this.ParentNode)
+                    this.Position = this.Position + this.ParentNode.Position;
+                end
                 this.ParentNode = ic.node.Node.empty;
                 this.ParentNodeID = "";
             else
+                % Grouping: convert absolute → relative
+                this.Position = this.Position - groupNode.Position;
                 this.ParentNode = groupNode;
                 this.ParentNodeID = groupNode.ID;
             end
