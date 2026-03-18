@@ -51,6 +51,10 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         % > GRIDVARIANT background grid pattern: dots | lines | cross
         GridVariant (1,1) string {mustBeMember(GridVariant, ...
             ["dots", "lines", "cross"])} = "dots"
+
+        % > DEFAULTGROUPTYPE class used when creating groups from UI actions
+        DefaultGroupType (1,1) string {mustBeMember(DefaultGroupType, ...
+            ["ic.node.CollapsibleGroup", "ic.node.BasicGroup"])} = "ic.node.CollapsibleGroup"
     end
 
     properties (SetObservable, Description = "Reactive", ...
@@ -517,8 +521,8 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             groupW = maxX - minX;
             groupH = maxY - minY;
 
-            % 3. Create Group node
-            group = ic.node.Group( ...
+            % 3. Create Group node (using DefaultGroupType)
+            group = feval(this.DefaultGroupType, ...
                 Label="Group", Position=groupPos, ...
                 Width=groupW, Height=groupH);
             this.addNode(group);

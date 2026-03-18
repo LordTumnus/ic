@@ -1,17 +1,13 @@
 <!--
-  GroupNode.svelte — Subflow container with Industrial Flat styling.
-  Semi-transparent rectangle with header bar, resize handles, collapse toggle.
-  Children are rendered by SvelteFlow via parentId, not by this component.
-
-  Handles are placed directly in the group root (no intermediate positioned
-  containers) so SvelteFlow measures their position relative to the node.
-  Port labels/dots are separate visual-only elements.
+  GroupNode.svelte — Basic group container with Industrial Flat styling.
+  Simple label bar + optional background color. No accent stripe,
+  no collapse toggle, no resize handles.
+  Children are rendered by SvelteFlow via parentId.
 -->
 <script lang="ts">
   import {
     Handle,
     Position,
-    NodeResizer,
     type NodeProps,
     type Node,
   } from '@xyflow/svelte';
@@ -21,32 +17,24 @@
 
   type GroupData = {
     label: string;
-    color: string;
     backgroundColor: string;
     backgroundOpacity: number;
     disabled: boolean;
     locked: boolean;
     width: number;
     height: number;
-    collapsed: boolean;
-    resizable: boolean;
     inputs: PortDef[];
     outputs: PortDef[];
-    onGroupResize?: (nodeId: string, width: number, height: number) => void;
-    onGroupCollapse?: (nodeId: string, collapsed: boolean) => void;
   };
 
-  type GroupNodeType = Node<GroupData, 'ic.node.Group'>;
+  type GroupNodeType = Node<GroupData, 'ic.node.BasicGroup'>;
 
   let { id, data, selected, dragging }: NodeProps<GroupNodeType> = $props();
 
   let hovered = $state(false);
 
-  const accentColor = $derived(data.color || 'var(--ic-primary)');
-  const bgOpacity = $derived(data.backgroundOpacity ?? 0);
-
   const bgStyle = $derived.by(() => {
-    const opacity = bgOpacity;
+    const opacity = data.backgroundOpacity ?? 0;
     if (opacity <= 0) return '';
     const color = data.backgroundColor;
     if (color && color.startsWith('#')) {
@@ -56,48 +44,13 @@
     return `background: rgba(128, 128, 128, ${opacity * 0.3})`;
   });
 
-  const hasInputs = $derived((data.inputs?.length ?? 0) > 0);
-  const hasOutputs = $derived((data.outputs?.length ?? 0) > 0);
-
-  const BASE_HEADER_H = 30;
-  const PORT_ROW_H = 24;
-  const PORT_PAD = 20;
-
-  /** Height of the header when collapsed — header + room for ports. */
-  const collapsedH = $derived((() => {
-    const maxPorts = Math.max(data.inputs?.length ?? 0, data.outputs?.length ?? 0);
-    if (maxPorts === 0) return BASE_HEADER_H;
-    return BASE_HEADER_H + maxPorts * PORT_ROW_H + PORT_PAD;
-  })());
-
-  /** Compute vertical position (%) for the i-th port out of count.
-   *  When collapsed, ports are placed below the header band. */
+  /** Compute vertical position (%) for the i-th port out of count. */
   function portTopPct(i: number, count: number): number {
-    const h = data.collapsed ? collapsedH : data.height;
-    if (data.collapsed) {
-      // Distribute ports in the area below the header
-      const availH = h - BASE_HEADER_H;
-      const spacing = availH / (count + 1);
-      const top = BASE_HEADER_H + spacing * (i + 1);
-      return (top / h) * 100;
-    }
-    if (h <= BASE_HEADER_H) return 50;
+    const h = data.height;
+    if (h <= 30) return 50;
     const spacing = h / (count + 1);
     const top = spacing * (i + 1);
     return (top / h) * 100;
-  }
-
-
-  function handleResizeEnd(
-    _event: MouseEvent | TouchEvent,
-    params: { width: number; height: number },
-  ) {
-    data.onGroupResize?.(id, params.width, params.height);
-  }
-
-  function toggleCollapse(e: MouseEvent) {
-    e.stopPropagation();
-    data.onGroupCollapse?.(id, !data.collapsed);
   }
 </script>
 
@@ -109,43 +62,12 @@
   class:ic-ne-group--selected={selected}
   class:ic-ne-group--dragging={dragging}
   class:ic-ne-group--disabled={data.disabled}
-  class:ic-ne-group--collapsed={data.collapsed}
   onpointerenter={() => (hovered = true)}
   onpointerleave={() => (hovered = false)}
 >
-  {#if data.resizable && !data.collapsed}
-    <NodeResizer
-      minWidth={120}
-      minHeight={60}
-      isVisible={selected}
-      lineClass="ic-ne-group__resize-line"
-      handleClass="ic-ne-group__resize-handle"
-      onResizeEnd={handleResizeEnd}
-    />
-  {/if}
+  <span class="ic-ne-group__label">{data.label || 'Group'}</span>
 
-  <div class="ic-ne-group__header" style:--accent={accentColor}>
-    <button
-      class="ic-ne-group__chevron"
-      class:ic-ne-group__chevron--collapsed={data.collapsed}
-      onclick={toggleCollapse}
-      aria-label={data.collapsed ? 'Expand group' : 'Collapse group'}
-    >
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path
-          d="M3 4.5L6 7.5L9 4.5"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-    </button>
-    <span class="ic-ne-group__label">{data.label || 'Group'}</span>
-  </div>
-
-  <!-- Handles: exterior + interior overlap at the same edge position.
-       Direction (Position) differs so edges route correctly inward/outward. -->
+  <!-- Handles: exterior + interior -->
   {#each data.inputs ?? [] as port, i (port.name)}
     {@const top = portTopPct(i, data.inputs.length)}
     {#key port.name}
@@ -156,16 +78,14 @@
         style="top: {top}%"
       />
     {/key}
-    {#if !data.collapsed}
-      {#key `${port.name}:int`}
-        <Handle
-          type="source"
-          position={Position.Right}
-          id={`${port.name}:int`}
-          style="top: {top}%; left: 0; right: auto"
-        />
-      {/key}
-    {/if}
+    {#key `${port.name}:int`}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={`${port.name}:int`}
+        style="top: {top}%; left: 0; right: auto"
+      />
+    {/key}
   {/each}
 
   {#each data.outputs ?? [] as port, i (port.name)}
@@ -178,19 +98,17 @@
         style="top: {top}%"
       />
     {/key}
-    {#if !data.collapsed}
-      {#key `${port.name}:int`}
-        <Handle
-          type="target"
-          position={Position.Left}
-          id={`${port.name}:int`}
-          style="top: {top}%; right: 0; left: auto"
-        />
-      {/key}
-    {/if}
+    {#key `${port.name}:int`}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={`${port.name}:int`}
+        style="top: {top}%; right: 0; left: auto"
+      />
+    {/key}
   {/each}
 
-  <!-- Port visuals: dot at handle height, label above -->
+  <!-- Port visuals -->
   {#each data.inputs ?? [] as port, i (port.name)}
     {@const top = portTopPct(i, data.inputs.length)}
     <div
@@ -258,60 +176,25 @@
     pointer-events: none;
   }
 
-  .ic-ne-group--collapsed {
-    overflow: clip;
-  }
-
-  /* ── Header ────────────────────────────────── */
-  .ic-ne-group__header {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    background: var(--ic-muted);
-    color: var(--ic-muted-foreground);
+  /* ── Label ─────────────────────────────────── */
+  .ic-ne-group__label {
+    position: absolute;
+    top: 4px;
+    left: 6px;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    border-bottom: 2px solid var(--accent);
-    border-radius: 3px 3px 0 0;
-    user-select: none;
-    position: relative;
-    z-index: 1;
-  }
-
-  .ic-ne-group__chevron {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    border: none;
-    background: transparent;
     color: var(--ic-muted-foreground);
-    cursor: pointer;
-    border-radius: 2px;
-    flex-shrink: 0;
-    transition: transform 0.15s ease;
-  }
-
-  .ic-ne-group__chevron:hover {
-    background: rgba(128, 128, 128, 0.15);
-  }
-
-  .ic-ne-group__chevron--collapsed {
-    transform: rotate(-90deg);
-  }
-
-  .ic-ne-group__label {
+    opacity: 0.7;
+    user-select: none;
     white-space: nowrap;
     overflow: clip;
     text-overflow: ellipsis;
+    z-index: 1;
   }
 
-  /* ── Port hit area (clickable container for dot + label) ── */
+  /* ── Port hit area ── */
   .ic-ne-group__port-hit {
     position: absolute;
     display: flex;
@@ -336,7 +219,6 @@
     right: 2px;
   }
 
-  /* ── Port dot ─────────────────────────────────── */
   .ic-ne-group__port-dot {
     width: 7px;
     height: 7px;
@@ -345,7 +227,6 @@
     flex-shrink: 0;
   }
 
-  /* ── Port label ───────────────────────────────── */
   .ic-ne-group__port-label {
     font-size: 10px;
     color: var(--ic-muted-foreground);
@@ -359,18 +240,5 @@
     border-radius: 2px;
     background: transparent;
     border: none;
-  }
-
-  /* ── Resize handle styling ──────────────────── */
-  .ic-ne-group :global(.ic-ne-group__resize-handle) {
-    width: 8px;
-    height: 8px;
-    background: var(--ic-primary);
-    border: 1px solid var(--ic-background);
-    border-radius: 2px;
-  }
-
-  .ic-ne-group :global(.ic-ne-group__resize-line) {
-    border-color: var(--ic-primary);
   }
 </style>

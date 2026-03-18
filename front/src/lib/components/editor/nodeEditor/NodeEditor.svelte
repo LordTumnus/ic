@@ -44,6 +44,7 @@
   // Node type components — one per concrete MATLAB class
   import TransformNode from './nodes/TransformNode.svelte';
   import GroupNode from './nodes/GroupNode.svelte';
+  import CollapsibleGroupNode from './nodes/CollapsibleGroupNode.svelte';
 
   // Edge type components — one per concrete MATLAB edge class
   import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
@@ -114,8 +115,12 @@
 
   const nodeTypes = {
     'ic.node.Transform': TransformNode,
-    'ic.node.Group': GroupNode,
+    'ic.node.BasicGroup': GroupNode,
+    'ic.node.CollapsibleGroup': CollapsibleGroupNode,
   } as Record<string, any>;
+
+  const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
+  function isGroupType(type?: string): boolean { return GROUP_TYPES.has(type ?? ''); }
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
 
@@ -158,6 +163,7 @@
         label: (p.label as string) ?? '',
         expression: (p.expression as string) ?? '',
         color: (p.color as string) ?? '',
+        accentColor: (p.accentColor as string) ?? '',
         icon: p.icon ?? null,
         width: (p.width as number) ?? 400,
         height: (p.height as number) ?? 300,
@@ -239,7 +245,7 @@
     // even when the child's own data reference hasn't changed.
     const collapsedGroups = new Set(
       states
-        .filter((s) => s.data.type === 'ic.node.Group' && s.data.collapsed)
+        .filter((s) => isGroupType(s.data.type) && s.data.collapsed)
         .map((s) => s.data.id),
     );
 
@@ -272,6 +278,7 @@
           label: d.label,
           expression: d.expression,
           color: d.color,
+          accentColor: d.accentColor,
           icon: d.icon,
           disabled: d.disabled,
           locked: d.locked,
@@ -306,7 +313,7 @@
         if (collapsedGroups.has(d.parentNodeId)) node.hidden = true;
       }
       // Group nodes need explicit dimensions and low zIndex
-      if (d.type === 'ic.node.Group') {
+      if (isGroupType(d.type)) {
         const h = d.collapsed ? groupCollapsedH(d) : d.height;
         node.style = `width: ${d.width}px; height: ${h}px;`;
         node.zIndex = -1;
@@ -606,8 +613,8 @@
         // - target IS a group and source is a child inside it
         // - source IS a group and target is a child inside it
         const allowed =
-          (tgtNode.type === 'ic.node.Group' && srcScope === target) ||
-          (srcNode.type === 'ic.node.Group' && tgtScope === source);
+          (isGroupType(tgtNode.type) && srcScope === target) ||
+          (isGroupType(srcNode.type) && tgtScope === source);
         if (!allowed) return false;
       }
     }
@@ -660,7 +667,7 @@
   }): Promise<boolean> {
     // Expand: include children of any group nodes being deleted
     const groupIds = new Set(
-      nodes.filter((n) => n.type === 'ic.node.Group').map((n) => n.id),
+      nodes.filter((n) => isGroupType(n.type)).map((n) => n.id),
     );
     if (groupIds.size > 0) {
       const children = flowNodes.filter(
@@ -766,7 +773,7 @@
     const expanded = new Set(nodeIds);
     for (const id of nodeIds) {
       const node = flowNodes.find((n) => n.id === id);
-      if (node?.type === 'ic.node.Group') {
+      if (isGroupType(node?.type)) {
         flowNodes
           .filter((n) => n.parentId === id)
           .forEach((n) => expanded.add(n.id));
@@ -859,7 +866,7 @@
     const topIds = new Set(topLevel.map((n) => n.id));
 
     for (const node of topLevel) {
-      const isGroup = node.type === 'ic.node.Group';
+      const isGroup = isGroupType(node.type);
       const el = document.querySelector(`[data-id="${node.id}"]`);
       const width = isGroup ? (node.data?.width as number ?? 400) : (el?.clientWidth ?? 180);
       const height = isGroup ? (node.data?.height as number ?? 300) : (el?.clientHeight ?? 100);
@@ -1239,6 +1246,7 @@
   // -- Group context menu -----------------------------------------------------
 
   function buildGroupContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const isCollapsible = node.type === 'ic.node.CollapsibleGroup';
     const collapsed = (node.data?.collapsed as boolean) ?? false;
     const locked = (node.data?.locked as boolean) ?? false;
     const childCount = flowNodes.filter((n) => n.parentId === node.id).length;
@@ -1246,18 +1254,33 @@
       (e) => e.source === node.id || e.target === node.id,
     ).length;
 
-    return [
+    const entries: ContextMenuEntry[] = [
       { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
-      { type: 'color', key: 'groupColor', label: 'Accent', value: (node.data?.color as string) || '' },
+    ];
+
+    entries.push(
       { type: 'color', key: 'groupBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
-      { type: 'range', key: 'groupBgOpacity', label: 'Opacity', value: (node.data?.backgroundOpacity as number) ?? 0.15 },
-      { type: 'separator' },
-      {
+      { type: 'range', key: 'groupBgOpacity', label: 'Opacity', value: (node.data?.backgroundOpacity as number) ?? 0 },
+    );
+
+    if (isCollapsible) {
+      entries.push(
+        { type: 'color', key: 'groupAccent', label: 'Accent', value: (node.data?.accentColor as string) || '' },
+      );
+    }
+
+    entries.push({ type: 'separator' });
+
+    if (isCollapsible) {
+      entries.push({
         type: 'item',
         key: 'toggle-collapse',
         label: collapsed ? 'Expand Group' : 'Collapse Group',
         icon: collapsed ? 'chevron-down' : 'chevron-up',
-      },
+      });
+    }
+
+    entries.push(
       {
         type: 'item',
         key: 'ungroup',
@@ -1288,7 +1311,9 @@
         icon: 'trash-2',
         disabled: locked,
       },
-    ];
+    );
+
+    return entries;
   }
 
   function handleNodeContextMenu(event: MouseEvent, node: FlowNode) {
@@ -1312,7 +1337,7 @@
       const selIds = new Set(selectedNodeIds);
       const selected = flowNodes.filter((n) => selIds.has(n.id));
       const groupable = selected.filter(
-        (n) => n.type !== 'ic.node.Group' && !n.parentId,
+        (n) => !isGroupType(n.type) && !n.parentId,
       );
 
       if (selIds.has(node.id) && groupable.length >= 2) {
@@ -1322,7 +1347,7 @@
           y: event.clientY,
           context: { type: 'selection', id: '', data: { nodeIds: groupable.map((n) => n.id) } },
         };
-      } else if (node.type === 'ic.node.Group') {
+      } else if (isGroupType(node.type)) {
         ctxMenu = {
           entries: buildGroupContextMenu(node),
           x: event.clientX,
@@ -1350,7 +1375,7 @@
     event.stopPropagation();
 
     const groupable = selNodes.filter(
-      (n) => n.type !== 'ic.node.Group' && !n.parentId,
+      (n) => !isGroupType(n.type) && !n.parentId,
     );
     if (groupable.length < 2) return;
 
@@ -1417,7 +1442,7 @@
   }
 
   // Keys whose actions should NOT close the menu (live preview / inline editing)
-  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupColor', 'groupBgColor']);
+  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupAccent', 'groupBgColor']);
   const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression']);
   const RANGE_PROPS = new Set(['groupBgOpacity']);
 
@@ -1452,9 +1477,10 @@
         }
       }
     } else if (ctx.type === 'node') {
-      if (key.startsWith('nodeColor:') || key.startsWith('groupColor:')) {
-        const value = key.includes(':') ? key.slice(key.indexOf(':') + 1) : '';
-        updateNodeProp(ctx.id, 'color', value);
+      if (key.startsWith('nodeColor:')) {
+        updateNodeProp(ctx.id, 'color', key.slice('nodeColor:'.length));
+      } else if (key.startsWith('groupAccent:')) {
+        updateNodeProp(ctx.id, 'accentColor', key.slice('groupAccent:'.length));
       } else if (key.startsWith('groupBgColor:')) {
         updateNodeProp(ctx.id, 'backgroundColor', key.slice('groupBgColor:'.length));
       } else if (key.startsWith('groupBgOpacity:')) {
@@ -1495,7 +1521,7 @@
           request?.('deleteNodes', { nodeIds: [ctx.id] });
           // Collect all nodes to remove (include group children)
           const idsToRemove = new Set([ctx.id]);
-          if (node.type === 'ic.node.Group') {
+          if (isGroupType(node.type)) {
             flowNodes.filter((n) => n.parentId === ctx.id).forEach((n) => idsToRemove.add(n.id));
           }
           // Disconnect all edges connected to removed nodes

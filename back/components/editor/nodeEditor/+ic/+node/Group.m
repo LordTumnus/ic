@@ -1,12 +1,10 @@
-classdef Group < ic.node.Node
-    % > GROUP Subflow container — visually contains other nodes.
+classdef (Abstract) Group < ic.node.Node
+    % > GROUP Abstract base for subflow containers.
     %   All child nodes stay in NodeEditor's flat "nodes" target.
     %   The parent-child relationship is expressed via ParentNode on
     %   the child, which maps to SvelteFlow's parentId.
     %
-    %   g = ic.node.Group(Label="Pipeline", Width=500, Height=300)
-    %   editor.addNode(g);
-    %   g.addGroupChild(someNode);
+    %   Concrete subclasses: CollapsibleGroup, BasicGroup
     %
     %   % Connect through boundary ports:
     %   g.addPort("in", "input");
@@ -23,16 +21,7 @@ classdef Group < ic.node.Node
         % > HEIGHT container height in pixels
         Height (1,1) double = 300
 
-        % > COLLAPSED collapse to header-only (hide children)
-        Collapsed (1,1) logical = false
-
-        % > RESIZABLE allow user resize via drag handles
-        Resizable (1,1) logical = true
-
-        % > COLOR accent color for header stripe (CSS value, empty = theme default)
-        Color (1,1) string = ""
-
-        % > BACKGROUNDCOLOR body fill color (CSS value, empty = theme muted)
+        % > BACKGROUNDCOLOR body fill color (CSS value, empty = transparent)
         BackgroundColor (1,1) string = ""
 
         % > BACKGROUNDOPACITY body fill opacity (0–1)
@@ -45,15 +34,6 @@ classdef Group < ic.node.Node
     end
 
     methods
-        function this = Group(props)
-            % > GROUP Construct a group node.
-            arguments
-                props.?ic.node.Group
-                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
-            end
-            this@ic.node.Node(props);
-        end
-
         function nodes = get.GroupChildren(this)
             if isempty(this.Parent)
                 nodes = ic.node.Node.empty;
