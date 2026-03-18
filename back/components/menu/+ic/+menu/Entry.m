@@ -4,7 +4,8 @@ classdef (Abstract) Entry < matlab.mixin.Heterogeneous & matlab.mixin.SetGetExac
     %   Enables heterogeneous arrays so Item, Separator, and Folder
     %   can be mixed:  [Item("a"), Separator(), Folder(Label="Sub")]
     %
-    %   Subclasses: ic.menu.Item, ic.menu.Separator, ic.menu.Folder
+    %   Subclasses: ic.menu.Item, ic.menu.Separator, ic.menu.Folder,
+    %              ic.menu.ColorEntry, ic.menu.TextEntry
 
     methods (Abstract)
         s = toStruct(this)
