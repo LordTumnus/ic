@@ -660,12 +660,24 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                 ic.NodeEditor.clonePorts(orig.Outputs, newNode.Outputs);
                 ic.NodeEditor.clonePorts(orig.Inputs,  newNode.Inputs);
 
+                % Groups may have dynamically-added boundary ports that
+                % the constructor doesn't create — replicate them.
+                if isa(orig, 'ic.node.Group')
+                    ic.NodeEditor.cloneDynamicPorts( ...
+                        orig.Inputs,  newNode.Inputs,  newNode, "inputs");
+                    ic.NodeEditor.cloneDynamicPorts( ...
+                        orig.Outputs, newNode.Outputs, newNode, "outputs");
+                end
+
                 this.addNode(newNode);
                 oldToNew(char(nodeIds(ii))) = newNode;
                 newNodeIds{end+1} = newNode.ID; %#ok<AGROW>
             end
 
-            % Re-establish parent-child relationships in cloned set
+            % Re-establish parent-child relationships in cloned set.
+            % Children already have relative positions from the original.
+            % setParentNode converts absolute→relative by subtracting
+            % the group position, so we pre-add it to cancel out.
             for ii = 1:numel(nodeIds)
                 origKey = char(nodeIds(ii));
                 if ~oldToNew.isKey(origKey), continue; end
@@ -678,6 +690,9 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                         oldToNew.isKey(char(orig.ParentNode.ID))
                     newChild = oldToNew(origKey);
                     newGroup = oldToNew(char(orig.ParentNode.ID));
+                    % Position is relative — add group pos so setParentNode
+                    % subtracts it back, yielding the original relative pos.
+                    newChild.Position = newChild.Position + newGroup.Position;
                     newChild.setParentNode(newGroup);
                 end
             end
@@ -692,7 +707,18 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                     try
                         newSrc = oldToNew(srcKey);
                         newTgt = oldToNew(tgtKey);
-                        newSrc.connect(newTgt, e.SourcePortName, e.TargetPortName);
+                        isBoundary = contains(e.SourcePortName, ":int") ...
+                            || contains(e.TargetPortName, ":int");
+                        if isBoundary
+                            % Boundary edges use :int port names that
+                            % connect() can't resolve — use setEndpoints.
+                            newEdge = feval(class(e));
+                            newEdge.setEndpoints(newSrc, e.SourcePortName, ...
+                                newTgt, e.TargetPortName);
+                            this.addChild(newEdge, "edges");
+                        else
+                            newSrc.connect(newTgt, e.SourcePortName, e.TargetPortName);
+                        end
                     catch
                         % Skip edges that can't be recreated
                     end
@@ -767,6 +793,18 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                     if ~strcmp(mp.SetAccess, 'public'), continue; end
                     newPorts(jj).(mp.Name) = origPorts(jj).(mp.Name);
                 end
+            end
+        end
+
+        function cloneDynamicPorts(origPorts, existingPorts, newNode, side)
+            % Clone ports that exist on the original but not on the new node.
+            % Groups have dynamic boundary ports added via addPort() that
+            % the constructor doesn't create.
+            nExisting = numel(existingPorts);
+            for jj = (nExisting + 1):numel(origPorts)
+                op = origPorts(jj);
+                np = ic.node.Port(op.Name, Label=op.Label, Type=op.Type);
+                newNode.addPort(np, side);
             end
         end
     end
