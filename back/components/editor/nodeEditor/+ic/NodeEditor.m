@@ -266,6 +266,154 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             end
         end
 
+        function group = groupNodes(this, nodes, props)
+            % > GROUPNODES Create a group wrapping the given nodes.
+            %   Automatically creates boundary ports for any edges that cross
+            %   the group boundary, with correct types and signal/flow props
+            %   copied from the connected output ports. Rewires crossing edges
+            %   through the boundary ports.
+            %
+            %   All nodes must already be in this editor. Group nodes in the
+            %   input array are silently filtered out.
+            %
+            %   g = editor.groupNodes([n1, n2], Label="Pipeline")
+            %   g = editor.groupNodes([n1, n2, n3], ...
+            %       Label="DSP", AccentColor="#3b82f6")
+            arguments
+                this (1,1) ic.NodeEditor
+                nodes (1,:) ic.node.Node
+                props.Label (1,1) string = "Group"
+                props.Position (1,2) double = [NaN NaN]
+                props.Width (1,1) double = NaN
+                props.Height (1,1) double = NaN
+                props.BackgroundColor (1,1) string = ""
+                props.BackgroundOpacity (1,1) double = 0
+                props.AccentColor (1,1) string = ""
+                props.GroupType (1,1) string = ""
+            end
+
+            % Filter out groups
+            keep = arrayfun(@(n) ~isa(n, 'ic.node.Group'), nodes);
+            nodes = nodes(find(keep)); %#ok<FNDSB>
+            assert(numel(nodes) >= 1, ...
+                "ic:NodeEditor:TooFewNodes", ...
+                "groupNodes requires at least 1 non-group node.");
+            for ii = 1:numel(nodes)
+                assert(~isempty(nodes(ii).Parent) && nodes(ii).Parent == this, ...
+                    "ic:NodeEditor:NotAttached", ...
+                    "All nodes must already be in this NodeEditor.");
+            end
+            selectedIds = arrayfun(@(n) n.ID, nodes);
+
+            % Compute bounding box (auto-compute if not given)
+            positions = cell2mat(arrayfun( ...
+                @(n) n.Position, nodes, 'UniformOutput', false)');
+            nodeW = 180; nodeH = 60;  % estimated node size
+            pad = [40, 50, 40, 40];   % left, top, right, bottom
+            if any(isnan(props.Position))
+                props.Position = [min(positions(:,1)) - pad(1), ...
+                                  min(positions(:,2)) - pad(2)];
+            end
+            if isnan(props.Width)
+                props.Width = max(positions(:,1)) + nodeW + pad(3) ...
+                    - props.Position(1);
+            end
+            if isnan(props.Height)
+                props.Height = max(positions(:,2)) + nodeH + pad(4) ...
+                    - props.Position(2);
+            end
+
+            % Create group
+            groupType = props.GroupType;
+            if groupType == ""
+                groupType = this.DefaultGroupType;
+            end
+            groupArgs = {'Label', props.Label, ...
+                'Position', props.Position, ...
+                'Width', props.Width, 'Height', props.Height, ...
+                'BackgroundColor', props.BackgroundColor, ...
+                'BackgroundOpacity', props.BackgroundOpacity};
+            if props.AccentColor ~= "" && groupType == "ic.node.CollapsibleGroup"
+                groupArgs = [groupArgs, {'AccentColor', props.AccentColor}];
+            end
+            group = feval(groupType, groupArgs{:});
+            this.addNode(group);
+
+            % Analyze crossing edges
+            edges = this.Edges;
+            inboundIdx  = [];
+            outboundIdx = [];
+            for ii = 1:numel(edges)
+                e = edges(ii);
+                srcIn = ismember(e.SourceNodeID, selectedIds);
+                tgtIn = ismember(e.TargetNodeID, selectedIds);
+                if ~srcIn && tgtIn
+                    inboundIdx(end+1) = ii; %#ok<AGROW>
+                elseif srcIn && ~tgtIn
+                    outboundIdx(end+1) = ii; %#ok<AGROW>
+                end
+            end
+
+            % Rewire INBOUND edges (external → selected)
+            for ii = 1:numel(inboundIdx)
+                e = edges(inboundIdx(ii));
+                srcPort = e.SourcePort;
+                portType = srcPort.Type;
+                bpName = ic.NodeEditor.uniquePortName( ...
+                    group, e.TargetPortName + "_in", "inputs");
+                bp = ic.node.Port(bpName, ...
+                    Label=string(bpName), Type=portType);
+                ic.NodeEditor.copyPortBehavior(srcPort, bp);
+                group.addPort(bp, "inputs");
+
+                extNode = e.SourceNode;
+                extPort = e.SourcePortName;
+                intNode = e.TargetNode;
+                intPort = e.TargetPortName;
+                this.removeEdge(e);
+
+                extEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                extEdge.setEndpoints(extNode, extPort, group, bpName);
+                this.addChild(extEdge, "edges");
+
+                intEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                intEdge.setEndpoints(group, bpName + ":int", intNode, intPort);
+                this.addChild(intEdge, "edges");
+            end
+
+            % Rewire OUTBOUND edges (selected → external)
+            for ii = 1:numel(outboundIdx)
+                e = edges(outboundIdx(ii));
+                srcPort = e.SourcePort;
+                portType = srcPort.Type;
+                bpName = ic.NodeEditor.uniquePortName( ...
+                    group, e.SourcePortName + "_out", "outputs");
+                bp = ic.node.Port(bpName, ...
+                    Label=string(bpName), Type=portType);
+                ic.NodeEditor.copyPortBehavior(srcPort, bp);
+                group.addPort(bp, "outputs");
+
+                extNode = e.TargetNode;
+                extPort = e.TargetPortName;
+                intNode = e.SourceNode;
+                intPort = e.SourcePortName;
+                this.removeEdge(e);
+
+                intEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                intEdge.setEndpoints(intNode, intPort, group, bpName + ":int");
+                this.addChild(intEdge, "edges");
+
+                extEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                extEdge.setEndpoints(group, bpName, extNode, extPort);
+                this.addChild(extEdge, "edges");
+            end
+
+            % Parent all nodes into the group
+            for ii = 1:numel(nodes)
+                group.addGroupChild(nodes(ii));
+            end
+        end
+
         function node = findNodeById(this, id)
             % > FINDNODEBYID Look up a node by its ID string.
             nodes = this.Nodes;
@@ -335,8 +483,18 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             % Frontend drew a connection — edge type from source port.
             srcNode = this.findNodeById(data.source);
             tgtNode = this.findNodeById(data.target);
-            srcPort = srcNode.findPort(string(data.sourcePort), "outputs");
-            tgtPort = tgtNode.findPort(string(data.targetPort), "inputs");
+
+            % :int suffix reverses the port side (interior group handles)
+            srcPortName = string(data.sourcePort);
+            tgtPortName = string(data.targetPort);
+            srcIsInt = endsWith(srcPortName, ":int");
+            tgtIsInt = endsWith(tgtPortName, ":int");
+            srcLookup = regexprep(srcPortName, ':int$', '');
+            tgtLookup = regexprep(tgtPortName, ':int$', '');
+            srcSide = "outputs"; if srcIsInt, srcSide = "inputs"; end
+            tgtSide = "inputs";  if tgtIsInt, tgtSide = "outputs"; end
+            srcPort = srcNode.findPort(srcLookup, srcSide);
+            tgtPort = tgtNode.findPort(tgtLookup, tgtSide);
 
             % Validate MaxConnections on both ports
             if numel(srcPort.Edges) >= srcPort.MaxConnections
@@ -490,11 +648,8 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function result = handleGroupSelection(this, data)
-            % Group Selection: create group around selected nodes with
-            % automatic boundary ports and edge rewiring.
+            % Frontend sends node IDs → delegates to public groupNodes().
             nodeIds = string(data.nodeIds);
-
-            % 1. Resolve node handles, filter out groups
             nodes = ic.node.Node.empty;
             for ii = 1:numel(nodeIds)
                 n = this.findNodeById(nodeIds(ii));
@@ -506,101 +661,7 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                 result = false;
                 return
             end
-            selectedIds = arrayfun(@(n) n.ID, nodes);
-
-            % 2. Compute bounding box
-            positions = cell2mat(arrayfun( ...
-                @(n) n.Position, nodes, 'UniformOutput', false)');
-            nodeW = 180; nodeH = 60;  % estimated node size
-            pad = [40, 50, 40, 40];   % left, top, right, bottom
-            minX = min(positions(:,1)) - pad(1);
-            minY = min(positions(:,2)) - pad(2);
-            maxX = max(positions(:,1)) + nodeW + pad(3);
-            maxY = max(positions(:,2)) + nodeH + pad(4);
-            groupPos = [minX, minY];
-            groupW = maxX - minX;
-            groupH = maxY - minY;
-
-            % 3. Create Group node (using DefaultGroupType)
-            group = feval(this.DefaultGroupType, ...
-                Label="Group", Position=groupPos, ...
-                Width=groupW, Height=groupH);
-            this.addNode(group);
-
-            % 4. Analyze crossing edges (before reparenting)
-            edges = this.Edges;
-            inboundIdx  = [];
-            outboundIdx = [];
-            for ii = 1:numel(edges)
-                e = edges(ii);
-                srcIn = ismember(e.SourceNodeID, selectedIds);
-                tgtIn = ismember(e.TargetNodeID, selectedIds);
-                if ~srcIn && tgtIn
-                    inboundIdx(end+1) = ii; %#ok<AGROW>
-                elseif srcIn && ~tgtIn
-                    outboundIdx(end+1) = ii; %#ok<AGROW>
-                end
-            end
-
-            % 5. Rewire INBOUND edges (external → selected)
-            for ii = 1:numel(inboundIdx)
-                e = edges(inboundIdx(ii));
-                portType = e.TargetPort.Type;
-                bpName = ic.NodeEditor.uniquePortName( ...
-                    group, e.TargetPortName + "_in", "inputs");
-                bp = ic.node.Port(bpName, ...
-                    Label=string(bpName), Type=portType);
-                group.addPort(bp, "inputs");
-
-                extNode = e.SourceNode;
-                extPort = e.SourcePortName;
-                intNode = e.TargetNode;
-                intPort = e.TargetPortName;
-                this.removeEdge(e);
-
-                % Exterior: extNode → group boundary
-                extEdge = feval(ic.NodeEditor.edgeClassForType(portType));
-                extEdge.setEndpoints(extNode, extPort, group, bpName);
-                this.addChild(extEdge, "edges");
-
-                % Interior: group boundary:int → intNode
-                intEdge = feval(ic.NodeEditor.edgeClassForType(portType));
-                intEdge.setEndpoints(group, bpName + ":int", intNode, intPort);
-                this.addChild(intEdge, "edges");
-            end
-
-            % 6. Rewire OUTBOUND edges (selected → external)
-            for ii = 1:numel(outboundIdx)
-                e = edges(outboundIdx(ii));
-                portType = e.SourcePort.Type;
-                bpName = ic.NodeEditor.uniquePortName( ...
-                    group, e.SourcePortName + "_out", "outputs");
-                bp = ic.node.Port(bpName, ...
-                    Label=string(bpName), Type=portType);
-                group.addPort(bp, "outputs");
-
-                extNode = e.TargetNode;
-                extPort = e.TargetPortName;
-                intNode = e.SourceNode;
-                intPort = e.SourcePortName;
-                this.removeEdge(e);
-
-                % Interior: intNode → group boundary:int
-                intEdge = feval(ic.NodeEditor.edgeClassForType(portType));
-                intEdge.setEndpoints(intNode, intPort, group, bpName + ":int");
-                this.addChild(intEdge, "edges");
-
-                % Exterior: group boundary → extNode
-                extEdge = feval(ic.NodeEditor.edgeClassForType(portType));
-                extEdge.setEndpoints(group, bpName, extNode, extPort);
-                this.addChild(extEdge, "edges");
-            end
-
-            % 7. Parent all selected nodes into the group
-            for ii = 1:numel(nodes)
-                group.addGroupChild(nodes(ii));
-            end
-
+            group = this.groupNodes(nodes);
             result = struct('groupId', group.ID);
         end
 
@@ -797,6 +858,22 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                     if ~strcmp(mp.SetAccess, 'public'), continue; end
                     newPorts(jj).(mp.Name) = origPorts(jj).(mp.Name);
                 end
+            end
+        end
+
+        function copyPortBehavior(srcPort, dstPort)
+            % Copy signal/flow behavior props from source to destination port.
+            % Called when creating group boundary ports so they inherit the
+            % connected node's port behavior (speed, expression, etc.).
+            if srcPort.Type == "flow" || srcPort.Type == "signal"
+                dstPort.Speed = srcPort.Speed;
+            end
+            if srcPort.Type == "flow"
+                dstPort.OutputRate = srcPort.OutputRate;
+            end
+            if srcPort.Type == "signal"
+                dstPort.Expression = srcPort.Expression;
+                dstPort.Frequency = srcPort.Frequency;
             end
         end
 

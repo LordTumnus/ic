@@ -156,6 +156,10 @@
   // IDs of nodes hidden due to group collapse — used to hide connected edges
   let hiddenNodeIds: Set<string> = $state.raw(new Set());
 
+  // IDs of nodes eagerly deleted by SF (before MATLAB confirms removal).
+  // Prevents $effect.pre from re-adding them from stale nodeStates.
+  let pendingDeleteIds: Set<string> = $state.raw(new Set());
+
   // -- Nodes: per-node reactive isolation ----------------------------------------
   //
   // Each node gets its own $derived that tracks ONLY its proxy properties.
@@ -241,10 +245,15 @@
   });
 
   // Build lookup: "nodeId:portName" → PortDef (for source port behavior on edges)
+  // Group boundary INPUT ports also act as sources for interior ":int" edges,
+  // so we add them with the ":int" suffix key (matching edge sourcePortName).
   const portBehaviorMap = $derived.by(() => {
     const map = new Map<string, PortDef>();
     for (const ns of nodeStates) {
       for (const p of ns.data.outputs) map.set(`${ns.data.id}:${p.name}`, p);
+      if (isGroupType(ns.data.type)) {
+        for (const p of ns.data.inputs) map.set(`${ns.data.id}:${p.name}:int`, p);
+      }
     }
     return map;
   });
@@ -306,8 +315,18 @@
   $effect.pre(() => {
     const states = nodeStates;
     const sigMap = inputSignalMap; // track as dependency so effect re-runs on edge changes
+    const pending = untrack(() => pendingDeleteIds);
     const existing = new Map(untrack(() => flowNodes).map((n) => [n.id, n]));
     let changed = false;
+
+    // Clear pending deletes that MATLAB has now confirmed (no longer in states)
+    if (pending.size > 0) {
+      const stateIds = new Set(states.map((s) => s.data.id));
+      const stillPending = new Set([...pending].filter((id) => stateIds.has(id)));
+      if (stillPending.size !== pending.size) {
+        pendingDeleteIds = stillPending;
+      }
+    }
 
     // Pre-compute collapsed group IDs so child hidden state can be checked
     // even when the child's own data reference hasn't changed.
@@ -317,7 +336,12 @@
         .map((s) => s.data.id),
     );
 
-    const mapped = states.map((ns) => {
+    // Filter out nodes that are eagerly deleted but not yet removed by MATLAB
+    const activeStates = pending.size > 0
+      ? states.filter((ns) => !pending.has(ns.data.id))
+      : states;
+
+    const mapped = activeStates.map((ns) => {
       const d = ns.data;
       const prev = existing.get(d.id);
 
@@ -390,19 +414,7 @@
       };
       if (d.parentNodeId) {
         node.parentId = d.parentNodeId;
-        // Use coordinate extent with 30px top padding to keep children
-        // below the group header. Coordinates are relative to parent.
-        const parentData = states.find(
-          (s) => s.data.id === d.parentNodeId,
-        )?.data;
-        if (parentData?.width && parentData?.height) {
-          node.extent = [
-            [0, 30],
-            [parentData.width, parentData.height],
-          ];
-        } else {
-          node.extent = 'parent';
-        }
+        node.extent = 'parent';
         if (collapsedGroups.has(d.parentNodeId)) node.hidden = true;
       }
       // Group nodes need explicit dimensions and low zIndex
@@ -546,8 +558,9 @@
       edgeRetryTimer = setTimeout(() => {
         edgeRetryTimer = null;
         const current = flowEdges;
+        const visibleEdges = current.filter(e => !e.hidden);
         const domEdges = document.querySelectorAll('.svelte-flow__edge').length;
-        if (domEdges < current.length) {
+        if (domEdges < visibleEdges.length) {
           const store = sfRefs.store;
           if (store) {
             const domEdgeIds = new Set(
@@ -782,6 +795,10 @@
     const deletableNodes = nodes.filter((n) => !n.data?.locked);
 
     if (deletableNodes.length > 0) {
+      // Mark as pending so $effect.pre won't re-add from stale nodeStates
+      const deleteIds = new Set(deletableNodes.map((n) => n.id));
+      pendingDeleteIds = new Set([...pendingDeleteIds, ...deleteIds]);
+
       request?.('deleteNodes', {
         nodeIds: deletableNodes.map((n) => n.id),
       });
@@ -1444,6 +1461,8 @@
         : (e.source === node.id && e.sourceHandle === portName),
     );
 
+    const isGroup = isGroupType(node.type);
+
     const entries: ContextMenuEntry[] = [
       {
         type: 'item',
@@ -1457,7 +1476,8 @@
     ];
 
     // Output port props — type, rate, speed, expression, frequency
-    if (portSide === 'output') {
+    // Group boundary ports inherit type from connected nodes — no editing allowed
+    if (portSide === 'output' && !isGroup) {
       entries.push({
         type: 'folder',
         label: 'Port Type',
@@ -1815,7 +1835,15 @@
       } else if (key.startsWith('nodeOutlineColor:')) {
         updateNodeProp(ctx.id, 'outlineColor', key.slice('nodeOutlineColor:'.length));
       } else if (key.startsWith('value:')) {
-        updateNodeProp(ctx.id, 'value', key.slice('value:'.length));
+        const rawVal = key.slice('value:'.length);
+        const numVal = Number(rawVal);
+        const val = isNaN(numVal) ? 0 : numVal;
+        updateNodeProp(ctx.id, 'value', val);
+        // Constant nodes: propagate value as signal expression to output port
+        const valNode = flowNodes.find((n) => n.id === ctx.id);
+        if (valNode?.type === CONSTANT_TYPE) {
+          updatePortProp(ctx.id, 'value', 'output', 'expression', String(val));
+        }
       } else if (key.startsWith('label:')) {
         updateNodeProp(ctx.id, 'label', key.slice('label:'.length));
       } else if (key.startsWith('expression:')) {

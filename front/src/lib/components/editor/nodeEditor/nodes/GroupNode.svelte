@@ -142,7 +142,6 @@
         class="ic-ne-group__port-dot"
         style:background-color={getPortColor(port)}
       ></span>
-      <span class="ic-ne-group__port-label">{port.label || port.name}</span>
     </div>
   {/each}
 
@@ -154,7 +153,6 @@
       data-port-name={port.name}
       data-port-side="output"
     >
-      <span class="ic-ne-group__port-label">{port.label || port.name}</span>
       <span
         class="ic-ne-group__port-dot"
         style:background-color={getPortColor(port)}
@@ -248,11 +246,6 @@
     flex-shrink: 0;
   }
 
-  .ic-ne-group__port-label {
-    font-size: 10px;
-    color: var(--ic-muted-foreground);
-    white-space: nowrap;
-  }
 
   /* ── Resize: hide edge lines ────────────────── */
   .ic-ne-group :global(.ic-ne-group__resize-line) {

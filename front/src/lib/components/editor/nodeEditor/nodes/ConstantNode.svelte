@@ -8,7 +8,7 @@
 
   type ConstantData = {
     label: string;
-    value: string | number;
+    value: number;
     backgroundColor: string;
     outlineColor: string;
     disabled: boolean;
@@ -29,7 +29,7 @@
       : data.outlineColor || 'var(--ic-border)',
   );
 
-  const displayValue = $derived(String(data.value ?? '0'));
+  const displayValue = $derived(String(data.value ?? 0));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->

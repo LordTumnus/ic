@@ -199,7 +199,6 @@
         class="ic-ne-group__port-dot"
         style:background-color={getPortColor(port)}
       ></span>
-      <span class="ic-ne-group__port-label">{port.label || port.name}</span>
     </div>
   {/each}
 
@@ -211,7 +210,6 @@
       data-port-name={port.name}
       data-port-side="output"
     >
-      <span class="ic-ne-group__port-label">{port.label || port.name}</span>
       <span
         class="ic-ne-group__port-dot"
         style:background-color={getPortColor(port)}
@@ -341,12 +339,6 @@
     flex-shrink: 0;
   }
 
-  /* ── Port label ───────────────────────────────── */
-  .ic-ne-group__port-label {
-    font-size: 10px;
-    color: var(--ic-muted-foreground);
-    white-space: nowrap;
-  }
 
   /* ── Hide SF's default handle visuals ────────── */
   .ic-ne-group :global(.svelte-flow__handle) {

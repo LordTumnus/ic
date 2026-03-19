@@ -91,8 +91,20 @@
       const sampleCount = Math.min(200, Math.max(30, Math.round(totalLength / 3)));
       const points: { x: number; y: number }[] = [];
 
+      // Two-pass: evaluate expression at all samples, center around mean (remove DC offset)
+      const samples: { frac: number; value: number }[] = [];
+      let sum = 0;
       for (let i = 0; i <= sampleCount; i++) {
         const frac = i / sampleCount;
+        const t = (1 - frac) * frequency + timeOffset;
+        const value = evaluateExpression(expression, t);
+        samples.push({ frac, value });
+        sum += value;
+      }
+      const mean = sum / samples.length;
+
+      for (let i = 0; i <= sampleCount; i++) {
+        const { frac, value } = samples[i];
         const len = frac * totalLength;
         const pt = sampler.getPointAtLength(len);
 
@@ -109,9 +121,8 @@
         const nx = -dy / mag;
         const ny = dx / mag;
 
-        const t = (1 - frac) * frequency + timeOffset;
-        const value = evaluateExpression(expression, t);
-        const displacement = amplitude * value;
+        // Subtract mean so waveform is centered on the guide line
+        const displacement = amplitude * (value - mean);
 
         points.push({
           x: pt.x + nx * displacement,

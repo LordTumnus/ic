@@ -1,14 +1,13 @@
 classdef Constant < ic.node.Node
-    % > CONSTANT Inline value node — compact pill with one output.
-    %   Accepts numbers or strings. Numbers are auto-converted to string.
+    % > CONSTANT Inline numeric value node — compact pill with one signal output.
+    %   The constant value is emitted as a flat signal (expression = the number).
     %
-    %   n = ic.node.Constant(Value="42")
-    %   n = ic.node.Constant(Value=3.14)
-    %   n = ic.node.Constant(Value="hello", BackgroundColor="#fef3c7")
+    %   n = ic.node.Constant(Value=42)
+    %   n = ic.node.Constant(Value=3.14, BackgroundColor="#fef3c7")
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE the value displayed in the pill (number or string)
-        Value (1,1) string = "0"
+        % > VALUE the numeric value displayed in the pill and emitted as signal
+        Value (1,1) double = 0
 
         % > BACKGROUNDCOLOR pill fill color (empty = theme default)
         BackgroundColor (1,1) string = ""
@@ -26,11 +25,29 @@ classdef Constant < ic.node.Node
             end
             this@ic.node.Node(props);
         end
+
+        function set.Value(this, val)
+            this.Value = val;
+            this.syncSignalPort();
+        end
     end
 
     methods (Access = protected)
         function defineDefaultPorts(this)
             this.addPort(ic.node.Port("value"), "outputs");
+            this.outputSignal("value", Expression=string(this.Value));
+        end
+    end
+
+    methods (Access = private)
+        function syncSignalPort(this)
+            % > SYNCSIGNALPORT Propagate Value to the output port expression.
+            try
+                port = this.findPort("value", "outputs");
+            catch
+                return  % Port not yet created (during construction)
+            end
+            port.Expression = string(this.Value);
         end
     end
 end
