@@ -45,6 +45,9 @@
   import TransformNode from './nodes/TransformNode.svelte';
   import GroupNode from './nodes/GroupNode.svelte';
   import CollapsibleGroupNode from './nodes/CollapsibleGroupNode.svelte';
+  import InputNode from './nodes/InputNode.svelte';
+  import OutputNode from './nodes/OutputNode.svelte';
+  import ConstantNode from './nodes/ConstantNode.svelte';
 
   // Edge type components — one per concrete MATLAB edge class
   import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
@@ -117,6 +120,9 @@
     'ic.node.Transform': TransformNode,
     'ic.node.BasicGroup': GroupNode,
     'ic.node.CollapsibleGroup': CollapsibleGroupNode,
+    'ic.node.Input': InputNode,
+    'ic.node.Output': OutputNode,
+    'ic.node.Constant': ConstantNode,
   } as Record<string, any>;
 
   const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
@@ -171,6 +177,8 @@
         resizable: (p.resizable as boolean) ?? true,
         backgroundColor: (p.backgroundColor as string) ?? '',
         backgroundOpacity: (p.backgroundOpacity as number) ?? 0,
+        outlineColor: (p.outlineColor as string) ?? '',
+        value: p.value ?? '0',
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -291,6 +299,8 @@
           resizable: d.resizable,
           backgroundColor: d.backgroundColor,
           backgroundOpacity: d.backgroundOpacity,
+          outlineColor: d.outlineColor,
+          value: d.value,
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
         },
@@ -1073,6 +1083,51 @@
 
   // -- Node context menu ------------------------------------------------------
 
+  const TERMINAL_TYPES = new Set(['ic.node.Input', 'ic.node.Output']);
+  const CONSTANT_TYPE = 'ic.node.Constant';
+
+  function buildTerminalContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'color', key: 'nodeBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
+      { type: 'color', key: 'nodeOutlineColor', label: 'Outline', value: (node.data?.outlineColor as string) || '' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildConstantContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'value', label: 'Value', value: String(node.data?.value ?? '0') },
+      { type: 'color', key: 'nodeBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
+      { type: 'color', key: 'nodeOutlineColor', label: 'Outline', value: (node.data?.outlineColor as string) || '' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
   function buildNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
     const disabled = (node.data?.disabled as boolean) ?? false;
@@ -1355,8 +1410,13 @@
           context: { type: 'node', id: node.id, data: node },
         };
       } else {
+        const entries = TERMINAL_TYPES.has(node.type!)
+          ? buildTerminalContextMenu(node)
+          : node.type === CONSTANT_TYPE
+            ? buildConstantContextMenu(node)
+            : buildNodeContextMenu(node);
         ctxMenu = {
-          entries: buildNodeContextMenu(node),
+          entries,
           x: event.clientX,
           y: event.clientY,
           context: { type: 'node', id: node.id, data: node },
@@ -1442,8 +1502,8 @@
   }
 
   // Keys whose actions should NOT close the menu (live preview / inline editing)
-  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupAccent', 'groupBgColor']);
-  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression']);
+  const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupAccent', 'groupBgColor', 'nodeBgColor', 'nodeOutlineColor']);
+  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value']);
   const RANGE_PROPS = new Set(['groupBgOpacity']);
 
   function handleCtxAction(key: string) {
@@ -1485,6 +1545,12 @@
         updateNodeProp(ctx.id, 'backgroundColor', key.slice('groupBgColor:'.length));
       } else if (key.startsWith('groupBgOpacity:')) {
         updateNodeProp(ctx.id, 'backgroundOpacity', Number(key.slice('groupBgOpacity:'.length)));
+      } else if (key.startsWith('nodeBgColor:')) {
+        updateNodeProp(ctx.id, 'backgroundColor', key.slice('nodeBgColor:'.length));
+      } else if (key.startsWith('nodeOutlineColor:')) {
+        updateNodeProp(ctx.id, 'outlineColor', key.slice('nodeOutlineColor:'.length));
+      } else if (key.startsWith('value:')) {
+        updateNodeProp(ctx.id, 'value', key.slice('value:'.length));
       } else if (key.startsWith('label:')) {
         updateNodeProp(ctx.id, 'label', key.slice('label:'.length));
       } else if (key.startsWith('expression:')) {
