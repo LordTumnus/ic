@@ -48,6 +48,9 @@
   import InputNode from './nodes/InputNode.svelte';
   import OutputNode from './nodes/OutputNode.svelte';
   import ConstantNode from './nodes/ConstantNode.svelte';
+  import ClockNode from './nodes/ClockNode.svelte';
+  import SignalNode from './nodes/SignalNode.svelte';
+  import RandomNode from './nodes/RandomNode.svelte';
 
   // Edge type components — one per concrete MATLAB edge class
   import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
@@ -123,6 +126,9 @@
     'ic.node.Input': InputNode,
     'ic.node.Output': OutputNode,
     'ic.node.Constant': ConstantNode,
+    'ic.node.Clock': ClockNode,
+    'ic.node.Signal': SignalNode,
+    'ic.node.Random': RandomNode,
   } as Record<string, any>;
 
   const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
@@ -179,6 +185,15 @@
         backgroundOpacity: (p.backgroundOpacity as number) ?? 0,
         outlineColor: (p.outlineColor as string) ?? '',
         value: p.value ?? '0',
+        // Clock props
+        interval: (p.interval as number) ?? 1,
+        unit: (p.unit as string) ?? 's',
+        animated: (p.animated as boolean) ?? true,
+        // Signal props (expression already extracted above)
+        frequency: (p.frequency as number) ?? 1,
+        previewTime: (p.previewTime as number) ?? 2,
+        // Random props
+        profile: (p.profile as string) ?? 'white',
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -301,6 +316,12 @@
           backgroundOpacity: d.backgroundOpacity,
           outlineColor: d.outlineColor,
           value: d.value,
+          interval: d.interval,
+          unit: d.unit,
+          animated: d.animated,
+          frequency: d.frequency,
+          previewTime: d.previewTime,
+          profile: d.profile,
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
         },
@@ -1087,6 +1108,9 @@
 
   const TERMINAL_TYPES = new Set(['ic.node.Input', 'ic.node.Output']);
   const CONSTANT_TYPE = 'ic.node.Constant';
+  const CLOCK_TYPE = 'ic.node.Clock';
+  const SIGNAL_TYPE = 'ic.node.Signal';
+  const RANDOM_TYPE = 'ic.node.Random';
 
   function buildTerminalContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
@@ -1120,6 +1144,95 @@
       { type: 'text', key: 'value', label: 'Value', value: String(node.data?.value ?? '0') },
       { type: 'color', key: 'nodeBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
       { type: 'color', key: 'nodeOutlineColor', label: 'Outline', value: (node.data?.outlineColor as string) || '' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildClockContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const animated = (node.data?.animated as boolean) ?? true;
+    const unit = (node.data?.unit as string) ?? 's';
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'interval', label: 'Interval', value: String(node.data?.interval ?? 1) },
+      {
+        type: 'folder', label: `Unit: ${unit}`, icon: 'clock',
+        children: [
+          { type: 'item', key: 'unit:s', label: 'Seconds (s)', icon: unit === 's' ? 'check' : undefined },
+          { type: 'item', key: 'unit:ms', label: 'Milliseconds (ms)', icon: unit === 'ms' ? 'check' : undefined },
+          { type: 'item', key: 'unit:Hz', label: 'Hertz (Hz)', icon: unit === 'Hz' ? 'check' : undefined },
+        ],
+      },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-animated', label: animated ? 'Pause Animation' : 'Start Animation', icon: animated ? 'pause' : 'play' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildSignalContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'expression', label: 'f(t)', value: (node.data?.expression as string) || '', placeholder: 'e.g. sin(2*pi*t)' },
+      { type: 'text', key: 'previewTime', label: 'Preview (s)', value: String(node.data?.previewTime ?? 2) },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  /** Profile → expr-eval expression map (mirrors Random.profileExpression in MATLAB). */
+  const RANDOM_PROFILES: Record<string, string> = {
+    white: 'sin(floor(t*8)*127.1)*cos(floor(t*8)*269.3)',
+    binary: 'sign(sin(floor(t*6)*127.1)*cos(floor(t*6)*269.3))',
+    sparse: '((abs(sin(floor(t*4)*127.1)*cos(floor(t*4)*269.3))>0.7) * sign(sin(floor(t*4)*127.1))) * 1',
+    smooth: 'sin(t*3.17)*0.5 + cos(t*7.31)*0.3 + sin(t*13.03)*0.2',
+  };
+
+  function buildRandomContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const profile = (node.data?.profile as string) ?? 'white';
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      {
+        type: 'folder', label: `Profile: ${profile}`, icon: 'dice-5',
+        children: [
+          { type: 'item', key: 'profile:white', label: 'White Noise', icon: profile === 'white' ? 'check' : undefined },
+          { type: 'item', key: 'profile:binary', label: 'Binary (±1)', icon: profile === 'binary' ? 'check' : undefined },
+          { type: 'item', key: 'profile:sparse', label: 'Sparse Pulses', icon: profile === 'sparse' ? 'check' : undefined },
+          { type: 'item', key: 'profile:smooth', label: 'Smooth', icon: profile === 'smooth' ? 'check' : undefined },
+        ],
+      },
       { type: 'separator' },
       { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
       { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
@@ -1416,7 +1529,13 @@
           ? buildTerminalContextMenu(node)
           : node.type === CONSTANT_TYPE
             ? buildConstantContextMenu(node)
-            : buildNodeContextMenu(node);
+            : node.type === CLOCK_TYPE
+              ? buildClockContextMenu(node)
+              : node.type === SIGNAL_TYPE
+                ? buildSignalContextMenu(node)
+                : node.type === RANDOM_TYPE
+                  ? buildRandomContextMenu(node)
+                  : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,
@@ -1505,7 +1624,7 @@
 
   // Keys whose actions should NOT close the menu (live preview / inline editing)
   const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupAccent', 'groupBgColor', 'nodeBgColor', 'nodeOutlineColor']);
-  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value']);
+  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value', 'interval', 'previewTime']);
   const RANGE_PROPS = new Set(['groupBgOpacity']);
 
   function handleCtxAction(key: string) {
@@ -1556,7 +1675,39 @@
       } else if (key.startsWith('label:')) {
         updateNodeProp(ctx.id, 'label', key.slice('label:'.length));
       } else if (key.startsWith('expression:')) {
-        updateNodeProp(ctx.id, 'expression', key.slice('expression:'.length));
+        const expr = key.slice('expression:'.length);
+        updateNodeProp(ctx.id, 'expression', expr);
+        // For Signal nodes, propagate expression to the "signal" output port → edge
+        const exprNode = flowNodes.find((n) => n.id === ctx.id);
+        if (exprNode?.type === SIGNAL_TYPE) {
+          updatePortProp(ctx.id, 'signal', 'output', 'expression', expr);
+        }
+      } else if (key.startsWith('interval:')) {
+        const val = Number(key.slice('interval:'.length));
+        if (val > 0) {
+          updateNodeProp(ctx.id, 'interval', val);
+          // One particle, speed = 2/interval syncs with CSS hand rotation
+          // (BASE_SPEED=0.5 → traversal time = 2/speed = interval seconds)
+          updatePortProp(ctx.id, 'tick', 'output', 'outputRate', 1);
+          updatePortProp(ctx.id, 'tick', 'output', 'speed', 2 / val);
+        }
+      } else if (key.startsWith('previewTime:')) {
+        const val = Number(key.slice('previewTime:'.length));
+        if (val > 0) updateNodeProp(ctx.id, 'previewTime', val);
+      } else if (key === 'toggle-animated') {
+        const node = flowNodes.find((n) => n.id === ctx.id);
+        const current = (node?.data?.animated as boolean) ?? true;
+        updateNodeProp(ctx.id, 'animated', !current);
+      } else if (key.startsWith('unit:')) {
+        updateNodeProp(ctx.id, 'unit', key.slice('unit:'.length));
+      } else if (key.startsWith('profile:')) {
+        const prof = key.slice('profile:'.length);
+        updateNodeProp(ctx.id, 'profile', prof);
+        // Update port expression to match the new noise profile
+        const expr = RANDOM_PROFILES[prof];
+        if (expr) {
+          updatePortProp(ctx.id, 'value', 'output', 'expression', expr);
+        }
       } else if (key === 'toggle-collapse') {
         const node = flowNodes.find((n) => n.id === ctx.id);
         const current = (node?.data?.collapsed as boolean) ?? false;
