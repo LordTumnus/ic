@@ -8,6 +8,7 @@
   import {
     Handle,
     Position,
+    NodeResizer,
     type NodeProps,
     type Node,
   } from '@xyflow/svelte';
@@ -21,10 +22,12 @@
     backgroundOpacity: number;
     disabled: boolean;
     locked: boolean;
+    resizable: boolean;
     width: number;
     height: number;
     inputs: PortDef[];
     outputs: PortDef[];
+    onGroupResize?: (nodeId: string, width: number, height: number, x: number, y: number) => void;
   };
 
   type GroupNodeType = Node<GroupData, 'ic.node.BasicGroup'>;
@@ -43,6 +46,13 @@
     }
     return `background: rgba(128, 128, 128, ${opacity * 0.3})`;
   });
+
+  function handleResizeEnd(
+    _event: MouseEvent | TouchEvent,
+    params: { x: number; y: number; width: number; height: number },
+  ) {
+    data.onGroupResize?.(id, params.width, params.height, params.x, params.y);
+  }
 
   /** Compute vertical position (%) for the i-th port out of count. */
   function portTopPct(i: number, count: number): number {
@@ -65,6 +75,17 @@
   onpointerenter={() => (hovered = true)}
   onpointerleave={() => (hovered = false)}
 >
+  {#if data.resizable}
+    <NodeResizer
+      minWidth={120}
+      minHeight={60}
+      isVisible={selected}
+      lineClass="ic-ne-group__resize-line"
+      handleClass="ic-ne-group__resize-handle"
+      onResizeEnd={handleResizeEnd}
+    />
+  {/if}
+
   <span class="ic-ne-group__label">{data.label || 'Group'}</span>
 
   <!-- Handles: exterior + interior -->
@@ -231,6 +252,51 @@
     font-size: 10px;
     color: var(--ic-muted-foreground);
     white-space: nowrap;
+  }
+
+  /* ── Resize: hide edge lines ────────────────── */
+  .ic-ne-group :global(.ic-ne-group__resize-line) {
+    border-color: transparent;
+  }
+
+  /* ── Resize: L-bracket corner handles ─────── */
+  .ic-ne-group :global(.ic-ne-group__resize-handle) {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+    border: 2px solid var(--ic-muted-foreground);
+    border-radius: 0;
+    opacity: 0.5;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+  }
+
+  .ic-ne-group :global(.ic-ne-group__resize-handle:hover) {
+    border-color: var(--ic-primary);
+    opacity: 1;
+  }
+
+  /* Top-left: show only top + left borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.top.left) {
+    border-right: none;
+    border-bottom: none;
+  }
+
+  /* Top-right: show only top + right borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.top.right) {
+    border-left: none;
+    border-bottom: none;
+  }
+
+  /* Bottom-left: show only bottom + left borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.bottom.left) {
+    border-right: none;
+    border-top: none;
+  }
+
+  /* Bottom-right: show only bottom + right borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.bottom.right) {
+    border-left: none;
+    border-top: none;
   }
 
   /* ── Hide SF's default handle visuals ────────── */

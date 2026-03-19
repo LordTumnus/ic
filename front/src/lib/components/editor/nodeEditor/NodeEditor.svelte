@@ -508,19 +508,21 @@
 
   // -- Group: resize and collapse handlers ------------------------------------
 
-  function handleGroupResize(nodeId: string, width: number, height: number) {
-    // Write back to MATLAB childEntries
+  function handleGroupResize(nodeId: string, width: number, height: number, x: number, y: number) {
+    // Write back to MATLAB childEntries (dimensions + position)
     const entries = childEntries['nodes'] ?? [];
     const entry = entries.find((c) => c.id === nodeId);
     if (entry) {
       entry.props.width = width;
       entry.props.height = height;
+      entry.props.position = [x, y];
     }
-    // Update flowNodes with new dimensions
+    // Update flowNodes with new dimensions and position
     flowNodes = flowNodes.map((n) =>
       n.id === nodeId
         ? {
             ...n,
+            position: { x, y },
             style: `width: ${width}px; height: ${height}px;`,
             data: { ...n.data, width, height },
           }

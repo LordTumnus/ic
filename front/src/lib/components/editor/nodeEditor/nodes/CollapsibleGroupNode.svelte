@@ -28,7 +28,7 @@
     resizable: boolean;
     inputs: PortDef[];
     outputs: PortDef[];
-    onGroupResize?: (nodeId: string, width: number, height: number) => void;
+    onGroupResize?: (nodeId: string, width: number, height: number, x: number, y: number) => void;
     onGroupCollapse?: (nodeId: string, collapsed: boolean) => void;
   };
 
@@ -86,9 +86,9 @@
 
   function handleResizeEnd(
     _event: MouseEvent | TouchEvent,
-    params: { width: number; height: number },
+    params: { x: number; y: number; width: number; height: number },
   ) {
-    data.onGroupResize?.(id, params.width, params.height);
+    data.onGroupResize?.(id, params.width, params.height, params.x, params.y);
   }
 
   function toggleCollapse(e: MouseEvent) {
@@ -357,16 +357,48 @@
     border: none;
   }
 
-  /* ── Resize handle styling ──────────────────── */
-  .ic-ne-group :global(.ic-ne-group__resize-handle) {
-    width: 8px;
-    height: 8px;
-    background: var(--ic-primary);
-    border: 1px solid var(--ic-background);
-    border-radius: 2px;
+  /* ── Resize: hide edge lines ────────────────── */
+  .ic-ne-group :global(.ic-ne-group__resize-line) {
+    border-color: transparent;
   }
 
-  .ic-ne-group :global(.ic-ne-group__resize-line) {
+  /* ── Resize: L-bracket corner handles ─────── */
+  .ic-ne-group :global(.ic-ne-group__resize-handle) {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+    border: 2px solid var(--ic-muted-foreground);
+    border-radius: 0;
+    opacity: 0.5;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+  }
+
+  .ic-ne-group :global(.ic-ne-group__resize-handle:hover) {
     border-color: var(--ic-primary);
+    opacity: 1;
+  }
+
+  /* Top-left: show only top + left borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.top.left) {
+    border-right: none;
+    border-bottom: none;
+  }
+
+  /* Top-right: show only top + right borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.top.right) {
+    border-left: none;
+    border-bottom: none;
+  }
+
+  /* Bottom-left: show only bottom + left borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.bottom.left) {
+    border-right: none;
+    border-top: none;
+  }
+
+  /* Bottom-right: show only bottom + right borders */
+  .ic-ne-group :global(.ic-ne-group__resize-handle.bottom.right) {
+    border-left: none;
+    border-top: none;
   }
 </style>
