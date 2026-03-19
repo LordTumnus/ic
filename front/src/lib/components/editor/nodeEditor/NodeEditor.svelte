@@ -51,6 +51,9 @@
   import ClockNode from './nodes/ClockNode.svelte';
   import SignalNode from './nodes/SignalNode.svelte';
   import RandomNode from './nodes/RandomNode.svelte';
+  import DisplayNode from './nodes/DisplayNode.svelte';
+  import MeterNode from './nodes/MeterNode.svelte';
+  import LoggerNode from './nodes/LoggerNode.svelte';
 
   // Edge type components — one per concrete MATLAB edge class
   import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
@@ -129,6 +132,9 @@
     'ic.node.Clock': ClockNode,
     'ic.node.Signal': SignalNode,
     'ic.node.Random': RandomNode,
+    'ic.node.Display': DisplayNode,
+    'ic.node.Meter': MeterNode,
+    'ic.node.Logger': LoggerNode,
   } as Record<string, any>;
 
   const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
@@ -194,6 +200,15 @@
         previewTime: (p.previewTime as number) ?? 2,
         // Random props
         profile: (p.profile as string) ?? 'white',
+        // Display props
+        inputNumber: (p.inputNumber as number) ?? 1,
+        // Meter props
+        min: (p.min as number) ?? 0,
+        max: (p.max as number) ?? 100,
+        meterUnit: (p.unit as string) ?? '',
+        // Logger props
+        maxLines: (p.maxLines as number) ?? 100,
+        logEntries: Array.isArray(p.logEntries) ? (p.logEntries as string[]) : (p.logEntries ? [p.logEntries as string] : []),
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -234,6 +249,35 @@
     return map;
   });
 
+  // Build lookup: targetNodeId → incoming signal info from connected edges.
+  // Used by sink nodes (Display, Meter) to visualize data from connected sources.
+  interface InputSignal {
+    portName: string;
+    expression: string;
+    frequency: number;
+    speed: number;
+    type: string;
+  }
+
+  const inputSignalMap = $derived.by(() => {
+    const map = new Map<string, InputSignal[]>();
+    for (const edge of childEntries['edges'] ?? []) {
+      const p = edge.props;
+      const srcPort = portBehaviorMap.get(`${p.sourceNodeId}:${p.sourcePortName}`);
+      if (!srcPort) continue;
+      const targetId = p.targetNodeId as string;
+      if (!map.has(targetId)) map.set(targetId, []);
+      map.get(targetId)!.push({
+        portName: (p.targetPortName as string) || '',
+        expression: srcPort.expression,
+        frequency: srcPort.frequency,
+        speed: srcPort.speed,
+        type: srcPort.type,
+      });
+    }
+    return map;
+  });
+
   // Build lookup: "nodeId:portName" → PortDef (all ports, for connection validation)
   const allPortMap = $derived.by(() => {
     const map = new Map<string, PortDef>();
@@ -261,6 +305,7 @@
   // the previous FlowNode is reused — preserving SvelteFlow's handleBounds.
   $effect.pre(() => {
     const states = nodeStates;
+    const sigMap = inputSignalMap; // track as dependency so effect re-runs on edge changes
     const existing = new Map(untrack(() => flowNodes).map((n) => [n.id, n]));
     let changed = false;
 
@@ -280,6 +325,16 @@
       // Reuse previous FlowNode to prevent SvelteFlow's adoptUserNodes from
       // re-processing it (which can wipe handleBounds before measurement).
       if (prev && (prev as any).__nsData === d) {
+        // Check if inputSignals changed (edge added/removed to this node)
+        const newSignals = sigMap.get(d.id) ?? [];
+        const oldSignals = (prev as any).__signals;
+        if (newSignals !== oldSignals) {
+          changed = true;
+          const updated = { ...prev, data: { ...prev.data, inputSignals: newSignals } };
+          (updated as any).__nsData = d;
+          (updated as any).__signals = newSignals;
+          return updated;
+        }
         // Even when reusing, update hidden state for children of groups
         // whose collapsed state may have changed.
         if (d.parentNodeId) {
@@ -322,6 +377,13 @@
           frequency: d.frequency,
           previewTime: d.previewTime,
           profile: d.profile,
+          inputNumber: d.inputNumber,
+          min: d.min,
+          max: d.max,
+          meterUnit: d.meterUnit,
+          maxLines: d.maxLines,
+          logEntries: d.logEntries,
+          inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
         },
@@ -351,6 +413,7 @@
       }
       if (d.locked) node.draggable = false;
       node.__nsData = d;
+      node.__signals = sigMap.get(d.id) ?? [];
       return node;
     });
 
@@ -632,6 +695,12 @@
 
       if (srcCount >= srcPort.maxConnections) return false;
       if (tgtCount >= tgtPort.maxConnections) return false;
+
+      // Display and Meter sinks only accept signal-type source ports
+      const tgtNode = flowNodes.find((n) => n.id === target);
+      if (tgtNode && (tgtNode.type === 'ic.node.Display' || tgtNode.type === 'ic.node.Meter')) {
+        if (srcPort.type !== 'signal') return false;
+      }
     }
 
     // Group boundary enforcement: connections cannot cross group boundaries
@@ -1111,6 +1180,10 @@
   const CLOCK_TYPE = 'ic.node.Clock';
   const SIGNAL_TYPE = 'ic.node.Signal';
   const RANDOM_TYPE = 'ic.node.Random';
+  const DISPLAY_TYPE = 'ic.node.Display';
+  const METER_TYPE = 'ic.node.Meter';
+  const LOGGER_TYPE = 'ic.node.Logger';
+  const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
   function buildTerminalContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
@@ -1233,6 +1306,71 @@
           { type: 'item', key: 'profile:smooth', label: 'Smooth', icon: profile === 'smooth' ? 'check' : undefined },
         ],
       },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildDisplayContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const inputNumber = (node.data?.inputNumber as number) ?? 1;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'inputNumber', label: 'Input Count', value: String(inputNumber), placeholder: '1–8' },
+      { type: 'text', key: 'previewTime', label: 'Preview Time', value: String((node.data?.previewTime as number) ?? 2), placeholder: 'seconds' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildMeterContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'min', label: 'Min', value: String((node.data?.min as number) ?? 0) },
+      { type: 'text', key: 'max', label: 'Max', value: String((node.data?.max as number) ?? 100) },
+      { type: 'text', key: 'meterUnit', label: 'Unit', value: (node.data?.meterUnit as string) || '', placeholder: 'e.g. V, dB' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildLoggerContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'maxLines', label: 'Max Lines', value: String((node.data?.maxLines as number) ?? 100), placeholder: '1–1000' },
+      { type: 'item', key: 'clear-log', label: 'Clear Log', icon: 'eraser' },
       { type: 'separator' },
       { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
       { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
@@ -1535,7 +1673,13 @@
                 ? buildSignalContextMenu(node)
                 : node.type === RANDOM_TYPE
                   ? buildRandomContextMenu(node)
-                  : buildNodeContextMenu(node);
+                  : node.type === DISPLAY_TYPE
+                    ? buildDisplayContextMenu(node)
+                    : node.type === METER_TYPE
+                      ? buildMeterContextMenu(node)
+                      : node.type === LOGGER_TYPE
+                        ? buildLoggerContextMenu(node)
+                        : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,
@@ -1624,7 +1768,7 @@
 
   // Keys whose actions should NOT close the menu (live preview / inline editing)
   const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupAccent', 'groupBgColor', 'nodeBgColor', 'nodeOutlineColor']);
-  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value', 'interval', 'previewTime']);
+  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value', 'interval', 'previewTime', 'inputNumber', 'min', 'max', 'meterUnit', 'maxLines']);
   const RANGE_PROPS = new Set(['groupBgOpacity']);
 
   function handleCtxAction(key: string) {
@@ -1708,6 +1852,20 @@
         if (expr) {
           updatePortProp(ctx.id, 'value', 'output', 'expression', expr);
         }
+      } else if (key.startsWith('inputNumber:')) {
+        const val = Math.round(Number(key.slice('inputNumber:'.length)));
+        if (val > 0 && val <= 8) updateNodeProp(ctx.id, 'inputNumber', val);
+      } else if (key.startsWith('min:')) {
+        updateNodeProp(ctx.id, 'min', Number(key.slice('min:'.length)));
+      } else if (key.startsWith('max:')) {
+        updateNodeProp(ctx.id, 'max', Number(key.slice('max:'.length)));
+      } else if (key.startsWith('meterUnit:')) {
+        updateNodeProp(ctx.id, 'unit', key.slice('meterUnit:'.length));
+      } else if (key.startsWith('maxLines:')) {
+        const val = Math.round(Number(key.slice('maxLines:'.length)));
+        if (val > 0) updateNodeProp(ctx.id, 'maxLines', val);
+      } else if (key === 'clear-log') {
+        updateNodeProp(ctx.id, 'logEntries', []);
       } else if (key === 'toggle-collapse') {
         const node = flowNodes.find((n) => n.id === ctx.id);
         const current = (node?.data?.collapsed as boolean) ?? false;
