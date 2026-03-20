@@ -61,6 +61,7 @@
   import DemuxNode from './nodes/DemuxNode.svelte';
   import AccumulatorNode from './nodes/AccumulatorNode.svelte';
   import NoteNode from './nodes/NoteNode.svelte';
+  import FunctionNode from './nodes/FunctionNode.svelte';
 
   // Unified edge renderer — switches rendering mode based on data.type
   import EdgeRenderer from './edges/EdgeRenderer.svelte';
@@ -155,6 +156,7 @@
     'ic.node.Demux': DemuxNode,
     'ic.node.Accumulator': AccumulatorNode,
     'ic.node.Note': NoteNode,
+    'ic.node.Function': FunctionNode,
   } as Record<string, any>;
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
@@ -183,6 +185,7 @@
   const DEMUX_TYPE = 'ic.node.Demux';
   const ACCUMULATOR_TYPE = 'ic.node.Accumulator';
   const NOTE_TYPE = 'ic.node.Note';
+  const FUNCTION_TYPE = 'ic.node.Function';
   const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
   function isGroupType(type: string | undefined) {
@@ -190,7 +193,7 @@
   }
 
   function isProcessorType(type: string | undefined): boolean {
-    return type === GAIN_TYPE || type === DELAY_TYPE || type === SWITCH_TYPE || type === ACCUMULATOR_TYPE || type === TRANSFORM_TYPE;
+    return type === GAIN_TYPE || type === DELAY_TYPE || type === SWITCH_TYPE || type === ACCUMULATOR_TYPE || type === TRANSFORM_TYPE || type === FUNCTION_TYPE;
   }
 
   // -- Svelte Flow state ------------------------------------------------------
@@ -773,6 +776,46 @@
           });
         }
         continue; // Skip the single-output logic below
+      }
+
+      // --- Function: combine N inputs via expression referencing in1, in2, ... ---
+      if (d.type === FUNCTION_TYPE) {
+        let fnExpr = d.expression || '';
+        let hasAnyInput = false;
+        let maxSpd = 1;
+
+        const resolveInput = (sig: InputSignal | undefined): string | null => {
+          if (!sig) return null;
+          if (sig.type === 'signal') return sig.expression || '0';
+          if (sig.type === 'flow') {
+            const r = sig.outputRate ?? 1;
+            const o = sig.timeOffset ?? 0;
+            return o > 0 ? `pulse((t-${o})*${r},0.05)` : `pulse(t*${r},0.05)`;
+          }
+          return null;
+        };
+
+        const numInputs = d.inputNumber ?? 2;
+        for (let p = 1; p <= numInputs; p++) {
+          const varName = `in${p}`;
+          const sig = sigs.find((s: InputSignal) => s.portName === varName);
+          const inputExpr = resolveInput(sig);
+          const varRegex = new RegExp(`(?<![a-zA-Z_])${varName}(?![a-zA-Z_0-9])`, 'g');
+
+          if (inputExpr) {
+            hasAnyInput = true;
+            maxSpd = Math.max(maxSpd, sig!.speed ?? 1);
+            fnExpr = fnExpr.replace(varRegex, `(${inputExpr})`);
+          } else {
+            fnExpr = fnExpr.replace(varRegex, '0');
+          }
+        }
+
+        if (hasAnyInput && fnExpr) {
+          expectedExpr = fnExpr;
+          expectedType = 'signal';
+          expectedSpeed = maxSpd;
+        }
       }
 
       // --- Accumulator: sum ALL inputs ---
@@ -1867,6 +1910,26 @@
     ];
   }
 
+  function buildFunctionContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'inputNumber', label: 'Inputs', value: String((node.data?.inputNumber as number) ?? 2) },
+      { type: 'color', key: 'nodeColor', label: 'Node Color', value: (node.data?.color as string) || '' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock Node' : 'Lock Node', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable Node' : 'Disable Node', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete Node', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
   function buildTransformContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
     const disabled = (node.data?.disabled as boolean) ?? false;
@@ -2182,7 +2245,9 @@
                                     ? buildAccumulatorContextMenu(node)
                                     : node.type === TRANSFORM_TYPE
                                       ? buildTransformContextMenu(node)
-                                      : node.type === NOTE_TYPE
+                                      : node.type === FUNCTION_TYPE
+                                        ? buildFunctionContextMenu(node)
+                                        : node.type === NOTE_TYPE
                                         ? buildNoteContextMenu(node)
                                         : buildNodeContextMenu(node);
         ctxMenu = {
