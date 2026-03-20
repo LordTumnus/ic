@@ -60,6 +60,7 @@
   import MuxNode from './nodes/MuxNode.svelte';
   import DemuxNode from './nodes/DemuxNode.svelte';
   import AccumulatorNode from './nodes/AccumulatorNode.svelte';
+  import NoteNode from './nodes/NoteNode.svelte';
 
   // Unified edge renderer — switches rendering mode based on data.type
   import EdgeRenderer from './edges/EdgeRenderer.svelte';
@@ -153,6 +154,7 @@
     'ic.node.Mux': MuxNode,
     'ic.node.Demux': DemuxNode,
     'ic.node.Accumulator': AccumulatorNode,
+    'ic.node.Note': NoteNode,
   } as Record<string, any>;
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
@@ -180,6 +182,7 @@
   const MUX_TYPE = 'ic.node.Mux';
   const DEMUX_TYPE = 'ic.node.Demux';
   const ACCUMULATOR_TYPE = 'ic.node.Accumulator';
+  const NOTE_TYPE = 'ic.node.Note';
   const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
   function isGroupType(type: string | undefined) {
@@ -187,7 +190,7 @@
   }
 
   function isProcessorType(type: string | undefined): boolean {
-    return type === GAIN_TYPE || type === DELAY_TYPE || type === SWITCH_TYPE || type === ACCUMULATOR_TYPE;
+    return type === GAIN_TYPE || type === DELAY_TYPE || type === SWITCH_TYPE || type === ACCUMULATOR_TYPE || type === TRANSFORM_TYPE;
   }
 
   // -- Svelte Flow state ------------------------------------------------------
@@ -261,6 +264,8 @@
         factor: (p.factor as number) ?? 1,
         // Delay props
         delayTime: (p.delayTime as number) ?? 1,
+        // Note props
+        content: (p.content as string) ?? '',
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -462,6 +467,7 @@
           factor: d.factor,
           delayTime: d.delayTime,
           outputNumber: d.outputNumber,
+          content: d.content,
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
@@ -479,6 +485,10 @@
         const h = d.collapsed ? groupCollapsedH(d) : d.height;
         node.style = `width: ${d.width}px; height: ${h}px;`;
         node.zIndex = -1;
+      }
+      // Note nodes need explicit dimensions from MATLAB
+      if (d.type === NOTE_TYPE) {
+        node.style = `width: ${d.width}px; height: ${d.height}px;`;
       }
       // Restore user-resized dimensions for non-group nodes
       const dims = resizedNodeDims.get(d.id);
@@ -689,6 +699,81 @@
       let expectedType: string = 'static';
       let expectedTimeOffset: number = 0;
       let expectedSpeed: number | null = null;
+
+      // --- Transform: N paired in→out channels, apply expression to each ---
+      if (d.type === TRANSFORM_TYPE) {
+        const transformExpr = d.expression || '';
+        const numPorts = d.inputNumber ?? 1;
+        const perPortKeys: string[] = [];
+
+        for (let p = 1; p <= numPorts; p++) {
+          const portName = `in${p}`;
+          const outName = `out${p}`;
+          const sig = sigs.find((s: InputSignal) => s.portName === portName);
+
+          let portExpr: string | null = null;
+          let portSpeed: number = 1;
+
+          if (sig) {
+            if (sig.type === 'signal') {
+              portExpr = sig.expression || '0';
+              portSpeed = sig.speed ?? 1;
+            } else if (sig.type === 'flow') {
+              const r = sig.outputRate ?? 1;
+              const o = sig.timeOffset ?? 0;
+              portExpr = o > 0 ? `pulse((t-${o})*${r},0.05)` : `pulse(t*${r},0.05)`;
+              portSpeed = sig.speed ?? 1;
+            }
+          }
+
+          if (portExpr) {
+            const outExpr = transformExpr
+              ? transformExpr.replace(/(?<![a-zA-Z_])x(?![a-zA-Z_0-9])/g, `(${portExpr})`)
+              : portExpr;
+            perPortKeys.push(`${outName}:signal|${outExpr}|${portSpeed}`);
+          } else {
+            perPortKeys.push(`${outName}:static`);
+          }
+        }
+
+        const cacheKey = perPortKeys.join('||');
+        const cached = processorOutputCache.get(d.id);
+        if (cached !== cacheKey) {
+          processorOutputCache.set(d.id, cacheKey);
+          untrack(() => {
+            for (let p = 1; p <= numPorts; p++) {
+              const portName = `in${p}`;
+              const outName = `out${p}`;
+              const sig = sigs.find((s: InputSignal) => s.portName === portName);
+              let portExpr: string | null = null;
+              let portSpeed: number = 1;
+              if (sig) {
+                if (sig.type === 'signal') {
+                  portExpr = sig.expression || '0';
+                  portSpeed = sig.speed ?? 1;
+                } else if (sig.type === 'flow') {
+                  const r = sig.outputRate ?? 1;
+                  const o = sig.timeOffset ?? 0;
+                  portExpr = o > 0 ? `pulse((t-${o})*${r},0.05)` : `pulse(t*${r},0.05)`;
+                  portSpeed = sig.speed ?? 1;
+                }
+              }
+              if (portExpr) {
+                const outExpr = transformExpr
+                  ? transformExpr.replace(/(?<![a-zA-Z_])x(?![a-zA-Z_0-9])/g, `(${portExpr})`)
+                  : portExpr;
+                updatePortProp(d.id, outName, 'output', 'expression', outExpr);
+                updatePortProp(d.id, outName, 'output', 'type', 'signal');
+                updatePortProp(d.id, outName, 'output', 'speed', portSpeed);
+              } else {
+                updatePortProp(d.id, outName, 'output', 'type', 'static');
+                updatePortProp(d.id, outName, 'output', 'expression', '0');
+              }
+            }
+          });
+        }
+        continue; // Skip the single-output logic below
+      }
 
       // --- Accumulator: sum ALL inputs ---
       if (d.type === ACCUMULATOR_TYPE) {
@@ -1782,6 +1867,26 @@
     ];
   }
 
+  function buildTransformContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'inputNumber', label: 'Channels', value: String((node.data?.inputNumber as number) ?? 1) },
+      { type: 'color', key: 'nodeColor', label: 'Node Color', value: (node.data?.color as string) || '' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock Node' : 'Lock Node', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable Node' : 'Disable Node', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete Node', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
   function buildNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
     const disabled = (node.data?.disabled as boolean) ?? false;
@@ -1789,42 +1894,25 @@
       (e) => e.source === node.id || e.target === node.id,
     ).length;
 
-    const entries: ContextMenuEntry[] = [
-      // Node-specific editable props
-      { type: 'text', key: 'expression', label: 'f(x)', value: (node.data?.expression as string) || '', placeholder: 'e.g. x + 1' },
-      { type: 'color', key: 'nodeColor', label: 'Node Color', value: (node.data?.color as string) || '' },
+    return [
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock Node' : 'Lock Node', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable Node' : 'Disable Node', icon: disabled ? 'eye' : 'eye-off' },
       { type: 'separator' },
-      {
-        type: 'item',
-        key: 'toggle-lock',
-        label: locked ? 'Unlock Node' : 'Lock Node',
-        icon: locked ? 'unlock' : 'lock',
-      },
-      {
-        type: 'item',
-        key: 'toggle-disabled',
-        label: disabled ? 'Enable Node' : 'Disable Node',
-        icon: disabled ? 'eye' : 'eye-off',
-      },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
       { type: 'separator' },
-      {
-        type: 'item',
-        key: 'disconnect-all',
-        label: `Disconnect All (${connectedEdgeCount})`,
-        icon: 'unplug',
-        disabled: connectedEdgeCount === 0,
-      },
-      { type: 'separator' },
-      {
-        type: 'item',
-        key: 'delete-node',
-        label: 'Delete Node',
-        icon: 'trash-2',
-        disabled: locked,
-      },
+      { type: 'item', key: 'delete-node', label: 'Delete Node', icon: 'trash-2', disabled: locked },
     ];
+  }
 
-    return entries;
+  function buildNoteContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    return [
+      { type: 'color', key: 'nodeColor', label: 'Note Color', value: (node.data?.color as string) || '#fef9c3' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock Note' : 'Lock Note', icon: locked ? 'unlock' : 'lock' },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete Note', icon: 'trash-2', disabled: locked },
+    ];
   }
 
   // -- Port context menu ------------------------------------------------------
@@ -2092,7 +2180,11 @@
                                   ? buildDemuxContextMenu(node)
                                   : node.type === ACCUMULATOR_TYPE
                                     ? buildAccumulatorContextMenu(node)
-                                    : buildNodeContextMenu(node);
+                                    : node.type === TRANSFORM_TYPE
+                                      ? buildTransformContextMenu(node)
+                                      : node.type === NOTE_TYPE
+                                        ? buildNoteContextMenu(node)
+                                        : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,

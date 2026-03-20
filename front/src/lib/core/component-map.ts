@@ -54,6 +54,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.node.Mux': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.Demux': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.Accumulator': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
+  'ic.node.Note': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.Edge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.StaticEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.FlowEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
