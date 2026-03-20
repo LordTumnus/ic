@@ -117,6 +117,12 @@
       }
 
       const sig = signals[0];
+      if (sig.type === 'static') {
+        // Static port — show constant zero
+        needleAngle = ARC_START - ((0 - min) / range) * ARC_SWEEP;
+        displayValue = 0;
+        return;
+      }
       const elapsed = (timestamp - mountTime) / 1000;
       const t = elapsed * BASE_SPEED * (sig.speed ?? 1);
       const raw = evaluateExpression(sig.expression || '0', t);

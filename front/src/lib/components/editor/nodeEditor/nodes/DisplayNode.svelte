@@ -124,13 +124,18 @@
     const allChannels: number[][] = [];
     for (const sig of signals) {
       const values: number[] = [];
-      const expr = sig.expression || 'sin(2*pi*t)';
-      const speed = sig.speed ?? 1;
-      const tNow = elapsed * BASE_SPEED * speed;
-      const tStart = tNow - previewTime;
-      for (let i = 0; i <= SAMPLE_COUNT; i++) {
-        const t = tStart + (i / SAMPLE_COUNT) * previewTime;
-        values.push(evaluateExpression(expr, t));
+      if (sig.type === 'static') {
+        // Static port — flat zero line
+        for (let i = 0; i <= SAMPLE_COUNT; i++) values.push(0);
+      } else {
+        const expr = sig.expression || 'sin(2*pi*t)';
+        const speed = sig.speed ?? 1;
+        const tNow = elapsed * BASE_SPEED * speed;
+        const tStart = tNow - previewTime;
+        for (let i = 0; i <= SAMPLE_COUNT; i++) {
+          const t = tStart + (i / SAMPLE_COUNT) * previewTime;
+          values.push(evaluateExpression(expr, t));
+        }
       }
       allChannels.push(values);
     }

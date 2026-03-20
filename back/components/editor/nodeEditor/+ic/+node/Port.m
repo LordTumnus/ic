@@ -104,6 +104,7 @@ classdef Port < ic.core.Component
                 edge (1,1) ic.node.Edge
             end
             this.Edges(end+1) = edge;
+            this.notifyParent();
         end
 
         function removeEdge(this, edge)
@@ -117,6 +118,7 @@ classdef Port < ic.core.Component
             edgeId = edge.ID;
             keep = arrayfun(@(e) e.ID ~= edgeId, this.Edges);
             this.Edges = this.Edges(find(keep));
+            this.notifyParent();
         end
 
         function delete(this)
@@ -131,6 +133,15 @@ classdef Port < ic.core.Component
     end
 
     methods (Access = private)
+        function notifyParent(this)
+            % > NOTIFYPARENT Notify parent node of edge change (duck-typed).
+            %   Only nodes implementing onPortEdgeChanged receive the call.
+            node = this.Parent;
+            if ~isempty(node) && isvalid(node) && ismethod(node, 'onPortEdgeChanged')
+                node.onPortEdgeChanged(this);
+            end
+        end
+
         function p = otherPort(this, edge)
             % > OTHERPORT Return the port on the opposite end of an edge.
             if edge.SourcePort == this

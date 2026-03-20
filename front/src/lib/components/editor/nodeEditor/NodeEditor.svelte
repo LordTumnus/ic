@@ -54,6 +54,8 @@
   import DisplayNode from './nodes/DisplayNode.svelte';
   import MeterNode from './nodes/MeterNode.svelte';
   import LoggerNode from './nodes/LoggerNode.svelte';
+  import GainNode from './nodes/GainNode.svelte';
+  import DelayNode from './nodes/DelayNode.svelte';
 
   // Edge type components — one per concrete MATLAB edge class
   import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
@@ -135,6 +137,8 @@
     'ic.node.Display': DisplayNode,
     'ic.node.Meter': MeterNode,
     'ic.node.Logger': LoggerNode,
+    'ic.node.Gain': GainNode,
+    'ic.node.Delay': DelayNode,
   } as Record<string, any>;
 
   const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
@@ -213,6 +217,10 @@
         // Logger props
         maxLines: (p.maxLines as number) ?? 100,
         logEntries: Array.isArray(p.logEntries) ? (p.logEntries as string[]) : (p.logEntries ? [p.logEntries as string] : []),
+        // Gain props
+        factor: (p.factor as number) ?? 1,
+        // Delay props
+        delayTime: (p.delayTime as number) ?? 1,
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -1200,6 +1208,8 @@
   const DISPLAY_TYPE = 'ic.node.Display';
   const METER_TYPE = 'ic.node.Meter';
   const LOGGER_TYPE = 'ic.node.Logger';
+  const GAIN_TYPE = 'ic.node.Gain';
+  const DELAY_TYPE = 'ic.node.Delay';
   const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
   function buildTerminalContextMenu(node: FlowNode): ContextMenuEntry[] {
@@ -1390,6 +1400,56 @@
       { type: 'item', key: 'clear-log', label: 'Clear Log', icon: 'eraser' },
       { type: 'separator' },
       { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildGainContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'factor', label: 'Factor', value: String(node.data?.factor ?? 1) },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'lock-open' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildDelayContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const unit = (node.data?.unit as string) ?? 's';
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
+      { type: 'text', key: 'delayTime', label: 'Delay', value: String(node.data?.delayTime ?? 1) },
+      {
+        type: 'folder', label: `Unit: ${unit}`, icon: 'clock',
+        children: (['s', 'ms'] as const).map((u) => ({
+          type: 'item' as const,
+          key: `delayUnit:${u}`,
+          label: u === 's' ? 'Seconds (s)' : 'Milliseconds (ms)',
+          icon: u === unit ? 'check' : undefined,
+        })),
+      },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'lock-open' : 'lock' },
       { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
       { type: 'separator' },
       { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
@@ -1699,7 +1759,11 @@
                       ? buildMeterContextMenu(node)
                       : node.type === LOGGER_TYPE
                         ? buildLoggerContextMenu(node)
-                        : buildNodeContextMenu(node);
+                        : node.type === GAIN_TYPE
+                          ? buildGainContextMenu(node)
+                          : node.type === DELAY_TYPE
+                            ? buildDelayContextMenu(node)
+                            : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,
@@ -1788,7 +1852,7 @@
 
   // Keys whose actions should NOT close the menu (live preview / inline editing)
   const COLOR_PROPS = new Set(['color', 'signalColor', 'particleColor', 'nodeColor', 'groupAccent', 'groupBgColor', 'nodeBgColor', 'nodeOutlineColor']);
-  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value', 'interval', 'previewTime', 'inputNumber', 'min', 'max', 'meterUnit', 'maxLines']);
+  const TEXT_PROPS = new Set(['label', 'expression', 'port-label', 'port-expression', 'value', 'interval', 'previewTime', 'inputNumber', 'min', 'max', 'meterUnit', 'maxLines', 'factor', 'delayTime']);
   const RANGE_PROPS = new Set(['groupBgOpacity']);
 
   function handleCtxAction(key: string) {
@@ -1892,6 +1956,14 @@
       } else if (key.startsWith('maxLines:')) {
         const val = Math.round(Number(key.slice('maxLines:'.length)));
         if (val > 0) updateNodeProp(ctx.id, 'maxLines', val);
+      } else if (key.startsWith('factor:')) {
+        const val = Number(key.slice('factor:'.length));
+        if (!isNaN(val)) updateNodeProp(ctx.id, 'factor', val);
+      } else if (key.startsWith('delayTime:')) {
+        const val = Number(key.slice('delayTime:'.length));
+        if (!isNaN(val) && val >= 0) updateNodeProp(ctx.id, 'delayTime', val);
+      } else if (key.startsWith('delayUnit:')) {
+        updateNodeProp(ctx.id, 'unit', key.slice('delayUnit:'.length));
       } else if (key === 'clear-log') {
         updateNodeProp(ctx.id, 'logEntries', []);
       } else if (key === 'toggle-collapse') {
