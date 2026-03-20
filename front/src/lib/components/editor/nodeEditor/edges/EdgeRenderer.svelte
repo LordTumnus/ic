@@ -10,7 +10,6 @@
   Uses the global clock for coherent animations across the graph.
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
   import type { EdgeProps } from '@xyflow/svelte';
   import {
     computeEdgePath,
@@ -90,9 +89,14 @@
 
   // Animation via shared coordinator (one rAF for all animated edges)
   // Uses global clock — no per-edge startTime
-  onMount(() => {
-    const isAnimated = () => edgeType === 'flow' || edgeType === 'signal';
-    if (!isAnimated()) return;
+  // Reactive: re-registers when animated/edgeType changes (e.g. cascade sets type to signal)
+  $effect(() => {
+    const shouldAnimate = (edgeType === 'flow' || edgeType === 'signal') && animated;
+    if (!shouldAnimate) {
+      particles = [];
+      waveformPath = '';
+      return;
+    }
 
     const sampler = createPathSampler();
 
@@ -194,7 +198,7 @@
     fill="none"
     stroke={strokeColor}
     stroke-width={selected ? Math.max(thickness, 2) : thickness}
-    stroke-opacity={edgeType === 'signal' ? 0.2 : 1}
+    stroke-opacity={edgeType === 'signal' && animated ? 0.2 : 1}
     stroke-dasharray={edgeType === 'static' && animated ? '6 4' : undefined}
     marker-start={markerStart}
     marker-end={markerEnd}
@@ -203,7 +207,7 @@
   />
 
   <!-- Signal: animated waveform overlay -->
-  {#if edgeType === 'signal' && waveformPath}
+  {#if edgeType === 'signal' && animated && waveformPath}
     <path
       d={waveformPath}
       fill="none"
@@ -216,7 +220,7 @@
   {/if}
 
   <!-- Flow: animated particles -->
-  {#if edgeType === 'flow'}
+  {#if edgeType === 'flow' && animated}
     {#each particles as p, i (i)}
       <circle
         cx={p.x}

@@ -12,7 +12,7 @@ classdef SignalEdge < ic.node.Edge
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             args = namedargs2cell(props);
-            this@ic.node.Edge(args{:}, Type="signal");
+            this@ic.node.Edge(args{:}, Type="signal", Animated=true);
         end
     end
 end

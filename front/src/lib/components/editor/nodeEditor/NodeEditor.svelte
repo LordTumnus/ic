@@ -539,6 +539,11 @@
         data.sourceSpeed = srcPort.speed;
         data.sourceExpression = srcPort.expression;
         data.sourceFrequency = srcPort.frequency;
+        // Override edge type/animated when source port has been promoted by cascade
+        if (srcPort.type === 'signal' || srcPort.type === 'flow') {
+          data.type = srcPort.type;
+          data.animated = true;
+        }
       }
 
       return {
@@ -1364,6 +1369,12 @@
         icon: animated ? 'pause' : 'play',
       });
     } else if (edgeType === 'flow') {
+      const flowAnimated = (edge.data?.animated as boolean) ?? true;
+      entries.push({
+        type: 'item', key: 'toggle-animated',
+        label: flowAnimated ? 'Disable Particles' : 'Enable Particles',
+        icon: flowAnimated ? 'pause' : 'play',
+      });
       const pSize = (edge.data?.particleSize as number) ?? 3;
       entries.push({
         type: 'folder', label: `Particle Size (${pSize})`, icon: 'circle-dot',
@@ -1379,6 +1390,12 @@
         value: (edge.data?.particleColor as string) || '',
       });
     } else if (edgeType === 'signal') {
+      const sigAnimated = (edge.data?.animated as boolean) ?? true;
+      entries.push({
+        type: 'item', key: 'toggle-animated',
+        label: sigAnimated ? 'Disable Waveform' : 'Enable Waveform',
+        icon: sigAnimated ? 'pause' : 'play',
+      });
       const amp = (edge.data?.amplitude as number) ?? 8;
       entries.push({
         type: 'folder', label: `Amplitude (${amp})`, icon: 'activity',
@@ -2286,11 +2303,15 @@
     // Propagate behavior props to connected edges
     const edgeDataKey = PORT_TO_EDGE_KEY[prop];
     if (edgeDataKey && portSide === 'output') {
-      flowEdges = flowEdges.map((e) =>
-        (e.source === nodeId && e.sourceHandle === portName)
-          ? { ...e, data: { ...e.data, [edgeDataKey]: value } }
-          : e,
-      );
+      flowEdges = flowEdges.map((e) => {
+        if (e.source !== nodeId || e.sourceHandle !== portName) return e;
+        const updated: Record<string, unknown> = { ...e.data, [edgeDataKey]: value };
+        // Auto-enable animation when type changes to signal/flow
+        if (prop === 'type' && (value === 'signal' || value === 'flow')) {
+          updated.animated = true;
+        }
+        return { ...e, data: updated };
+      });
     }
   }
 

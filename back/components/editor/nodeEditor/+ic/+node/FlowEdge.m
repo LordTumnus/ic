@@ -12,7 +12,7 @@ classdef FlowEdge < ic.node.Edge
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             args = namedargs2cell(props);
-            this@ic.node.Edge(args{:}, Type="flow");
+            this@ic.node.Edge(args{:}, Type="flow", Animated=true);
         end
     end
 end

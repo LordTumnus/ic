@@ -68,9 +68,9 @@ classdef Edge < ic.core.Component
         EndArrow (1,1) string {mustBeMember(EndArrow, ...
             ["none", "arrow", "diamond", "circle"])} = "none"
 
-        % ── Static edge properties ──
+        % ── Shared animation ──
 
-        % > ANIMATED enable dash animation on static edges
+        % > ANIMATED enable animation (dash on static, waveform on signal)
         Animated (1,1) logical = false
 
         % ── Flow edge properties ──

@@ -239,7 +239,9 @@ classdef (Abstract) Node < ic.core.ComponentContainer
 
             % Create unified edge with type from source port
             srcPortHandle = this.findPort(sourcePort, "outputs");
-            edge = ic.node.Edge(Type=srcPortHandle.Type);
+            portType = srcPortHandle.Type;
+            edge = ic.node.Edge(Type=portType, ...
+                Animated=ismember(portType, ["flow", "signal"]));
 
             % Forward display props from Edge= if provided
             if isfield(props, 'Edge')
