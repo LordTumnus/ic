@@ -154,6 +154,9 @@ parser.functions.smooth = (t: number, width = 1) => {
 };
 parser.functions.exp_decay = (t: number, rate = 1) => Math.exp(-rate * Math.max(0, t));
 
+// Selection / switching: sel(ctrl, in1, in2) — selects in1 by default, in2 when ctrl >= 1
+parser.functions.sel = (ctrl: number, a: number, b: number) => ctrl >= 1 ? b : a;
+
 /** Common math constants passed to every expression evaluation. */
 const MATH_CONSTANTS = {
   pi: Math.PI,

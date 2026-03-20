@@ -56,6 +56,10 @@
   import LoggerNode from './nodes/LoggerNode.svelte';
   import GainNode from './nodes/GainNode.svelte';
   import DelayNode from './nodes/DelayNode.svelte';
+  import SwitchNode from './nodes/SwitchNode.svelte';
+  import MuxNode from './nodes/MuxNode.svelte';
+  import DemuxNode from './nodes/DemuxNode.svelte';
+  import AccumulatorNode from './nodes/AccumulatorNode.svelte';
 
   // Unified edge renderer — switches rendering mode based on data.type
   import EdgeRenderer from './edges/EdgeRenderer.svelte';
@@ -145,6 +149,10 @@
     'ic.node.Logger': LoggerNode,
     'ic.node.Gain': GainNode,
     'ic.node.Delay': DelayNode,
+    'ic.node.Switch': SwitchNode,
+    'ic.node.Mux': MuxNode,
+    'ic.node.Demux': DemuxNode,
+    'ic.node.Accumulator': AccumulatorNode,
   } as Record<string, any>;
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
@@ -168,6 +176,10 @@
   const LOGGER_TYPE = 'ic.node.Logger';
   const GAIN_TYPE = 'ic.node.Gain';
   const DELAY_TYPE = 'ic.node.Delay';
+  const SWITCH_TYPE = 'ic.node.Switch';
+  const MUX_TYPE = 'ic.node.Mux';
+  const DEMUX_TYPE = 'ic.node.Demux';
+  const ACCUMULATOR_TYPE = 'ic.node.Accumulator';
   const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
   function isGroupType(type: string | undefined) {
@@ -175,7 +187,7 @@
   }
 
   function isProcessorType(type: string | undefined): boolean {
-    return type === GAIN_TYPE || type === DELAY_TYPE;
+    return type === GAIN_TYPE || type === DELAY_TYPE || type === SWITCH_TYPE || type === ACCUMULATOR_TYPE;
   }
 
   // -- Svelte Flow state ------------------------------------------------------
@@ -234,8 +246,10 @@
         previewTime: (p.previewTime as number) ?? 2,
         // Random props
         profile: (p.profile as string) ?? 'white',
-        // Display props
+        // Display / Mux / Accumulator props
         inputNumber: (p.inputNumber as number) ?? 1,
+        // Demux props
+        outputNumber: (p.outputNumber as number) ?? 2,
         // Meter props
         min: (p.min as number) ?? 0,
         max: (p.max as number) ?? 100,
@@ -447,6 +461,7 @@
           logEntries: d.logEntries,
           factor: d.factor,
           delayTime: d.delayTime,
+          outputNumber: d.outputNumber,
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
@@ -664,44 +679,122 @@
       let expectedTimeOffset: number = 0;
       let expectedSpeed: number | null = null;
 
-      // Resolve the effective input expression: signal edges pass through directly,
-      // flow edges are converted to a narrow impulse: pulse(t * rate, 0.05)
-      let inputExpr: string | null = null;
-      if (sigInput) {
-        inputExpr = sigInput.expression;
-      } else if (flowInput && d.type === GAIN_TYPE) {
-        // Flow → signal conversion: impulse train
-        const rate = flowInput.outputRate ?? 1;
-        const offset = flowInput.timeOffset ?? 0;
-        const speed = flowInput.speed ?? 1;
-        inputExpr = offset > 0
-          ? `pulse((t-${offset})*${rate},0.05)`
-          : `pulse(t*${rate},0.05)`;
-        // Carry forward the flow's speed so the edge animates at the right rate
-        expectedSpeed = speed;
-      }
+      // --- Accumulator: sum ALL inputs ---
+      if (d.type === ACCUMULATOR_TYPE) {
+        const terms: string[] = [];
+        let maxSpd = 1;
+        for (const s of sigs) {
+          if (s.type === 'signal') {
+            terms.push(`(${s.expression})`);
+            maxSpd = Math.max(maxSpd, s.speed ?? 1);
+          } else if (s.type === 'flow') {
+            const r = s.outputRate ?? 1;
+            const o = s.timeOffset ?? 0;
+            terms.push(o > 0 ? `pulse((t-${o})*${r},0.05)` : `pulse(t*${r},0.05)`);
+            maxSpd = Math.max(maxSpd, s.speed ?? 1);
+          }
+        }
+        if (terms.length > 0) {
+          expectedExpr = terms.join('+');
+          expectedType = 'signal';
+          expectedSpeed = maxSpd;
+        }
+      } else if (d.type === SWITCH_TYPE) {
+        // --- Switch: select between in1 and in2 based on ctrl ---
+        const ctrlSig = sigs.find((s: InputSignal) => s.portName === 'ctrl');
+        const in1Sig = sigs.find((s: InputSignal) => s.portName === 'in1');
+        const in2Sig = sigs.find((s: InputSignal) => s.portName === 'in2');
 
-      if (inputExpr) {
-        // Signal-domain transform
-        if (d.type === GAIN_TYPE) {
-          const factor = d.factor ?? 1;
-          expectedExpr = `(${factor})*(${inputExpr})`;
-        } else if (d.type === DELAY_TYPE) {
+        // Build ctrl expression
+        let ctrlExpr: string | null = null;
+        if (ctrlSig) {
+          if (ctrlSig.type === 'signal') {
+            ctrlExpr = ctrlSig.expression || '0';
+          } else if (ctrlSig.type === 'flow') {
+            const r = ctrlSig.outputRate ?? 1;
+            const o = ctrlSig.timeOffset ?? 0;
+            ctrlExpr = o > 0 ? `pulse((t-${o})*${r},0.05)` : `pulse(t*${r},0.05)`;
+          }
+        }
+
+        // Helper: resolve an input signal to an expression string
+        const resolveInput = (sig: InputSignal | undefined): string | null => {
+          if (!sig) return null;
+          if (sig.type === 'signal') return sig.expression || '0';
+          if (sig.type === 'flow') {
+            const r = sig.outputRate ?? 1;
+            const o = sig.timeOffset ?? 0;
+            return o > 0 ? `pulse((t-${o})*${r},0.05)` : `pulse(t*${r},0.05)`;
+          }
+          return null;
+        };
+
+        const in1Expr = resolveInput(in1Sig);
+        const in2Expr = resolveInput(in2Sig);
+
+        // Build output: sel(ctrl, in1, in2)
+        if (ctrlExpr && in1Expr && in2Expr) {
+          expectedExpr = `sel(${ctrlExpr},${in1Expr},${in2Expr})`;
+          expectedType = 'signal';
+        } else if (ctrlExpr && in1Expr) {
+          expectedExpr = `sel(${ctrlExpr},${in1Expr},0)`;
+          expectedType = 'signal';
+        } else if (ctrlExpr && in2Expr) {
+          expectedExpr = `sel(${ctrlExpr},0,${in2Expr})`;
+          expectedType = 'signal';
+        } else if (in1Expr) {
+          expectedExpr = in1Expr;
+          expectedType = 'signal';
+        } else if (in2Expr) {
+          expectedExpr = in2Expr;
+          expectedType = 'signal';
+        }
+
+        // Pick the fastest speed from all inputs
+        let maxSpd = 1;
+        for (const s of [ctrlSig, in1Sig, in2Sig]) {
+          if (s) maxSpd = Math.max(maxSpd, s.speed ?? 1);
+        }
+        expectedSpeed = maxSpd;
+      } else {
+        // --- Single-input processors: Gain, Delay ---
+        // Resolve the effective input expression: signal edges pass through directly,
+        // flow edges are converted to a narrow impulse: pulse(t * rate, 0.05)
+        let inputExpr: string | null = null;
+        if (sigInput) {
+          inputExpr = sigInput.expression;
+        } else if (flowInput && d.type === GAIN_TYPE) {
+          // Flow → signal conversion: impulse train
+          const rate = flowInput.outputRate ?? 1;
+          const offset = flowInput.timeOffset ?? 0;
+          const speed = flowInput.speed ?? 1;
+          inputExpr = offset > 0
+            ? `pulse((t-${offset})*${rate},0.05)`
+            : `pulse(t*${rate},0.05)`;
+          expectedSpeed = speed;
+        }
+
+        if (inputExpr) {
+          if (d.type === GAIN_TYPE) {
+            const factor = d.factor ?? 1;
+            expectedExpr = `(${factor})*(${inputExpr})`;
+          } else if (d.type === DELAY_TYPE) {
+            const dt = Number(d.delayTime ?? 1);
+            const unit = String(d.unit ?? 's');
+            const delaySec = unit === 'ms' ? dt / 1000 : dt;
+            expectedExpr = inputExpr.replace(
+              /(?<![a-zA-Z_])t(?![a-zA-Z_0-9])/g, `(t-${delaySec})`,
+            );
+          }
+          if (expectedExpr) expectedType = 'signal';
+        } else if (flowInput && d.type === DELAY_TYPE) {
+          // Flow through Delay — stay flow, shift timeOffset
           const dt = Number(d.delayTime ?? 1);
           const unit = String(d.unit ?? 's');
           const delaySec = unit === 'ms' ? dt / 1000 : dt;
-          expectedExpr = inputExpr.replace(
-            /(?<![a-zA-Z_])t(?![a-zA-Z_0-9])/g, `(t-${delaySec})`,
-          );
+          expectedType = 'flow';
+          expectedTimeOffset = (flowInput.timeOffset ?? 0) + delaySec;
         }
-        if (expectedExpr) expectedType = 'signal';
-      } else if (flowInput && d.type === DELAY_TYPE) {
-        // Flow through Delay — stay flow, shift timeOffset
-        const dt = Number(d.delayTime ?? 1);
-        const unit = String(d.unit ?? 's');
-        const delaySec = unit === 'ms' ? dt / 1000 : dt;
-        expectedType = 'flow';
-        expectedTimeOffset = (flowInput.timeOffset ?? 0) + delaySec;
       }
 
       // Cache key encodes all output state
@@ -1577,6 +1670,83 @@
     ];
   }
 
+  function buildSwitchContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildMuxContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const inputNumber = (node.data?.inputNumber as number) ?? 2;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'inputNumber', label: 'Input Count', value: String(inputNumber), placeholder: '2–16' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildDemuxContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const outputNumber = (node.data?.outputNumber as number) ?? 2;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'outputNumber', label: 'Output Count', value: String(outputNumber), placeholder: '2–16' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildAccumulatorContextMenu(node: FlowNode): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const inputNumber = (node.data?.inputNumber as number) ?? 2;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      { type: 'text', key: 'inputNumber', label: 'Input Count', value: String(inputNumber), placeholder: '2–16' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
   function buildNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
     const disabled = (node.data?.disabled as boolean) ?? false;
@@ -1879,7 +2049,15 @@
                           ? buildGainContextMenu(node)
                           : node.type === DELAY_TYPE
                             ? buildDelayContextMenu(node)
-                            : buildNodeContextMenu(node);
+                            : node.type === SWITCH_TYPE
+                              ? buildSwitchContextMenu(node)
+                              : node.type === MUX_TYPE
+                                ? buildMuxContextMenu(node)
+                                : node.type === DEMUX_TYPE
+                                  ? buildDemuxContextMenu(node)
+                                  : node.type === ACCUMULATOR_TYPE
+                                    ? buildAccumulatorContextMenu(node)
+                                    : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,

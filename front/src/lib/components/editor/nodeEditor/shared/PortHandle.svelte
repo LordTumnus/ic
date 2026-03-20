@@ -4,6 +4,7 @@
 
   Variants:
     dot       6px colored square, 2px radius (default)
+    circle    6px colored circle
     chevron   Small > arrow (Gain output)
     bar       Horizontal bar 4×8px (Delay ports)
     wave      Tiny sine squiggle (Signal/Random output)
@@ -12,7 +13,7 @@
 <script lang="ts">
   import { Handle, Position } from '@xyflow/svelte';
 
-  type Variant = 'dot' | 'chevron' | 'bar' | 'wave' | 'diamond';
+  type Variant = 'dot' | 'circle' | 'chevron' | 'bar' | 'wave' | 'diamond';
 
   let {
     type,
@@ -45,6 +46,9 @@
   <!-- Visible indicator -->
   {#if variant === 'dot'}
     <span class="ic-ph__dot" style:background-color={color}></span>
+
+  {:else if variant === 'circle'}
+    <span class="ic-ph__circle" style:background-color={color}></span>
 
   {:else if variant === 'chevron'}
     <svg class="ic-ph__icon" viewBox="0 0 8 10" xmlns="http://www.w3.org/2000/svg">
@@ -121,6 +125,15 @@
     width: 6px;
     height: 6px;
     border-radius: 2px;
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* -- Variant: circle -- */
+  .ic-ph__circle {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
     position: absolute;
     pointer-events: none;
   }
