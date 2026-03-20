@@ -50,6 +50,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.node.Logger': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.Gain': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.Delay': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
+  'ic.node.Edge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.StaticEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.FlowEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.SignalEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],

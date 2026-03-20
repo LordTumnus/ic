@@ -70,17 +70,16 @@
   let particles: { x: number; y: number }[] = $state([]);
 
   // Animation via shared coordinator (one rAF for all animated edges)
+  // Uses global clock — no per-edge startTime, so remounting doesn't reset
   onMount(() => {
     const sampler = createPathSampler();
-    const startTime = performance.now();
 
-    const unregister = registerAnimationCallback((timestamp) => {
+    const unregister = registerAnimationCallback((globalTime) => {
       sampler.setPath(path);
       const totalLength = sampler.getTotalLength();
       if (totalLength <= 0) return;
 
-      const elapsed = (timestamp - startTime) / 1000;
-      const frac = (elapsed * BASE_SPEED * speed) % 1;
+      const frac = (globalTime * BASE_SPEED * speed) % 1;
       const offset = frac * totalLength;
       const count = particleCount;
       const spacing = totalLength / count;

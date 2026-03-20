@@ -4,9 +4,11 @@
   Input ports are visible as small dots on the left edge (no labels).
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
   import { evaluateExpression, registerAnimationCallback } from '$lib/utils/edge-utils';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
   import { onMount, onDestroy } from 'svelte';
 
   type InputSignal = {
@@ -14,6 +16,8 @@
     expression: string;
     frequency: number;
     speed: number;
+    outputRate: number;
+    timeOffset: number;
     type: string;
   };
 
@@ -26,6 +30,7 @@
     inputs: PortDef[];
     outputs: PortDef[];
     inputSignals: InputSignal[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type DisplayNodeType = Node<DisplayData, 'ic.node.Display'>;
@@ -56,7 +61,7 @@
   let cachedDpr = 1;
   let dprSet = false;
 
-  function drawFrame(timestamp: number) {
+  function drawFrame(globalTime: number) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -115,11 +120,8 @@
       return;
     }
 
-    // Elapsed since mount — matches signal edge's time base
-    const elapsed = (timestamp - mountTime) / 1000;
-
-    // Sample all channels over a sliding window to find global Y range.
-    // Each channel uses its own speed: t = elapsed * BASE_SPEED * speed.
+    // Sample all channels over a sliding window using global time.
+    // Each channel uses its own speed: t = globalTime * BASE_SPEED * speed.
     // The window spans [now - previewTime, now] in the channel's own time scale.
     const allChannels: number[][] = [];
     for (const sig of signals) {
@@ -127,10 +129,23 @@
       if (sig.type === 'static') {
         // Static port — flat zero line
         for (let i = 0; i <= SAMPLE_COUNT; i++) values.push(0);
+      } else if (sig.type === 'flow') {
+        // Flow port — pulse train at the output rate, shifted by timeOffset
+        const rate = sig.outputRate ?? 3;
+        const speed = sig.speed ?? 1;
+        const offset = sig.timeOffset ?? 0;
+        const tNow = globalTime * BASE_SPEED * speed;
+        const tStart = tNow - previewTime;
+        for (let i = 0; i <= SAMPLE_COUNT; i++) {
+          const t = tStart + (i / SAMPLE_COUNT) * previewTime - offset;
+          const phase = ((t * rate) % 1 + 1) % 1;
+          values.push(phase < 0.05 ? 1 : 0);
+        }
       } else {
+        // Signal port — evaluate expression
         const expr = sig.expression || 'sin(2*pi*t)';
         const speed = sig.speed ?? 1;
-        const tNow = elapsed * BASE_SPEED * speed;
+        const tNow = globalTime * BASE_SPEED * speed;
         const tStart = tNow - previewTime;
         for (let i = 0; i <= SAMPLE_COUNT; i++) {
           const t = tStart + (i / SAMPLE_COUNT) * previewTime;
@@ -192,10 +207,8 @@
   }
 
   let unregister: (() => void) | null = null;
-  let mountTime = 0;
 
   onMount(() => {
-    mountTime = performance.now();
     unregister = registerAnimationCallback(drawFrame);
   });
 
@@ -226,7 +239,9 @@
   <!-- Header -->
   <div class="ic-ne-display__header">
     <span class="ic-ne-display__badge">&#x229F;</span>
-    <span class="ic-ne-display__title">{data.label || 'Display'}</span>
+    <span class="ic-ne-display__title">
+      <InlineEdit value={data.label || 'Display'} className="ic-ne-display__title-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+    </span>
   </div>
 
   <!-- Oscilloscope canvas -->
@@ -238,27 +253,19 @@
     ></canvas>
   </div>
 
-  <!-- Input port dots (no labels, small, positioned on left edge) -->
+  <!-- Input port dots (positioned on left edge) -->
   {#if data.inputs?.length}
     {#each data.inputs as port, i (port.name)}
-      <div
-        class="ic-ne-display__port-dot"
-        style:top={portTopPercent(i, data.inputs.length)}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          id={port.name}
-          style="top: 0; left: 0; transform: none;"
-        />
-      </div>
+      <PortHandle
+        type="target"
+        position={Position.Left}
+        id={port.name}
+        variant="dot"
+        style="top: {portTopPercent(i, data.inputs.length)}; left: -3px; transform: translateY(-50%);"
+      />
     {/each}
   {/if}
 </div>
-
-{#if data.label}
-  <div class="ic-ne-display__label">{data.label}</div>
-{/if}
 
 <style>
   .ic-ne-display {
@@ -269,7 +276,6 @@
     color: var(--ic-foreground);
     font-family: var(--ic-font-family);
     font-size: 12px;
-    overflow: clip;
     position: relative;
     transition:
       border-color 0.15s ease,
@@ -335,45 +341,4 @@
     display: block;
   }
 
-  /* Port dots — small, positioned on left edge */
-  .ic-ne-display__port-dot {
-    position: absolute;
-    left: -4px;
-    width: 7px;
-    height: 7px;
-    border-radius: 2px;
-    background: var(--ic-border);
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    transform: translateY(-50%);
-    transition: transform 0.12s ease, border-color 0.12s ease;
-  }
-
-  .ic-ne-display__port-dot:hover {
-    transform: translateY(-50%) scale(1.4);
-    border-color: rgba(0, 0, 0, 0.4);
-  }
-
-  /* Label below */
-  .ic-ne-display__label {
-    font-family: var(--ic-font-family);
-    font-size: 10px;
-    color: var(--ic-muted-foreground);
-    white-space: nowrap;
-    text-align: center;
-    margin-top: 4px;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Handle hitbox — invisible but large enough to grab */
-  .ic-ne-display__port-dot :global(.svelte-flow__handle) {
-    width: 14px;
-    height: 14px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
-    transform: translate(-50%, -50%);
-    top: 50% !important;
-    left: 50% !important;
-  }
 </style>

@@ -237,21 +237,13 @@ classdef (Abstract) Node < ic.core.ComponentContainer
                 targetPort = inputs(1).Name;
             end
 
-            % Create edge from source port type
+            % Create unified edge with type from source port
             srcPortHandle = this.findPort(sourcePort, "outputs");
-            typeMap = dictionary("static", "ic.node.StaticEdge", ...
-                                 "flow",   "ic.node.FlowEdge", ...
-                                 "signal", "ic.node.SignalEdge");
-            edge = feval(typeMap(srcPortHandle.Type));
+            edge = ic.node.Edge(Type=srcPortHandle.Type);
 
             % Forward display props from Edge= if provided
             if isfield(props, 'Edge')
-                userEdge = props.Edge;
-                if userEdge.Label ~= "", edge.Label = userEdge.Label; end
-                if userEdge.Geometry ~= "", edge.Geometry = userEdge.Geometry; end
-                if class(userEdge) == class(edge)
-                    edge.copyDisplayProps(userEdge);
-                end
+                edge.copyDisplayProps(props.Edge);
             end
 
             % Adjust handle for group boundary port (child → group)

@@ -34,7 +34,7 @@
 
   import type { ChildEntries, ChildEntry, RequestFn, Resolution } from '$lib/types';
   import { extractPorts, type PortDef } from '$lib/utils/node-editor-types';
-  import { EDGE_TYPE_MAP } from '$lib/utils/edge-utils';
+  import { EDGE_TYPE_MAP, setPlaying, setSpeed } from '$lib/utils/edge-utils';
   import dagre from '@dagrejs/dagre';
   import logger from '$lib/core/logger';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
@@ -57,10 +57,8 @@
   import GainNode from './nodes/GainNode.svelte';
   import DelayNode from './nodes/DelayNode.svelte';
 
-  // Edge type components — one per concrete MATLAB edge class
-  import StaticEdgeRenderer from './edges/StaticEdgeRenderer.svelte';
-  import FlowEdgeRenderer from './edges/FlowEdgeRenderer.svelte';
-  import SignalEdgeRenderer from './edges/SignalEdgeRenderer.svelte';
+  // Unified edge renderer — switches rendering mode based on data.type
+  import EdgeRenderer from './edges/EdgeRenderer.svelte';
 
   const OK: Resolution = { success: true, data: null };
 
@@ -72,6 +70,8 @@
     layout = $bindable('horizontal'),
     snapToGrid = $bindable(false),
     gridVariant: gridVariantProp = $bindable('dots'),
+    playing: playingProp = $bindable(true),
+    playSpeed = $bindable(1),
     childEntries = {} as ChildEntries,
     request,
     // Selection state (written back to MATLAB)
@@ -94,6 +94,8 @@
     layout?: string;
     snapToGrid?: boolean;
     gridVariant?: string;
+    playing?: boolean;
+    playSpeed?: number;
     childEntries?: ChildEntries;
     request?: RequestFn;
     selectedNodeIds?: string[];
@@ -106,6 +108,10 @@
     clearSelection?: () => Resolution;
     relayout?: (data?: unknown) => Resolution;
   } = $props();
+
+  // -- Global clock: sync MATLAB props → animation coordinator ----------------
+  $effect(() => { setPlaying(playingProp); });
+  $effect(() => { setSpeed(playSpeed); });
 
   // -- Snap grid: when enabled, nodes snap to gridSize intervals ---------------
   const snapGrid = $derived<[number, number] | undefined>(
@@ -141,16 +147,36 @@
     'ic.node.Delay': DelayNode,
   } as Record<string, any>;
 
-  const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
-  function isGroupType(type?: string): boolean { return GROUP_TYPES.has(type ?? ''); }
-
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
 
   const edgeTypes = {
-    static: StaticEdgeRenderer,
-    flow: FlowEdgeRenderer,
-    signal: SignalEdgeRenderer,
+    default: EdgeRenderer,
   } as Record<string, any>;
+
+  // -- Node type constants (used throughout for type-checks) ------------------
+
+  const TRANSFORM_TYPE = 'ic.node.Transform';
+  const GROUP_TYPES = new Set(['ic.node.BasicGroup', 'ic.node.CollapsibleGroup']);
+  const INPUT_TYPE = 'ic.node.Input';
+  const OUTPUT_TYPE = 'ic.node.Output';
+  const CONSTANT_TYPE = 'ic.node.Constant';
+  const CLOCK_TYPE = 'ic.node.Clock';
+  const SIGNAL_TYPE = 'ic.node.Signal';
+  const RANDOM_TYPE = 'ic.node.Random';
+  const DISPLAY_TYPE = 'ic.node.Display';
+  const METER_TYPE = 'ic.node.Meter';
+  const LOGGER_TYPE = 'ic.node.Logger';
+  const GAIN_TYPE = 'ic.node.Gain';
+  const DELAY_TYPE = 'ic.node.Delay';
+  const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
+
+  function isGroupType(type: string | undefined) {
+    return type ? GROUP_TYPES.has(type) : false;
+  }
+
+  function isProcessorType(type: string | undefined): boolean {
+    return type === GAIN_TYPE || type === DELAY_TYPE;
+  }
 
   // -- Svelte Flow state ------------------------------------------------------
 
@@ -273,6 +299,8 @@
     expression: string;
     frequency: number;
     speed: number;
+    outputRate: number;
+    timeOffset: number;
     type: string;
   }
 
@@ -289,6 +317,8 @@
         expression: srcPort.expression,
         frequency: srcPort.frequency,
         speed: srcPort.speed,
+        outputRate: srcPort.outputRate,
+        timeOffset: srcPort.timeOffset,
         type: srcPort.type,
       });
     }
@@ -415,9 +445,12 @@
           meterUnit: d.meterUnit,
           maxLines: d.maxLines,
           logEntries: d.logEntries,
+          factor: d.factor,
+          delayTime: d.delayTime,
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
+          onpropchange: (prop: string, value: unknown) => handleNodePropChange(d.id, prop, value),
         },
       };
       if (d.parentNodeId) {
@@ -602,6 +635,101 @@
     }
   });
 
+  // -- Processor cascade: keep processor output ports in sync with inputs ------
+  //
+  // When a processor node's input signal changes (edge connected/disconnected,
+  // upstream expression changed), recalculate its output port expression.
+  // This is the reactive equivalent of MATLAB's onPortEdgeChanged → syncOutput.
+  //
+  // Uses a cache to avoid infinite loops: only calls updatePortProp when the
+  // computed expression actually differs from the last one we set.
+
+  // Cache key encodes both expression and timeOffset so we detect changes to either.
+  const processorOutputCache = new Map<string, string>();
+
+  $effect(() => {
+    const sigMap = inputSignalMap; // reactive dependency
+    const states = nodeStates;    // reactive dependency
+
+    for (const ns of states) {
+      const d = ns.data;
+      if (!isProcessorType(d.type)) continue;
+
+      const sigs = sigMap.get(d.id) ?? [];
+      const sigInput = sigs.find((s: InputSignal) => s.type === 'signal');
+      const flowInput = sigs.find((s: InputSignal) => s.type === 'flow');
+
+      let expectedExpr: string | null = null;
+      let expectedType: string = 'static';
+      let expectedTimeOffset: number = 0;
+      let expectedSpeed: number | null = null;
+
+      // Resolve the effective input expression: signal edges pass through directly,
+      // flow edges are converted to a narrow impulse: pulse(t * rate, 0.05)
+      let inputExpr: string | null = null;
+      if (sigInput) {
+        inputExpr = sigInput.expression;
+      } else if (flowInput && d.type === GAIN_TYPE) {
+        // Flow → signal conversion: impulse train
+        const rate = flowInput.outputRate ?? 1;
+        const offset = flowInput.timeOffset ?? 0;
+        const speed = flowInput.speed ?? 1;
+        inputExpr = offset > 0
+          ? `pulse((t-${offset})*${rate},0.05)`
+          : `pulse(t*${rate},0.05)`;
+        // Carry forward the flow's speed so the edge animates at the right rate
+        expectedSpeed = speed;
+      }
+
+      if (inputExpr) {
+        // Signal-domain transform
+        if (d.type === GAIN_TYPE) {
+          const factor = d.factor ?? 1;
+          expectedExpr = `(${factor})*(${inputExpr})`;
+        } else if (d.type === DELAY_TYPE) {
+          const dt = Number(d.delayTime ?? 1);
+          const unit = String(d.unit ?? 's');
+          const delaySec = unit === 'ms' ? dt / 1000 : dt;
+          expectedExpr = inputExpr.replace(
+            /(?<![a-zA-Z_])t(?![a-zA-Z_0-9])/g, `(t-${delaySec})`,
+          );
+        }
+        if (expectedExpr) expectedType = 'signal';
+      } else if (flowInput && d.type === DELAY_TYPE) {
+        // Flow through Delay — stay flow, shift timeOffset
+        const dt = Number(d.delayTime ?? 1);
+        const unit = String(d.unit ?? 's');
+        const delaySec = unit === 'ms' ? dt / 1000 : dt;
+        expectedType = 'flow';
+        expectedTimeOffset = (flowInput.timeOffset ?? 0) + delaySec;
+      }
+
+      // Cache key encodes all output state
+      const cacheKey = `${expectedType}|${expectedExpr}|${expectedTimeOffset}|${expectedSpeed}`;
+      const cached = processorOutputCache.get(d.id);
+      if (cached !== cacheKey) {
+        processorOutputCache.set(d.id, cacheKey);
+        untrack(() => {
+          if (expectedType === 'signal' && expectedExpr) {
+            updatePortProp(d.id, 'out', 'output', 'expression', expectedExpr);
+            updatePortProp(d.id, 'out', 'output', 'type', 'signal');
+            if (expectedSpeed !== null) {
+              updatePortProp(d.id, 'out', 'output', 'speed', expectedSpeed);
+            }
+          } else if (expectedType === 'flow') {
+            updatePortProp(d.id, 'out', 'output', 'type', 'flow');
+            updatePortProp(d.id, 'out', 'output', 'outputRate', flowInput!.outputRate);
+            updatePortProp(d.id, 'out', 'output', 'speed', flowInput!.speed);
+            updatePortProp(d.id, 'out', 'output', 'timeOffset', expectedTimeOffset);
+          } else {
+            updatePortProp(d.id, 'out', 'output', 'type', 'static');
+            updatePortProp(d.id, 'out', 'output', 'expression', '0');
+          }
+        });
+      }
+    }
+  });
+
   // -- Group: helpers ----------------------------------------------------------
 
   /** Collapsed height for a group — grows with port count. */
@@ -717,11 +845,6 @@
       if (srcCount >= srcPort.maxConnections) return false;
       if (tgtCount >= tgtPort.maxConnections) return false;
 
-      // Display and Meter sinks only accept signal-type source ports
-      const tgtNode = flowNodes.find((n) => n.id === target);
-      if (tgtNode && (tgtNode.type === 'ic.node.Display' || tgtNode.type === 'ic.node.Meter')) {
-        if (srcPort.type !== 'signal') return false;
-      }
     }
 
     // Group boundary enforcement: connections cannot cross group boundaries
@@ -822,6 +945,11 @@
     for (const edge of standaloneEdges) {
       request?.('disconnect', { edgeId: edge.id });
     }
+
+    // Cascade downstream for removed edges (reset processor nodes that lost input)
+    const allRemovedEdges = [...edges, ...standaloneEdges];
+    // Defer so flowEdges is updated by SvelteFlow before we check remaining edges
+    queueMicrotask(() => handleEdgesRemoved(allRemovedEdges));
 
     // Return true to let SF eagerly remove nodes/edges from the view
     return true;
@@ -1073,7 +1201,7 @@
     const geom = (edge.data?.geometry as string) || edgeGeometry;
     const startArrow = (edge.data?.startArrow as string) || 'none';
     const endArrow = (edge.data?.endArrow as string) || 'none';
-    const edgeType = edge.type || 'static';
+    const edgeType = (edge.data?.type as string) || 'static';
     const arrowOptions = ['none', 'arrow', 'diamond', 'circle'] as const;
 
     const edgeColor = (edge.data?.color as string) || '';
@@ -1119,6 +1247,18 @@
       },
       { type: 'color', key: 'color', label: 'Edge Color', value: edgeColor },
     ];
+
+    // Convert edge type
+    const typeOptions = ['static', 'flow', 'signal'] as const;
+    entries.push({
+      type: 'folder', label: 'Edge Type', icon: 'repeat',
+      children: typeOptions.map((t) => ({
+        type: 'item' as const,
+        key: `type:${t}`,
+        label: t.charAt(0).toUpperCase() + t.slice(1),
+        icon: edgeType === t ? 'check' : undefined,
+      })),
+    });
 
     // Edge-type-specific entries
     entries.push({ type: 'separator' });
@@ -1196,21 +1336,13 @@
     const edgeEntries = childEntries['edges'] ?? [];
     const entry = edgeEntries.find((c) => c.id === edgeId);
     if (entry) entry.props[prop] = value;
+    // Push to MATLAB so reactive setters fire
+    request?.('updateEdgeProp', { edgeId, prop, value });
   }
 
   // -- Node context menu ------------------------------------------------------
 
-  const TERMINAL_TYPES = new Set(['ic.node.Input', 'ic.node.Output']);
-  const CONSTANT_TYPE = 'ic.node.Constant';
-  const CLOCK_TYPE = 'ic.node.Clock';
-  const SIGNAL_TYPE = 'ic.node.Signal';
-  const RANDOM_TYPE = 'ic.node.Random';
-  const DISPLAY_TYPE = 'ic.node.Display';
-  const METER_TYPE = 'ic.node.Meter';
-  const LOGGER_TYPE = 'ic.node.Logger';
-  const GAIN_TYPE = 'ic.node.Gain';
-  const DELAY_TYPE = 'ic.node.Delay';
-  const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
+  const TERMINAL_TYPES = new Set([INPUT_TYPE, OUTPUT_TYPE]);
 
   function buildTerminalContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
@@ -1220,7 +1352,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       { type: 'color', key: 'nodeBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
       { type: 'color', key: 'nodeOutlineColor', label: 'Outline', value: (node.data?.outlineColor as string) || '' },
       { type: 'separator' },
@@ -1241,7 +1372,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'value', label: 'Value', value: String(node.data?.value ?? '0') },
       { type: 'color', key: 'nodeBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
       { type: 'color', key: 'nodeOutlineColor', label: 'Outline', value: (node.data?.outlineColor as string) || '' },
       { type: 'separator' },
@@ -1264,7 +1394,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       { type: 'text', key: 'interval', label: 'Interval', value: String(node.data?.interval ?? 1) },
       {
         type: 'folder', label: `Unit: ${unit}`, icon: 'clock',
@@ -1293,8 +1422,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
-      { type: 'text', key: 'expression', label: 'f(t)', value: (node.data?.expression as string) || '', placeholder: 'e.g. sin(2*pi*t)' },
       { type: 'text', key: 'previewTime', label: 'Preview (s)', value: String(node.data?.previewTime ?? 2) },
       { type: 'separator' },
       { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
@@ -1323,7 +1450,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       {
         type: 'folder', label: `Profile: ${profile}`, icon: 'dice-5',
         children: [
@@ -1352,7 +1478,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       { type: 'text', key: 'inputNumber', label: 'Input Count', value: String(inputNumber), placeholder: '1–8' },
       { type: 'text', key: 'previewTime', label: 'Preview Time', value: String((node.data?.previewTime as number) ?? 2), placeholder: 'seconds' },
       { type: 'separator' },
@@ -1373,7 +1498,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       { type: 'text', key: 'min', label: 'Min', value: String((node.data?.min as number) ?? 0) },
       { type: 'text', key: 'max', label: 'Max', value: String((node.data?.max as number) ?? 100) },
       { type: 'text', key: 'meterUnit', label: 'Unit', value: (node.data?.meterUnit as string) || '', placeholder: 'e.g. V, dB' },
@@ -1395,7 +1519,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       { type: 'text', key: 'maxLines', label: 'Max Lines', value: String((node.data?.maxLines as number) ?? 100), placeholder: '1–1000' },
       { type: 'item', key: 'clear-log', label: 'Clear Log', icon: 'eraser' },
       { type: 'separator' },
@@ -1416,8 +1539,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
-      { type: 'text', key: 'factor', label: 'Factor', value: String(node.data?.factor ?? 1) },
       { type: 'separator' },
       { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'lock-open' : 'lock' },
       { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
@@ -1437,8 +1558,6 @@
     ).length;
 
     return [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
-      { type: 'text', key: 'delayTime', label: 'Delay', value: String(node.data?.delayTime ?? 1) },
       {
         type: 'folder', label: `Unit: ${unit}`, icon: 'clock',
         children: (['s', 'ms'] as const).map((u) => ({
@@ -1467,7 +1586,6 @@
 
     const entries: ContextMenuEntry[] = [
       // Node-specific editable props
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
       { type: 'text', key: 'expression', label: 'f(x)', value: (node.data?.expression as string) || '', placeholder: 'e.g. x + 1' },
       { type: 'color', key: 'nodeColor', label: 'Node Color', value: (node.data?.color as string) || '' },
       { type: 'separator' },
@@ -1642,9 +1760,7 @@
       (e) => e.source === node.id || e.target === node.id,
     ).length;
 
-    const entries: ContextMenuEntry[] = [
-      { type: 'text', key: 'label', label: 'Label', value: (node.data?.label as string) || '' },
-    ];
+    const entries: ContextMenuEntry[] = [];
 
     entries.push(
       { type: 'color', key: 'groupBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
@@ -1796,22 +1912,172 @@
     };
   }
 
-  /** Update a single prop on a node + write back to childEntries. */
+  /** Update a single prop on a node + write back to childEntries + push to MATLAB. */
   function updateNodeProp(nodeId: string, prop: string, value: unknown) {
+    // Update SvelteFlow's internal store + flowNodes array
+    sfRefs.flow?.updateNodeData(nodeId, { [prop]: value });
     flowNodes = flowNodes.map((n) =>
       n.id === nodeId ? { ...n, data: { ...n.data, [prop]: value } } : n,
     );
+    // Write back to childEntries for IC bridge sync
     const nodeEntries = childEntries['nodes'] ?? [];
     const entry = nodeEntries.find((c) => c.id === nodeId);
     if (entry) entry.props[prop] = value;
+    // Push to MATLAB so reactive setters fire (e.g., Gain.syncOutput, Delay.syncOutput)
+    request?.('updateNodeProp', { nodeId, prop, value });
+  }
+
+  /**
+   * Recalculate a processor node's output expression based on its input.
+   * Pass null inputExpression to reset (input disconnected).
+   * Returns the new output expression, or null if not a processor.
+   */
+  function recalcProcessorOutput(nodeId: string, inputExpression: string | null): string | null {
+    const node = flowNodes.find((n) => n.id === nodeId);
+    if (!node || !isProcessorType(node.type)) return null;
+
+    // No input → reset to static, clear expression on connected edges
+    if (inputExpression === null) {
+      updatePortProp(nodeId, 'out', 'output', 'type', 'static');
+      updatePortProp(nodeId, 'out', 'output', 'expression', '0');
+      return null;
+    }
+
+    if (node.type === GAIN_TYPE) {
+      const factor = (node.data as any).factor ?? 1;
+      const expr = `(${factor})*(${inputExpression})`;
+      updatePortProp(nodeId, 'out', 'output', 'expression', expr);
+      updatePortProp(nodeId, 'out', 'output', 'type', 'signal');
+      return expr;
+    }
+
+    if (node.type === DELAY_TYPE) {
+      const dt = Number((node.data as any).delayTime ?? 1);
+      const unit = String((node.data as any).unit ?? 's');
+      const delaySec = unit === 'ms' ? dt / 1000 : dt;
+      const expr = inputExpression.replace(
+        /(?<![a-zA-Z_])t(?![a-zA-Z_0-9])/g, `(t-${delaySec})`,
+      );
+      updatePortProp(nodeId, 'out', 'output', 'expression', expr);
+      updatePortProp(nodeId, 'out', 'output', 'type', 'signal');
+      return expr;
+    }
+
+    return null;
+  }
+
+  /**
+   * Walk downstream from sourceNodeId through processor nodes, recalculating
+   * their outputs. Pass null expression to signal "input disconnected".
+   */
+  function cascadeDownstream(sourceNodeId: string, outputExpression: string | null) {
+    const visited = new Set<string>();
+    const queue: Array<{ nodeId: string; expression: string | null }> = [];
+
+    for (const e of flowEdges) {
+      if (e.source === sourceNodeId) {
+        queue.push({ nodeId: e.target, expression: outputExpression });
+      }
+    }
+
+    while (queue.length > 0) {
+      const { nodeId, expression } = queue.shift()!;
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+
+      const newExpr = recalcProcessorOutput(nodeId, expression);
+      // Continue downstream: newExpr if processor produced output, null if it reset
+      const isProcessor = isProcessorType(flowNodes.find((n) => n.id === nodeId)?.type);
+      if (isProcessor) {
+        for (const e of flowEdges) {
+          if (e.source === nodeId && !visited.has(e.target)) {
+            queue.push({ nodeId: e.target, expression: newExpr });
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * After edges are removed, reset any downstream processor nodes that lost
+   * their input and cascade the change further downstream.
+   */
+  function handleEdgesRemoved(removedEdges: FlowEdge[]) {
+    const removedIds = new Set(removedEdges.map((e) => e.id));
+    for (const edge of removedEdges) {
+      const targetNode = flowNodes.find((n) => n.id === edge.target);
+      if (!targetNode || !isProcessorType(targetNode.type)) continue;
+
+      // Check if the processor still has an input edge (excluding removed ones)
+      const stillHasInput = flowEdges.some(
+        (e) => !removedIds.has(e.id) && e.target === edge.target && e.targetHandle === 'in',
+      );
+
+      if (!stillHasInput) {
+        recalcProcessorOutput(edge.target, null);
+        cascadeDownstream(edge.target, null);
+      }
+    }
+  }
+
+  /** Handle inline prop changes from node components (double-click edit). */
+  function handleNodePropChange(nodeId: string, prop: string, value: unknown) {
+    updateNodeProp(nodeId, prop, value);
+    const node = flowNodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    let outputExpr: string | null = null;
+
+    // Side effects: propagate to port props where needed (mirrors MATLAB setters)
+    if (prop === 'expression' && node.type === SIGNAL_TYPE) {
+      outputExpr = String(value);
+      updatePortProp(nodeId, 'signal', 'output', 'expression', outputExpr);
+    } else if (prop === 'value' && node.type === CONSTANT_TYPE) {
+      outputExpr = String(value);
+      updatePortProp(nodeId, 'value', 'output', 'expression', outputExpr);
+    } else if (prop === 'interval' && node.type === CLOCK_TYPE) {
+      const val = Number(value);
+      if (val > 0) {
+        updatePortProp(nodeId, 'tick', 'output', 'outputRate', 1);
+        updatePortProp(nodeId, 'tick', 'output', 'speed', 2 / val);
+      }
+    } else if (prop === 'factor' && node.type === GAIN_TYPE) {
+      const inputSigs = (node.data as any).inputSignals as InputSignal[] ?? [];
+      const sig = inputSigs.find((s) => s.type === 'signal');
+      if (sig) {
+        outputExpr = `(${value})*(${sig.expression})`;
+        updatePortProp(nodeId, 'out', 'output', 'expression', outputExpr);
+        updatePortProp(nodeId, 'out', 'output', 'type', 'signal');
+      }
+    } else if ((prop === 'delayTime' || prop === 'unit') && node.type === DELAY_TYPE) {
+      const inputSigs = (node.data as any).inputSignals as InputSignal[] ?? [];
+      const sig = inputSigs.find((s) => s.type === 'signal');
+      if (sig) {
+        const dt = Number(node.data.delayTime ?? 1);
+        const unit = String(node.data.unit ?? 's');
+        const delaySec = unit === 'ms' ? dt / 1000 : dt;
+        outputExpr = sig.expression.replace(
+          /(?<![a-zA-Z_])t(?![a-zA-Z_0-9])/g, `(t-${delaySec})`,
+        );
+        updatePortProp(nodeId, 'out', 'output', 'expression', outputExpr);
+        updatePortProp(nodeId, 'out', 'output', 'type', 'signal');
+      }
+    }
+
+    // Cascade expression change through downstream processor nodes
+    if (outputExpr) {
+      cascadeDownstream(nodeId, outputExpr);
+    }
   }
 
   /** Map output port props to edge data keys. */
   const PORT_TO_EDGE_KEY: Record<string, string> = {
+    type: 'type',
     outputRate: 'sourceOutputRate',
     speed: 'sourceSpeed',
     expression: 'sourceExpression',
     frequency: 'sourceFrequency',
+    timeOffset: 'sourceTimeOffset',
   };
 
   /** Update a single prop on a port + write back to childEntries + propagate to edges. */
@@ -1866,10 +2132,12 @@
 
     if (ctx.type === 'edge') {
       if (key === 'delete-edge') {
+        const removed = flowEdges.filter((e) => e.id === ctx.id);
         if (!ctx.id.startsWith('sf-')) {
           request?.('disconnect', { edgeId: ctx.id });
         }
         flowEdges = flowEdges.filter((e) => e.id !== ctx.id);
+        handleEdgesRemoved(removed);
       } else if (key === 'toggle-animated') {
         const edge = flowEdges.find((e) => e.id === ctx.id);
         const current = (edge?.data?.animated as boolean) ?? false;
@@ -1902,31 +2170,14 @@
         const rawVal = key.slice('value:'.length);
         const numVal = Number(rawVal);
         const val = isNaN(numVal) ? 0 : numVal;
-        updateNodeProp(ctx.id, 'value', val);
-        // Constant nodes: propagate value as signal expression to output port
-        const valNode = flowNodes.find((n) => n.id === ctx.id);
-        if (valNode?.type === CONSTANT_TYPE) {
-          updatePortProp(ctx.id, 'value', 'output', 'expression', String(val));
-        }
+        handleNodePropChange(ctx.id, 'value', val);
       } else if (key.startsWith('label:')) {
-        updateNodeProp(ctx.id, 'label', key.slice('label:'.length));
+        handleNodePropChange(ctx.id, 'label', key.slice('label:'.length));
       } else if (key.startsWith('expression:')) {
-        const expr = key.slice('expression:'.length);
-        updateNodeProp(ctx.id, 'expression', expr);
-        // For Signal nodes, propagate expression to the "signal" output port → edge
-        const exprNode = flowNodes.find((n) => n.id === ctx.id);
-        if (exprNode?.type === SIGNAL_TYPE) {
-          updatePortProp(ctx.id, 'signal', 'output', 'expression', expr);
-        }
+        handleNodePropChange(ctx.id, 'expression', key.slice('expression:'.length));
       } else if (key.startsWith('interval:')) {
         const val = Number(key.slice('interval:'.length));
-        if (val > 0) {
-          updateNodeProp(ctx.id, 'interval', val);
-          // One particle, speed = 2/interval syncs with CSS hand rotation
-          // (BASE_SPEED=0.5 → traversal time = 2/speed = interval seconds)
-          updatePortProp(ctx.id, 'tick', 'output', 'outputRate', 1);
-          updatePortProp(ctx.id, 'tick', 'output', 'speed', 2 / val);
-        }
+        if (val > 0) handleNodePropChange(ctx.id, 'interval', val);
       } else if (key.startsWith('previewTime:')) {
         const val = Number(key.slice('previewTime:'.length));
         if (val > 0) updateNodeProp(ctx.id, 'previewTime', val);
@@ -1958,12 +2209,12 @@
         if (val > 0) updateNodeProp(ctx.id, 'maxLines', val);
       } else if (key.startsWith('factor:')) {
         const val = Number(key.slice('factor:'.length));
-        if (!isNaN(val)) updateNodeProp(ctx.id, 'factor', val);
+        if (!isNaN(val)) handleNodePropChange(ctx.id, 'factor', val);
       } else if (key.startsWith('delayTime:')) {
         const val = Number(key.slice('delayTime:'.length));
-        if (!isNaN(val) && val >= 0) updateNodeProp(ctx.id, 'delayTime', val);
+        if (!isNaN(val) && val >= 0) handleNodePropChange(ctx.id, 'delayTime', val);
       } else if (key.startsWith('delayUnit:')) {
-        updateNodeProp(ctx.id, 'unit', key.slice('delayUnit:'.length));
+        handleNodePropChange(ctx.id, 'unit', key.slice('delayUnit:'.length));
       } else if (key === 'clear-log') {
         updateNodeProp(ctx.id, 'logEntries', []);
       } else if (key === 'toggle-collapse') {
@@ -1992,6 +2243,7 @@
         flowEdges = flowEdges.filter(
           (e) => e.source !== ctx.id && e.target !== ctx.id,
         );
+        handleEdgesRemoved(connected);
       } else if (key === 'delete-node' || key === 'delete-group') {
         const node = flowNodes.find((n) => n.id === ctx.id);
         if (node && !node.data?.locked) {
@@ -2033,6 +2285,7 @@
           }
         }
         flowEdges = flowEdges.filter((e) => !portEdges.includes(e));
+        handleEdgesRemoved(portEdges);
       } else if (key.startsWith('port-type:')) {
         updatePortProp(ctx.id, portName, portSide, 'type', key.slice('port-type:'.length));
       } else if (key.startsWith('port-speed:')) {
@@ -2184,6 +2437,38 @@
         <path d="m5 8 4 4" />
       </svg>
     </button>
+    <div class="ic-ne__control-sep"></div>
+    <!-- Play/Pause toggle -->
+    <button
+      class="ic-ne__control-btn"
+      class:ic-ne__control-btn--active={playingProp}
+      title={playingProp ? 'Pause animations' : 'Play animations'}
+      onclick={() => { playingProp = !playingProp; }}
+    >
+      {#if playingProp}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <rect x="6" y="4" width="4" height="16" rx="1" />
+          <rect x="14" y="4" width="4" height="16" rx="1" />
+        </svg>
+      {:else}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <polygon points="6,4 20,12 6,20" />
+        </svg>
+      {/if}
+    </button>
+    <!-- Speed dropdown -->
+    <select
+      class="ic-ne__speed-select"
+      title="Animation speed"
+      value={String(playSpeed)}
+      onchange={(e) => { playSpeed = parseFloat((e.target as HTMLSelectElement).value); }}
+    >
+      <option value="0.5">0.5x</option>
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="5">5x</option>
+      <option value="10">10x</option>
+    </select>
   </div>
 {/snippet}
 
@@ -2267,6 +2552,28 @@
     background: var(--ic-border);
     margin: 0 2px;
     flex-shrink: 0;
+  }
+
+  .ic-ne__speed-select {
+    height: 26px;
+    padding: 0 4px;
+    border: 1px solid var(--ic-border);
+    border-radius: 2px;
+    background: var(--ic-background);
+    color: var(--ic-muted-foreground);
+    font-family: var(--ic-font-family);
+    font-size: 11px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .ic-ne__speed-select:hover {
+    border-color: var(--ic-muted-foreground);
+    color: var(--ic-foreground);
+  }
+
+  .ic-ne__speed-select:focus {
+    border-color: var(--ic-primary);
   }
 
   /* ── MiniMap ─── */

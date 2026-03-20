@@ -55,6 +55,12 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
         % > DEFAULTGROUPTYPE class used when creating groups from UI actions
         DefaultGroupType (1,1) string {mustBeMember(DefaultGroupType, ...
             ["ic.node.CollapsibleGroup", "ic.node.BasicGroup"])} = "ic.node.CollapsibleGroup"
+
+        % > PLAYING whether edge animations are running
+        Playing (1,1) logical = true
+
+        % > PLAYSPEED animation speed multiplier (0.5x, 1x, 2x, 5x, 10x)
+        PlaySpeed (1,1) double {mustBePositive} = 1
     end
 
     properties (SetObservable, Description = "Reactive", ...
@@ -372,11 +378,11 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                 intPort = e.TargetPortName;
                 this.removeEdge(e);
 
-                extEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                extEdge = ic.node.Edge(Type=portType);
                 extEdge.setEndpoints(extNode, extPort, group, bpName);
                 this.addChild(extEdge, "edges");
 
-                intEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                intEdge = ic.node.Edge(Type=portType);
                 intEdge.setEndpoints(group, bpName + ":int", intNode, intPort);
                 this.addChild(intEdge, "edges");
             end
@@ -399,11 +405,11 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                 intPort = e.SourcePortName;
                 this.removeEdge(e);
 
-                intEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                intEdge = ic.node.Edge(Type=portType);
                 intEdge.setEndpoints(intNode, intPort, group, bpName + ":int");
                 this.addChild(intEdge, "edges");
 
-                extEdge = feval(ic.NodeEditor.edgeClassForType(portType));
+                extEdge = ic.node.Edge(Type=portType);
                 extEdge.setEndpoints(group, bpName, extNode, extPort);
                 this.addChild(extEdge, "edges");
             end
@@ -477,6 +483,8 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             this.onRequest("DuplicateNodes",  @(comp, data) comp.handleDuplicateNodes(data));
             this.onRequest("UngroupNodes",    @(comp, data) comp.handleUngroupNodes(data));
             this.onRequest("GroupSelection",  @(comp, data) comp.handleGroupSelection(data));
+            this.onRequest("UpdateNodeProp",  @(comp, data) comp.handleUpdateNodeProp(data));
+            this.onRequest("UpdateEdgeProp",  @(comp, data) comp.handleUpdateEdgeProp(data));
         end
 
         function result = handleConnect(this, data)
@@ -508,10 +516,7 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
                     tgtPort.Name, numel(tgtPort.Edges), tgtPort.MaxConnections);
             end
 
-            typeMap = dictionary("static", "ic.node.StaticEdge", ...
-                                 "flow",   "ic.node.FlowEdge", ...
-                                 "signal", "ic.node.SignalEdge");
-            edge = feval(typeMap(srcPort.Type));
+            edge = ic.node.Edge(Type=srcPort.Type);
             edge.setEndpoints(srcNode, string(data.sourcePort), ...
                               tgtNode, string(data.targetPort));
             this.addChild(edge, "edges");
@@ -663,6 +668,42 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             end
             group = this.groupNodes(nodes);
             result = struct('groupId', group.ID);
+        end
+
+        function result = handleUpdateNodeProp(this, data)
+            % > HANDLEUPDATENODEPROP Set a reactive property on a node.
+            %   data.nodeId: node ID string
+            %   data.prop:   camelCase property name
+            %   data.value:  new value
+            node = this.findNodeById(data.nodeId);
+            prop = string(data.prop);
+            % camelCase → PascalCase (capitalize first letter)
+            propPascal = upper(extractBefore(prop, 2)) + extractAfter(prop, 1);
+            node.(propPascal) = data.value;
+            result = true;
+        end
+
+        function result = handleUpdateEdgeProp(this, data)
+            % > HANDLEUPDATEEDGEPROP Set a reactive property on an edge.
+            %   data.edgeId: edge ID string
+            %   data.prop:   camelCase property name
+            %   data.value:  new value
+            edges = this.Edges;
+            edge = [];
+            for ii = 1:numel(edges)
+                if edges(ii).ID == string(data.edgeId)
+                    edge = edges(ii);
+                    break
+                end
+            end
+            if isempty(edge)
+                error("ic:NodeEditor:EdgeNotFound", ...
+                    "Edge with ID '%s' not found.", data.edgeId);
+            end
+            prop = string(data.prop);
+            propPascal = upper(extractBefore(prop, 2)) + extractAfter(prop, 1);
+            edge.(propPascal) = data.value;
+            result = true;
         end
 
         function result = handleDuplicateNodes(this, data)
@@ -839,12 +880,10 @@ classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
             end
         end
 
-        function cls = edgeClassForType(portType)
-            % Return the fully qualified edge class for a port type.
-            map = dictionary("static", "ic.node.StaticEdge", ...
-                             "flow",   "ic.node.FlowEdge", ...
-                             "signal", "ic.node.SignalEdge");
-            cls = map(portType);
+        function cls = edgeClassForType(~)
+            % Return the edge class name. With unified Edge, always ic.node.Edge.
+            % Kept for backward compatibility.
+            cls = "ic.node.Edge";
         end
 
         function clonePorts(origPorts, newPorts)

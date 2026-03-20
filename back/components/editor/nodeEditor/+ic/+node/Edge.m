@@ -1,6 +1,8 @@
-classdef (Abstract) Edge < ic.core.Component
+classdef Edge < ic.core.Component
     % > EDGE Connection between two node ports.
-    %   Abstract base — subclass for specific edge visuals (StaticEdge, etc.).
+    %   Unified edge class with a Type property that controls rendering:
+    %   "static" (simple line), "flow" (animated particles), "signal" (waveform).
+    %
     %   Stores handle references to source/target nodes AND ports.
     %
     %   Traversal:
@@ -40,6 +42,10 @@ classdef (Abstract) Edge < ic.core.Component
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive")
+        % > TYPE rendering mode: static | flow | signal
+        Type (1,1) string {mustBeMember(Type, ...
+            ["static", "flow", "signal"])} = "static"
+
         % > LABEL edge label text
         Label (1,1) string = ""
 
@@ -61,6 +67,30 @@ classdef (Abstract) Edge < ic.core.Component
         % > ENDARROW arrowhead at target end: none | arrow | diamond | circle
         EndArrow (1,1) string {mustBeMember(EndArrow, ...
             ["none", "arrow", "diamond", "circle"])} = "none"
+
+        % ── Static edge properties ──
+
+        % > ANIMATED enable dash animation on static edges
+        Animated (1,1) logical = false
+
+        % ── Flow edge properties ──
+
+        % > PARTICLESIZE circle radius in pixels (flow type)
+        ParticleSize (1,1) double {mustBePositive} = 3
+
+        % > PARTICLECOLOR CSS color for particles (empty = --ic-primary)
+        ParticleColor (1,1) string = ""
+
+        % ── Signal edge properties ──
+
+        % > AMPLITUDE perpendicular displacement in pixels (signal type)
+        Amplitude (1,1) double {mustBePositive} = 8
+
+        % > SIGNALCOLOR waveform stroke color (empty = --ic-primary)
+        SignalColor (1,1) string = ""
+
+        % > SIGNALTHICKNESS waveform line width in pixels (signal type)
+        SignalThickness (1,1) double {mustBePositive} = 2
     end
 
     properties (Access = private)
@@ -69,8 +99,13 @@ classdef (Abstract) Edge < ic.core.Component
 
     methods
         function this = Edge(props)
-            % > EDGE Construct an edge (called by subclass constructors).
-            %   No arguments block — abstract classes can't use props.?ClassName.
+            % > EDGE Construct an edge.
+            %   e = ic.node.Edge()
+            %   e = ic.node.Edge(Type="flow", ParticleSize=4)
+            arguments
+                props.?ic.node.Edge
+                props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
+            end
             this@ic.core.Component(props);
         end
 
@@ -116,6 +151,28 @@ classdef (Abstract) Edge < ic.core.Component
             this.EndpointsSet = true;
         end
 
+        function copyDisplayProps(this, source)
+            % > COPYDISPLAYPROPS Copy display-only props from another edge.
+            %   Used by Node.connect() to forward Edge= display props.
+            arguments
+                this (1,1) ic.node.Edge
+                source (1,1) ic.node.Edge
+            end
+            this.Type = source.Type;
+            this.Label = source.Label;
+            this.Geometry = source.Geometry;
+            this.Color = source.Color;
+            this.Thickness = source.Thickness;
+            this.StartArrow = source.StartArrow;
+            this.EndArrow = source.EndArrow;
+            this.Animated = source.Animated;
+            this.ParticleSize = source.ParticleSize;
+            this.ParticleColor = source.ParticleColor;
+            this.Amplitude = source.Amplitude;
+            this.SignalColor = source.SignalColor;
+            this.SignalThickness = source.SignalThickness;
+        end
+
         function delete(this)
             % > DELETE Destructor — unregister from connected ports.
             if ~isempty(this.SourcePort) && isvalid(this.SourcePort)
@@ -125,11 +182,5 @@ classdef (Abstract) Edge < ic.core.Component
                 this.TargetPort.removeEdge(this);
             end
         end
-    end
-
-    methods (Abstract)
-        % > COPYDISPLAYPROPS Copy display-only props from another edge of the same class.
-        %   Used by Node.connect() to forward Edge= display props.
-        copyDisplayProps(this, source)
     end
 end

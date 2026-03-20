@@ -142,20 +142,12 @@ classdef (Abstract) Group < ic.node.Node
                 srcPortHandle = this.findPort(sourcePort, "outputs");
             end
 
-            % Create edge from port type
-            typeMap = dictionary("static", "ic.node.StaticEdge", ...
-                                 "flow",   "ic.node.FlowEdge", ...
-                                 "signal", "ic.node.SignalEdge");
-            edge = feval(typeMap(srcPortHandle.Type));
+            % Create unified edge with type from source port
+            edge = ic.node.Edge(Type=srcPortHandle.Type);
 
             % Forward display props
             if isfield(props, 'Edge')
-                userEdge = props.Edge;
-                if userEdge.Label ~= "", edge.Label = userEdge.Label; end
-                if userEdge.Geometry ~= "", edge.Geometry = userEdge.Geometry; end
-                if class(userEdge) == class(edge)
-                    edge.copyDisplayProps(userEdge);
-                end
+                edge.copyDisplayProps(props.Edge);
             end
 
             % Wire endpoints based on direction

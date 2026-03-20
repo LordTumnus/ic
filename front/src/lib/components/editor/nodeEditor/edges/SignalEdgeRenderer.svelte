@@ -75,17 +75,16 @@
   let waveformPath: string = $state('');
 
   // Animation via shared coordinator (one rAF for all animated edges)
+  // Uses global clock — no per-edge startTime, so remounting doesn't reset
   onMount(() => {
     const sampler = createPathSampler();
-    const startTime = performance.now();
 
-    const unregister = registerAnimationCallback((timestamp) => {
+    const unregister = registerAnimationCallback((globalTime) => {
       sampler.setPath(path);
       const totalLength = sampler.getTotalLength();
       if (totalLength <= 0) return;
 
-      const elapsed = (timestamp - startTime) / 1000;
-      const timeOffset = elapsed * BASE_SPEED * speed;
+      const timeOffset = globalTime * BASE_SPEED * speed;
 
       // Dynamic sample count: scale with edge length, clamp to [30, 200]
       const sampleCount = Math.min(200, Math.max(30, Math.round(totalLength / 3)));
@@ -103,6 +102,15 @@
       }
       const mean = sum / samples.length;
 
+      // Compute max absolute deviation for normalization
+      // This ensures the waveform always fits within [-amplitude, +amplitude] pixels
+      let maxAbsDev = 0;
+      for (let i = 0; i <= sampleCount; i++) {
+        const dev = Math.abs(samples[i].value - mean);
+        if (dev > maxAbsDev) maxAbsDev = dev;
+      }
+      if (maxAbsDev < 0.001) maxAbsDev = 0.001; // avoid division by zero
+
       for (let i = 0; i <= sampleCount; i++) {
         const { frac, value } = samples[i];
         const len = frac * totalLength;
@@ -118,11 +126,11 @@
         const dy = ptAfter.y - ptBefore.y;
         const mag = Math.sqrt(dx * dx + dy * dy) || 1;
 
-        const nx = -dy / mag;
-        const ny = dx / mag;
+        const nx = dy / mag;
+        const ny = -dx / mag;
 
-        // Subtract mean so waveform is centered on the guide line
-        const displacement = amplitude * (value - mean);
+        // Normalized displacement: always fits within [-amplitude, +amplitude] px
+        const displacement = amplitude * (value - mean) / maxAbsDev;
 
         points.push({
           x: pt.x + nx * displacement,

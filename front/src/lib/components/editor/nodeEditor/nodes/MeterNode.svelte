@@ -4,8 +4,10 @@
   Tick marks and value labels show the Min→Max range.
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
   import { evaluateExpression, registerAnimationCallback } from '$lib/utils/edge-utils';
   import { onMount, onDestroy } from 'svelte';
 
@@ -14,6 +16,8 @@
     expression: string;
     frequency: number;
     speed: number;
+    outputRate: number;
+    timeOffset: number;
     type: string;
   };
 
@@ -27,6 +31,7 @@
     inputs: PortDef[];
     outputs: PortDef[];
     inputSignals: InputSignal[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type MeterNodeType = Node<MeterData, 'ic.node.Meter'>;
@@ -99,18 +104,15 @@
   const BASE_SPEED = 0.5;
 
   let unregister: (() => void) | null = null;
-  let mountTime = 0;
 
   onMount(() => {
-    mountTime = performance.now();
-    unregister = registerAnimationCallback((timestamp: number) => {
+    unregister = registerAnimationCallback((globalTime: number) => {
       const signals = data.inputSignals;
       const min = data.min ?? 0;
       const max = data.max ?? 100;
       const range = max - min || 1;
 
       if (!signals || signals.length === 0) {
-        // No signal connected — reset to minimum
         needleAngle = ARC_START;
         displayValue = min;
         return;
@@ -118,18 +120,27 @@
 
       const sig = signals[0];
       if (sig.type === 'static') {
-        // Static port — show constant zero
         needleAngle = ARC_START - ((0 - min) / range) * ARC_SWEEP;
         displayValue = 0;
         return;
       }
-      const elapsed = (timestamp - mountTime) / 1000;
-      const t = elapsed * BASE_SPEED * (sig.speed ?? 1);
-      const raw = evaluateExpression(sig.expression || '0', t);
+
+      let raw: number;
+      if (sig.type === 'flow') {
+        // Flow port — animate needle with pulse train (same formula as Display)
+        const rate = sig.outputRate ?? 1;
+        const speed = sig.speed ?? 1;
+        const offset = sig.timeOffset ?? 0;
+        const t = globalTime * BASE_SPEED * speed - offset;
+        const phase = ((t * rate) % 1 + 1) % 1;
+        raw = phase < 0.05 ? 1 : 0;
+      } else {
+        const t = globalTime * BASE_SPEED * (sig.speed ?? 1);
+        raw = evaluateExpression(sig.expression || '0', t);
+      }
       const clamped = Math.max(min, Math.min(max, raw));
       const frac = (clamped - min) / range;
 
-      // Map fraction to angle
       needleAngle = ARC_START - frac * ARC_SWEEP;
       displayValue = Math.round(raw * 100) / 100;
     });
@@ -156,7 +167,9 @@
   <!-- Header -->
   <div class="ic-ne-meter__header">
     <span class="ic-ne-meter__badge">&#x25D4;</span>
-    <span class="ic-ne-meter__title">{data.label || 'Meter'}</span>
+    <span class="ic-ne-meter__title">
+      <InlineEdit value={data.label || 'Meter'} className="ic-ne-meter__title-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+    </span>
   </div>
 
   <!-- Gauge SVG -->
@@ -217,17 +230,14 @@
 
   <!-- Input handle on left -->
   {#if data.inputs?.[0]}
-    <Handle
+    <PortHandle
       type="target"
       position={Position.Left}
       id={data.inputs[0].name}
+      variant="dot"
     />
   {/if}
 </div>
-
-{#if data.label}
-  <div class="ic-ne-meter__label">{data.label}</div>
-{/if}
 
 <style>
   .ic-ne-meter {
@@ -238,7 +248,7 @@
     color: var(--ic-foreground);
     font-family: var(--ic-font-family);
     font-size: 12px;
-    overflow: clip;
+    position: relative;
     transition:
       border-color 0.15s ease,
       box-shadow 0.15s ease;
@@ -313,24 +323,4 @@
     fill: var(--ic-foreground);
   }
 
-  /* Label below */
-  .ic-ne-meter__label {
-    font-family: var(--ic-font-family);
-    font-size: 10px;
-    color: var(--ic-muted-foreground);
-    white-space: nowrap;
-    text-align: center;
-    margin-top: 4px;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-meter :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
-  }
 </style>

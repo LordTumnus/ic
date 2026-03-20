@@ -4,8 +4,10 @@
   Input port on the left. Label displayed below the node (Simulink-style).
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type OutputData = {
     label: string;
@@ -14,6 +16,7 @@
     disabled: boolean;
     locked: boolean;
     inputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type OutputNodeType = Node<OutputData, 'ic.node.Output'>;
@@ -65,15 +68,18 @@
 
   <!-- Input handle at left tip -->
   {#if data.inputs?.[0]}
-    <Handle
+    <PortHandle
       type="target"
       position={Position.Left}
       id={data.inputs[0].name}
+      variant="dot"
     />
   {/if}
 
   {#if data.label}
-    <div class="ic-ne-output__label">{data.label}</div>
+    <div class="ic-ne-output__label">
+      <InlineEdit value={data.label} className="ic-ne-output__label-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+    </div>
   {/if}
 </div>
 
@@ -116,16 +122,5 @@
     color: var(--ic-muted-foreground);
     white-space: nowrap;
     text-align: center;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-output :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
   }
 </style>

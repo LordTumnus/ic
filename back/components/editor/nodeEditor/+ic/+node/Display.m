@@ -37,7 +37,7 @@ classdef Display < ic.node.Node
     methods (Access = protected)
         function defineDefaultPorts(this)
             for ii = 1:this.InputNumber
-                this.addPort(ic.node.Port("in" + ii), "inputs");
+                this.addPort(ic.node.Port("in" + ii, MaxConnections=1), "inputs");
             end
         end
     end
@@ -48,7 +48,7 @@ classdef Display < ic.node.Node
             try
                 if newN > oldN
                     for ii = (oldN+1):newN
-                        this.addPort(ic.node.Port("in" + ii), "inputs");
+                        this.addPort(ic.node.Port("in" + ii, MaxConnections=1), "inputs");
                     end
                 elseif newN < oldN
                     for ii = oldN:-1:(newN+1)

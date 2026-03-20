@@ -4,8 +4,10 @@
   Dynamically mirrors input port type on output.
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type DelayData = {
     label: string;
@@ -15,6 +17,7 @@
     locked: boolean;
     inputs: PortDef[];
     outputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type DelayNodeType = Node<DelayData, 'ic.node.Delay'>;
@@ -22,13 +25,6 @@
   let { data, selected, dragging }: NodeProps<DelayNodeType> = $props();
 
   let hovered = $state(false);
-
-  const displayDelay = $derived(() => {
-    const t = data.delayTime ?? 1;
-    const u = data.unit ?? 's';
-    const formatted = Number.isInteger(t) ? t.toString() : t.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-    return `${formatted} ${u}`;
-  });
 
   const strokeColor = $derived(
     selected
@@ -92,36 +88,37 @@
       stroke-width="1"
     />
 
-    <!-- Delay value text -->
-    <text
-      x="18" y="24"
-      class="ic-ne-delay__value"
-      text-anchor="middle"
-      dominant-baseline="middle"
-    >{displayDelay()}</text>
   </svg>
+
+  <div class="ic-ne-delay__value-overlay">
+    <InlineEdit value={data.delayTime ?? 1} inputType="number" className="ic-ne-delay__value" oncommit={(v) => data.onpropchange?.('delayTime', v)} />
+  </div>
 
   <!-- Input handle: left midpoint -->
   {#if data.inputs?.[0]}
-    <Handle
+    <PortHandle
       type="target"
       position={Position.Left}
       id={data.inputs[0].name}
+      variant="bar"
     />
   {/if}
 
   <!-- Output handle: right midpoint -->
   {#if data.outputs?.[0]}
-    <Handle
+    <PortHandle
       type="source"
       position={Position.Right}
       id={data.outputs[0].name}
+      variant="bar"
     />
   {/if}
 </div>
 
 {#if data.label}
-  <div class="ic-ne-delay__label">{data.label}</div>
+  <div class="ic-ne-delay__label">
+    <InlineEdit value={data.label} className="ic-ne-delay__label-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+  </div>
 {/if}
 
 <style>
@@ -156,13 +153,18 @@
     display: block;
   }
 
-  .ic-ne-delay__value {
+  .ic-ne-delay__value-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+  }
+  .ic-ne-delay__value-overlay :global(.ic-ne-delay__value) {
     font-family: monospace;
-    font-size: 5.5px;
+    font-size: 10px;
     font-weight: 700;
-    fill: var(--ic-foreground);
-    user-select: none;
-    pointer-events: none;
+    color: var(--ic-foreground);
   }
 
   .ic-ne-delay__label {
@@ -176,16 +178,5 @@
     color: var(--ic-muted-foreground);
     white-space: nowrap;
     text-align: center;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-delay :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
   }
 </style>

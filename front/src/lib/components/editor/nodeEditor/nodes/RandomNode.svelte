@@ -4,14 +4,17 @@
   Industrial Flat: muted face colors, sharp edges.
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type RandomData = {
     label: string;
     disabled: boolean;
     locked: boolean;
     outputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type RandomNodeType = Node<RandomData, 'ic.node.Random'>;
@@ -96,16 +99,19 @@
 
   <!-- Output handle on right -->
   {#if data.outputs?.[0]}
-    <Handle
+    <PortHandle
       type="source"
       position={Position.Right}
       id={data.outputs[0].name}
+      variant="wave"
     />
   {/if}
 </div>
 
 {#if data.label}
-  <div class="ic-ne-random__label">{data.label}</div>
+  <div class="ic-ne-random__label">
+    <InlineEdit value={data.label} className="ic-ne-random__label-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+  </div>
 {/if}
 
 <style>
@@ -151,16 +157,5 @@
     color: var(--ic-muted-foreground);
     white-space: nowrap;
     text-align: center;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-random :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
   }
 </style>

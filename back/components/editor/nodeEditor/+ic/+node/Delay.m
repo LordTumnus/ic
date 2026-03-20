@@ -66,10 +66,8 @@ classdef Delay < ic.node.Node
 
         function syncOutput(this)
             % > SYNCOUTPUT Mirror input port type on output, applying delay.
-            %   After updating the port, reconnects downstream edges so the
-            %   MATLAB edge class matches the new port type.
             try
-                inPort = this.findPort("in", "inputs");
+                inPort  = this.findPort("in",  "inputs");
                 outPort = this.findPort("out", "outputs");
             catch
                 return
@@ -86,54 +84,29 @@ classdef Delay < ic.node.Node
                 switch srcPort.Type
                     case "signal"
                         outPort.Type = "signal";
-                        % Replace standalone 't' with '(t-delay)' in expression
                         delayed = regexprep(srcPort.Expression, ...
                             '(?<![a-zA-Z_])t(?![a-zA-Z_0-9])', ...
                             "(t-" + string(dur) + ")");
                         outPort.Expression = delayed;
-                        outPort.Frequency = srcPort.Frequency;
-                        outPort.Speed = srcPort.Speed;
+                        outPort.Frequency  = srcPort.Frequency;
+                        outPort.Speed      = srcPort.Speed;
                     case "flow"
-                        outPort.Type = "flow";
+                        outPort.Type       = "flow";
                         outPort.OutputRate = srcPort.OutputRate;
-                        % Slow down particles to visualize delay
-                        outPort.Speed = srcPort.Speed / max(1, 1 + dur);
+                        outPort.Speed      = srcPort.Speed;
+                        outPort.TimeOffset = srcPort.TimeOffset + dur;
                     case "static"
                         outPort.Type = "static";
                 end
             end
 
-            % If type changed, reconnect downstream edges with correct class
+            % Update existing output edges' Type in-place
             if outPort.Type ~= oldType
-                this.reconnectOutputEdges(outPort);
-            end
-        end
-
-        function reconnectOutputEdges(this, outPort)
-            % > RECONNECTOUTPUTEDGES Delete and recreate output edges so
-            %   the MATLAB edge class matches the current port type.
-            editor = this.Parent;
-            if isempty(editor) || ~isvalid(editor)
-                return
-            end
-
-            % Snapshot targets before deleting (iterate backwards)
-            targets = struct('node', {}, 'port', {});
-            edges = outPort.Edges;
-            for ii = numel(edges):-1:1
-                e = edges(ii);
-                if ~isvalid(e), continue; end
-                targets(end+1) = struct( ...
-                    'node', e.TargetNode, ...
-                    'port', e.TargetPortName); %#ok<AGROW>
-                editor.removeEdge(e);
-            end
-
-            % Recreate with current port type
-            for ii = 1:numel(targets)
-                t = targets(ii);
-                if isvalid(t.node)
-                    this.connect(t.node, outPort.Name, t.port);
+                edges = outPort.Edges;
+                for ii = 1:numel(edges)
+                    if isvalid(edges(ii))
+                        edges(ii).Type = outPort.Type;
+                    end
                 end
             end
         end

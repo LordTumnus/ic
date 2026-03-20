@@ -3,8 +3,10 @@
   No port labels. Optional label below (Simulink-style).
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type ConstantData = {
     label: string;
@@ -14,6 +16,7 @@
     disabled: boolean;
     locked: boolean;
     outputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type ConstantNodeType = Node<ConstantData, 'ic.node.Constant'>;
@@ -44,20 +47,25 @@
   onpointerenter={() => (hovered = true)}
   onpointerleave={() => (hovered = false)}
 >
-  <span class="ic-ne-const__value">{displayValue}</span>
+  <span class="ic-ne-const__value">
+    <InlineEdit value={data.value ?? 0} inputType="number" className="ic-ne-const__value-edit" oncommit={(v) => data.onpropchange?.('value', v)} />
+  </span>
 
   <!-- Output handle on right -->
   {#if data.outputs?.[0]}
-    <Handle
+    <PortHandle
       type="source"
       position={Position.Right}
       id={data.outputs[0].name}
+      variant="dot"
     />
   {/if}
 </div>
 
 {#if data.label}
-  <div class="ic-ne-const__label">{data.label}</div>
+  <div class="ic-ne-const__label">
+    <InlineEdit value={data.label} className="ic-ne-const__label-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+  </div>
 {/if}
 
 <style>
@@ -109,16 +117,5 @@
     white-space: nowrap;
     text-align: center;
     margin-top: 4px;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-const :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
   }
 </style>

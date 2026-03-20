@@ -41,6 +41,9 @@ classdef Port < ic.core.Component
 
         % > FREQUENCY number of waveform cycles visible (signal behavior)
         Frequency (1,1) double {mustBePositive} = 2
+
+        % > TIMEOFFSET cumulative time offset in seconds (used by Delay for flow)
+        TimeOffset (1,1) double = 0
     end
 
     properties (SetAccess = {?ic.node.Edge})

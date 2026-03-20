@@ -4,8 +4,10 @@
   Dynamically mirrors input port type on output.
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type GainData = {
     label: string;
@@ -14,6 +16,7 @@
     locked: boolean;
     inputs: PortDef[];
     outputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type GainNodeType = Node<GainData, 'ic.node.Gain'>;
@@ -21,12 +24,6 @@
   let { data, selected, dragging }: NodeProps<GainNodeType> = $props();
 
   let hovered = $state(false);
-
-  const displayFactor = $derived(() => {
-    const f = data.factor ?? 1;
-    // Format: "x2", "x0.5", "x-1"
-    return 'x' + (Number.isInteger(f) ? f.toString() : f.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
-  });
 
   const strokeColor = $derived(
     selected
@@ -56,41 +53,42 @@
       stroke-width="1.5"
       stroke-linejoin="round"
     />
-    <!-- Factor text -->
-    <text
-      x="24"
-      y="34"
-      class="ic-ne-gain__factor"
-      text-anchor="middle"
-      dominant-baseline="middle"
-    >{displayFactor()}</text>
   </svg>
+
+  <!-- Factor overlay (HTML for inline editing) -->
+  <div class="ic-ne-gain__factor-overlay">
+    <InlineEdit
+      value={data.factor ?? 1}
+      inputType="number"
+      className="ic-ne-gain__factor"
+      oncommit={(v) => data.onpropchange?.('factor', v)}
+    />
+  </div>
 
   <!-- Input handle: left midpoint -->
   {#if data.inputs?.[0]}
-    <Handle
-      type="target"
-      position={Position.Left}
-      id={data.inputs[0].name}
-    />
+    <PortHandle type="target" position={Position.Left} id={data.inputs[0].name} variant="dot" />
   {/if}
 
-  <!-- Output handle: right tip -->
+  <!-- Output handle: right tip (chevron) -->
   {#if data.outputs?.[0]}
-    <Handle
-      type="source"
-      position={Position.Right}
-      id={data.outputs[0].name}
-    />
+    <PortHandle type="source" position={Position.Right} id={data.outputs[0].name} variant="chevron" />
   {/if}
 </div>
 
 {#if data.label}
-  <div class="ic-ne-gain__label">{data.label}</div>
+  <div class="ic-ne-gain__label">
+    <InlineEdit
+      value={data.label}
+      className="ic-ne-gain__label-edit"
+      oncommit={(v) => data.onpropchange?.('label', v)}
+    />
+  </div>
 {/if}
 
 <style>
   .ic-ne-gain {
+    position: relative;
     width: 80px;
     height: 60px;
     transition: filter 0.15s ease;
@@ -111,13 +109,19 @@
     display: block;
   }
 
-  .ic-ne-gain__factor {
+  .ic-ne-gain__factor-overlay {
+    position: absolute;
+    top: 50%;
+    left: 30%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+  }
+
+  .ic-ne-gain__factor-overlay :global(.ic-ne-gain__factor) {
     font-family: monospace;
     font-size: 13px;
     font-weight: 700;
-    fill: var(--ic-foreground);
-    user-select: none;
-    pointer-events: none;
+    color: var(--ic-foreground);
   }
 
   .ic-ne-gain__label {
@@ -127,16 +131,6 @@
     white-space: nowrap;
     text-align: center;
     margin-top: 4px;
-    pointer-events: none;
-    user-select: none;
   }
 
-  /* Hide SF's default handle visuals */
-  .ic-ne-gain :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
-  }
 </style>

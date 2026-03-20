@@ -4,9 +4,12 @@
   on a mini canvas. Y-axis auto-scales to show all points.
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
-  import { evaluateExpression } from '$lib/utils/edge-utils';
+  import { evaluateExpression, registerAnimationCallback } from '$lib/utils/edge-utils';
+  import { onMount, onDestroy } from 'svelte';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type SignalData = {
     label: string;
@@ -16,6 +19,7 @@
     disabled: boolean;
     locked: boolean;
     outputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type SignalNodeType = Node<SignalData, 'ic.node.Signal'>;
@@ -28,9 +32,14 @@
   const CANVAS_W = 140;
   const CANVAS_H = 56;
   const SAMPLE_COUNT = 200;
+  const BASE_SPEED = 0.5;
 
-  // Redraw waveform when expression or previewTime changes
-  $effect(() => {
+  // Cache DPR and computed style to avoid re-querying every frame
+  let cachedStyle: CSSStyleDeclaration | null = null;
+  let cachedDpr = 1;
+  let dprSet = false;
+
+  function drawFrame(globalTime: number) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -38,38 +47,22 @@
     const expr = data.expression || 'sin(2*pi*t)';
     const previewTime = data.previewTime ?? 2;
 
-    // Sample the expression
-    const values: number[] = [];
-    for (let i = 0; i <= SAMPLE_COUNT; i++) {
-      const t = (i / SAMPLE_COUNT) * previewTime;
-      values.push(evaluateExpression(expr, t));
-    }
-
-    // Auto-scale Y
-    let yMin = Infinity;
-    let yMax = -Infinity;
-    for (const v of values) {
-      if (v < yMin) yMin = v;
-      if (v > yMax) yMax = v;
-    }
-    if (!isFinite(yMin) || !isFinite(yMax) || yMin === yMax) {
-      yMin = -1;
-      yMax = 1;
-    }
-    const yPad = (yMax - yMin) * 0.1 || 0.1;
-    yMin -= yPad;
-    yMax += yPad;
-    const yRange = yMax - yMin;
-
-    // Get device pixel ratio for sharp rendering
+    // Set up DPR once
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = CANVAS_W * dpr;
-    canvas.height = CANVAS_H * dpr;
-    ctx.scale(dpr, dpr);
+    if (!dprSet || dpr !== cachedDpr) {
+      cachedDpr = dpr;
+      canvas.width = CANVAS_W * dpr;
+      canvas.height = CANVAS_H * dpr;
+      dprSet = true;
+    }
+    ctx.setTransform(cachedDpr, 0, 0, cachedDpr, 0, 0);
+
+    if (!cachedStyle) cachedStyle = getComputedStyle(canvas);
+    const style = cachedStyle;
 
     // Background
-    const bgStyle = getComputedStyle(canvas).getPropertyValue('--ic-muted').trim() || '#1e1e2e';
-    ctx.fillStyle = bgStyle;
+    const bgColor = style.getPropertyValue('--ic-muted').trim() || '#1e1e2e';
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
     // Grid lines (horizontal)
@@ -92,7 +85,32 @@
       ctx.stroke();
     }
 
-    // Zero line (if visible in range)
+    // Sample over a sliding window: [tNow - previewTime, tNow]
+    const tNow = globalTime * BASE_SPEED;
+    const tStart = tNow - previewTime;
+    const values: number[] = [];
+    for (let i = 0; i <= SAMPLE_COUNT; i++) {
+      const t = tStart + (i / SAMPLE_COUNT) * previewTime;
+      values.push(evaluateExpression(expr, t));
+    }
+
+    // Auto-scale Y
+    let yMin = Infinity;
+    let yMax = -Infinity;
+    for (const v of values) {
+      if (v < yMin) yMin = v;
+      if (v > yMax) yMax = v;
+    }
+    if (!isFinite(yMin) || !isFinite(yMax) || yMin === yMax) {
+      yMin = -1;
+      yMax = 1;
+    }
+    const yPad = (yMax - yMin) * 0.1 || 0.1;
+    yMin -= yPad;
+    yMax += yPad;
+    const yRange = yMax - yMin;
+
+    // Zero line
     if (yMin < 0 && yMax > 0) {
       const zeroY = CANVAS_H - ((0 - yMin) / yRange) * CANVAS_H;
       ctx.strokeStyle = 'rgba(128, 128, 128, 0.3)';
@@ -104,8 +122,8 @@
     }
 
     // Waveform
-    const primaryStyle = getComputedStyle(canvas).getPropertyValue('--ic-primary').trim() || '#3b82f6';
-    ctx.strokeStyle = primaryStyle;
+    const primaryColor = style.getPropertyValue('--ic-primary').trim() || '#3b82f6';
+    ctx.strokeStyle = primaryColor;
     ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -117,6 +135,16 @@
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
+  }
+
+  let unregister: (() => void) | null = null;
+
+  onMount(() => {
+    unregister = registerAnimationCallback(drawFrame);
+  });
+
+  onDestroy(() => {
+    if (unregister) unregister();
   });
 </script>
 
@@ -133,15 +161,17 @@
   <!-- Header -->
   <div class="ic-ne-signal__header">
     <span class="ic-ne-signal__badge">~</span>
-    <span class="ic-ne-signal__title">{data.label || 'Signal'}</span>
+    <span class="ic-ne-signal__title">
+      <InlineEdit value={data.label || 'Signal'} className="ic-ne-signal__title-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+    </span>
   </div>
 
   <!-- Expression text -->
-  {#if data.expression}
-    <div class="ic-ne-signal__expression">
-      <span class="ic-ne-signal__expr-text">{data.expression}</span>
-    </div>
-  {/if}
+  <div class="ic-ne-signal__expression">
+    <span class="ic-ne-signal__expr-text">
+      <InlineEdit value={data.expression || ''} className="ic-ne-signal__expr-edit" placeholder="sin(2*pi*t)" oncommit={(v) => data.onpropchange?.('expression', v)} />
+    </span>
+  </div>
 
   <!-- Oscilloscope canvas -->
   <div class="ic-ne-signal__scope">
@@ -154,17 +184,14 @@
 
   <!-- Output handle on right, centered on canvas area -->
   {#if data.outputs?.[0]}
-    <Handle
+    <PortHandle
       type="source"
       position={Position.Right}
       id={data.outputs[0].name}
+      variant="wave"
     />
   {/if}
 </div>
-
-{#if data.label}
-  <div class="ic-ne-signal__label">{data.label}</div>
-{/if}
 
 <style>
   .ic-ne-signal {
@@ -256,24 +283,4 @@
     display: block;
   }
 
-  /* Label below */
-  .ic-ne-signal__label {
-    font-family: var(--ic-font-family);
-    font-size: 10px;
-    color: var(--ic-muted-foreground);
-    white-space: nowrap;
-    text-align: center;
-    margin-top: 4px;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-signal :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
-  }
 </style>

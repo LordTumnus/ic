@@ -12,6 +12,7 @@ export interface PortDef {
 	speed: number;
 	expression: string;
 	frequency: number;
+	timeOffset: number;
 }
 
 /** Default port dot color when no color is specified. */
@@ -41,5 +42,6 @@ export function extractPorts(
 		speed: (pe.props.speed as number) ?? 1,
 		expression: (pe.props.expression as string) ?? 'sin(2*pi*t)',
 		frequency: (pe.props.frequency as number) ?? 2,
+		timeOffset: (pe.props.timeOffset as number) ?? 0,
 	}));
 }

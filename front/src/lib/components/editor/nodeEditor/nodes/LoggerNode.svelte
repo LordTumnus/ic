@@ -4,8 +4,10 @@
   Auto-scrolls to bottom on new entries.
 -->
 <script lang="ts">
-  import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
+  import PortHandle from '../shared/PortHandle.svelte';
+  import InlineEdit from '../shared/InlineEdit.svelte';
 
   type LoggerData = {
     label: string;
@@ -15,6 +17,7 @@
     locked: boolean;
     inputs: PortDef[];
     outputs: PortDef[];
+    onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type LoggerNodeType = Node<LoggerData, 'ic.node.Logger'>;
@@ -49,7 +52,9 @@
   <!-- Header -->
   <div class="ic-ne-logger__header">
     <span class="ic-ne-logger__badge">&gt;_</span>
-    <span class="ic-ne-logger__title">{data.label || 'Logger'}</span>
+    <span class="ic-ne-logger__title">
+      <InlineEdit value={data.label || 'Logger'} className="ic-ne-logger__title-edit" oncommit={(v) => data.onpropchange?.('label', v)} />
+    </span>
   </div>
 
   <!-- Terminal area -->
@@ -65,17 +70,14 @@
 
   <!-- Input handle on left -->
   {#if data.inputs?.[0]}
-    <Handle
+    <PortHandle
       type="target"
       position={Position.Left}
       id={data.inputs[0].name}
+      variant="dot"
     />
   {/if}
 </div>
-
-{#if data.label}
-  <div class="ic-ne-logger__label">{data.label}</div>
-{/if}
 
 <style>
   .ic-ne-logger {
@@ -166,27 +168,6 @@
     opacity: 0.5;
     text-align: center;
     padding-top: 40px;
-  }
-
-  /* Label below */
-  .ic-ne-logger__label {
-    font-family: var(--ic-font-family);
-    font-size: 10px;
-    color: var(--ic-muted-foreground);
-    white-space: nowrap;
-    text-align: center;
-    margin-top: 4px;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* Hide SF's default handle visuals */
-  .ic-ne-logger :global(.svelte-flow__handle) {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    background: transparent;
-    border: none;
   }
 
   /* Scrollbar styling for terminal */
