@@ -62,6 +62,16 @@
   import AccumulatorNode from './nodes/AccumulatorNode.svelte';
   import NoteNode from './nodes/NoteNode.svelte';
   import FunctionNode from './nodes/FunctionNode.svelte';
+  import ProcessNode from './nodes/ProcessNode.svelte';
+  import DecisionNode from './nodes/DecisionNode.svelte';
+  import TerminatorNode from './nodes/TerminatorNode.svelte';
+  import DatabaseNode from './nodes/DatabaseNode.svelte';
+  import CloudNode from './nodes/CloudNode.svelte';
+  import DocumentNode from './nodes/DocumentNode.svelte';
+  import QueueNode from './nodes/QueueNode.svelte';
+  import ActorNode from './nodes/ActorNode.svelte';
+  import IconBoxNode from './nodes/IconBoxNode.svelte';
+  import ClassNodeComponent from './nodes/ClassNode.svelte';
 
   // Unified edge renderer — switches rendering mode based on data.type
   import EdgeRenderer from './edges/EdgeRenderer.svelte';
@@ -157,6 +167,16 @@
     'ic.node.Accumulator': AccumulatorNode,
     'ic.node.Note': NoteNode,
     'ic.node.Function': FunctionNode,
+    'ic.node.Process': ProcessNode,
+    'ic.node.Decision': DecisionNode,
+    'ic.node.Terminator': TerminatorNode,
+    'ic.node.Database': DatabaseNode,
+    'ic.node.Cloud': CloudNode,
+    'ic.node.Document': DocumentNode,
+    'ic.node.Queue': QueueNode,
+    'ic.node.Actor': ActorNode,
+    'ic.node.IconBox': IconBoxNode,
+    'ic.node.ClassNode': ClassNodeComponent,
   } as Record<string, any>;
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
@@ -186,6 +206,17 @@
   const ACCUMULATOR_TYPE = 'ic.node.Accumulator';
   const NOTE_TYPE = 'ic.node.Note';
   const FUNCTION_TYPE = 'ic.node.Function';
+  const PROCESS_TYPE = 'ic.node.Process';
+  const DECISION_TYPE = 'ic.node.Decision';
+  const TERMINATOR_TYPE = 'ic.node.Terminator';
+  const DATABASE_TYPE = 'ic.node.Database';
+  const CLOUD_TYPE = 'ic.node.Cloud';
+  const DOCUMENT_TYPE = 'ic.node.Document';
+  const QUEUE_TYPE = 'ic.node.Queue';
+  const ACTOR_TYPE = 'ic.node.Actor';
+  const ICONBOX_TYPE = 'ic.node.IconBox';
+  const CLASSNODE_TYPE = 'ic.node.ClassNode';
+  const CLASSICAL_TYPES = new Set([PROCESS_TYPE, DECISION_TYPE, TERMINATOR_TYPE, DATABASE_TYPE, CLOUD_TYPE, DOCUMENT_TYPE, QUEUE_TYPE, ACTOR_TYPE, ICONBOX_TYPE, CLASSNODE_TYPE]);
   const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
   function isGroupType(type: string | undefined) {
@@ -269,6 +300,8 @@
         delayTime: (p.delayTime as number) ?? 1,
         // Note props
         content: (p.content as string) ?? '',
+        // ClassNode props
+        fields: Array.isArray(p.fields) ? (p.fields as string[]) : [],
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -473,6 +506,7 @@
           delayTime: d.delayTime,
           outputNumber: d.outputNumber,
           content: d.content,
+          fields: d.fields,
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
@@ -560,10 +594,10 @@
         data.sourceSpeed = srcPort.speed;
         data.sourceExpression = srcPort.expression;
         data.sourceFrequency = srcPort.frequency;
-        // Override edge type/animated when source port has been promoted by cascade
+        // Override edge type when source port has been promoted by cascade
         if (srcPort.type === 'signal' || srcPort.type === 'flow') {
           data.type = srcPort.type;
-          data.animated = true;
+          data.animated = data.animated ?? true;
         }
       }
 
@@ -2097,6 +2131,70 @@
     ];
   }
 
+  // -- Classical node context menus ------------------------------------------
+
+  function buildClassicalContextMenu(node: FlowNode, extraEntries: ContextMenuEntry[] = []): ContextMenuEntry[] {
+    const locked = (node.data?.locked as boolean) ?? false;
+    const disabled = (node.data?.disabled as boolean) ?? false;
+    const connectedEdgeCount = flowEdges.filter(
+      (e) => e.source === node.id || e.target === node.id,
+    ).length;
+
+    return [
+      ...extraEntries,
+      ...(extraEntries.length > 0 ? [{ type: 'separator' as const }] : []),
+      { type: 'color', key: 'nodeBgColor', label: 'Background', value: (node.data?.backgroundColor as string) || '' },
+      { type: 'color', key: 'nodeOutlineColor', label: 'Outline', value: (node.data?.outlineColor as string) || '' },
+      { type: 'separator' },
+      { type: 'item', key: 'toggle-lock', label: locked ? 'Unlock' : 'Lock', icon: locked ? 'unlock' : 'lock' },
+      { type: 'item', key: 'toggle-disabled', label: disabled ? 'Enable' : 'Disable', icon: disabled ? 'eye' : 'eye-off' },
+      { type: 'separator' },
+      { type: 'item', key: 'disconnect-all', label: `Disconnect All (${connectedEdgeCount})`, icon: 'unplug', disabled: connectedEdgeCount === 0 },
+      { type: 'separator' },
+      { type: 'item', key: 'delete-node', label: 'Delete', icon: 'trash-2', disabled: locked },
+    ];
+  }
+
+  function buildProcessContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildDecisionContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildTerminatorContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildDatabaseContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildCloudContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildDocumentContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildQueueContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildActorContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildIconBoxContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
+  function buildClassNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
   function buildNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
     const disabled = (node.data?.disabled as boolean) ?? false;
@@ -2395,8 +2493,28 @@
                                       : node.type === FUNCTION_TYPE
                                         ? buildFunctionContextMenu(node)
                                         : node.type === NOTE_TYPE
-                                        ? buildNoteContextMenu(node)
-                                        : buildNodeContextMenu(node);
+                                          ? buildNoteContextMenu(node)
+                                          : node.type === PROCESS_TYPE
+                                            ? buildProcessContextMenu(node)
+                                            : node.type === DECISION_TYPE
+                                              ? buildDecisionContextMenu(node)
+                                              : node.type === TERMINATOR_TYPE
+                                                ? buildTerminatorContextMenu(node)
+                                                : node.type === DATABASE_TYPE
+                                                  ? buildDatabaseContextMenu(node)
+                                                  : node.type === CLOUD_TYPE
+                                                    ? buildCloudContextMenu(node)
+                                                    : node.type === DOCUMENT_TYPE
+                                                      ? buildDocumentContextMenu(node)
+                                                      : node.type === QUEUE_TYPE
+                                                        ? buildQueueContextMenu(node)
+                                                        : node.type === ACTOR_TYPE
+                                                          ? buildActorContextMenu(node)
+                                                          : node.type === ICONBOX_TYPE
+                                                            ? buildIconBoxContextMenu(node)
+                                                            : node.type === CLASSNODE_TYPE
+                                                              ? buildClassNodeContextMenu(node)
+                                                              : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,
