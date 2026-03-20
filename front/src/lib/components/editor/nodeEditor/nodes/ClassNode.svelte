@@ -1,7 +1,8 @@
 <!--
-  ClassNode.svelte — UML class box with header and fields.
-  HTML-based vertically stacked box: dark header + light body with monospace fields.
-  Input port on left, output port on right.
+  ClassNode.svelte — UML class diagram box with Properties, Methods, Events sections.
+  Header has class name with left/right ports for subclass linking and a top port
+  for superclass inheritance. Each member row has invisible left/right port handles.
+  Sections are separated by horizontal lines.
 -->
 <script lang="ts">
   import { Position, type NodeProps, type Node } from '@xyflow/svelte';
@@ -11,7 +12,9 @@
 
   type ClassData = {
     label: string;
-    fields: string[];
+    propertyList: string[];
+    methodList: string[];
+    eventList: string[];
     backgroundColor: string;
     outlineColor: string;
     disabled: boolean;
@@ -34,6 +37,17 @@
         ? 'var(--ic-muted-foreground)'
         : data.outlineColor || 'var(--ic-border)',
   );
+
+  // Find header ports by name
+  const inheritPort = $derived(data.inputs?.find((p) => p.name === 'inherit'));
+  const subLeftPort = $derived(data.outputs?.find((p) => p.name === 'sub-left'));
+  const subRightPort = $derived(data.outputs?.find((p) => p.name === 'sub-right'));
+
+  // Check which sections have content
+  const hasProperties = $derived((data.propertyList?.length ?? 0) > 0);
+  const hasMethods = $derived((data.methodList?.length ?? 0) > 0);
+  const hasEvents = $derived((data.eventList?.length ?? 0) > 0);
+  const hasAnyMembers = $derived(hasProperties || hasMethods || hasEvents);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -47,38 +61,132 @@
   onpointerenter={() => (hovered = true)}
   onpointerleave={() => (hovered = false)}
 >
+  <!-- Top port: inherit (superclass link) -->
+  {#if inheritPort}
+    <PortHandle
+      type="target"
+      position={Position.Top}
+      id={inheritPort.name}
+      variant="dot"
+    />
+  {/if}
+
+  <!-- Header with class name + left/right subclass ports -->
   <div class="ic-ne-class__header">
+    {#if subLeftPort}
+      <PortHandle
+        type="source"
+        position={Position.Left}
+        id={subLeftPort.name}
+        variant="dot"
+        style="top: 50%; transform: translateY(-50%);"
+      />
+    {/if}
+
     <InlineEdit
       value={data.label}
       className="ic-ne-class__header-edit"
       oncommit={(v) => data.onpropchange?.('label', v)}
     />
-  </div>
-  <div class="ic-ne-class__body">
-    {#each data.fields ?? [] as field}
-      <div class="ic-ne-class__field">{field}</div>
-    {/each}
+
+    {#if subRightPort}
+      <PortHandle
+        type="source"
+        position={Position.Right}
+        id={subRightPort.name}
+        variant="dot"
+        style="top: 50%; transform: translateY(-50%);"
+      />
+    {/if}
   </div>
 
-  <!-- Input handle: left vertically centered -->
-  {#if data.inputs?.[0]}
-    <PortHandle type="target" position={Position.Left} id={data.inputs[0].name} variant="dot" />
-  {/if}
+  <!-- Body: sectioned members -->
+  {#if hasAnyMembers}
+    <div class="ic-ne-class__body">
+      <!-- Properties section -->
+      {#if hasProperties}
+        <div class="ic-ne-class__section-label">Properties</div>
+        {#each data.propertyList as prop, i}
+          <div class="ic-ne-class__row">
+            <PortHandle
+              type="target"
+              position={Position.Left}
+              id={`prop-${i + 1}-in`}
+              hidden
+            />
+            <span class="ic-ne-class__member">{prop}</span>
+            <PortHandle
+              type="source"
+              position={Position.Right}
+              id={`prop-${i + 1}-out`}
+              hidden
+            />
+          </div>
+        {/each}
+      {/if}
 
-  <!-- Output handle: right vertically centered -->
-  {#if data.outputs?.[0]}
-    <PortHandle type="source" position={Position.Right} id={data.outputs[0].name} variant="dot" />
+      <!-- Methods section -->
+      {#if hasMethods}
+        {#if hasProperties}
+          <div class="ic-ne-class__hline"></div>
+        {/if}
+        <div class="ic-ne-class__section-label">Methods</div>
+        {#each data.methodList as method, i}
+          <div class="ic-ne-class__row">
+            <PortHandle
+              type="target"
+              position={Position.Left}
+              id={`meth-${i + 1}-in`}
+              hidden
+            />
+            <span class="ic-ne-class__member">{method}</span>
+            <PortHandle
+              type="source"
+              position={Position.Right}
+              id={`meth-${i + 1}-out`}
+              hidden
+            />
+          </div>
+        {/each}
+      {/if}
+
+      <!-- Events section -->
+      {#if hasEvents}
+        {#if hasProperties || hasMethods}
+          <div class="ic-ne-class__hline"></div>
+        {/if}
+        <div class="ic-ne-class__section-label">Events</div>
+        {#each data.eventList as evt, i}
+          <div class="ic-ne-class__row">
+            <PortHandle
+              type="target"
+              position={Position.Left}
+              id={`evt-${i + 1}-in`}
+              hidden
+            />
+            <span class="ic-ne-class__member">{evt}</span>
+            <PortHandle
+              type="source"
+              position={Position.Right}
+              id={`evt-${i + 1}-out`}
+              hidden
+            />
+          </div>
+        {/each}
+      {/if}
+    </div>
   {/if}
 </div>
 
 <style>
   .ic-ne-class {
     position: relative;
-    min-width: 120px;
+    min-width: 140px;
     border: 1px solid var(--ic-border);
     border-radius: 3px;
     overflow: clip;
     font-family: var(--ic-font-family);
+    background: var(--ic-background);
     transition:
       border-color 0.15s ease,
       box-shadow 0.15s ease;
@@ -101,13 +209,16 @@
     pointer-events: none;
   }
 
+  /* ── Header ─────────────────────────────────── */
   .ic-ne-class__header {
+    position: relative;
     background-color: var(--ic-secondary);
     color: var(--ic-secondary-foreground);
-    padding: 4px 8px;
+    padding: 5px 14px;
     font-size: 11px;
     font-weight: 600;
     text-align: center;
+    border-bottom: 1px solid var(--ic-border);
   }
 
   .ic-ne-class__header :global(.ic-ne-class__header-edit) {
@@ -117,16 +228,48 @@
     color: var(--ic-secondary-foreground);
   }
 
+  /* ── Body ───────────────────────────────────── */
   .ic-ne-class__body {
-    background-color: var(--ic-muted);
-    padding: 4px 8px;
+    padding: 2px 0;
   }
 
-  .ic-ne-class__field {
+  /* ── Section label ──────────────────────────── */
+  .ic-ne-class__section-label {
+    padding: 3px 8px 1px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ic-muted-foreground);
+    opacity: 0.7;
+  }
+
+  /* ── Horizontal line between sections ───────── */
+  .ic-ne-class__hline {
+    height: 1px;
+    background-color: var(--ic-border);
+    margin: 2px 0;
+  }
+
+  /* ── Member row ─────────────────────────────── */
+  .ic-ne-class__row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 1px 8px;
+    min-height: 18px;
+    transition: background-color 0.1s ease;
+  }
+
+  .ic-ne-class__row:hover {
+    background-color: rgba(128, 128, 128, 0.06);
+  }
+
+  .ic-ne-class__member {
     font-family: monospace;
     font-size: 10px;
     color: var(--ic-foreground);
-    line-height: 1.6;
+    line-height: 1.5;
     white-space: nowrap;
   }
 </style>

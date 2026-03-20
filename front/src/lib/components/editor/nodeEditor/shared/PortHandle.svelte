@@ -9,6 +9,8 @@
     bar       Horizontal bar 4×8px (Delay ports)
     wave      Tiny sine squiggle (Signal/Random output)
     diamond   Small rotated square (Clock output)
+
+  Set hidden=true for invisible connection points (only the Handle, no visual).
 -->
 <script lang="ts">
   import { Handle, Position } from '@xyflow/svelte';
@@ -22,6 +24,7 @@
     variant = 'dot',
     color = 'var(--ic-muted-foreground)',
     style = '',
+    hidden = false,
   }: {
     type: 'source' | 'target';
     position: Position;
@@ -29,61 +32,71 @@
     variant?: Variant;
     color?: string;
     style?: string;
+    hidden?: boolean;
   } = $props();
 
-  const isLeft = $derived(position === Position.Left);
+  const posClass = $derived(
+    position === Position.Left
+      ? 'ic-ph--left'
+      : position === Position.Right
+        ? 'ic-ph--right'
+        : position === Position.Top
+          ? 'ic-ph--top'
+          : 'ic-ph--bottom',
+  );
 </script>
 
 <div
-  class="ic-ph"
-  class:ic-ph--left={isLeft}
-  class:ic-ph--right={!isLeft}
+  class="ic-ph {posClass}"
+  class:ic-ph--hidden={hidden}
   {style}
 >
   <!-- Invisible SvelteFlow handle (connection target) -->
   <Handle {type} {position} {id} />
 
-  <!-- Visible indicator -->
-  {#if variant === 'dot'}
-    <span class="ic-ph__dot" style:background-color={color}></span>
+  <!-- Visible indicator (skipped when hidden) -->
+  {#if !hidden}
+    {#if variant === 'dot'}
+      <span class="ic-ph__dot" style:background-color={color}></span>
 
-  {:else if variant === 'circle'}
-    <span class="ic-ph__circle" style:background-color={color}></span>
+    {:else if variant === 'circle'}
+      <span class="ic-ph__circle" style:background-color={color}></span>
 
-  {:else if variant === 'chevron'}
-    <svg class="ic-ph__icon" viewBox="0 0 8 10" xmlns="http://www.w3.org/2000/svg">
-      <polyline
-        points="1,1 6,5 1,9"
-        fill="none"
-        stroke={color}
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    </svg>
+    {:else if variant === 'chevron'}
+      <svg class="ic-ph__icon" viewBox="0 0 8 10" xmlns="http://www.w3.org/2000/svg">
+        <polyline
+          points="1,1 6,5 1,9"
+          fill="none"
+          stroke={color}
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
 
-  {:else if variant === 'bar'}
-    <span class="ic-ph__bar" style:background-color={color}></span>
+    {:else if variant === 'bar'}
+      <span class="ic-ph__bar" style:background-color={color}></span>
 
-  {:else if variant === 'wave'}
-    <svg class="ic-ph__icon" viewBox="0 0 12 8" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M 0.5,4 C 2,1 4,1 5.5,4 C 7,7 9,7 11.5,4"
-        fill="none"
-        stroke={color}
-        stroke-width="1.2"
-        stroke-linecap="round"
-      />
-    </svg>
+    {:else if variant === 'wave'}
+      <svg class="ic-ph__icon" viewBox="0 0 12 8" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M 0.5,4 C 2,1 4,1 5.5,4 C 7,7 9,7 11.5,4"
+          fill="none"
+          stroke={color}
+          stroke-width="1.2"
+          stroke-linecap="round"
+        />
+      </svg>
 
-  {:else if variant === 'diamond'}
-    <svg class="ic-ph__icon ic-ph__icon--diamond" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-      <rect
-        x="1" y="1" width="6" height="6" rx="0.5"
-        fill={color}
-        transform="rotate(45 4 4)"
-      />
-    </svg>
+    {:else if variant === 'diamond'}
+      <svg class="ic-ph__icon ic-ph__icon--diamond" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
+        <rect
+          x="1" y="1" width="6" height="6" rx="0.5"
+          fill={color}
+          transform="rotate(45 4 4)"
+        />
+      </svg>
+    {/if}
   {/if}
 </div>
 
@@ -108,6 +121,25 @@
     right: -3px;
     top: 50%;
     transform: translateY(-50%);
+  }
+
+  .ic-ph--top {
+    top: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .ic-ph--bottom {
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* Hidden: only the Handle is rendered, no visual indicator */
+  .ic-ph--hidden {
+    width: 0;
+    height: 0;
+    overflow: visible;
   }
 
   /* The SvelteFlow handle stays invisible but fully clickable */

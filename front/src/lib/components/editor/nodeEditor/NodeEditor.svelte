@@ -301,7 +301,9 @@
         // Note props
         content: (p.content as string) ?? '',
         // ClassNode props
-        fields: Array.isArray(p.fields) ? (p.fields as string[]) : [],
+        propertyList: Array.isArray(p.propertyList) ? (p.propertyList as string[]) : [],
+        methodList: Array.isArray(p.methodList) ? (p.methodList as string[]) : [],
+        eventList: Array.isArray(p.eventList) ? (p.eventList as string[]) : [],
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
       };
@@ -506,7 +508,9 @@
           delayTime: d.delayTime,
           outputNumber: d.outputNumber,
           content: d.content,
-          fields: d.fields,
+          propertyList: d.propertyList,
+          methodList: d.methodList,
+          eventList: d.eventList,
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,

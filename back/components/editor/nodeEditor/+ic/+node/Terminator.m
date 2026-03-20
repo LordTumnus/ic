@@ -1,5 +1,5 @@
 classdef Terminator < ic.node.Node
-    % > TERMINATOR Flowchart start/end — stadium/pill shape with one input and one output.
+    % > TERMINATOR Flowchart start/end — stadium/pill shape with one input port.
     %
     %   n = ic.node.Terminator(Label="Start")
     %   n = ic.node.Terminator(Label="End", Position=[400 300])
@@ -29,7 +29,6 @@ classdef Terminator < ic.node.Node
     methods (Access = protected)
         function defineDefaultPorts(this)
             this.addPort(ic.node.Port("in"), "inputs");
-            this.addPort(ic.node.Port("out"), "outputs");
         end
     end
 end
