@@ -183,6 +183,231 @@ export function evaluateExpression(expression: string, t: number): number {
   }
 }
 
+// ── Stateful feedback buffers (IIR / z^-1 semantics) ────────────────────
+//
+// SignalBuffer runs the IIR recurrence y[n] = f(x[n], y[n-1]) at a fixed
+// sample rate over continuous time t.  It stores a sliding window of
+// output samples indexed by their t value.  `read(t)` interpolates into
+// this window, so edge renderers and display previews can query any t in
+// the buffered range.
+//
+// Each animation frame, `advance(currentT)` extends the buffer from where
+// it left off up to `currentT`.  The edge renderer then samples along the
+// edge at various t values that fall within the buffered window.
+
+const SAMPLE_RATE = 128;  // samples per unit of t (higher = smoother)
+const BUFFER_SIZE = 2048; // max stored samples (covers ~16 units of t)
+
+/**
+ * Time-indexed IIR output buffer.
+ *
+ * Stores a sliding window of filtered output samples at fixed t intervals.
+ * The combiner expression uses `__prev__` for the feedback term.
+ */
+export class SignalBuffer {
+  combinerExpression = '';
+  speed = 1;
+  frequency = 2;
+  /** Feedback delay in t-units.  __prev__ reads y(t - delayT). */
+  delayT = 0.025;
+
+  private samples: Float64Array = new Float64Array(BUFFER_SIZE);
+  private head = 0;         // write pointer (circular)
+  private count = 0;        // number of valid samples
+  private tStart = 0;       // t value of oldest sample in buffer
+  private tEnd = 0;         // t value of newest sample in buffer
+  private compiledExpr: ReturnType<Parser['parse']> | null = null;
+  private initialized = false;
+
+  /** Compile the combiner expression. */
+  recompile(): void {
+    try {
+      this.compiledExpr = parser.parse(this.combinerExpression);
+    } catch {
+      this.compiledExpr = null;
+    }
+  }
+
+  /**
+   * Advance the buffer up to time `targetT`.
+   * Fills in all samples from where we left off to targetT at SAMPLE_RATE.
+   * __prev__ reads from the buffer at `t - delayT` (true time-delayed feedback).
+   */
+  advance(targetT: number): void {
+    if (!this.compiledExpr) return;
+    const dt = 1 / SAMPLE_RATE;
+
+    if (!this.initialized) {
+      // Seed: compute warmup samples before targetT so IIR settles
+      const warmupT = targetT - (this.frequency + 2);
+      let t = warmupT;
+      // Warmup without storing
+      while (t < targetT - (BUFFER_SIZE / SAMPLE_RATE)) {
+        const prev = this.read(t - this.delayT); // 0 during warmup
+        const y = this.evalExpr(t, prev);
+        this.writeSample(y);
+        this.tEnd = t;
+        t += dt;
+      }
+      // Reset and store from here
+      this.samples.fill(0);
+      this.head = 0;
+      this.count = 0;
+      this.tStart = t;
+      while (t <= targetT) {
+        const prev = this.read(t - this.delayT);
+        const y = this.evalExpr(t, prev);
+        this.writeSample(y);
+        t += dt;
+      }
+      this.tEnd = t - dt;
+      this.initialized = true;
+      return;
+    }
+
+    // Extend from where we left off
+    let t = this.tEnd + dt;
+    while (t <= targetT) {
+      const prev = this.read(t - this.delayT);
+      const y = this.evalExpr(t, prev);
+      this.writeSample(y);
+      t += dt;
+    }
+    this.tEnd = t - dt;
+
+    // Update tStart if buffer wrapped
+    if (this.count >= BUFFER_SIZE) {
+      this.tStart = this.tEnd - (BUFFER_SIZE - 1) / SAMPLE_RATE;
+    }
+  }
+
+  /**
+   * Read the filtered value at time t.
+   * Linearly interpolates between stored samples.
+   */
+  read(t: number): number {
+    if (this.count === 0) return 0;
+
+    // Clamp to buffered range
+    if (t <= this.tStart) return this.getSample(0);
+    if (t >= this.tEnd) return this.getSample(this.count - 1);
+
+    // Map t to fractional sample index
+    const pos = (t - this.tStart) * SAMPLE_RATE;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, this.count - 1);
+    const frac = pos - i0;
+    return this.getSample(i0) * (1 - frac) + this.getSample(i1) * frac;
+  }
+
+  /** Reset buffer state (e.g. when expression changes). */
+  reset(): void {
+    this.samples.fill(0);
+    this.head = 0;
+    this.count = 0;
+    this.tStart = 0;
+    this.tEnd = 0;
+    this.initialized = false;
+  }
+
+  private evalExpr(t: number, prev: number): number {
+    try {
+      const y = this.compiledExpr!.evaluate({
+        ...MATH_CONSTANTS, t, __prev__: prev,
+      }) as number;
+      return isFinite(y) ? y : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private writeSample(value: number): void {
+    this.head = (this.head + 1) % BUFFER_SIZE;
+    this.samples[this.head] = value;
+    this.count = Math.min(this.count + 1, BUFFER_SIZE);
+  }
+
+  private getSample(indexFromStart: number): number {
+    // Convert from "index from oldest" to circular buffer position
+    const oldest = this.count >= BUFFER_SIZE
+      ? (this.head + 1) % BUFFER_SIZE
+      : 0;
+    const idx = (oldest + indexFromStart) % BUFFER_SIZE;
+    return this.samples[idx];
+  }
+}
+
+// ── Feedback buffer registry ─────────────────────────────────────────────
+
+const feedbackBuffers = new Map<string, SignalBuffer>();
+
+/** Sanitize an ID for use in expression function names (replace non-alphanumeric with _). */
+export function feedbackFnName(loopId: string): string {
+  return '__fb_' + loopId.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+/**
+ * Register (or update) a feedback loop buffer.
+ *
+ * @param loopId       Unique ID for this feedback loop (e.g. delay node ID)
+ * @param combinerExpr Full combiner expression with `__prev__` for feedback
+ * @param speed        Signal speed multiplier
+ * @param frequency    Source signal frequency
+ * @param delayT       Feedback delay in t-units (from Delay node's time)
+ */
+export function registerFeedbackLoop(
+  loopId: string,
+  combinerExpr: string,
+  speed: number,
+  frequency: number,
+  delayT: number,
+): SignalBuffer {
+  let buf = feedbackBuffers.get(loopId);
+  if (!buf) {
+    buf = new SignalBuffer();
+    feedbackBuffers.set(loopId, buf);
+    parser.functions[feedbackFnName(loopId)] = (t: number) => buf!.read(t);
+  }
+  const exprChanged = buf.combinerExpression !== combinerExpr;
+  buf.combinerExpression = combinerExpr;
+  buf.speed = speed;
+  buf.frequency = frequency;
+  buf.delayT = Math.max(delayT, 1 / SAMPLE_RATE); // at least 1 sample
+  if (exprChanged) {
+    buf.recompile();
+    buf.reset();
+    expressionCache.clear();
+  }
+  return buf;
+}
+
+/** Remove a feedback loop. */
+export function unregisterFeedbackLoop(loopId: string): void {
+  feedbackBuffers.delete(loopId);
+  delete parser.functions[feedbackFnName(loopId)];
+  expressionCache.clear();
+}
+
+/**
+ * Advance ALL feedback buffers to the current animation time.
+ * Called once per frame BEFORE edge renderers.
+ */
+export function advanceFeedbackBuffers(globalTime: number): void {
+  for (const buf of feedbackBuffers.values()) {
+    // Convert globalTime to the t-domain used by edge renderers:
+    // t = (1-frac)*freq + globalTime * BASE_SPEED * speed
+    // The maximum t any renderer will request is freq + timeOffset
+    const timeOffset = globalTime * 0.5 * buf.speed;
+    const maxT = buf.frequency + timeOffset;
+    buf.advance(maxT);
+  }
+}
+
+/** Get the set of registered feedback loop IDs. */
+export function getFeedbackLoopIds(): Set<string> {
+  return new Set(feedbackBuffers.keys());
+}
+
 // ── Global clock + shared animation coordinator ─────────────────────────
 //
 // Single rAF loop shared by all animated edges (FlowEdge + SignalEdge).
@@ -211,6 +436,9 @@ function animationLoop(timestamp: number) {
     }
   }
   lastTimestamp = timestamp;
+
+  // Advance feedback buffers BEFORE edge renderers sample them
+  advanceFeedbackBuffers(globalTime);
 
   // Dispatch to all edge callbacks with the shared global time
   for (const cb of animationCallbacks) {

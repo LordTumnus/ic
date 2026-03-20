@@ -34,7 +34,7 @@
 
   import type { ChildEntries, ChildEntry, RequestFn, Resolution } from '$lib/types';
   import { extractPorts, type PortDef } from '$lib/utils/node-editor-types';
-  import { EDGE_TYPE_MAP, setPlaying, setSpeed } from '$lib/utils/edge-utils';
+  import { EDGE_TYPE_MAP, setPlaying, setSpeed, registerFeedbackLoop, unregisterFeedbackLoop, getFeedbackLoopIds, feedbackFnName } from '$lib/utils/edge-utils';
   import dagre from '@dagrejs/dagre';
   import logger from '$lib/core/logger';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
@@ -317,6 +317,7 @@
   // Build lookup: targetNodeId → incoming signal info from connected edges.
   // Used by sink nodes (Display, Meter) to visualize data from connected sources.
   interface InputSignal {
+    sourceNodeId: string;
     portName: string;
     expression: string;
     frequency: number;
@@ -335,6 +336,7 @@
       const targetId = p.targetNodeId as string;
       if (!map.has(targetId)) map.set(targetId, []);
       map.get(targetId)!.push({
+        sourceNodeId: (p.sourceNodeId as string) || '',
         portName: (p.targetPortName as string) || '',
         expression: srcPort.expression,
         frequency: srcPort.frequency,
@@ -686,15 +688,119 @@
   // Cache key encodes both expression and timeOffset so we detect changes to either.
   const processorOutputCache = new Map<string, string>();
 
+  /**
+   * Detect cycles and return a Map of back-edge keys → source Delay node IDs.
+   * Key: "targetNodeId:targetPortName", Value: source Delay node ID (or "" for non-Delay breaks).
+   * The Delay ID is used by the cascade to register feedback buffers.
+   */
+  function findCycleSkips(
+    states: NodeState[],
+    edges: ChildEntry[],
+  ): Map<string, string> {
+    const procNodes = states.filter((ns) => isProcessorType(ns.data.type));
+    const procIds = new Set(procNodes.map((ns) => ns.data.id));
+    if (procIds.size === 0) return new Map();
+
+    // Build adjacency + in-degree for processor subgraph
+    const adj = new Map<string, string[]>();
+    const inDeg = new Map<string, number>();
+    for (const id of procIds) {
+      adj.set(id, []);
+      inDeg.set(id, 0);
+    }
+    for (const e of edges) {
+      const src = e.props.sourceNodeId as string;
+      const tgt = e.props.targetNodeId as string;
+      if (procIds.has(src) && procIds.has(tgt)) {
+        adj.get(src)!.push(tgt);
+        inDeg.set(tgt, (inDeg.get(tgt) ?? 0) + 1);
+      }
+    }
+
+    // Kahn's topological sort — nodes remaining are in cycles
+    const queue: string[] = [];
+    for (const [id, d] of inDeg) {
+      if (d === 0) queue.push(id);
+    }
+    const sorted = new Set<string>();
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      sorted.add(id);
+      for (const next of adj.get(id) ?? []) {
+        const nd = (inDeg.get(next) ?? 1) - 1;
+        inDeg.set(next, nd);
+        if (nd === 0) queue.push(next);
+      }
+    }
+
+    const cycleIds = new Set([...procIds].filter((id) => !sorted.has(id)));
+    if (cycleIds.size === 0) return new Map();
+
+    const skips = new Map<string, string>();
+    const nodeTypeMap = new Map(procNodes.map((ns) => [ns.data.id, ns.data.type]));
+
+    // Map back-edges FROM Delay nodes → Delay node ID
+    for (const e of edges) {
+      const src = e.props.sourceNodeId as string;
+      const tgt = e.props.targetNodeId as string;
+      if (!cycleIds.has(src) || !cycleIds.has(tgt)) continue;
+      if (nodeTypeMap.get(src) === DELAY_TYPE) {
+        skips.set(`${tgt}:${e.props.targetPortName}`, src);
+      }
+    }
+
+    // If no Delay in cycle, break at an arbitrary edge
+    if (skips.size === 0) {
+      for (const e of edges) {
+        const src = e.props.sourceNodeId as string;
+        const tgt = e.props.targetNodeId as string;
+        if (cycleIds.has(src) && cycleIds.has(tgt)) {
+          skips.set(`${tgt}:${e.props.targetPortName}`, '');
+          break;
+        }
+      }
+    }
+
+    return skips;
+  }
+
+  // Cascade depth limiter: prevents infinite re-triggers.
+  let cascadeDepth = 0;
+  let cascadeResetTimer: ReturnType<typeof setTimeout> | null = null;
+
   $effect(() => {
     const sigMap = inputSignalMap; // reactive dependency
     const states = nodeStates;    // reactive dependency
+    const edgeEntries = childEntries['edges'] ?? [];
+
+    // Cap cascade depth — reset after effects settle
+    cascadeDepth++;
+    if (cascadeResetTimer !== null) clearTimeout(cascadeResetTimer);
+    cascadeResetTimer = setTimeout(() => { cascadeDepth = 0; cascadeResetTimer = null; }, 0);
+    const processorCount = states.filter((ns) => isProcessorType(ns.data.type)).length;
+    if (cascadeDepth > processorCount + 3) return;
+
+    // Detect cycles and build skip set for back-edges
+    const cycleSkips = findCycleSkips(states, edgeEntries);
+
+    // Cleanup feedback buffers for loops that no longer exist
+    const activeDelayIds = new Set(cycleSkips.values());
+    for (const existingId of getFeedbackLoopIds()) {
+      if (!activeDelayIds.has(existingId)) {
+        unregisterFeedbackLoop(existingId);
+      }
+    }
 
     for (const ns of states) {
       const d = ns.data;
       if (!isProcessorType(d.type)) continue;
 
-      const sigs = sigMap.get(d.id) ?? [];
+      // Filter out signals from cycle back-edges (non-Delay breaks only).
+      // Delay-backed feedback edges are handled specially per node type.
+      const rawSigs = sigMap.get(d.id) ?? [];
+      const sigs = cycleSkips.size > 0
+        ? rawSigs.filter((s: InputSignal) => !cycleSkips.has(`${d.id}:${s.portName}`))
+        : rawSigs;
       const sigInput = sigs.find((s: InputSignal) => s.type === 'signal');
       const flowInput = sigs.find((s: InputSignal) => s.type === 'flow');
 
@@ -779,10 +885,17 @@
       }
 
       // --- Function: combine N inputs via expression referencing in1, in2, ... ---
+      // Feedback-aware: if a Delay back-edge feeds one of the inputs, we
+      // register a SignalBuffer and use __fb_{delayId}(t) as the output
+      // expression so the edge renderer reads from the IIR buffer.
       if (d.type === FUNCTION_TYPE) {
         let fnExpr = d.expression || '';
+        let combinerExpr = d.expression || ''; // version with __prev__ for buffer
         let hasAnyInput = false;
+        let hasFeedback = false;
+        let feedbackDelayId = '';
         let maxSpd = 1;
+        let fbFrequency = 2;
 
         const resolveInput = (sig: InputSignal | undefined): string | null => {
           if (!sig) return null;
@@ -796,22 +909,56 @@
         };
 
         const numInputs = d.inputNumber ?? 2;
+        // Also look at rawSigs for feedback signals that were filtered out
         for (let p = 1; p <= numInputs; p++) {
           const varName = `in${p}`;
-          const sig = sigs.find((s: InputSignal) => s.portName === varName);
-          const inputExpr = resolveInput(sig);
           const varRegex = new RegExp(`(?<![a-zA-Z_])${varName}(?![a-zA-Z_0-9])`, 'g');
 
-          if (inputExpr) {
-            hasAnyInput = true;
-            maxSpd = Math.max(maxSpd, sig!.speed ?? 1);
-            fnExpr = fnExpr.replace(varRegex, `(${inputExpr})`);
+          // Check if this port is a feedback back-edge
+          const skipKey = `${d.id}:${varName}`;
+          const delayId = cycleSkips.get(skipKey);
+
+          if (delayId) {
+            // This input is the feedback path from a Delay node
+            hasFeedback = true;
+            feedbackDelayId = delayId;
+            // In combiner expr, replace feedback var with __prev__
+            combinerExpr = combinerExpr.replace(varRegex, '__prev__');
+            // In display expr, replace with buffer read function
+            fnExpr = fnExpr.replace(varRegex, `${feedbackFnName(delayId)}(t)`);
           } else {
-            fnExpr = fnExpr.replace(varRegex, '0');
+            // Normal forward input
+            const sig = sigs.find((s: InputSignal) => s.portName === varName);
+            const inputExpr = resolveInput(sig);
+
+            if (inputExpr) {
+              hasAnyInput = true;
+              maxSpd = Math.max(maxSpd, sig!.speed ?? 1);
+              fbFrequency = sig!.frequency ?? 2;
+              fnExpr = fnExpr.replace(varRegex, `(${inputExpr})`);
+              combinerExpr = combinerExpr.replace(varRegex, `(${inputExpr})`);
+            } else {
+              fnExpr = fnExpr.replace(varRegex, '0');
+              combinerExpr = combinerExpr.replace(varRegex, '0');
+            }
           }
         }
 
-        if (hasAnyInput && fnExpr) {
+        // Register or update feedback buffer when we have a feedback loop
+        if (hasFeedback && hasAnyInput && feedbackDelayId) {
+          // Get Delay node's time and convert to t-units
+          const delayNode = states.find((ns) => ns.data.id === feedbackDelayId);
+          const delayTime = (delayNode?.data.delayTime as number) ?? 50;
+          const delayUnit = String(delayNode?.data.unit ?? 'ms');
+          const delaySec = delayUnit === 'ms' ? delayTime / 1000 : delayTime;
+          // Convert real seconds to t-units: t advances at BASE_SPEED * speed per second
+          const delayT = delaySec * 0.5 * maxSpd;
+          registerFeedbackLoop(feedbackDelayId, combinerExpr, maxSpd, fbFrequency, delayT);
+          // Output expression reads from the feedback buffer
+          expectedExpr = `${feedbackFnName(feedbackDelayId)}(t)`;
+          expectedType = 'signal';
+          expectedSpeed = maxSpd;
+        } else if (hasAnyInput && fnExpr) {
           expectedExpr = fnExpr;
           expectedType = 'signal';
           expectedSpeed = maxSpd;
