@@ -465,6 +465,7 @@
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
+          onNodeResize: handleNodeResize,
           onpropchange: (prop: string, value: unknown) => handleNodePropChange(d.id, prop, value),
         },
       };
@@ -478,6 +479,11 @@
         const h = d.collapsed ? groupCollapsedH(d) : d.height;
         node.style = `width: ${d.width}px; height: ${h}px;`;
         node.zIndex = -1;
+      }
+      // Restore user-resized dimensions for non-group nodes
+      const dims = resizedNodeDims.get(d.id);
+      if (dims && !isGroupType(d.type)) {
+        node.style = `width: ${dims.width}px; height: ${dims.height}px;`;
       }
       if (d.locked) node.draggable = false;
       node.__nsData = d;
@@ -857,6 +863,18 @@
             style: `width: ${width}px; height: ${height}px;`,
             data: { ...n.data, width, height },
           }
+        : n,
+    );
+  }
+
+  // Track resized node dimensions so they survive MATLAB data updates
+  const resizedNodeDims = new Map<string, { width: number; height: number }>();
+
+  function handleNodeResize(nodeId: string, width: number, height: number) {
+    resizedNodeDims.set(nodeId, { width, height });
+    flowNodes = flowNodes.map((n) =>
+      n.id === nodeId
+        ? { ...n, style: `width: ${width}px; height: ${height}px;` }
         : n,
     );
   }

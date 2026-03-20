@@ -3,7 +3,7 @@
   N inputs → 1 signal output with their sum.
 -->
 <script lang="ts">
-  import { Position, type NodeProps, type Node } from '@xyflow/svelte';
+  import { Position, NodeResizer, type NodeProps, type Node } from '@xyflow/svelte';
   import type { PortDef } from '$lib/utils/node-editor-types';
   import PortHandle from '../shared/PortHandle.svelte';
   import InlineEdit from '../shared/InlineEdit.svelte';
@@ -15,14 +15,19 @@
     locked: boolean;
     inputs: PortDef[];
     outputs: PortDef[];
+    onNodeResize?: (nodeId: string, width: number, height: number) => void;
     onpropchange?: (prop: string, value: unknown) => void;
   };
 
   type AccumulatorNodeType = Node<AccumulatorData, 'ic.node.Accumulator'>;
 
-  let { data, selected, dragging }: NodeProps<AccumulatorNodeType> = $props();
+  let { id, data, selected, dragging }: NodeProps<AccumulatorNodeType> = $props();
 
   let hovered = $state(false);
+
+  // Minimum height scales with port count
+  const portCount = $derived(data.inputs?.length ?? 2);
+  const minH = $derived(Math.max(50, portCount * 20));
 
   const strokeColor = $derived(
     selected
@@ -32,11 +37,11 @@
         : 'var(--ic-border)',
   );
 
-  // Port vertical positions
+  // Port vertical positions (percentage-based for resize responsiveness)
   function portTop(index: number, total: number): string {
     if (total <= 1) return '50%';
-    const start = 25;
-    const end = 75;
+    const start = 20;
+    const end = 80;
     const pct = start + (index / (total - 1)) * (end - start);
     return `${pct}%`;
   }
@@ -49,9 +54,19 @@
   class:ic-ne-acc--selected={selected}
   class:ic-ne-acc--dragging={dragging}
   class:ic-ne-acc--disabled={data.disabled}
+  style:min-height="{minH}px"
   onpointerenter={() => (hovered = true)}
   onpointerleave={() => (hovered = false)}
 >
+  <NodeResizer
+    minWidth={40}
+    minHeight={minH}
+    isVisible={selected}
+    lineClass="ic-ne-acc__resize-line"
+    handleClass="ic-ne-acc__resize-handle"
+    onResizeEnd={(_e, params) => data.onNodeResize?.(id, params.width, params.height)}
+  />
+
   <svg class="ic-ne-acc__svg" viewBox="0 0 40 50">
     <!-- Sigma as a filled 2D shape -->
     <path
@@ -98,6 +113,7 @@
   .ic-ne-acc {
     position: relative;
     width: 40px;
+    height: 100%;
   }
 
   .ic-ne-acc--selected {
@@ -115,7 +131,7 @@
 
   .ic-ne-acc__svg {
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
   }
 
@@ -128,5 +144,38 @@
     overflow: clip;
     text-overflow: ellipsis;
     padding: 0 2px;
+  }
+
+  /* Resize handles */
+  .ic-ne-acc :global(.ic-ne-acc__resize-line) {
+    border-color: transparent;
+  }
+
+  .ic-ne-acc :global(.ic-ne-acc__resize-handle) {
+    width: 6px;
+    height: 6px;
+    background: transparent;
+    border: 2px solid var(--ic-muted-foreground);
+    border-radius: 0;
+    opacity: 0.5;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+  }
+
+  .ic-ne-acc :global(.ic-ne-acc__resize-handle:hover) {
+    border-color: var(--ic-primary);
+    opacity: 1;
+  }
+
+  .ic-ne-acc :global(.ic-ne-acc__resize-handle.top.left) {
+    border-right: none; border-bottom: none;
+  }
+  .ic-ne-acc :global(.ic-ne-acc__resize-handle.top.right) {
+    border-left: none; border-bottom: none;
+  }
+  .ic-ne-acc :global(.ic-ne-acc__resize-handle.bottom.left) {
+    border-right: none; border-top: none;
+  }
+  .ic-ne-acc :global(.ic-ne-acc__resize-handle.bottom.right) {
+    border-left: none; border-top: none;
   }
 </style>
