@@ -101,6 +101,8 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.tab.Tab': modules['../components/layout/tabContainer/Tab.svelte'],
   'ic.tab.TabPanel': modules['../components/layout/tabContainer/TabPanel.svelte'],
   'ic.TileLayout': modules['../components/layout/tileLayout/TileLayout.svelte'],
+  'ic.Accordion': modules['../components/layout/accordion/Accordion.svelte'],
+  'ic.accordion.AccordionPanel': modules['../components/layout/accordion/AccordionPanel.svelte'],
 
   // Panel components
   'ic.Panel': modules['../components/panel/panel/Panel.svelte'],
