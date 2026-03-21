@@ -66,6 +66,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.node.Actor': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.IconBox': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.ClassNode': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
+  'ic.node.IcNode': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.Edge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.StaticEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],
   'ic.node.FlowEdge': modules['../components/editor/nodeEditor/EdgeProxy.svelte'],

@@ -45,3 +45,13 @@ export function extractPorts(
 		timeOffset: (pe.props.timeOffset as number) ?? 0,
 	}));
 }
+
+/**
+ * Extract content child entries from a node's nested childEntries.
+ * Unlike extractPorts (which maps to plain PortDef), this returns raw
+ * ChildEntry objects so their .snippet can be rendered inside the node.
+ */
+export function extractContentEntries(nodeEntry: ChildEntry): ChildEntry[] {
+	const ce = nodeEntry.props.childEntries as ChildEntries | undefined;
+	return ce?.['content'] ?? [];
+}

@@ -33,7 +33,7 @@
   import '@xyflow/svelte/dist/base.css';
 
   import type { ChildEntries, ChildEntry, RequestFn, Resolution } from '$lib/types';
-  import { extractPorts, type PortDef } from '$lib/utils/node-editor-types';
+  import { extractPorts, extractContentEntries, type PortDef } from '$lib/utils/node-editor-types';
   import { EDGE_TYPE_MAP, setPlaying, setSpeed, registerFeedbackLoop, unregisterFeedbackLoop, getFeedbackLoopIds, feedbackFnName } from '$lib/utils/edge-utils';
   import dagre from '@dagrejs/dagre';
   import logger from '$lib/core/logger';
@@ -72,6 +72,7 @@
   import ActorNode from './nodes/ActorNode.svelte';
   import IconBoxNode from './nodes/IconBoxNode.svelte';
   import ClassNodeComponent from './nodes/ClassNode.svelte';
+  import IcNodeComponent from './nodes/IcNode.svelte';
 
   // Unified edge renderer — switches rendering mode based on data.type
   import EdgeRenderer from './edges/EdgeRenderer.svelte';
@@ -177,6 +178,7 @@
     'ic.node.Actor': ActorNode,
     'ic.node.IconBox': IconBoxNode,
     'ic.node.ClassNode': ClassNodeComponent,
+    'ic.node.IcNode': IcNodeComponent,
   } as Record<string, any>;
 
   // -- Edge type registry: SvelteFlow edge type key → Svelte component --------
@@ -216,6 +218,7 @@
   const ACTOR_TYPE = 'ic.node.Actor';
   const ICONBOX_TYPE = 'ic.node.IconBox';
   const CLASSNODE_TYPE = 'ic.node.ClassNode';
+  const ICNODE_TYPE = 'ic.node.IcNode';
   const CLASSICAL_TYPES = new Set([PROCESS_TYPE, DECISION_TYPE, TERMINATOR_TYPE, DATABASE_TYPE, CLOUD_TYPE, DOCUMENT_TYPE, QUEUE_TYPE, ACTOR_TYPE, ICONBOX_TYPE, CLASSNODE_TYPE]);
   const SINK_TYPES = new Set([DISPLAY_TYPE, METER_TYPE, LOGGER_TYPE]);
 
@@ -306,6 +309,7 @@
         eventList: Array.isArray(p.eventList) ? (p.eventList as string[]) : [],
         inputs: extractPorts(e, 'inputs'),
         outputs: extractPorts(e, 'outputs'),
+        contentEntries: extractContentEntries(e),
       };
     });
 
@@ -511,6 +515,7 @@
           propertyList: d.propertyList,
           methodList: d.methodList,
           eventList: d.eventList,
+          contentEntries: d.contentEntries,
           inputSignals: sigMap.get(d.id) ?? [],
           onGroupResize: handleGroupResize,
           onGroupCollapse: handleGroupCollapse,
@@ -529,8 +534,8 @@
         node.style = `width: ${d.width}px; height: ${h}px;`;
         node.zIndex = -1;
       }
-      // Note nodes need explicit dimensions from MATLAB
-      if (d.type === NOTE_TYPE) {
+      // Note and IcNode nodes need explicit dimensions from MATLAB
+      if (d.type === NOTE_TYPE || d.type === ICNODE_TYPE) {
         node.style = `width: ${d.width}px; height: ${d.height}px;`;
       }
       // Restore user-resized dimensions for non-group nodes
@@ -2199,6 +2204,10 @@
     return buildClassicalContextMenu(node);
   }
 
+  function buildIcNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
+    return buildClassicalContextMenu(node);
+  }
+
   function buildNodeContextMenu(node: FlowNode): ContextMenuEntry[] {
     const locked = (node.data?.locked as boolean) ?? false;
     const disabled = (node.data?.disabled as boolean) ?? false;
@@ -2518,7 +2527,9 @@
                                                             ? buildIconBoxContextMenu(node)
                                                             : node.type === CLASSNODE_TYPE
                                                               ? buildClassNodeContextMenu(node)
-                                                              : buildNodeContextMenu(node);
+                                                              : node.type === ICNODE_TYPE
+                                                                ? buildIcNodeContextMenu(node)
+                                                                : buildNodeContextMenu(node);
         ctxMenu = {
           entries,
           x: event.clientX,
