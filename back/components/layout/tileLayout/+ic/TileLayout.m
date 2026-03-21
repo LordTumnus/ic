@@ -13,7 +13,7 @@ classdef TileLayout < ic.core.ComponentContainer
     %   [p2, t2] = tl.addTab("Console", Icon="terminal", Closable=true);
     %   p2.addChild(ic.Label(Text="Output"));
     %
-    %   addlistener(tl, 'TabClosed', @(~,e) tl.removeTab(e.Data.value));
+    %   % Tabs are auto-deleted when closed from the UI.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % > GUTTERSIZE size of resize gutter between groups (pixels)
@@ -66,6 +66,10 @@ classdef TileLayout < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
+
+            % Auto-delete tabs when closed from the UI
+            addlistener(this, 'TabClosed', ...
+                @(~, e) this.removeTab(e.Data.value));
         end
 
         function tabs = get.Tabs(this)

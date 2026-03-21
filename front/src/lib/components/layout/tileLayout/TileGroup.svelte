@@ -9,6 +9,7 @@
   - Cross-group DnD via shared type 'tile-tab'
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
   import {
     dndzone,
@@ -69,7 +70,7 @@
     if (entry && entry.props.label !== undefined) {
       return {
         label: (entry.props.label as string) ?? '',
-        closable: (entry.props.closable as boolean) ?? false,
+        closable: tabs.length > 1 && ((entry.props.closable as boolean) ?? false),
         disabled: (entry.props.disabled as boolean) ?? false,
         icon: (entry.props.icon as IconSource) ?? null,
       };
@@ -88,11 +89,19 @@
   // update, so animate:flip uses 0 → items jump to final position instantly.
   let flipMs = $derived(isDragging ? FLIP_MS : 0);
 
-  // Sync dndItems from tabs prop when not dragging
+  // Sync dndItems from tabs prop.
+  // Uses untrack(isDragging) so this effect ONLY re-runs when `tabs` changes,
+  // not when isDragging toggles (which would fight svelte-dnd-action).
+  // If tabs change while a drag is in progress (e.g. MATLAB removed a tab,
+  // or svelte-dnd-action failed to fire finalize), force-reset isDragging
+  // to prevent the stuck-drag state that causes tab headers to vanish.
   $effect(() => {
-    if (!isDragging) {
-      dndItems = tabs.map((t) => ({ id: t }));
+    const newItems = tabs.map((t) => ({ id: t }));
+    if (untrack(() => isDragging)) {
+      isDragging = false;
+      document.documentElement.style.removeProperty('--_tg-cursor');
     }
+    dndItems = newItems;
   });
 
   function handleConsider(e: CustomEvent<{ items: DndTabItem[] }>) {

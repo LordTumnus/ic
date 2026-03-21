@@ -65,7 +65,7 @@
     if (entry && entry.props.label !== undefined) {
       return {
         label: (entry.props.label as string) ?? '',
-        closable: (entry.props.closable as boolean) ?? false,
+        closable: tabTargets.length > 1 && ((entry.props.closable as boolean) ?? false),
         disabled: (entry.props.disabled as boolean) ?? false,
         editable: (entry.props.editable as boolean) ?? false,
         icon: (entry.props.icon as IconSource) ?? null,
@@ -139,8 +139,9 @@
     closeMenu();
   }
 
-  function handleClose(e: MouseEvent, target: string) {
+  function handleClose(e: PointerEvent, target: string) {
     e.stopPropagation();
+    e.preventDefault();
     tabClosed?.({ value: target });
   }
 
@@ -509,7 +510,7 @@
                 class="ic-tc__close"
                 tabindex={-1}
                 aria-label="Close {config.label}"
-                onmousedown={(e) => handleClose(e, target)}
+                onpointerdown={(e) => handleClose(e, target)}
               >
                 <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
                   <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>

@@ -68,6 +68,10 @@ classdef TabContainer < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
+
+            % Auto-delete tabs when closed from the UI
+            addlistener(this, 'TabClosed', ...
+                @(~, e) this.removeTab(e.Data.value));
         end
 
         function tabs = get.Tabs(this)
@@ -196,12 +200,12 @@ classdef TabContainer < ic.core.ComponentContainer
             this.Targets(this.Targets == target | ...
                          this.Targets == panelTarget) = [];
 
-            % Adjust selection if the removed tab was selected
+            % Adjust selection: prefer previous tab, fall back to first
             if wasSelected
                 remainingTabs = this.Tabs;
                 n = numel(remainingTabs);
                 if n > 0
-                    newPos = min(pos, n);
+                    newPos = max(pos - 1, 1);
                     this.SelectedTab = remainingTabs(newPos).Target;
                 else
                     this.SelectedTab = "";
@@ -248,6 +252,10 @@ classdef TabContainer < ic.core.ComponentContainer
             panel = tab.Panel;
             wasSelected = (this.SelectedTab == target);
 
+            % Find position before removing (for previous-tab selection)
+            tabTargets = this.Targets(startsWith(this.Targets, "tab-"));
+            pos = find(tabTargets == target, 1);
+
             % Remove panel
             if ~isempty(panel) && isvalid(panel)
                 panelTarget = panel.Target;
@@ -258,11 +266,13 @@ classdef TabContainer < ic.core.ComponentContainer
             % Remove tab target
             this.Targets(this.Targets == target) = [];
 
-            % Adjust selection
+            % Adjust selection: prefer previous tab
             if wasSelected
                 remainingTabs = this.Tabs;
-                if ~isempty(remainingTabs)
-                    this.SelectedTab = remainingTabs(1).Target;
+                n = numel(remainingTabs);
+                if n > 0
+                    newPos = max(pos - 1, 1);
+                    this.SelectedTab = remainingTabs(newPos).Target;
                 else
                     this.SelectedTab = "";
                 end

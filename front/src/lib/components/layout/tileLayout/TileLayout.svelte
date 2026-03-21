@@ -404,6 +404,13 @@
     dragState = { ...dragState, active: false };
     cleanupDragListeners();
 
+    // If no drag was tracked (e.g. handleGroupConsider failed to find the leaf),
+    // just update local group tabs and bail — prevents adding empty-string tabs.
+    if (!tabTarget) {
+      tree = mapLeafTabs(tree, groupId, finalTabs);
+      return;
+    }
+
     // The true target is where the mouse is (hoveredGroupId), NOT the zone
     // where dndzone fired finalize (groupId). dndzone fires on the source
     // zone when the drop lands outside any tab bar element.
@@ -411,7 +418,7 @@
     const isCrossGroup = sourceGroupId !== targetGroupId;
     const isEdge = zone != null && zone !== 'center';
 
-    if (isEdge && tabTarget) {
+    if (isEdge) {
       // Edge drop → split the target group
       let updated = tree;
 
@@ -434,7 +441,7 @@
       tree = updated;
       tabMoved?.({ value: { tab: tabTarget, fromGroup: sourceGroupId, toGroup: targetGroupId + '-split' } });
       fireLayoutChanged();
-    } else if (isCrossGroup && tabTarget) {
+    } else if (isCrossGroup) {
       // Center drop on different group → move tab there
       let updated = tree;
 

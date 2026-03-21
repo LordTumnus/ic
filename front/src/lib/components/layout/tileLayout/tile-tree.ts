@@ -79,9 +79,13 @@ export function addTabToLeaf(
  */
 export function removeTabFromLeaf(tree: TileNode, leafId: string, tabTarget: string): TileNode {
 	return mapLeaf(tree, leafId, (leaf) => {
+		const oldIndex = leaf.tabs.indexOf(tabTarget);
 		const tabs = leaf.tabs.filter((t) => t !== tabTarget);
+		// Select previous tab (or first if closing the first tab)
 		const selectedTab =
-			leaf.selectedTab === tabTarget ? (tabs[0] ?? '') : leaf.selectedTab;
+			leaf.selectedTab === tabTarget
+				? (tabs[Math.max(0, oldIndex - 1)] ?? '')
+				: leaf.selectedTab;
 		return { ...leaf, tabs, selectedTab };
 	});
 }
