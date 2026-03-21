@@ -1,4 +1,4 @@
-classdef (Abstract) Entry < matlab.mixin.Heterogeneous & matlab.mixin.SetGetExactNames
+classdef (Abstract) Entry < matlab.mixin.Heterogeneous & matlab.mixin.SetGetExactNames & ic.event.TransportData
     % > ENTRY Abstract base for context menu entries.
     %
     %   Enables heterogeneous arrays so Item, Separator, and Folder

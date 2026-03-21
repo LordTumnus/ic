@@ -311,11 +311,7 @@
         return;
       }
 
-      const binary = atob(resolved.data);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-      const doc = await getDocument({ data: bytes }).promise;
+      const doc = await getDocument({ data: resolved.bytes }).promise;
       if (ticket !== loadTicket) {
         doc.destroy();
         return;

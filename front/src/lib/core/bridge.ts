@@ -13,6 +13,7 @@ import { setBatchMode } from './container';
 import Factory from './factory';
 import logger from './logger';
 
+
 type Dispatcher = (event: JsEvent) => Promise<void>;
 
 class Bridge {

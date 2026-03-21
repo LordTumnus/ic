@@ -1,4 +1,4 @@
-classdef Node < handle
+classdef Node < handle & ic.event.TransportData
     % > NODE Tree node for hierarchical data structures.
     %
     %   fruits = ic.tree.Node("Fruits");

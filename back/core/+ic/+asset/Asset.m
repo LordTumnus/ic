@@ -1,4 +1,4 @@
-classdef Asset
+classdef Asset < ic.event.TransportData
    % > ASSET Universal source: Lucide name, local file, or URL.
    %   ic.asset.Asset("home")           → name (Lucide)
    %   ic.asset.Asset("photo.png")      → file (isfile=true)
@@ -38,17 +38,18 @@ classdef Asset
          end
       end
 
-      function json = jsonencode(this, varargin)
-         % > JSONENCODE Encode asset for JSON transmission.
+      function s = toStruct(this)
+         % > TOSTRUCT Convert to plain struct for bridge transport.
+         % Returns: string (Lucide name), struct (file/url hash stub), or [].
          if isempty(this) || this.Type == ""
-            json = jsonencode([], varargin{:});
+            s = [];
             return
          end
          if this.Type == "name"
-            json = jsonencode(this.Value, varargin{:});
+            s = this.Value;
             return
          end
-         % file or url → read raw bytes, compute hash, encode only if needed
+         % file or url → read raw bytes, compute hash
          if this.Type == "file"
             [raw, ext] = ic.asset.Asset.readFile(this.Value);
             hash = ic.asset.Asset.computeHash(raw);
@@ -59,11 +60,15 @@ classdef Asset
             s = struct('hash', hash);
          else
             ic.asset.AssetRegistry.markSent(hash);
-            s = struct('hash', hash, ...
-                       'mime', ic.asset.Asset.mimeFromExt(ext), ...
+            mime = ic.asset.Asset.mimeFromExt(ext);
+            s = struct('hash', hash, 'mime', mime, ...
                        'data', string(matlab.net.base64encode(raw)));
          end
-         json = jsonencode(s, varargin{:});
+      end
+
+      function json = jsonencode(this, varargin)
+         % > JSONENCODE Encode asset for JSON transmission.
+         json = jsonencode(this.toStruct(), varargin{:});
       end
    end
 

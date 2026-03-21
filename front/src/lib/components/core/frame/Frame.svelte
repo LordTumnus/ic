@@ -29,7 +29,9 @@
         const resolved = Array.isArray(value)
           ? value[colorScheme === 'light' ? 0 : 1]
           : value;
-        return `--ic-${prop}: ${resolved}`;
+        // camelCase → kebab-case (e.g. primaryForeground → primary-foreground)
+        const kebab = prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+        return `--ic-${kebab}: ${resolved}`;
       })
     ];
 

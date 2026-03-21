@@ -437,7 +437,7 @@ export async function mapImagesToShadow(
     if (!resolved) continue;
 
     const shadowPath = toShadowPath(path, asset.hash);
-    const bytes = base64ToUint8Array(resolved.data);
+    const bytes = resolved.bytes;
     await snippet.mapShadow(shadowPath, bytes);
 
     // Track in unified map: shadow filename for URLs/absolute, null for relative
@@ -555,23 +555,5 @@ function toShadowPath(originalPath: string, hash: string): string {
   return `/tmp/_img_${hash}.${ext}`;
 }
 
-/** Decode a base64 string to Uint8Array. */
-export function base64ToUint8Array(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-/** Convert Uint8Array to base64 string (chunked to avoid stack overflow). */
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const chunkSize = 8192;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
+// Re-export from centralized asset-cache utilities
+export { base64ToUint8Array, uint8ArrayToBase64 } from '$lib/utils/asset-cache';

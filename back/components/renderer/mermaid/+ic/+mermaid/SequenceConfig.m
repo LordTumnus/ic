@@ -1,4 +1,4 @@
-classdef SequenceConfig
+classdef SequenceConfig < ic.event.TransportData
     % > SEQUENCECONFIG Mermaid sequence diagram configuration.
     %
     %   m.Config = ic.mermaid.SequenceConfig(MirrorActors=false, ShowSequenceNumbers=true)
@@ -55,14 +55,18 @@ classdef SequenceConfig
             end
         end
 
-        function json = jsonencode(this, varargin)
-            s = struct();
+        function s = toStruct(this)
+            inner = struct();
             plist = properties(this);
             for i = 1:numel(plist)
                 name = plist{i};
-                s.([lower(name(1)), name(2:end)]) = this.(name);
+                inner.([lower(name(1)), name(2:end)]) = this.(name);
             end
-            json = jsonencode(struct('sequence', s), varargin{:});
+            s = struct('sequence', inner);
+        end
+
+        function json = jsonencode(this, varargin)
+            json = jsonencode(this.toStruct(), varargin{:});
         end
     end
 end

@@ -1,4 +1,4 @@
-classdef GanttConfig
+classdef GanttConfig < ic.event.TransportData
     % > GANTTCONFIG Mermaid Gantt chart configuration.
     %
     %   m.Config = ic.mermaid.GanttConfig(BarHeight=30, AxisFormat="%b %d")
@@ -49,14 +49,18 @@ classdef GanttConfig
             end
         end
 
-        function json = jsonencode(this, varargin)
-            s = struct();
+        function s = toStruct(this)
+            inner = struct();
             plist = properties(this);
             for i = 1:numel(plist)
                 name = plist{i};
-                s.([lower(name(1)), name(2:end)]) = this.(name);
+                inner.([lower(name(1)), name(2:end)]) = this.(name);
             end
-            json = jsonencode(struct('gantt', s), varargin{:});
+            s = struct('gantt', inner);
+        end
+
+        function json = jsonencode(this, varargin)
+            json = jsonencode(this.toStruct(), varargin{:});
         end
     end
 end

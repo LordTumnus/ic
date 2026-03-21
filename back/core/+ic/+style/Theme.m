@@ -1,6 +1,6 @@
 % > THEME stores CSS custom property values with light/dark scheme support.
 % Color properties store [light, dark] pairs; non-color properties store single values.
-classdef Theme < handle
+classdef Theme < handle & ic.event.TransportData
 
     properties (SetAccess = ?ic.Frame)
         % Slate-based engineering palette with blue accents
@@ -67,6 +67,27 @@ classdef Theme < handle
     end
 
     methods
+        function s = toStruct(this)
+            % > TOSTRUCT Convert to plain struct with camelCase keys.
+            colorProps = ["Background", "Foreground", ...
+                          "Primary", "PrimaryForeground", ...
+                          "Secondary", "SecondaryForeground", ...
+                          "Muted", "MutedForeground", ...
+                          "Accent", "AccentForeground", ...
+                          "Destructive", "DestructiveForeground", ...
+                          "Success", "SuccessForeground", ...
+                          "Warning", "WarningForeground", ...
+                          "Info", "InfoForeground", ...
+                          "Border", "Input", "Ring"];
+            s = struct();
+            for ii = 1:numel(colorProps)
+                propName = colorProps(ii);
+                camelKey = char(ic.utils.toCamelCase(propName));
+                s.(camelKey) = cellstr(this.(propName));
+            end
+            s.radius = this.Radius;
+        end
+
         function css = jsonencode(this, varargin)
             % > JSONENCODE returns CSS custom properties as a JSON string.
             % Called automatically when the Theme is serialized for the frontend.

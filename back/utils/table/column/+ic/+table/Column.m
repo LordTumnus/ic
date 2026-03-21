@@ -1,4 +1,4 @@
-classdef Column < matlab.mixin.Heterogeneous
+classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
     % > COLUMN Definition of a single table column.
     %
     %   Specifies how a column of data is displayed, including its

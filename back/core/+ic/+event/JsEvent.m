@@ -23,6 +23,22 @@ classdef JsEvent < handle & matlab.mixin.Heterogeneous
             this.Id = matlab.lang.internal.uuid();
         end
 
+        function s = toStruct(this)
+            % > TOSTRUCT Convert to plain struct for bridge transport.
+            if ~isscalar(this)
+                s = cell(1, numel(this));
+                for ii = 1:numel(this)
+                    s{ii} = this(ii).toStruct();
+                end
+                return
+            end
+            s = struct( ...
+                'component', this.ComponentID, ...
+                'name', this.Name, ...
+                'id', this.Id);
+            s.data = this.Data;
+        end
+
         function json = jsonencode(this, varargin)
             % Handle arrays by encoding each element and joining.
             % (Struct field-name restrictions prevent native array encoding
