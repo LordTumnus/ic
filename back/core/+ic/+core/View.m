@@ -1,7 +1,7 @@
 % VIEW bridges MATLAB components to the HTML frontend via uihtml.
 %
-% MATLAB → JS: sendEventToHTMLSource("ic", event) — one event at a time
-% JS → MATLAB: sendEventToMATLAB("ic", events)   — via HTMLEventReceivedFcn
+% MATLAB → JS: sendEventToHTMLSource("ic", events) — batched as JSON array
+% JS → MATLAB: sendEventToMATLAB("ic", events)     — via HTMLEventReceivedFcn
 %
 % On startup, events are queued until the frontend sends "ic-ready".
 classdef View < matlab.ui.componentcontainer.ComponentContainer
@@ -57,9 +57,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
       function send(this, events)
          if this.Ready
             ic.asset.AssetRegistry.activate(this);
-            for ii = 1:numel(events)
-               sendEventToHTMLSource(this.HTMLElement, "ic", jsonencode(events(ii)));
-            end
+            sendEventToHTMLSource(this.HTMLElement, "ic", jsonencode(events));
          else
             this.Queue((end+1):(end+numel(events))) = events;
          end
@@ -74,9 +72,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
                ic.asset.AssetRegistry.activate(this);
                data = this.Queue;
                this.Queue = ic.event.JsEvent.empty();
-               for ii = 1:numel(data)
-                  sendEventToHTMLSource(this.HTMLElement, "ic", jsonencode(data(ii)));
-               end
+               sendEventToHTMLSource(this.HTMLElement, "ic", jsonencode(data));
             end
          elseif evt.HTMLEventName == "ic"
             this.onReceive(evt.HTMLEventData);

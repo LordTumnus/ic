@@ -14,6 +14,7 @@ import componentMap from './component-map';
  */
 class Factory {
   private static _instance: Factory | null = null;
+  private moduleCache = new Map<string, SvelteComponent<Record<string, unknown>>>();
 
   private constructor() {
     // Private constructor enforces singleton
@@ -35,6 +36,10 @@ class Factory {
    * @throws Error if the type is not registered in component-map.ts
    */
   async loadSvelteComponent(type: string): Promise<SvelteComponent<Record<string, unknown>>> {
+    // Return from cache if available (avoids async yield)
+    const cached = this.moduleCache.get(type);
+    if (cached) return cached;
+
     const loader = componentMap[type];
     if (!loader) {
       throw new Error(
@@ -44,6 +49,7 @@ class Factory {
     }
 
     const module = await loader() as { default: SvelteComponent<Record<string, unknown>> };
+    this.moduleCache.set(type, module.default);
     return module.default;
   }
 
@@ -61,6 +67,30 @@ class Factory {
     const svelteComp = await this.loadSvelteComponent(type);
 
     return new Component(id, type, props, events, methods, svelteComp, mixins);
+  }
+
+  /**
+   * Synchronous create — returns Component directly when module is cached.
+   * Returns null if the module hasn't been loaded yet.
+   */
+  createSync(definition: ComponentDefinition): Component | null {
+    const cached = this.moduleCache.get(definition.type);
+    if (!cached) return null;
+    const { type, id, props, events, methods, mixins } = definition;
+    return new Component(id, type, props, events, methods, cached, mixins);
+  }
+
+  /**
+   * Pre-load component modules into cache so createSync can be used.
+   */
+  async preload(types: Iterable<string>): Promise<void> {
+    const promises: Promise<void>[] = [];
+    for (const type of types) {
+      if (!this.moduleCache.has(type)) {
+        promises.push(this.loadSvelteComponent(type).then(() => {}));
+      }
+    }
+    await Promise.all(promises);
   }
 
   /**

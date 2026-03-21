@@ -409,15 +409,37 @@
       .join('|'),
   );
 
-  // Map nodeStates → SvelteFlow FlowNode[]. Uses $effect.pre so nodes are set
-  // BEFORE the DOM update (handles register during DOM update, edge $effect
-  // runs after). When ns.data is the same reference (unchanged $derived),
-  // the previous FlowNode is reused — preserving SvelteFlow's handleBounds.
-  $effect.pre(() => {
+  // Map nodeStates → SvelteFlow FlowNode[]. Deferred via RAF so that
+  // rapid batch insertions (e.g. 30 addNode calls) produce ONE SvelteFlow
+  // update instead of 30 sequential re-renders with DOM measurement.
+  //
+  // CRITICAL: Only track the cheap source data (childEntries arrays), NOT
+  // the expensive derived chain (nodeStates, inputSignalMap, etc.). Those
+  // deriveds are evaluated lazily by Svelte — reading them here would force
+  // re-evaluation during every flushSync(), which is the core bottleneck.
+  // The heavy derivations happen once inside computeFlowNodes() in the RAF.
+  let flowNodesRaf: number | null = null;
+
+  $effect(() => {
+    // Track nodeStates for structural + prop changes (moderate cost).
+    // Track edge array length for edge add/remove (cheap).
+    // Avoid reading inputSignalMap/portBehaviorMap here — those are expensive
+    // and only needed inside computeFlowNodes (evaluated once in RAF).
+    const _states = nodeStates;
+    void (childEntries['edges'] ?? []).length;
+
+    if (flowNodesRaf !== null) cancelAnimationFrame(flowNodesRaf);
+    flowNodesRaf = requestAnimationFrame(() => {
+      flowNodesRaf = null;
+      untrack(() => computeFlowNodes());
+    });
+  });
+
+  function computeFlowNodes() {
     const states = nodeStates;
-    const sigMap = inputSignalMap; // track as dependency so effect re-runs on edge changes
-    const pending = untrack(() => pendingDeleteIds);
-    const existing = new Map(untrack(() => flowNodes).map((n) => [n.id, n]));
+    const sigMap = inputSignalMap;
+    const pending = pendingDeleteIds;
+    const existing = new Map(flowNodes.map((n) => [n.id, n]));
     let changed = false;
 
     // Clear pending deletes that MATLAB has now confirmed (no longer in states)
@@ -560,15 +582,15 @@
 
     // Track which nodes are hidden (children of collapsed groups)
     const newHidden = new Set(mapped.filter((n) => n.hidden).map((n) => n.id));
-    const oldHidden = untrack(() => hiddenNodeIds);
+    const oldHidden = hiddenNodeIds;
     if (newHidden.size !== oldHidden.size || [...newHidden].some((id) => !oldHidden.has(id))) {
       hiddenNodeIds = newHidden;
     }
 
-    if (changed || mapped.length !== untrack(() => flowNodes).length) {
+    if (changed || mapped.length !== flowNodes.length) {
       flowNodes = mapped;
     }
-  });
+  }
 
   // -- Edges: MATLAB-sourced edges with type mapping and data injection --------
 
@@ -637,10 +659,13 @@
   // so Svelte's cleanup (which runs at next-effect-start) fires AFTER the
   // timer has already executed with a stale closure.
   let edgeRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  let edgeReconcileRaf: number | null = null;
 
   $effect(() => {
-    const matlab = icEdges;
-    const _handles = nodeHandleKey; // re-run when port handles change
+    // Track nodeStates (moderate cost) + edge array length (cheap).
+    // Avoids forcing icEdges/nodeHandleKey/portBehaviorMap evaluation.
+    const _states = nodeStates;
+    void (childEntries['edges'] ?? []).length;
 
     // Cancel any pending retry FIRST — before it fires with stale data
     if (edgeRetryTimer !== null) {
@@ -648,8 +673,19 @@
       edgeRetryTimer = null;
     }
 
+    // Defer reconciliation to RAF — collapses rapid re-triggers
+    if (edgeReconcileRaf !== null) cancelAnimationFrame(edgeReconcileRaf);
+    edgeReconcileRaf = requestAnimationFrame(() => {
+      edgeReconcileRaf = null;
+      untrack(() => reconcileEdges());
+    });
+  });
+
+  function reconcileEdges() {
+    const matlab = icEdges;
+
     const matlabIds = new Set(matlab.map((e) => e.id));
-    const current = untrack(() => flowEdges);
+    const current = flowEdges;
 
     // Keep SF-created edges only while MATLAB hasn't confirmed them yet.
     // Drop sf-* edges once a real edge with the same endpoints arrives.
@@ -667,7 +703,7 @@
 
     // Apply hidden flag to edges where BOTH endpoints are hidden
     // (internal to a collapsed group). Cross-boundary edges stay visible.
-    const hidden = untrack(() => hiddenNodeIds);
+    const hidden = hiddenNodeIds;
     const merged = [...matlab, ...sfOnly].map((e) => {
       const anyHidden = hidden.has(e.source) || hidden.has(e.target);
       return anyHidden ? { ...e, hidden: true } : e;
@@ -717,7 +753,7 @@
         }
       }, 200);
     }
-  });
+  }
 
   // -- Processor cascade: keep processor output ports in sync with inputs ------
   //
@@ -807,21 +843,34 @@
     return skips;
   }
 
-  // Cascade depth limiter: prevents infinite re-triggers.
-  let cascadeDepth = 0;
-  let cascadeResetTimer: ReturnType<typeof setTimeout> | null = null;
+  // Cascade debounce: collapses rapid re-triggers (e.g. 30 node insertions)
+  // into a single RAF execution.
+  let cascadeRaf: number | null = null;
 
   $effect(() => {
-    const sigMap = inputSignalMap; // reactive dependency
-    const states = nodeStates;    // reactive dependency
+    // Track nodeStates (moderate cost) + edge array length (cheap).
+    const _states = nodeStates;
+    void (childEntries['edges'] ?? []).length;
+
+    // Defer actual cascade to RAF — collapses rapid re-triggers
+    if (cascadeRaf !== null) cancelAnimationFrame(cascadeRaf);
+    cascadeRaf = requestAnimationFrame(() => {
+      cascadeRaf = null;
+      untrack(() => runCascade());
+    });
+  });
+
+  function runCascade() {
+    const sigMap = inputSignalMap;
+    const states = nodeStates;
     const edgeEntries = childEntries['edges'] ?? [];
 
-    // Cap cascade depth — reset after effects settle
-    cascadeDepth++;
-    if (cascadeResetTimer !== null) clearTimeout(cascadeResetTimer);
-    cascadeResetTimer = setTimeout(() => { cascadeDepth = 0; cascadeResetTimer = null; }, 0);
-    const processorCount = states.filter((ns) => isProcessorType(ns.data.type)).length;
-    if (cascadeDepth > processorCount + 3) return;
+    // Early exit: nothing to cascade without processors or edges
+    if (edgeEntries.length === 0) return;
+    if (states.every((ns) => !isProcessorType(ns.data.type))) return;
+
+    // Buffer port updates during cascade — flushed once at the end
+    portBuffering = true;
 
     // Detect cycles and build skip set for back-edges
     const cycleSkips = findCycleSkips(states, edgeEntries);
@@ -1150,7 +1199,10 @@
         });
       }
     }
-  });
+
+    portBuffering = false;
+    flushPortUpdates();
+  }
 
   // -- Group: helpers ----------------------------------------------------------
 
@@ -2730,8 +2782,85 @@
     timeOffset: 'sourceTimeOffset',
   };
 
-  /** Update a single prop on a port + write back to childEntries + propagate to edges. */
+  // -- Port update batching: buffer updates during cascade, flush once at end --
+  type PortUpdate = { nodeId: string; portName: string; portSide: 'input' | 'output'; prop: string; value: unknown };
+  let portUpdateBuffer: PortUpdate[] = [];
+  let portBuffering = false;
+
+  /** Flush all buffered port updates into a single flowNodes + flowEdges rebuild. */
+  function flushPortUpdates() {
+    if (portUpdateBuffer.length === 0) return;
+    const updates = portUpdateBuffer;
+    portUpdateBuffer = [];
+
+    // Group by nodeId
+    const byNode = new Map<string, PortUpdate[]>();
+    for (const u of updates) {
+      if (!byNode.has(u.nodeId)) byNode.set(u.nodeId, []);
+      byNode.get(u.nodeId)!.push(u);
+    }
+
+    // 1. Mutate childEntries (reactive proxies, no array copy)
+    const entries = childEntries['nodes'] ?? [];
+    for (const [nodeId, nodeUpdates] of byNode) {
+      const nodeEntry = entries.find((c) => c.id === nodeId);
+      if (!nodeEntry) continue;
+      for (const u of nodeUpdates) {
+        const portsKey = u.portSide === 'input' ? 'inputs' : 'outputs';
+        const portEntries = (nodeEntry.props.childEntries as any)?.[portsKey] ?? [];
+        const portEntry = portEntries.find((p: any) => p.props.name === u.portName);
+        if (portEntry) portEntry.props[u.prop] = u.value;
+      }
+    }
+
+    // 2. Single flowNodes rebuild
+    flowNodes = flowNodes.map((n) => {
+      const nodeUpdates = byNode.get(n.id);
+      if (!nodeUpdates) return n;
+      let inputs = (n.data?.inputs as PortDef[]) ?? [];
+      let outputs = (n.data?.outputs as PortDef[]) ?? [];
+      for (const u of nodeUpdates) {
+        const isInput = u.portSide === 'input';
+        const arr = isInput ? inputs : outputs;
+        const idx = arr.findIndex((p) => p.name === u.portName);
+        if (idx >= 0) {
+          const copy = [...arr];
+          copy[idx] = { ...copy[idx], [u.prop]: u.value };
+          if (isInput) inputs = copy; else outputs = copy;
+        }
+      }
+      return { ...n, data: { ...n.data, inputs, outputs } };
+    });
+
+    // 3. Single flowEdges rebuild for output port behavior props
+    const edgeUpdates = updates.filter(
+      (u) => u.portSide === 'output' && PORT_TO_EDGE_KEY[u.prop],
+    );
+    if (edgeUpdates.length > 0) {
+      flowEdges = flowEdges.map((e) => {
+        const relevant = edgeUpdates.filter(
+          (u) => e.source === u.nodeId && e.sourceHandle === u.portName,
+        );
+        if (relevant.length === 0) return e;
+        const data: Record<string, unknown> = { ...e.data };
+        for (const u of relevant) {
+          data[PORT_TO_EDGE_KEY[u.prop]] = u.value;
+          if (u.prop === 'type' && (u.value === 'signal' || u.value === 'flow')) {
+            data.animated = true;
+          }
+        }
+        return { ...e, data };
+      });
+    }
+  }
+
+  /** Update a single prop on a port + write back to childEntries + propagate to edges.
+   *  During cascade (portBuffering=true), updates are collected and flushed in batch. */
   function updatePortProp(nodeId: string, portName: string, portSide: 'input' | 'output', prop: string, value: unknown) {
+    if (portBuffering) {
+      portUpdateBuffer.push({ nodeId, portName, portSide, prop, value });
+      return;
+    }
     const portsKey = portSide === 'input' ? 'inputs' : 'outputs';
     // Update childEntries
     const nodeEntries = childEntries['nodes'] ?? [];

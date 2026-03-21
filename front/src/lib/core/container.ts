@@ -14,7 +14,6 @@
 import { flushSync } from 'svelte';
 import type {
   ChildEntry,
-  ComponentDefinition,
   InsertEventData,
   RemoveEventData,
   ReorderEventData,
@@ -87,11 +86,23 @@ function buildChildProxies(child: Component): Omit<ChildEntry, 'snippet'> {
 }
 
 // ============================================================================
+// Batch mode — skip flushSync() during bulk event processing
+// ============================================================================
+
+let batchMode = false;
+
+/** Enable/disable batch mode. When enabled, flushSync() is deferred. */
+export function setBatchMode(enabled: boolean): void {
+  batchMode = enabled;
+}
+
+// ============================================================================
 // Event handlers
 // ============================================================================
 
 /**
  * Handle @insert event - create and add a child component.
+ * Tries sync creation first (cached modules), falls back to async.
  */
 export async function handleInsert(
   parent: Component,
@@ -101,21 +112,16 @@ export async function handleInsert(
 ): Promise<void> {
   const { component: definition, target } = data as InsertEventData;
 
-  // Create child via Factory
-  const child = await Factory.instance.create(definition);
+  const child = Factory.instance.createSync(definition)
+    ?? await Factory.instance.create(definition);
 
-  // Register child in global registry
   Registry.instance.register(child);
-
-  // Set parent reference
   child._parentComponent = parent;
 
-  // Create static children
   if (definition.staticChildren?.length) {
     child.svelteProps.staticChildren = await createStaticChildren(child, definition.staticChildren);
   }
 
-  // Create snippet
   const snippet = child.createSnippet();
   child._snippet = snippet;
 
@@ -123,13 +129,12 @@ export async function handleInsert(
     throw new Error(`[Component] @insert: Target slot "${target}" not defined in component "${parent.id}"`);
   }
 
-  // Build ChildEntry with reactive proxies and add to parent
   const childEntry: ChildEntry = { snippet, ...buildChildProxies(child) };
   parent._childEntries[target].push(childEntry);
   child._childEntry = childEntry;
   parent.children.push(child);
 
-  flushSync();
+  if (!batchMode) flushSync();
 }
 
 /**
@@ -170,7 +175,7 @@ export async function handleRemove(
   // Remove from children array
   parent.children.splice(childIndex, 1);
 
-  flushSync();
+  if (!batchMode) flushSync();
 }
 
 /**
@@ -222,7 +227,7 @@ export async function handleReparent(
           parent._childEntries[targetSlot] = [];
         }
         parent._childEntries[targetSlot].push(movedEntry);
-        flushSync();
+        if (!batchMode) flushSync();
         return;
       }
     }
@@ -241,7 +246,7 @@ export async function handleReparent(
   }
 
   // Flush to ensure old snippet cleanup completes before creating new one
-  flushSync();
+  if (!batchMode) flushSync();
 
   // Remove from current parent's children
   parent.children.splice(childIndex, 1);
@@ -270,7 +275,7 @@ export async function handleReparent(
 
   newParent.children.push(child);
 
-  flushSync();
+  if (!batchMode) flushSync();
 }
 
 /**
@@ -312,7 +317,7 @@ export async function handleReorder(
   newArray.splice(index, 0, moved);
   parent._childEntries[target] = newArray;
 
-  flushSync();
+  if (!batchMode) flushSync();
 }
 
 // ============================================================================
@@ -326,9 +331,7 @@ export async function handleReorder(
  * parent's @insert payload. They're full Component instances with ChildEntry
  * objects, just rendered in fixed template locations instead of dynamic slots.
  *
- * @param parent - Parent component to attach children to
- * @param defs - Array of static child component definitions
- * @returns Map keyed by target name, each containing an array of ChildEntry for that target
+ * Tries sync creation first (cached modules), falls back to async.
  */
 export async function createStaticChildren(
   parent: Component,
@@ -337,7 +340,8 @@ export async function createStaticChildren(
   const result: StaticChildrenMap = new Map();
 
   for (const def of defs) {
-    const child = await Factory.instance.create(def.component);
+    const child = Factory.instance.createSync(def.component)
+      ?? await Factory.instance.create(def.component);
     child._isStatic = true;
     child._parentComponent = parent;
 

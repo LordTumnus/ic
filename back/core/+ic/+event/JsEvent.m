@@ -24,6 +24,17 @@ classdef JsEvent < handle & matlab.mixin.Heterogeneous
         end
 
         function json = jsonencode(this, varargin)
+            % Handle arrays by encoding each element and joining.
+            % (Struct field-name restrictions prevent native array encoding
+            % because Data can differ across events.)
+            if ~isscalar(this)
+                parts = strings(1, numel(this));
+                for ii = 1:numel(this)
+                    parts(ii) = jsonencode(this(ii), varargin{:});
+                end
+                json = char("[" + join(parts, ",") + "]");
+                return;
+            end
             obj = struct( ...
                 "component", this.ComponentID, ...
                 "name", this.Name, ...

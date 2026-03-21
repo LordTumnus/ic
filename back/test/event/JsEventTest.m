@@ -126,6 +126,23 @@ classdef JsEventTest < matlab.unittest.TestCase
 
             testCase.verifyLength(arr, 1);
         end
+
+        function testJsonEncodeArray(testCase)
+            % Verify jsonencode produces a valid JSON array for multiple events
+            evt1 = ic.event.JsEvent("c1", "click", struct("x", 10));
+            evt2 = ic.event.JsEvent("c2", "hover", "hello");
+            arr = [evt1, evt2];
+
+            json = jsonencode(arr);
+            decoded = jsondecode(json);
+
+            testCase.verifyLength(decoded, 2);
+            testCase.verifyEqual(string(decoded(1).component), "c1");
+            testCase.verifyEqual(string(decoded(1).name), "click");
+            testCase.verifyEqual(decoded(1).data.x, 10);
+            testCase.verifyEqual(string(decoded(2).component), "c2");
+            testCase.verifyEqual(string(decoded(2).data), "hello");
+        end
     end
 
     methods (Test)
