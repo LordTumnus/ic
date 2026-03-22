@@ -1,27 +1,34 @@
 classdef Label < ic.core.Component
-    % > LABEL Display text with configurable typography.
+    % displays text with configurable typography and styling options
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > TEXT the text content to display
+        % the text content to display
         Text string = ""
-        % > VARIANT typography variant
+
+        % semantic variant that determines the default styling of the label
         Variant string {mustBeMember(Variant, ...
             ["body", "heading", "caption", "code", "overline"])} = "body"
-        % > SIZE text size
+
+        % text size, scaling the base font size of the label (i.e "xs" applies a 0.625 scaling factor to the base font size, "lg" applies a 1 scaling factor, etc.)
         Size string {mustBeMember(Size, ...
             ["xs", "sm", "md", "lg", "xl", "2xl", "3xl"])} = "md"
-        % > WEIGHT font weight
+
+        % font weight
         Weight string {mustBeMember(Weight, ...
             ["normal", "medium", "semibold", "bold"])} = "normal"
-        % > ALIGN text alignment
+
+        % text alignment within the label
         Align string {mustBeMember(Align, ...
             ["left", "center", "right"])} = "left"
-        % > COLOR semantic color variant
+
+        % text color specied as a semantic color name
         Color string {mustBeMember(Color, ...
             ["default", "muted", "primary", "destructive", "success", "warning"])} = "default"
-        % > TRUNCATE whether to truncate overflowing text with ellipsis
+
+        % whether to truncate overflowing text with ellipsis
         Truncate logical = false
-        % > SELECTABLE whether the text can be selected and copied
+
+        % whether the text can be selected and copied
         Selectable logical = true
     end
 

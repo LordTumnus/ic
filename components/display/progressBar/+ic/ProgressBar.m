@@ -1,54 +1,48 @@
 classdef ProgressBar < ic.core.Component
-    % > PROGRESSBAR Linear progress indicator with determinate and indeterminate modes.
-    %
-    % The ProgressBar component displays progress as a bar that fills from
-    % left to right (horizontal) or bottom to top (vertical). It supports both
-    % determinate (known progress) and indeterminate (unknown duration) modes,
-    % with optional striped patterns.
-    %
-    % Example:
-    %   pb = ic.ProgressBar();
-    %   pb.Value = 50;  % 50% complete
-    %
-    %   % Indeterminate mode for unknown duration tasks
-    %   pb.Indeterminate = true;
-    %
-    %   % Striped with animation
-    %   pb.Striped = true;
-    %   pb.Animated = true;
-    %
-    %   % Custom styling
-    %   pb.styleTrack("backgroundColor", "#e0e0e0");
-    %   pb.styleBar("backgroundColor", "#4caf50");
+    % linear progress indicator to indicate the completion
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current value (between Min and Max)
+        %  current value of the progress, clipped to the range defined by Min and Max
         Value double = 0
-        % > MIN minimum value of the range (0% fill)
+
+        % minimum value of the range, representing 0% fill of the progress bar
         Min double = 0
-        % > MAX maximum value of the range (100% fill)
+
+        % maximum value of the range, representing 100% fill of the progress bar
         Max double = 100
-        % > INDETERMINATE whether progress is indeterminate (unknown duration)
+
+        % whether progress is indeterminate (unknown value). If true, shows an infinite loading animation instead of a finite progress
         Indeterminate logical = false
-        % > STRIPED whether to show diagonal stripes pattern
+
+        % whether to show diagonal stripes pattern in the progress bar
         Striped logical = false
-        % > ANIMATED whether stripes should animate (only applies when Striped=true)
+
+        % whether stripes should animate (only applies when #ic.ProgressBar.Striped is set to true)
         Animated logical = false
-        % > SIZE height size of the progress bar
+
+        % height size of the progress bar, relative to the font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT color variant of the progress bar
+
+        % color scheme of the progress bar
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "success", "warning", "destructive", "gradient"])} = "primary"
-        % > GRADIENT color stops for gradient variant (struct array with 'color' and 'stop' fields)
+
+        % color gradient stops for progressbar, specified as a struct array with fields: color (CSS color string) and stop (numeric percentage). Only applies when #ic.ProgressBar.Variant is set to "gradient"
         Gradient struct = struct('color', {'#ef4444', '#f59e0b', '#22c55e'}, 'stop', {0, 50, 100})
-        % > SHOWLABEL whether to display progress percentage
+
+        % whether to display a label with the progress.
+        % {note} Label formatting and position can be customized with the #ic.ProgressBar.LabelFormat and #ic.ProgressBar.LabelPosition properties {/note}
         ShowLabel logical = false
-        % > LABELFORMAT sprintf-style format for the label
-        %   Supports %d (integer), %f (float), %.Nf (N decimals), %% (literal %)
+
+        % sprintf-style format for the label.
+        % {note} Supports %d (integer), %f (float), %.Nf (N decimals), %% (literal %) {/note}
         LabelFormat string = "%d%%"
-        % > LABELPOSITION position of the label relative to the progress bar
+
+        % position of the label relative to the progress bar.
+        % {note} When the #ic.Progressbar.Orientation is set to "vertical", the value of the position will be mapped to such that "left" is "top" and "right" is "bottom" {/note}
         LabelPosition string {mustBeMember(LabelPosition, ["left", "right"])} = "right"
-        % > ORIENTATION layout direction of the progress bar
+
+        % layout direction of the progress bar
         Orientation string {mustBeMember(Orientation, ...
             ["horizontal", "vertical"])} = "horizontal"
     end
@@ -63,20 +57,18 @@ classdef ProgressBar < ic.core.Component
         end
 
         function this = styleTrack(this, varargin)
-            % > STYLETRACK apply CSS styles to the progress track (background)
-            %
-            % Example:
+            % convenience method to apply CSS styles directly to the progress track (background portion). See #ic.mixin.Styleable for more details on how to specify styles.
+            % {example}
             %   pb.styleTrack("backgroundColor", "#e5e7eb");
-            %   pb.styleTrack("borderRadius", "4px");
+            % {/example}
             this.style(".ic-progress__track", varargin{:});
         end
 
         function this = styleBar(this, varargin)
-            % > STYLEBAR apply CSS styles to the progress bar (filled portion)
-            %
-            % Example:
-            %   pb.styleBar("backgroundColor", "#3b82f6");
-            %   pb.styleBar("borderRadius", "4px");
+            % convenience method to apply CSS styles directly to the progress bar (filled portion). See #ic.mixin.Styleable for more details on how to specify styles.
+            % {example}
+            %   pb.styleBar("backgroundColor", "linear-gradient(to right, #ef4444, #f59e0b, #22c55e)");
+            % {/example}
             this.style(".ic-progress__bar", varargin{:});
         end
     end

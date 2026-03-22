@@ -1,31 +1,36 @@
 classdef Image < ic.core.Component
-    % > IMAGE Displays a raster or vector image.
-    %
-    %   img = ic.Image(Source="photo.png")
-    %   img = ic.Image(Source="https://example.com/photo.jpg")
-    %
-    %
-    % Supported formats: PNG, JPG, GIF, WebP, SVG, BMP.
+    % displays a raster or vector image in any of the following formats:
+    % PNG, JPG, GIF, WebP, SVG, BMP.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > SOURCE image source (file path or URL)
+        % image asset source
         Source ic.asset.Asset {ic.assets.mustBeImage} = ic.asset.Asset()
-        % > WIDTH width of the image (CSS value: number=px, string=any unit)
+
+        % width of the image, in pixels or as a CSS string
         Width {ic.check.CssValidators.mustBeSize} = "auto"
-        % > HEIGHT height of the image (CSS value: number=px, string=any unit)
+
+        % height of the image, in pixels or as a CSS string
         Height {ic.check.CssValidators.mustBeSize} = "auto"
-        % > OBJECTFIT how the image fills its container
+
+        % way in which the image fills its container. See the [Mozilla Developer documentation](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-fit) for details
         ObjectFit string {mustBeMember(ObjectFit, ...
             ["contain", "cover", "fill", "none", "scale-down"])} = "contain"
-        % > BORDERRADIUS corner rounding (CSS value: number=px, string=any unit)
+
+        % corner rounding radius, in pixels or as a CSS string
         BorderRadius {ic.check.CssValidators.mustBeSize} = 2
-        % > OPACITY image opacity (0 to 1)
+
+        % image opacity, between 0 (fully transparent) and 1 (fully opaque)
         Opacity double {mustBeInRange(Opacity, 0, 1)} = 1
     end
 
     events (Description = "Reactive")
+        % triggered when the image is clicked
         Clicked
+
+        % triggered when the image finishes loading successfully
         Loaded
+
+        % triggered when the image fails to load
         Error
     end
 

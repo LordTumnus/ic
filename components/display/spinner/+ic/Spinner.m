@@ -1,28 +1,20 @@
 classdef Spinner < ic.core.Component
-    % > SPINNER Animated loading indicator with multiple style variants.
-    %
-    % The Spinner component displays an animated loading indicator. It
-    % supports 9 visual styles, 3 sizes, 5 color variants, and 3 speed
-    % settings.
-    %
-    % Example:
-    %   s = ic.Spinner();
-    %   s.Kind = "bars";        % iOS-style radial bars
-    %   s.Size = "lg";          % Large size
-    %   s.Variant = "success";  % Green color
-    %   s.Speed = "fast";       % Faster animation
+    % animated loading indicator with multiple style variants.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > KIND animation style of the spinner
+        % animation style of the spinner
         Kind string {mustBeMember(Kind, ...
             ["bars", "dots-wave", "dots-line", "ring", ...
              "pulse", "orbit", "grid", "dual-ring", "cube"])} = "ring"
-        % > SIZE overall size of the spinner
+
+        % overall size of the spinner, relative to the font size of the component
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT color variant of the spinner
+
+        % color scheme used for the spinner
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "success", "warning", "destructive"])} = "primary"
-        % > SPEED animation speed
+
+        % animation speed
         Speed string {mustBeMember(Speed, ...
             ["slow", "normal", "fast"])} = "normal"
     end
