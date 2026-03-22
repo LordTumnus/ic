@@ -1,79 +1,105 @@
 classdef CodeEditor < ic.core.Component
-    % > CODEEDITOR Source code editor with syntax highlighting.
-
-    %   Powered by CodeMirror 6 with Lezer parsers. Supports MATLAB,
-    %   JavaScript, Markdown, CSS, Typst, LaTeX, and plain text.
+    % code editor with syntax highlighting. Powered by [CodeMirror 6](https://codemirror.net/)
+    % Supports Matlab, JavaScript, Markdown, CSS, Typst, LaTeX, and plain (no highlighting) text languages. The editor can be configured with features like line numbers, line wrapping, bracket matching, code folding, multiple selections, and more,
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE editor text content
+        % editor text content
         Value string = ""
-        % > LANGUAGE syntax language: "matlab", "javascript", "markdown", "css", "typst", "latex", "plain"
+
+        % syntax language for highlighting
         Language string {mustBeMember(Language, ["matlab", "javascript", "markdown", "css", "typst", "latex", "plain"])} = "matlab"
-        % > READONLY make the entire editor read-only
-        ReadOnly logical = false
-        % > HEIGHT editor height (CSS value: number=px, string=any unit)
+
+        % editor heigh, as a pixel value or a CSS string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
-        % > LINENUMBERS show line number gutter
-        LineNumbers logical = true
-        % > LINEWRAPPING soft-wrap long lines
-        LineWrapping logical = false
-        % > HIGHLIGHTACTIVELINE highlight the cursor line
-        HighlightActiveLine logical = true
-        % > TABSIZE spaces per tab stop
-        TabSize double {mustBePositive, mustBeInteger} = 4
-        % > PLACEHOLDER ghost text when the editor is empty
-        Placeholder string = ""
-        % > FONTSIZE override font size in pixels (0 = inherit from theme)
-        FontSize double {mustBeNonnegative} = 0
-        % > BRACKETMATCHING highlight matching brackets
-        BracketMatching logical = true
-        % > CODEFOLDING enable fold gutter and fold commands
-        CodeFolding logical = false
-        % > SHOWSEARCH open the search panel
-        ShowSearch logical = false
-        % > HIGHLIGHTSELECTIONMATCHES highlight other occurrences of selected text
-        HighlightSelectionMatches logical = false
-        % > CLOSEBRACKETS auto-close brackets and quotes
-        CloseBrackets logical = false
-        % > ALLOWMULTIPLESELECTIONS allow multiple cursors
-        AllowMultipleSelections logical = false
-        % > ZEBRASTRIPES alternating line backgrounds
+
+        % display alternating line backgrounds. The amount of lines between stripes can be configured with #ic.CodeEditor.ZebraStripeStep
         ZebraStripes logical = false
-        % > ZEBRASTRIPESTEP lines between stripes
+
+        % whether to show line numbers in the gutter
+        LineNumbers logical = true
+
+        % enable wrapping long lines onto multiple visual lines
+        LineWrapping logical = false
+
+        % whether to highlight the line with the cursor
+        HighlightActiveLine logical = true
+
+        % whether the user is blocked from interacting with the editor
+        ReadOnly logical = false
+
+        % number of white spaces per tab stop
+        TabSize double {mustBePositive, mustBeInteger} = 4
+
+        % ghost text shown when the editor is empty
+        Placeholder string = ""
+
+        % editor font size in pixels (0 for default)
+        FontSize double {mustBeNonnegative} = 0
+
+        % whether to highlight the matching bracket of the one next to the cursor
+        BracketMatching logical = true
+
+        % display code folds in the gutter and enable fold commands
+        CodeFolding logical = false
+
+        % open the search panel. Can also be triggered by Ctrl+F / Cmd+F when the editor is focused
+        ShowSearch logical = false
+
+        % highlight other occurrences of selected text
+        HighlightSelectionMatches logical = false
+
+        % automatically close brackets and quotes after typing the opening character
+        CloseBrackets logical = false
+
+        % whether to allow multiple cursors for editing multiple selections at once
+        AllowMultipleSelections logical = false
+
+        % amount of lines between stripes
         ZebraStripeStep double {mustBePositive, mustBeInteger} = 2
-        % > UNEDITABLELINES 1-based line numbers locked from editing
+
+        % line numbers locked from editing. Adding new lines above or below will adjust the line numbers accordingly, so the user will not be able to directly edit these lines
         UneditableLines double {mustBeNonnegative, mustBeInteger} = []
-        % > HIGHLIGHTEDLINES 1-based line numbers to highlight with color
+
+        % line numbers with a highlighted background
         HighlightedLines double {mustBeNonnegative, mustBeInteger} = []
-        % > RULERS column positions for vertical ruler lines
+
+        % column positions for vertical ruler lines
         Rulers double {mustBeNonnegative, mustBeInteger} = []
-        % > INDENTGUIDES show vertical indent guide lines
+
+        % whether to show vertical indent guide lines on code blocks
         IndentGuides logical = false
-        % > SCROLLPASTEND allow scrolling beyond the last line
+
+        % allow scrolling beyond the last line
         ScrollPastEnd logical = false
-        % > SHOWSTATUSBAR show bottom bar with cursor position and language
+
+        % display a custom status bar at the bottom of the editor showing the current cursor position and the editor language
         ShowStatusBar logical = true
     end
 
     properties (SetObservable, AbortSet, ...
             SetAccess = {?ic.CodeEditor, ?ic.mixin.Reactive}, ...
             Description = "Reactive")
-        % > LINECOUNT total number of lines in the document (read-only)
+        % total number of lines in the document
         LineCount double = 0
-        % > CURSORLINE current cursor line, 1-based (read-only)
+
+        % current cursor line
         CursorLine double = 1
-        % > CURSORCOLUMN current cursor column, 1-based (read-only)
+
+        % current cursor column
         CursorColumn double = 1
-        % > SELECTIONCOUNT number of active selections (read-only)
+
+        % number of active selections
         SelectionCount double = 1
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the document content changes
+        % triggered when the document content changes
         ValueChanged
-        % > SELECTIONCHANGED fires when the cursor or selection moves
+
+        % fires when the cursor or selection moves
         SelectionChanged
-        % > FOCUSCHANGED fires when the editor gains or loses focus
+
+        % fires when the editor gains or loses focus
         FocusChanged
     end
 
@@ -89,74 +115,81 @@ classdef CodeEditor < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS give keyboard focus to the editor
+            % give keyboard focus to the editor
             out = this.publish("focus", []);
         end
 
         function out = blur(this)
-            % > BLUR remove keyboard focus from the editor
+            % remove keyboard focus from the editor
             out = this.publish("blur", []);
         end
 
         function out = gotoLine(this, line)
-            % > GOTOLINE jump cursor to the specified line
+            % move the cursor to the beginning of the specified line
             arguments
                 this
+                % line number to move the cursor to
                 line (1,1) double {mustBePositive, mustBeInteger}
             end
             out = this.publish("gotoLine", line);
         end
 
         function out = setSelection(this, fromLine, fromCol, toLine, toCol)
-            % > SETSELECTION set the selection range (1-based line and column)
+            % set the cursorselection range (square like - fromLine:fromCol to toLine:toCol)
             arguments
                 this
+                % starting line number of the selection
                 fromLine (1,1) double {mustBePositive, mustBeInteger}
-                fromCol  (1,1) double {mustBePositive, mustBeInteger}
-                toLine   (1,1) double {mustBePositive, mustBeInteger}
-                toCol    (1,1) double {mustBePositive, mustBeInteger}
+                % starting column number of the selection
+                fromCol (1,1) double {mustBePositive, mustBeInteger}
+                % ending line number of the selection
+                toLine (1,1) double {mustBePositive, mustBeInteger}
+                % ending column number of the selection
+                toCol (1,1) double {mustBePositive, mustBeInteger}
             end
             out = this.publish("setSelection", [fromLine, fromCol, toLine, toCol]);
         end
 
         function out = getSelection(this)
-            % > GETSELECTION get the currently selected text
+            % get the text in the current selection
             out = this.publish("getSelection", []);
         end
 
         function out = replaceSelection(this, text)
-            % > REPLACESELECTION replace the current selection with text
+            % replace the contents of the current selection with text
             arguments
                 this
+                % replacement text for the current selection
                 text (1,1) string
             end
             out = this.publish("replaceSelection", text);
         end
 
         function out = undo(this)
-            % > UNDO undo the last edit
+            % undo the last edit. Can be triggered by Ctrl+Z / Cmd+Z when the editor is focused
             out = this.publish("undo", []);
         end
 
         function out = redo(this)
-            % > REDO redo the last undone edit
+            % redo the last undone edit. Can be triggered by Ctrl+Y / Cmd+Shift+Z when the editor is focused
             out = this.publish("redo", []);
         end
 
         function out = foldAll(this)
-            % > FOLDALL fold all collapsible regions
+            % fold all collapsible blocks of code
             out = this.publish("foldAll", []);
         end
 
         function out = unfoldAll(this)
-            % > UNFOLDALL unfold all collapsed regions
+            % unfold all collapsed blocks of code
             out = this.publish("unfoldAll", []);
         end
 
         function out = scrollToLine(this, line)
-            % > SCROLLTOLINE scroll the specified line into view
+            % scroll the viewport the specified line
             arguments
                 this
+                % line number to scroll to
                 line (1,1) double {mustBePositive, mustBeInteger}
             end
             out = this.publish("scrollToLine", line);

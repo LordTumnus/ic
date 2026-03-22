@@ -1,67 +1,62 @@
 classdef RichEditor < ic.core.Component & ic.mixin.Requestable
-    % > RICHEDITOR WYSIWYG rich-text editor powered by TipTap.
-    %
-    %   r = ic.RichEditor()
-    %   r = ic.RichEditor(Value="<p>Hello <strong>world</strong></p>")
-    %   r = ic.RichEditor(Placeholder="Start typing...", Height=400)
-    %
-    % Full-featured document editor with toolbar, bubble menu, slash
-    % commands, table of contents, callout blocks, collapsible sections,
-    % math rendering (KaTeX), and syntax-highlighted code blocks.
-    %
-    % Images referenced by URL are fetched by MATLAB and delivered as
-    % base64 data URIs (the embedded browser blocks external resources).
+    % rich wysiwyg text editor powered by [TipTap](https://tiptap.dev/).
+    % Use the toolbar or markdown syntax for formatting.
+    % Type a slash (/) to see the list of available content blocks, including headings, lists, tables, callouts, and more.
+    % Equations (inside $...$ or $$...$$) are rendered using [KaTeX](https://katex.org/).
+    % Code blocks support syntax highlighting for many programming languages.
+    % Links will be automatically detected and can be opened in the system web browser. Images can be inserted from the local file system or by pasting a URL, and will be fetched by MatLab and embedded as base64-encoded data URIs.
+
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE HTML content
+        % content of the editor as an HTML string
         Value string = ""
 
-        % > HEIGHT container height (CSS value: number=px, string=any unit)
+        % > container height, in pixels or as a CSS string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
 
-        % > READONLY non-editable mode
+        % whether the user is blocked from editing the content
         ReadOnly (1,1) logical = false
 
-        % > PLACEHOLDER ghost text when editor is empty
+        % ghost text displayed when editor is empty
         Placeholder string = ""
 
-        % > DISABLED fully disabled state
+        % disable interaction and impede focus
         Disabled (1,1) logical = false
 
-        % > SHOWTOOLBAR show/hide the fixed top toolbar
+        % show/hide the fixed top toolbar with the most common formatting options
         ShowToolbar (1,1) logical = true
 
-        % > SHOWTOC show/hide the table of contents sidebar
+        % show/hide the table of contents on the sidebar
         ShowToc (1,1) logical = true
 
-        % > FOCUSMODE iA Writer-style focus mode (dim non-active blocks)
+        % when enabled, the editor will dim all but the current line or block to help focus
         FocusMode (1,1) logical = false
 
-        % > MAXLENGTH character limit (Inf = unlimited)
+        % content character limit (Inf = unlimited)
         MaxLength (1,1) double {mustBePositive} = Inf
     end
 
     properties (SetObservable, AbortSet, ...
             SetAccess = {?ic.RichEditor, ?ic.mixin.Reactive}, ...
             Description = "Reactive")
-        % > WORDCOUNT total word count (read-only, frontend-updated)
+        % total word count
         WordCount (1,1) double = 0
 
-        % > CHARACTERCOUNT total character count (read-only, frontend-updated)
+        % total character count
         CharacterCount (1,1) double = 0
 
-        % > ISFOCUSED whether the editor has keyboard focus (read-only)
+        % whether the editor has keyboard focus
         IsFocused (1,1) logical = false
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when content changes (debounced ~300ms)
+        % triggered when content change
         ValueChanged
 
-        % > FOCUSCHANGED fires when focus state changes
+        % fires when focus state changes
         FocusChanged
 
-        % > SUBMITTED fires on Ctrl+Enter / Cmd+Enter
+        % triggered when the user submits the editor content (Ctrl+Enter / Cmd+Enter)
         Submitted
     end
 
@@ -81,38 +76,40 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS give keyboard focus to the editor
+            % give keyboard focus to the editor
             out = this.publish("focus", []);
         end
 
         function out = blur(this)
-            % > BLUR remove keyboard focus from the editor
+            % remove keyboard focus from the editor
             out = this.publish("blur", []);
         end
 
         function out = clear(this)
-            % > CLEAR clear all editor content
+            % clear all editor content
             out = this.publish("clear", []);
         end
 
         function out = insertContent(this, html)
-            % > INSERTCONTENT insert HTML at the current cursor position
+            % insert HTML at the current cursor position
             arguments
                 this
+                % HTML string to insert at the current cursor position
                 html (1,1) string
             end
             out = this.publish("insertContent", html);
         end
 
         function out = getMarkdown(this)
-            % > GETMARKDOWN convert current content to Markdown
+            % convert current content to Markdown
+            % {returns}
+            %   an #ic.Promise that resolves to the Markdown string
+            % {/returns}
             out = this.publish("getMarkdown", []);
         end
 
         function out = exportPdf(this, filepath)
-            % > EXPORTPDF export editor content as a PDF file
-            %   exportPdf()          — opens a save dialog
-            %   exportPdf(filepath)  — writes directly to the given path
+            % export the editor content as a PDF file. If a filepath is provided, the PDF will be saved to that location. If no filepath is provided, a save dialog will prompt the user to choose a location.
             arguments
                 this
                 filepath (1,1) string = ""
@@ -123,12 +120,14 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
 
     methods (Access = private)
         function result = handleOpenLink(~, data)
+            % open a link in the system web browser
             url = string(data.url);
             web(url, '-browser');
             result = true;
         end
 
         function result = handleBrowseImage(~)
+            % open a file dialog to select an image, then read and return the file as a base64-encoded data URI
             [file, folder] = uigetfile( ...
                 {'*.png;*.jpg;*.jpeg;*.gif;*.svg;*.webp;*.bmp;*.tif;*.tiff', ...
                  'Image Files'}, ...
@@ -140,7 +139,7 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
             end
             src = fullfile(folder, file);
 
-            % Read the file and return as data URI
+            % read the file and return as data URI
             bytes = fileread(src, Encoding="bytes");
             [~, ~, ext] = fileparts(src);
             ext = lower(ext);
@@ -166,9 +165,10 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleSavePdf(~, data)
+            % save the provided base64-encoded PDF content to a file. Will open a save dialog if no filepath is provided.
             filepath = string(data.filepath);
 
-            % No filepath provided — open save dialog
+            % open save dialog
             if filepath == ""
                 [f, p] = uiputfile('*.pdf', 'Export as PDF');
                 if isequal(f, 0)
@@ -178,7 +178,7 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
                 filepath = fullfile(p, f);
             end
 
-            % Decode base64 and write to file
+            % decode base64 and write to file
             bytes = matlab.net.base64decode(string(data.base64));
             fid = fopen(filepath, 'wb');
             if fid == -1
@@ -192,18 +192,18 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleFetchImage(~, data)
+            % fetch an image from a URL or local file path, convert it to a base64-encoded data URI, and return the result
             src = string(data.url);
 
-            % Read bytes - URL or local file
+            % read URL or local file
             if startsWith(src, "http://") || startsWith(src, "https://")
                 opts = weboptions('ContentType', 'binary', 'Timeout', 10);
                 bytes = webread(src, opts);
             else
-                % Local file path
                 bytes = fileread(src, Encoding="bytes");
             end
 
-            % Detect MIME from extension
+            % detect MIME from extension
             [~, ~, ext] = fileparts(src);
             ext = lower(extractBefore(ext + "?", "?")); % strip query params
             mimeMap = dictionary( ...
