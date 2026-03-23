@@ -2,7 +2,7 @@ classdef ProgressBar < ic.core.Component
     % linear progress indicator to indicate the completion
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        %  current value of the progress, clipped to the range defined by Min and Max
+        % current value of the progress, clipped to the range defined by Min and Max
         Value double = 0
 
         % minimum value of the range, representing 0% fill of the progress bar
@@ -39,7 +39,7 @@ classdef ProgressBar < ic.core.Component
         LabelFormat string = "%d%%"
 
         % position of the label relative to the progress bar.
-        % {note} When the #ic.Progressbar.Orientation is set to "vertical", the value of the position will be mapped to such that "left" is "top" and "right" is "bottom" {/note}
+        % {note} When the #ic.ProgressBar.Orientation is set to "vertical", the value of the position will be mapped such that "left" is "top" and "right" is "bottom" {/note}
         LabelPosition string {mustBeMember(LabelPosition, ["left", "right"])} = "right"
 
         % layout direction of the progress bar

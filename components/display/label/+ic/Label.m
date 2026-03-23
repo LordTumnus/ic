@@ -21,7 +21,7 @@ classdef Label < ic.core.Component
         Align string {mustBeMember(Align, ...
             ["left", "center", "right"])} = "left"
 
-        % text color specied as a semantic color name
+        % text color specified as a semantic color name
         Color string {mustBeMember(Color, ...
             ["default", "muted", "primary", "destructive", "success", "warning"])} = "default"
 

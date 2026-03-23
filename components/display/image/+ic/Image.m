@@ -25,12 +25,21 @@ classdef Image < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the image is clicked
+        % {payload}
+        % source | struct or char: the image source that was clicked
+        % {/payload}
         Clicked
 
         % triggered when the image finishes loading successfully
+        % {payload}
+        % source | struct or char: the image source that loaded
+        % {/payload}
         Loaded
 
         % triggered when the image fails to load
+        % {payload}
+        % source | struct or char: the image source that failed
+        % {/payload}
         Error
     end
 
