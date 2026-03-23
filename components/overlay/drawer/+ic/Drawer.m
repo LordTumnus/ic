@@ -1,32 +1,34 @@
 classdef Drawer < ic.core.ComponentContainer & ic.mixin.Overlay
-    % > DRAWER Slide-in panel overlay with title, body, and optional backdrop.
-    %
-    %   d = ic.Drawer(Title="Settings", Side="right", Size="md");
-    %   d.addChild(ic.Label(Label="Panel content"));
-    %   frame.addOverlay(d);
-    %   d.open();
-    %
-    %   addlistener(d, 'Closed', @(~,~) disp("Drawer closed"));
+    % #ic.mixin.Overlay slide-in panel with a title bar, content body, and optional backdrop.
+    % {superclass}
+    %   #ic.mixin.Overlay
+    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > TITLE heading text displayed in the drawer header
+        % heading text displayed in the drawer header
         Title string = ""
-        % > OPEN whether the drawer is visible
+
+        % whether the drawer is visible
         Open logical = false
-        % > SIDE edge from which the drawer slides in
+
+        % edge from which the drawer slides in
         Side string {mustBeMember(Side, ["left", "right", "top", "bottom"])} = "right"
-        % > SIZE panel width (left/right) or height (top/bottom)
+
+        % panel dimension (width or height, depending on #ic.Drawer.Side) relative to the font size of the component. "full" makes the drawer take the entire width/height of the viewport.
         Size string {mustBeMember(Size, ["sm", "md", "lg", "xl", "full"])} = "md"
-        % > CLOSABLE whether the close button and Escape key are enabled
+
+        % whether the close button and Escape key to close the panel are enabled
         Closable logical = true
-        % > OVERLAY whether to show the backdrop behind the panel
+
+        % whether to show a backdrop behind the panel
         Overlay logical = true
-        % > CLOSEONBACKDROPCLICK whether clicking the backdrop closes the drawer
+
+        % whether clicking the backdrop closes the drawer
         CloseOnBackdropClick logical = true
     end
 
     events (Description = "Reactive")
-        % > CLOSED fires when the user dismisses the drawer (close button, Escape, backdrop)
+        % fires when the user dismisses the drawer (close button, Escape, or backdrop click)
         Closed
     end
 
@@ -41,20 +43,23 @@ classdef Drawer < ic.core.ComponentContainer & ic.mixin.Overlay
         end
 
         function open(this)
-            % > OPEN programmatically open the drawer
+            % programmatically open the drawer
             this.Open = true;
         end
 
         function close(this)
-            % > CLOSE programmatically close the drawer (no Closed event)
+            % programmatically close the drawer without firing the Closed event
             this.Open = false;
         end
 
         function effect = bindOpen(this, component, event)
-            % > BINDOPEN wires a DOM event on a component to open the drawer.
+            % utility function to wire a DOM event on a component to open the drawer
+            % {note} Uses #ic.mixin.Effectable.jsEffect under the hood to inject a JavaScript event listener on the specified component that sets the drawer's open prop to true when triggered
             arguments
                 this
+                % component whose DOM event triggers the open
                 component
+                % DOM event name to listen for
                 event string = "click"
             end
             effect = this.jsEffect(component, this, sprintf( ...
@@ -63,10 +68,12 @@ classdef Drawer < ic.core.ComponentContainer & ic.mixin.Overlay
         end
 
         function effect = bindClose(this, component, event)
-            % > BINDCLOSE wires a DOM event on a component to trigger drawer close.
+            % utility function to wire a DOM event on a component to close the drawer. See #ic.Drawer.bindOpen for details on how this function works under the hood
             arguments
                 this
+                % component whose DOM event triggers the close
                 component
+                % DOM event name to listen for
                 event string = "click"
             end
             effect = this.jsEffect(component, this, sprintf( ...

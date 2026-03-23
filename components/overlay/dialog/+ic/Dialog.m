@@ -1,40 +1,43 @@
 classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
-    % > DIALOG Modal overlay with title, body, and action buttons.
-    %
-    %   d = ic.Dialog(Title="Confirm", SubmitLabel="Delete", CancelLabel="Cancel");
-    %   d.addChild(ic.Label(Label="Are you sure?"));
-    %   frame.addChild(d);
-    %   d.open();
-    %
-    %   addlistener(d, 'Submitted', @(~,~) disp("Confirmed"));
-    %   addlistener(d, 'Closed',    @(~,~) disp("Cancelled"));
+    % modal overlay with a title, content body, and action buttons.
+    % The dialog auto-deletes after submit or close when #ic.Dialog.DestroyOnClose is true.
+    % {superclass}
+    %   #ic.mixin.Overlay
+    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > TITLE heading text displayed in the dialog header
+        % heading text displayed in the dialog header
         Title string = ""
-        % > OPEN whether the dialog is visible
+
+        % whether the dialog is visible
         Open logical = false
-        % > SIZE maximum width of the dialog content
+
+        % maximum width of the dialog, relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg", "xl"])} = "md"
-        % > CLOSABLE whether the close button and Escape key are enabled
+
+        % whether the close button and Escape key are enabled to close and delete the dialog
         Closable logical = true
-        % > CLOSEONBACKDROPCLICK whether clicking the backdrop closes the dialog
+
+        % whether clicking the backdrop closes the dialog
         CloseOnBackdropClick logical = true
-        % > SUBMITLABEL text for the submit button (empty = hidden)
+
+        % text for the submit button. Set to "" to hide the button
         SubmitLabel string = "OK"
-        % > CANCELLABEL text for the cancel button (empty = hidden)
+
+        % text for the cancel button. Set to "" to hide the button
         CancelLabel string = "Cancel"
     end
 
-    properties
-        % > DESTROYONCLOSE whether to delete the dialog after submit or close
+    properties (SetAccess = immutable)
+        % whether the dialog is automatically deleted after the Submitted or Closed event fires
         DestroyOnClose logical = true
     end
 
     events (Description = "Reactive")
-        % > SUBMITTED fires when the user clicks the submit button
+        % fires when the user clicks the submit button
         Submitted
-        % > CLOSED fires when the user dismisses the dialog (cancel, X, Escape, backdrop)
+
+        % fires when the user dismisses the dialog (cancel button, close button, Escape, or backdrop click)
         Closed
     end
 
@@ -51,20 +54,22 @@ classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
         end
 
         function open(this)
-            % > OPEN programmatically open the dialog
+            % programmatically open the dialog
             this.Open = true;
         end
 
         function close(this)
-            % > CLOSE programmatically close the dialog (no Closed event)
+            % programmatically close the dialog
             this.Open = false;
         end
 
         function effect = bindOpen(this, component, event)
-            % > BINDOPEN wires a DOM event on a component to open the dialog.
+            % utility function to wire a DOM event on a component to open the dialog
             arguments
                 this
+                % component whose DOM event triggers the open
                 component
+                % DOM event name to listen for
                 event string = "click"
             end
             effect = this.jsEffect(component, this, sprintf( ...
@@ -73,10 +78,12 @@ classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
         end
 
         function effect = bindSubmit(this, component, event)
-            % > BINDSUBMIT wires a DOM event on a component to trigger dialog submit.
+            % utility function to wire a DOM event on a component to trigger the submit action
             arguments
                 this
+                % component whose DOM event triggers the submit
                 component
+                % DOM event name to listen for
                 event string = "click"
             end
             effect = this.jsEffect(component, this, sprintf( ...
@@ -85,10 +92,12 @@ classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
         end
 
         function effect = bindClose(this, component, event)
-            % > BINDCLOSE wires a DOM event on a component to trigger dialog close.
+            % utility function to wire a DOM event on a component to close the dialog
             arguments
                 this
+                % component whose DOM event triggers the close
                 component
+                % DOM event name to listen for
                 event string = "click"
             end
             effect = this.jsEffect(component, this, sprintf( ...

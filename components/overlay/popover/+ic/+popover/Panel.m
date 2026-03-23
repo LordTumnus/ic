@@ -1,5 +1,6 @@
 classdef Panel < ic.core.ComponentContainer
-    % > PANEL Content container for ic.Popover.
+    % content container for an #ic.Popover.
+    % Add child components here via #ic.core.ComponentContainer.addChild. Created automatically by the Popover constructor.
 
     methods (Access = ?ic.Popover)
         function this = Panel(props)

@@ -1,28 +1,37 @@
 classdef Toast < ic.core.Component & ic.mixin.Overlay
-    % > TOAST Ephemeral notification message.
+    % ephemeral notification message.
+    % Displays a brief message that auto-dismisses after #ic.Toast.Duration seconds. The toast auto-deletes when closed (either by timeout, close button, or #ic.Toast.dismiss).
+    % {superclass}
+    %   #ic.mixin.Overlay
+    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE message text displayed in the toast
+        % message text displayed in the toast
         Value string = ""
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "success", "warning", "destructive", "info"])} = "primary"
-        % > DURATION seconds until auto-dismiss (0 = persistent)
+
+        % seconds until auto-dismiss (use 0 for a persistent toast that must be dismissed manually)
         Duration double {mustBeNonnegative} = 3
-        % > POSITION vertical position on screen
+
+        % vertical position on screen
         Position string {mustBeMember(Position, ["top", "bottom"])} = "bottom"
-        % > CLOSABLE whether to show the close button
+
+        % whether to show the close button
         Closable logical = true
-        % > ICON custom icon (empty = default per variant)
+
+        % custom icon displayed before the message. When empty, a default icon is shown based on the variant
         Icon ic.asset.Asset = ic.asset.Asset.empty
     end
 
     properties (Access = private)
-        % > CLOSELISTENER listener for when the toast is closed in the view
         ClosedListener event.listener
     end
 
     events (Description = "Reactive")
+        % fires when the toast is dismissed (timeout, close button, or programmatic dismiss). The toast is automatically deleted after this event
         Closed
     end
 
@@ -40,7 +49,14 @@ classdef Toast < ic.core.Component & ic.mixin.Overlay
 
     methods (Description = "Reactive")
         function out = dismiss(this)
-            % > DISMISS programmatically close and remove the toast
+            % programmatically dismiss and remove the toast
+            % {example}
+            %    t = ic.Toast("Value", "Data saved successfully!", "Variant", "success");
+            %    frame.addChild(t);
+            %    pause(2);
+            %    t.dismiss();
+            % {/example}
+
             out = this.publish("dismiss", []);
         end
     end
