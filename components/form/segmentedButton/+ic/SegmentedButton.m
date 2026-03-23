@@ -31,6 +31,9 @@ classdef SegmentedButton < ic.core.ComponentContainer
 
     events (Description = "Reactive")
         % triggered when the user selects or deselects a segment
+        % {payload}
+        % value | char or cell array: currently selected item(s) after the change
+        % {/payload}
         ValueChanged
     end
 
@@ -70,19 +73,21 @@ classdef SegmentedButton < ic.core.ComponentContainer
             this.Value = val;
         end
 
-        function setIcon(this, idx, icon)
-            % set, replace or remove the icon for a segment by index.
-
+        function setIcon(this, item, icon)
+            % set, replace or remove the icon for a segment
+            % {example}
+            % sb = ic.SegmentedButton("Items", ["Bold", "Italic", "Underline"]);
+            % sb.setIcon("Bold", ic.Icon("bold"));
+            % {/example}
             arguments
                 this
-                % index of the segment to set the icon for
-                idx (1,1) double {mustBePositive, mustBeInteger}
+                % one of the #ic.SegmentedButton.Items to set the icon for
+                item (1,1) string
                 % icon to display in the segment, or empty to remove the icon
                 icon ic.Icon {mustBeScalarOrEmpty} = ic.Icon.empty
             end
-            assert(idx <= numel(this.Items), "ic:SegmentedButton:InvalidIndex", ...
-                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
-            item = this.Items(idx);
+            assert(ismember(item, this.Items), "ic:SegmentedButton:InvalidItem", ...
+                "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
 
             % remove existing icon in this slot
             mask = arrayfun(@(child) child.Target == item, this.Children);
@@ -94,17 +99,16 @@ classdef SegmentedButton < ic.core.ComponentContainer
             end
         end
 
-        function icon = getIcon(this, idx)
-            % get the icon for a segment by index
+        function icon = getIcon(this, item)
+            % get the icon for a segment
             % {returns} the #ic.Icon object in the segment, or empty if there is no icon {/returns}
             arguments
                 this
-                % index of the segment to get the icon for
-                idx (1,1) double {mustBePositive, mustBeInteger}
+                % one of the #ic.SegmentedButton.Items to get the icon for
+                item (1,1) string
             end
-            assert(idx <= numel(this.Items), "ic:SegmentedButton:InvalidIndex", ...
-                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
-            item = this.Items(idx);
+            assert(ismember(item, this.Items), "ic:SegmentedButton:InvalidItem", ...
+                "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
             mask = arrayfun(@(child) child.Target == item, this.Children);
             if any(mask)
                 icon = this.Children(mask);

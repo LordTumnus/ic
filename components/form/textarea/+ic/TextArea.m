@@ -17,6 +17,9 @@ classdef TextArea < ic.core.Component
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
 
         % whether the textarea is disabled and cannot be interacted with
+        Disabled logical = false
+
+        % whether the textarea is read-only and cannot be edited
         Readonly logical = false
 
         % whether the textarea is in an invalid state, which will trigger error styling and display the #ic.TextArea.ErrorMessage

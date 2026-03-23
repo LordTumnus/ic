@@ -31,9 +31,15 @@ classdef SearchBar < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the tag list changes
+        % {payload}
+        % value | cell array or empty: current list of tags, or empty if all cleared
+        % {/payload}
         ValueChanged
 
         % fires when Enter is pressed
+        % {payload}
+        % value | cell array: current list of tags at the time of submission
+        % {/payload}
         Submitted
     end
 

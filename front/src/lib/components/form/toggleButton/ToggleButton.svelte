@@ -5,7 +5,7 @@
 
   let {
     label = $bindable(''),
-    value = $bindable(false),
+    value = $bindable('off'),
     variant = $bindable('primary'),
     size = $bindable('md'),
     disabled = $bindable(false),
@@ -13,7 +13,7 @@
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
     label?: string;
-    value?: boolean;
+    value?: string;
     variant?: string;
     size?: string;
     disabled?: boolean;
@@ -30,9 +30,11 @@
     };
   });
 
+  const isOn = $derived(value === 'on');
+
   function handleClick() {
     if (!disabled) {
-      value = !value;
+      value = isOn ? 'off' : 'on';
       valueChanged?.({ value });
       logger.debug('ToggleButton', 'toggled', { value });
     }
@@ -42,7 +44,7 @@
 <button
   bind:this={buttonEl}
   class="ic-toggle-btn"
-  class:ic-toggle-btn--on={value}
+  class:ic-toggle-btn--on={isOn}
   class:ic-toggle-btn--primary={variant === 'primary'}
   class:ic-toggle-btn--secondary={variant === 'secondary'}
   class:ic-toggle-btn--destructive={variant === 'destructive'}
@@ -50,7 +52,7 @@
   class:ic-toggle-btn--md={size === 'md'}
   class:ic-toggle-btn--lg={size === 'lg'}
   class:ic-toggle-btn--disabled={disabled}
-  aria-pressed={value}
+  aria-pressed={isOn}
   {disabled}
   onclick={handleClick}
 >

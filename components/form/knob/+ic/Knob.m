@@ -44,11 +44,11 @@ classdef Knob < ic.core.Component
     end
 
     events (Description = "Reactive")
-        % triggers continuously while the user drags the knob (differs from #ic.Knob.Value in that it is not debounced, so it fires on every change as the user drags the knob)
+        % triggers continuously while the user interacts with the knob (drag or keyboard)
+        % {payload}
+        % value | double: current knob value
+        % {/payload}
         ValueChanging
-
-        % fires on drag-end or keyboard step with final value
-        ValueChanged
     end
 
     methods

@@ -47,11 +47,11 @@ classdef Slider < ic.core.Component
     end
 
     events (Description = "Reactive")
-        % triggered continuously during drag with current value
+        % triggered continuously while the user interacts with the slider (drag or keyboard)
+        % {payload}
+        % value | double: current slider value
+        % {/payload}
         ValueChanging
-
-        % fires on drag-end or keyboard step with final value
-        ValueChanged
     end
 
     methods

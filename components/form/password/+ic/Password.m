@@ -36,9 +36,15 @@ classdef Password < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the value changes
+        % {payload}
+        % value | char: current text content
+        % {/payload}
         ValueChanged
 
         % fires when the Enter key is pressed
+        % {payload}
+        % value | char: current text content at the time of submission
+        % {/payload}
         Submitted
     end
 
@@ -54,7 +60,7 @@ classdef Password < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            %programmatically focus the input
+            % programmatically focus the input
             out = this.publish("focus", []);
         end
 

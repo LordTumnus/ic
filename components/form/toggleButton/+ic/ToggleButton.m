@@ -6,7 +6,7 @@ classdef ToggleButton < ic.core.Component
         Label string = ""
 
         % toggle state
-        Value logical = false
+        Value matlab.lang.OnOffSwitchState = "off"
 
         % visual style variant
         Variant string {mustBeMember(Variant, ...
@@ -21,6 +21,9 @@ classdef ToggleButton < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the user toggles the button
+        % {payload}
+        % value | char: current toggle state after the click ('on' or 'off)
+        % {/payload}
         ValueChanged
     end
 

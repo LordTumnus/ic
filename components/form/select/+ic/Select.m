@@ -18,7 +18,7 @@ classdef Select < ic.core.Component
         % whether the control is in an invalid state, in which case it is highlighted with an error color and the #ic.Select.ErrorMessage text is shown
         Invalid logical = false
 
-        %  error text shown below the field when #ic.Select.Invalid is true
+        % error text shown below the field when #ic.Select.Invalid is true
         ErrorMessage string = ""
 
         % text shown below the field
@@ -43,6 +43,9 @@ classdef Select < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the user selects or clears a value
+        % {payload}
+        % value | char or empty: selected item label, or empty if cleared
+        % {/payload}
         ValueChanged
 
         % fires when the dropdown opens
@@ -84,7 +87,7 @@ classdef Select < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % programatically focus the trigger field
+            % programmatically focus the trigger field
             out = this.publish("focus", []);
         end
 

@@ -6,7 +6,7 @@ classdef SplitButton < ic.core.ComponentContainer
         % list of labels for each action. The first item is considered the "main" action and is triggered when the main button (not the chevron) is clicked
         Items (1,:) string = "Action"
 
-        %optional descriptions shown below each item label in the dropdown
+        % optional descriptions shown below each item label in the dropdown
         ItemDescriptions (1,:) string = string.empty
 
         % visual style variant
@@ -23,7 +23,7 @@ classdef SplitButton < ic.core.ComponentContainer
         % whether the control is disabled and cannot be interacted with
         Disabled logical = false
 
-        % opening position of the dropdown relative to the main button
+        % layout of the split button and dropdown chevron
         SplitDirection string {mustBeMember(SplitDirection, ...
             ["right", "bottom"])} = "right"
     end
@@ -35,6 +35,10 @@ classdef SplitButton < ic.core.ComponentContainer
 
     events (Description = "Reactive")
         % triggered when an item is selected (the main button or an item in the dropdown)
+        % {payload}
+        % index | double: index of the selected item in #ic.SplitButton.Items
+        % label | char: label text of the selected item
+        % {/payload}
         ItemSelected
 
         % fires when the dropdown opens
@@ -81,22 +85,21 @@ classdef SplitButton < ic.core.ComponentContainer
             this.Targets = ["icon", val];
         end
 
-        function setIcon(this, idx, icon)
-            % set, replace or remove the for the item at the selected index.
+        function setIcon(this, item, icon)
+            % set, replace or remove the icon for a dropdown item
             % {example}
             % btn = ic.SplitButton("Items", ["New", "Edit", "Delete"]);
-            % btn.setIcon(2, ic.Icon("edit"));
+            % btn.setIcon("Edit", "star");
             % {/example}
             arguments
                 this
-                % index of the item to set the icon for
-                idx (1,1) double {mustBePositive, mustBeInteger}
+                % one of the #ic.SplitButton.Items to set the icon for
+                item (1,1) string
                 % icon to display for the item, or empty to remove the icon
                 icon ic.Icon {mustBeScalarOrEmpty} = ic.Icon.empty()
             end
-            assert(idx <= numel(this.Items), "ic:SplitButton:InvalidIndex", ...
-                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
-            item = this.Items(idx);
+            assert(ismember(item, this.Items), "ic:SplitButton:InvalidItem", ...
+                "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
             mask = arrayfun(@(child) child.Target == item, this.Children);
             delete(this.Children(mask));
             if ~isempty(icon)
@@ -104,17 +107,16 @@ classdef SplitButton < ic.core.ComponentContainer
             end
         end
 
-        function icon = getIcon(this, idx)
-            % get the icon for a dropdown item by index
+        function icon = getIcon(this, item)
+            % get the icon for a dropdown item
             % {returns} the #ic.Icon object for the item, or empty if there is no icon {/returns}
             arguments
                 this
-                % index of the item to get the icon for
-                idx (1,1) double {mustBePositive, mustBeInteger}
+                % one of the #ic.SplitButton.Items to get the icon for
+                item (1,1) string
             end
-            assert(idx <= numel(this.Items), "ic:SplitButton:InvalidIndex", ...
-                "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
-            item = this.Items(idx);
+            assert(ismember(item, this.Items), "ic:SplitButton:InvalidItem", ...
+                "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
             for child = this.Children
                 if child.Target == item
                     icon = child;

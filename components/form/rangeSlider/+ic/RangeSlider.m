@@ -51,9 +51,15 @@ classdef RangeSlider < ic.core.Component
 
     events (Description = "Reactive")
         % event triggered when the low thumb value is changing
+        % {payload}
+        % value | double: current low thumb value
+        % {/payload}
         LowChanging
 
         % event triggered when the high thumb value is changing
+        % {payload}
+        % value | double: current high thumb value
+        % {/payload}
         HighChanging
     end
 

@@ -32,6 +32,9 @@ classdef RadioButton < ic.core.ComponentContainer
 
     events (Description = "Reactive")
         % triggered when the user selects a different option
+        % {payload}
+        % value | char: label of the newly selected item
+        % {/payload}
         ValueChanged
     end
 

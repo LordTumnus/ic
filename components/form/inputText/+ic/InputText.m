@@ -36,7 +36,7 @@ classdef InputText < ic.core.Component
         % text or symbol displayed after the input
         Suffix string = ""
 
-        % whether to show a clear button on the sinput box to remove the contents
+        % whether to show a clear button on the input box to remove the contents
         Clearable logical = false
 
         % maximum number of characters allowed (0 = unlimited)
@@ -44,17 +44,19 @@ classdef InputText < ic.core.Component
 
         % whether to display character count (requires #ic.InputText.MaxLength to be defined different from 0)
         ShowCounter logical = false
-
-        % HTML input type attribute
-        Type string {mustBeMember(Type, ...
-            ["text", "email", "url", "tel", "search"])} = "text"
     end
 
     events (Description = "Reactive")
         % triggered when the value changes on user input
+        % {payload}
+        % value | char: current text content
+        % {/payload}
         ValueChanged
 
         % fires when the Enter key is pressed
+        % {payload}
+        % value | char: current text content at the time of submission
+        % {/payload}
         Submitted
     end
 

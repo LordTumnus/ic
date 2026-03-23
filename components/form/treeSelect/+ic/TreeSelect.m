@@ -1,9 +1,9 @@
 classdef TreeSelect < ic.TreeBase
     % hierarchical multi-value selector with cascading menus.
     % Opens cascading sub-menus for hierarchical item selection; and displays selected items as closable tags inside the input field.
-    % {properties}
+    % {superclass}
     % #ic.TreeBase
-    % {/properties}
+    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % text shown when no items are selected

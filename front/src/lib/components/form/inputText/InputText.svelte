@@ -18,7 +18,6 @@
     clearable = $bindable(false),
     maxLength = $bindable(0),
     showCounter = $bindable(false),
-    type = $bindable('text'),
     // Events
     valueChanged,
     submitted,
@@ -42,7 +41,6 @@
     clearable?: boolean;
     maxLength?: number;
     showCounter?: boolean;
-    type?: string;
     valueChanged?: (data?: unknown) => void;
     submitted?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -129,7 +127,7 @@
     <input
       bind:this={inputEl}
       class="ic-input-text__input"
-      {type}
+      type="text"
       value={value}
       {placeholder}
       {disabled}

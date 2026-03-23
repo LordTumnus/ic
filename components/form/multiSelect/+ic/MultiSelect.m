@@ -34,6 +34,9 @@ classdef MultiSelect < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the user changes the selection
+        % {payload}
+        % value | cell array or empty: list of selected item labels, or empty if all cleared
+        % {/payload}
         ValueChanged
 
         % fires when the dropdown opens

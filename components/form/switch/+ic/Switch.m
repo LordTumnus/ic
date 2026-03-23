@@ -24,6 +24,9 @@ classdef Switch < ic.core.Component
 
     events (Description = "Reactive")
         % triggered when the user toggles the switch
+        % {payload}
+        % value | char: current switch state ('on' or 'off')
+        % {/payload}
         ValueChanged
     end
 

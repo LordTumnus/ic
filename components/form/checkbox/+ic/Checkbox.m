@@ -15,7 +15,7 @@ classdef Checkbox < ic.core.ComponentContainer
         % dimension of the checkbox relative to the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
 
-        % whether the checkbox is disabled and can be interacted with
+        % whether the checkbox is disabled and cannot be interacted with
         Disabled logical = false
 
         % when true, the checkbox is in an indeterminate state (neither on nor off) and displays a dash instead of a checkmark
@@ -27,12 +27,15 @@ classdef Checkbox < ic.core.ComponentContainer
     end
 
     properties (Dependent)
-        % #ic.Icon displayed when the checkbox is selected (#ic.Checkbpx.Value is "on")
+        % #ic.Icon displayed when the checkbox is selected (#ic.Checkbox.Value is "on")
         Icon
     end
 
     events (Description = "Reactive")
         % triggered when the user toggles the checkbox
+        % {payload}
+        % value | char: current checkbox state ('on' or 'off')
+        % {/payload}
         ValueChanged
     end
 

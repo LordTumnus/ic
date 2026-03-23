@@ -20,7 +20,7 @@ classdef Button < ic.core.ComponentContainer
         % dimension of the button, as a function of the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
 
-        % whether the button is disabled and can be interacted with
+        % whether the button is disabled and cannot be interacted with
         Disabled logical = false
 
         % position of the icon relative to the label (see #ic.Button.Icon)
@@ -35,6 +35,9 @@ classdef Button < ic.core.ComponentContainer
 
     events (Description = "Reactive")
         % event triggered when the button is clicked
+        % {payload}
+        % timestamp | char: datetime of the click event
+        % {/payload}
         Clicked
     end
 

@@ -33,6 +33,9 @@ classdef ColorPicker < ic.core.Component
 
     events (Description = "Reactive")
         % triggered while the color value is being changed (this differs from #ic.ColorPicker.Value in that it is not debounced, so it fires on every change as the user drags the sliders in the editor)
+        % {payload}
+        % value | char: current color string in the active format
+        % {/payload}
         ValueChanging
 
         % fires when the color editor popup opens
