@@ -1,19 +1,17 @@
-classdef (Abstract) Entry < matlab.mixin.Heterogeneous & matlab.mixin.SetGetExactNames & ic.event.TransportData
-    % > ENTRY Abstract base for context menu entries.
-    %
-    %   Enables heterogeneous arrays so Item, Separator, and Folder
-    %   can be mixed:  [Item("a"), Separator(), Folder(Label="Sub")]
-    %
-    %   Subclasses: ic.menu.Item, ic.menu.Separator, ic.menu.Folder,
-    %              ic.menu.ColorEntry, ic.menu.TextEntry
+classdef (Abstract) Entry < matlab.mixin.Heterogeneous & ...
+                            matlab.mixin.SetGetExactNames & ...
+                            ic.event.TransportData
+    % abstract base class for context menu entries.
+    % Enables heterogeneous arrays so different entry types can be mixed.
 
     methods (Abstract)
+        % serialize this entry to a struct for JSON transport
         s = toStruct(this)
     end
 
     methods (Sealed)
         function json = jsonencode(this, varargin)
-            % > JSONENCODE Serialize entry array to JSON via struct conversion.
+            % serialize the entry array to JSON via struct conversion
             n = numel(this);
             if n == 0, json = '[]'; return; end
             c = cell(1, n);

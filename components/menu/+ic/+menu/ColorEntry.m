@@ -1,19 +1,15 @@
 classdef ColorEntry < ic.menu.Entry
-    % > COLORENTRY An inline color picker in a context menu.
-    %
-    %   The picked color is returned as "key:#hex" in the action payload.
-    %
-    %   Example:
-    %       ic.menu.ColorEntry("bg", Label="Background", Value="#3b82f6")
+    % inline color picker in a context menu.
+    % Displays a color swatch next to a label. The picked color is returned as "key: #hex" in the ContextMenuAction event payload.
 
     properties
-        % > KEY unique action identifier (returned as "key:#hex")
+        % unique action identifier. The #ic.mixin.hasContextMenu.ContextMenuAction payload contains an entry with #ic.menu.ColorEntry.Key=value
         Key (1,1) string
 
-        % > LABEL display text next to the swatch
+        % display text shown next to the color swatch
         Label (1,1) string = ""
 
-        % > VALUE initial hex color string
+        % color value as a hex string
         Value (1,1) string = "#000000"
     end
 

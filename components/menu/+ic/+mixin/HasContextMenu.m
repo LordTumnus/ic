@@ -1,18 +1,13 @@
 classdef (Abstract) HasContextMenu < handle
-    % > HASCONTEXTMENU Mixin that adds a ContextMenuAction reactive event.
-    %
-    %   Any component inheriting this mixin gets the ContextMenuAction event
-    %   bridged automatically by the IC framework (no manual subscribe/publish).
-    %
-    %   Usage:
-    %       classdef MyComponent < ic.core.Component & ic.mixin.HasContextMenu
-    %
-    %   The event payload varies by consumer:
-    %     Table:  struct with fields item, field, rowIndex
-    %     Tree:   struct with fields item, nodeKey  (future)
+    % mixin that adds a ContextMenuAction event to a component.
+    % Any component inheriting this mixin gets the event bridged automatically by the IC framework. The event payload varies by consumer
+
 
     events (Description = "Reactive")
-        % > CONTEXTMENUACTION fires when the user clicks a context menu item
+        % fires when the user clicks a context menu item.
+        % {payload}
+        % item | char: the Key of the selected #ic.menu.Item, or "key:value" for #ic.menu.ColorEntry / #ic.menu.TextEntry
+        % {/payload}
         ContextMenuAction
     end
 end

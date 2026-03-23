@@ -1,24 +1,21 @@
 classdef Item < ic.menu.Entry
-    % > ITEM A clickable leaf action in a context menu.
-    %
-    %   Example:
-    %       ic.menu.Item("copy", Label="Copy Name", Icon="clipboard")
-    %       ic.menu.Item("delete", Label="Delete", Icon="trash-2", Shortcut="Del")
+    % clickable leaf action in a context menu.
+    % When clicked, the parent component's #ic.mixin.HasContextMenu.ContextMenuAction event fires with the key in its payload.
 
     properties
-        % > KEY unique action identifier (returned in event payload)
+        % unique action identifier, returned in the #ic.mixin.HasContextMenu.ContextMenuAction event payload
         Key (1,1) string
 
-        % > LABEL display text
+        % display text shown in the menu
         Label (1,1) string = ""
 
-        % > ICON icon source (Lucide name, file path, or URL)
+        % icon displayed before the label
         Icon ic.asset.Asset = ic.asset.Asset.empty
 
-        % > DISABLED whether the item is grayed out
+        % whether the item is grayed out and cannot be clicked
         Disabled (1,1) logical = false
 
-        % > SHORTCUT display-only keyboard shortcut hint
+        % display-only keyboard shortcut hint shown on the right side of the item
         Shortcut (1,1) string = ""
     end
 

@@ -1,23 +1,18 @@
 classdef TextEntry < ic.menu.Entry
-    % > TEXTENTRY An inline text input in a context menu.
-    %
-    %   The entered text is returned as "key:value" in the action payload
-    %   when the user presses Enter or the input loses focus.
-    %
-    %   Example:
-    %       ic.menu.TextEntry("name", Label="Name", Placeholder="Enter name...")
+    % inline text input in a context menu.
+    % Displays a text field next to a label. The entered text is returned as "key:value" in the #ic.mixin.HasContextMenu.ContextMenuAction event payload when the user presses Enter or the input loses focus.
 
     properties
-        % > KEY unique action identifier (returned as "key:value")
+        % unique action identifier. The #ic.mixin.HasContextMenu.ContextMenuAction payload contains a field with #ic.menu.TextEntry.Key= value
         Key (1,1) string
 
-        % > LABEL display text next to the input
+        % display text shown next to the input
         Label (1,1) string = ""
 
-        % > VALUE initial text value
+        % initial text value
         Value (1,1) string = ""
 
-        % > PLACEHOLDER hint text shown when input is empty
+        % ghost text shown when the input is empty
         Placeholder (1,1) string = ""
     end
 

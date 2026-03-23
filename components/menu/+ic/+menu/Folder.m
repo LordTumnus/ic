@@ -1,24 +1,18 @@
 classdef Folder < ic.menu.Entry
-    % > FOLDER A submenu container in a context menu.
-    %
-    %   Example:
-    %       ic.menu.Folder(Label="Export", Icon="download", Children=[
-    %           ic.menu.Item("csv",  Label="As CSV",  Icon="file-text")
-    %           ic.menu.Item("pdf",  Label="As PDF",  Icon="file")
-    %           ic.menu.Item("xlsx", Label="As Excel", Icon="table")
-    %       ])
+    % submenu container in a context menu.
+    % Displays a label that expands into a nested list of child entries on hover.
 
     properties
-        % > LABEL display text for the submenu trigger
+        % display text for the submenu trigger
         Label (1,1) string = ""
 
-        % > ICON icon source (Lucide name, file path, or URL)
+        % icon displayed before the label
         Icon ic.asset.Asset = ic.asset.Asset.empty
 
-        % > CHILDREN nested menu entries
+        % nested menu entries displayed when the folder is expanded
         Children ic.menu.Entry = ic.menu.Entry.empty
 
-        % > DISABLED whether the folder is grayed out
+        % whether the folder is grayed out and cannot be expanded
         Disabled (1,1) logical = false
     end
 
@@ -33,7 +27,7 @@ classdef Folder < ic.menu.Entry
         end
 
         function s = toStruct(this)
-            % Recursively serialize children
+            % recursively serialize children
             if isempty(this.Children)
                 ch = [];
             else

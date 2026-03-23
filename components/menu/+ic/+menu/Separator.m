@@ -1,8 +1,5 @@
 classdef Separator < ic.menu.Entry
-    % > SEPARATOR A visual divider line in a context menu.
-    %
-    %   Example:
-    %       menu = [ic.menu.Item("a"), ic.menu.Separator(), ic.menu.Item("b")];
+    % visual divider line in a context menu.
 
     methods
         function this = Separator()
