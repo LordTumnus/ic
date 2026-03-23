@@ -1,32 +1,40 @@
 classdef Button < ic.core.ComponentContainer
-    % > BUTTON Interactive button with optional icon.
+    % interactive button component that can be clicked to trigger actions
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > LABEL text label of the button
+        % text label of the button
         Label string = "Click me"
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > FILL fill style of the button
+
+        % fill style of the button
         Fill string {mustBeMember(Fill, ...
             ["solid", "outline", "ghost"])} = "solid"
-        % > SHAPE shape style of the button
+
+        % shape style of the button
         Shape string {mustBeMember(Shape, ...
             ["default", "pill", "square"])} = "default"
-        % > SIZE size of the button -> affects padding
+
+        % dimension of the button, as a function of the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the button is disabled
+
+        % whether the button is disabled and can be interacted with
         Disabled logical = false
-        % > ICONPOSITION position of the icon relative to the label
+
+        % position of the icon relative to the label (see #ic.Button.Icon)
         IconPosition string {mustBeMember(IconPosition, ...
             ["left", "right"])} = "left"
     end
 
     properties (Dependent)
+        % child icon, either an #ic.Icon or #ic.Image
         Icon
     end
 
     events (Description = "Reactive")
+        % event triggered when the button is clicked
         Clicked
     end
 
@@ -51,16 +59,16 @@ classdef Button < ic.core.ComponentContainer
         end
 
         function set.Icon(this, icon)
-            % Remove existing icon from slot
             delete(this.Icon);
-            % Add new icon
             if ~isempty(icon)
                 this.addChild(icon, "icon");
             end
         end
 
+    end
+    methods (Hidden)
         function validateChild(~, child, target)
-            % > VALIDATECHILD checks target is "icon" and child is ic.Icon or ic.Image
+            % checks target is "icon" and child is ic.Icon or ic.Image
             assert(target == "icon", "ic:Button:InvalidTarget", ...
                 "Buttons only support children in an 'icon' target");
             assert(isa(child, "ic.Icon") || isa(child, "ic.Image"), ...
@@ -71,7 +79,7 @@ classdef Button < ic.core.ComponentContainer
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the button
+            % programmatically focus the button
             out = this.publish("focus", []);
         end
     end

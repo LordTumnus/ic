@@ -1,43 +1,38 @@
 classdef Checkbox < ic.core.ComponentContainer
-    % > CHECKBOX Toggle checkbox with optional custom icon.
-    %
-    % Create checkboxes:
-    %   cb = ic.Checkbox();
-    %   cb.Label = "Accept terms";
-    %   cb.Value = "on";
-    %
-    % With a custom icon (replaces default checkmark):
-    %   cb = ic.Checkbox();
-    %   cb.Icon = ic.Icon.fromName("star");
-    %
-    % Indeterminate state:
-    %   cb.Indeterminate = true;
+    % simple toggle checkbox
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE checkbox state (on or off)
+        % checkbox state (on or off)
         Value matlab.lang.OnOffSwitchState = "off"
-        % > LABEL text label displayed next to the checkbox
+
+        % text label displayed next to the checkbox
         Label string = ""
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > SIZE size of the checkbox
+
+        % dimension of the checkbox relative to the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the checkbox is disabled
+
+        % whether the checkbox is disabled and can be interacted with
         Disabled logical = false
-        % > INDETERMINATE whether the checkbox shows an indeterminate state
+
+        % when true, the checkbox is in an indeterminate state (neither on nor off) and displays a dash instead of a checkmark
         Indeterminate logical = false
-        % > LABELPOSITION position of the label relative to the checkbox
+
+        % position of the label relative to the checkbox
         LabelPosition string {mustBeMember(LabelPosition, ...
             ["right", "left"])} = "right"
     end
 
     properties (Dependent)
-        Icon  % Convenient access to the icon child
+        % #ic.Icon displayed when the checkbox is selected (#ic.Checkbpx.Value is "on")
+        Icon
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user toggles the checkbox
+        % triggered when the user toggles the checkbox
         ValueChanged
     end
 
@@ -67,9 +62,10 @@ classdef Checkbox < ic.core.ComponentContainer
                 this.addChild(icon, "icon");
             end
         end
-
+    end
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD checks target is "icon" and child is ic.Icon
+            % >checks target is "icon" and child is ic.Icon
             assert(target == "icon", "ic:Checkbox:InvalidTarget", ...
                 "Checkboxes only support children in an 'icon' target");
             assert(isa(child, "ic.Icon"), "ic:Checkbox:InvalidChild", ...
@@ -79,7 +75,7 @@ classdef Checkbox < ic.core.ComponentContainer
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the checkbox
+            % programmatically focus the checkbox
             out = this.publish("focus", []);
         end
     end

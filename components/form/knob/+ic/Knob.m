@@ -1,40 +1,53 @@
 classdef Knob < ic.core.Component
-    % > KNOB Rotary knob input control.
+    % rotary knob input control.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current value of the knob
+        % current value of the knob
         Value double = 0
-        % > MIN minimum value
+
+        % minimum value
         Min double = 0
-        % > MAX maximum value
+
+        % maximum value
         Max double = 100
-        % > STEP step increment
+
+        % step increment
         Step double = 1
-        % > DISABLED whether the knob is disabled
+
+        % whether the knob is disabled and cannot be interacted with
         Disabled logical = false
-        % > SIZE size of the knob (sm, md, lg)
+
+        % dimension of the knob relative to the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT color variant of the knob
+
+        % color variant of the knob
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "success", "warning", "destructive"])} = "primary"
-        % > SHOWVALUE whether to display the current value label
+
+        % whether to display the current value in text form
         ShowValue logical = false
-        % > SHOWTRACK whether to display the value arc ring
+
+        % whether to display an arc ring along the knob from the #ic.Knob.Min position to the current value
         ShowTrack logical = true
-        % > SHOWTICKS whether to display graduation tick marks
+
+        % whether to display graduation tick marks. Ticks are evenly spaced between the #ic.Knob.Min and #ic.Knob.Max values, with a total count specified by #ic.Knob.TickCount
         ShowTicks logical = false
-        % > TICKCOUNT number of tick marks to display
+
+        % number of tick marks to display if #ic.Knob.ShowTicks is true
         TickCount double {mustBePositive(TickCount), mustBeInteger(TickCount)} = 12
-        % > LABELFORMAT printf-style format string for the value label
+
+        % sprintf-style format string for the value label
         LabelFormat string = "%d"
-        % > LABELPOSITION position of the value label (inside or bottom)
+
+        % position of the value label relative to the knob
         LabelPosition string {mustBeMember(LabelPosition, ["inside", "bottom"])} = "bottom"
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGING fires continuously during drag with current value
+        % triggers continuously while the user drags the knob (differs from #ic.Knob.Value in that it is not debounced, so it fires on every change as the user drags the knob)
         ValueChanging
-        % > VALUECHANGED fires on drag-end or keyboard step with final value
+
+        % fires on drag-end or keyboard step with final value
         ValueChanged
     end
 
@@ -50,7 +63,7 @@ classdef Knob < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the knob
+            % programmatically focus the knob
             out = this.publish("focus", []);
         end
     end
