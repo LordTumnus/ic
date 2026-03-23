@@ -1,9 +1,6 @@
 classdef Popover < ic.core.ComponentContainer
     % floating panel anchored to a trigger component.
     % The popover opens when the user clicks the trigger and closes on click-outside or presses Escape. Add children to the panel via the #ic.popover.Panel returned by the Popover's Panel property.
-    % {superclass}
-    %   #ic.mixin.Overlay
-    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % whether the panel is visible

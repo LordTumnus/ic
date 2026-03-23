@@ -1,9 +1,6 @@
 classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
     % modal overlay with a title, content body, and action buttons.
     % The dialog auto-deletes after submit or close when #ic.Dialog.DestroyOnClose is true.
-    % {superclass}
-    %   #ic.mixin.Overlay
-    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % heading text displayed in the dialog header

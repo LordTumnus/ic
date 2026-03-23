@@ -1,9 +1,6 @@
 classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
     % abstract base for table components.
     % Provides shared column configuration, sorting, filtering, row selection, and cell interaction for #ic.Table and #ic.VirtualTable
-    % {superclass}
-    % #ic.mixin.HasContextMenu
-    % {/superclass}
 
     properties (SetObservable, Description = "Reactive")
         % column definitions that control how each data field is displayed, sorted, and filtered

@@ -1,9 +1,6 @@
 classdef Toast < ic.core.Component & ic.mixin.Overlay
     % ephemeral notification message.
     % Displays a brief message that auto-dismisses after #ic.Toast.Duration seconds. The toast auto-deletes when closed (either by timeout, close button, or #ic.Toast.dismiss).
-    % {superclass}
-    %   #ic.mixin.Overlay
-    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % message text displayed in the toast
