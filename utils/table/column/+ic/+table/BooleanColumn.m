@@ -1,19 +1,12 @@
 classdef BooleanColumn < ic.table.Column
-    % > BOOLEANCOLUMN Boolean column definition.
-    %
-    %   Displays cell values as a checkbox, text, or numeric indicator.
-    %
-    %   Example:
-    %       c = ic.table.BooleanColumn("Active", Sortable=true, Width=75)
-    %       c = ic.table.BooleanColumn("Active", DisplayMode="text")
+    % boolean column that displays logical values as checkboxes, text, or numeric indicators.
 
     properties
-        % > DISPLAYMODE visual representation: "checkbox", "text", or "numeric"
+        % visual representation of the boolean value
         DisplayMode (1,1) string {mustBeMember(DisplayMode, ...
             ["checkbox", "text", "numeric"])} = "checkbox"
 
-        % > COLORRULES conditional background color rules (first match wins)
-        %   Evaluates true=1, false=0 against the rules.
+        % conditional background color rules. Evaluates true=1, false=0 against the rules
         ColorRules ic.table.ColorRule = ic.table.ColorRule.empty
     end
 
@@ -39,7 +32,7 @@ classdef BooleanColumn < ic.table.Column
 
     methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
-            % Exact match: filterValue is a logical scalar
+            % exact match: filterValue is a logical scalar
             mask = logical(columnData) == logical(filterValue);
         end
     end

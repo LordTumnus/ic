@@ -1,26 +1,16 @@
 classdef ColorColumn < ic.table.Column
-    % > COLORCOLUMN Color swatch column with inline picker editing.
-    %
-    %   Displays cell values as colored swatches. Double-click opens a
-    %   color-picker popup with saturation/value pad, hue slider, and
-    %   optional alpha slider.
-    %
-    %   Example:
-    %       c = ic.table.ColorColumn("Color", ...
-    %           Format="hex", ShowAlpha=false, Editable=true)
-    %       c = ic.table.ColorColumn("BgColor", ...
-    %           Format="rgb", ShowAlpha=true, ...
-    %           Presets=["#ef4444","#f59e0b","#22c55e","#3b82f6"])
+    % color swatch column with inline color-picker editing.
+    % Displays cell values as colored swatches. When Editable, double-clicking opens a color picker popup.
 
     properties
-        % > FORMAT output color string format ("hex", "rgb", or "hsl")
+        % output color string format
         Format (1,1) string {mustBeMember(Format, ...
             ["hex", "rgb", "hsl"])} = "hex"
 
-        % > SHOWALPHA whether to show the alpha slider in the editor
+        % whether to show the alpha slider in the inline editor
         ShowAlpha (1,1) logical = false
 
-        % > PRESETS optional preset color swatches shown below the picker
+        % optional preset color swatches shown below the picker
         Presets (1,:) string = string.empty
     end
 

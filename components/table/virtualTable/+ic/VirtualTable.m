@@ -1,46 +1,31 @@
 classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
-    % > VIRTUALTABLE Virtual-scrolling table for massive datasets.
-    %
-    %   Renders a table with virtual scrolling and on-demand row fetching.
-    %   Only visible rows exist in the DOM (~30-40 elements). Sorting and
-    %   filtering are performed server-side in MATLAB, not in the browser.
-    %
-    %   Example:
-    %       vt = ic.VirtualTable();
-    %       vt.Data = array2table(rand(100000, 3), ...
-    %           'VariableNames', ["A","B","C"]);
-    %       vt.Columns = [
-    %           ic.table.NumberColumn("A", Sortable=true, Filterable=true)
-    %           ic.table.NumberColumn("B", Sortable=true)
-    %           ic.table.NumberColumn("C", Filterable=true)
-    %       ];
+    % virtual-scrolling table for large datasets.
+    % Only visible rows exist in the DOM (~30-40 elements). The frontend fetches rows on demand via the request/response protocol. Sorting and filtering are performed server-side in MATLAB via the column's filterColumn and sortKey methods.
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
             Access = ?ic.mixin.Reactive, Hidden)
-        % > ROWCOUNT total number of rows in the current view (after filtering)
+        % total number of rows in the current view (after filtering)
         RowCount (1,1) double = 0
 
-        % > VIEWVERSION cache-buster counter — Svelte clears its row cache
-        %   whenever this value changes (incremented on every recompute)
+        % cache-buster counter incremented on every recompute. The frontend clears its row cache when this changes
         ViewVersion (1,1) double = 0
     end
 
     properties
-        % > DATA the full dataset (NOT reactive — never published to Svelte)
+        % the full dataset as a MATLAB table. Its not reactive and never published to the frontend. The view fetches slices on demand as the user scrolls and interacts with the table
         Data table = table()
     end
 
     properties (Hidden)
-        % > VERBOSE print request info to the command window
+        % print request info to the command window for debugging
         Verbose logical = false
     end
 
     properties (Access = private)
-        % Sorted + filtered 1-based row indices into Data
+        % sorted + filtered row indices into Data
         ViewIndices double = []
 
-        % Guard flag: when true, set.Data skips selection clear + recompute
-        % (handleCellEdited controls recompute conditionally)
+        % guard flag: when true, set.Data skips selection clear + recompute
         InCellEdit logical = false
 
         % PostSet listener handles
@@ -55,10 +40,10 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             end
             this@ic.TableBase(props);
 
-            % Register request handler for row fetching
+            % register request handler for row fetching
             this.onRequest("getRows", @(comp, data) comp.handleGetRows(data));
 
-            % Recompute view when sort/filter state changes.
+            % recompute view when sort/filter state changes
             this.ViewListeners = [
                 addlistener(this, 'SortField', 'PostSet', ...
                     @(~,~) this.recomputeView())
@@ -68,21 +53,19 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
                     @(~,~) this.recomputeView())
             ];
 
-            % Initial view computation
+            % initial view computation
             this.recomputeView();
         end
 
         function delete(this)
-            % Kill PostSet listeners BEFORE property teardown to prevent
-            % recomputeView from touching the dying Columns array.
             delete(this.ViewListeners);
         end
 
         function set.Data(this, val)
             if ~this.InCellEdit %#ok<MCSUP>
-                % Clear selection when data changes
+                % clear selection when data changes
                 this.Selection = struct('type', 'none', 'value', []);
-                % Auto-infer columns if empty
+                % auto-infer columns if empty
                 if isempty(this.Columns) && ~isempty(val) && height(val) > 0
                     this.setValueSilently('Columns', ic.table.Column.fromTable(val));
                 end
@@ -96,9 +79,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
 
     methods (Access = protected)
         function handleCellEdited(this, evtData)
-            % > HANDLECELLEDITED modifies the contents of the Data when a
-            % cell gets edited in the view. Only recomputes the view if the
-            % edit affects the current sort column or changes filter status.
+            % update Data when a cell is edited in the view, then conditionally recompute
             field = string(evtData.field);
             rowIndex = double(evtData.rowIndex) + 1;
             newValue = evtData.newValue;
@@ -109,14 +90,14 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             colData = this.Data.(char(field));
             newValue = colDef.coerceEditValue(newValue, colData);
 
-            % Read old value from Data (proper MATLAB type) before overwrite
+            % read old value from Data (proper MATLAB type) before overwrite
             if iscell(colData)
                 oldMatlabVal = colData{rowIndex};
             else
                 oldMatlabVal = colData(rowIndex);
             end
 
-            % Modify cell — guard prevents set.Data from recomputing
+            % modify cell — guard prevents set.Data from recomputing
             this.InCellEdit = true;
             if iscell(colData)
                 this.Data.(char(field)){rowIndex} = newValue;
@@ -125,15 +106,15 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
             end
             this.InCellEdit = false;
 
-            % Only recompute if the edit impacts sorting or filtering
+            % only recompute if the edit impacts sorting or filtering
             needsRecompute = false;
 
-            % Sort: if this column is being sorted, row position may change
+            % sort: if this column is being sorted, row position may change
             if this.SortField == field && this.SortDirection ~= "none"
                 needsRecompute = true;
             end
 
-            % Filter: if this column is being filtered, check pass/fail
+            % filter: if this column is being filtered, check pass/fail
             if ~needsRecompute
                 fk = char(field);
                 fStruct = this.Filters;
@@ -164,9 +145,10 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
 
     methods (Description = "Reactive")
         function out = removeRow(this, rowIndex)
-            % > REMOVEROW Remove a row by 1-based original index.
+            % remove a row by its  index
             arguments
                 this
+                % row index to remove
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
             end
             assert(rowIndex <= height(this.Data), "ic:VirtualTable:RowOutOfRange", ...
@@ -179,9 +161,10 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
         end
 
         function out = removeColumn(this, field)
-            % > REMOVECOLUMN Remove a column by field name.
+            % remove a column by field name
             arguments
                 this
+                % field name of the column to remove
                 field (1,1) string
             end
             assert(ismember(field, this.Data.Properties.VariableNames), ...
@@ -202,11 +185,14 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
         end
 
         function out = editCell(this, rowIndex, field, value)
-            % > EDITCELL Update a single cell by 1-based original index.
+            % update a single cell value programmatically
             arguments
                 this
+                % row index
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
+                % column field name
                 field (1,1) string
+                % new cell value
                 value
             end
             assert(rowIndex <= height(this.Data), "ic:VirtualTable:RowOutOfRange", ...
@@ -222,7 +208,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
         end
 
         function out = refresh(this)
-            % > REFRESH Manually recompute the view.
+            % manually force to recompute the view
             this.recomputeView();
             out = [];
         end
@@ -230,8 +216,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
 
     methods (Access = private)
         function tf = testFilter(~, colDef, value, filterValue)
-            % > TESTFILTER Check if a single scalar value passes a filter.
-            %   Used by handleCellEdited to decide if recomputeView is needed.
+            % check if a single scalar value passes a filter
             if isstruct(filterValue) && isfield(filterValue, 'isEmpty')
                 if isstring(value) || ischar(value)
                     tf = ismissing(string(value)) || string(value) == "";
@@ -248,12 +233,12 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
                 end
                 return
             end
-            % Delegate to column's filterColumn (works on scalars)
+            % delegate to column's filterColumn (works on scalars)
             tf = colDef.filterColumn(value, filterValue);
         end
 
         function recomputeView(this)
-            % > RECOMPUTEVIEW Rebuild sorted + filtered index array.
+            % rebuild sorted + filtered index array
             nRows = height(this.Data);
             if nRows == 0
                 this.ViewIndices = [];
@@ -264,7 +249,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
 
             indices = (1:nRows)';
 
-            % apply filters (empty/notempty and column filters)
+            % apply filters
             filters = this.Filters;
             filterFields = fieldnames(filters);
             for k = 1:numel(filterFields)
@@ -290,7 +275,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
                     continue;
                 end
 
-                %isNotEmpty checks
+                % isNotEmpty checks
                 if isstruct(filterValue) && isfield(filterValue, 'isNotEmpty')
                     colData = this.Data.(char(field));
                     sliced = colData(indices);
@@ -346,7 +331,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
         end
 
         function result = handleGetRows(this, data)
-            % > HANDLEGETROWS Return a chunk of rows from the current view.
+            % return a chunk of rows from the current view
             offset = double(data.offset);
             count = double(data.count);
             viewLen = numel(this.ViewIndices);

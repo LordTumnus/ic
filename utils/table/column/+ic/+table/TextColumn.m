@@ -1,21 +1,14 @@
 classdef TextColumn < ic.table.Column
-    % > TEXTCOLUMN Plain text column definition.
-    %
-    %   Displays cell values as text with optional formatting.
-    %
-    %   Example:
-    %       c = ic.table.TextColumn("Name", Sortable=true, Width=200)
-    %       c = ic.table.TextColumn("Notes", RichText=true, Placeholder="—")
-    %       c = ic.table.TextColumn("Code", Transform="uppercase")
+    % text column that displays cell values as plain or rich text.
 
     properties
-        % > RICHTEXT enable **bold** and *italic* inline formatting
+        % enable **bold** and _italic_ inline Markdown formatting
         RichText (1,1) logical = false
 
-        % > PLACEHOLDER muted fallback text when cell value is empty
+        % ghost fallback text shown when the cell value is empty
         Placeholder (1,1) string = ""
 
-        % > TRANSFORM CSS text-transform: "none"|"uppercase"|"lowercase"|"capitalize"
+        % CSS text-transform applied to the displayed text
         Transform (1,1) string {mustBeMember(Transform, ["none","uppercase","lowercase","capitalize"])} = "none"
     end
 
@@ -47,7 +40,7 @@ classdef TextColumn < ic.table.Column
 
     methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
-            % Case-insensitive substring match
+            % case-insensitive substring match
             mask = contains(string(columnData), string(filterValue), ...
                 'IgnoreCase', true);
         end

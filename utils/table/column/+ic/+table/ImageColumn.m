@@ -1,26 +1,15 @@
 classdef ImageColumn < ic.table.Column
-    % > IMAGECOLUMN Image column definition.
-    %
-    %   Displays cell values (ic.Asset images) as a small thumbnail
-    %   indicator in the row. Hovering reveals a larger preview popup.
-    %
-    %   Cell data must be an ic.Asset (file or URL) per row.
-    %   Use a cell column in the MATLAB table to store variable-type values,
-    %   or an ic.Asset array column.
-    %
-    %   Example:
-    %       c = ic.table.ImageColumn("photo", ...
-    %               Header="Photo", Width=60, ...
-    %               PopupWidth=240, PopupHeight=180)
+    % image column that displays cell values as thumbnails with a hover preview popup.
+    % Cell data must be an #ic.asset.Asset (file or URL) per row.
 
     properties
-        % > POPUPWIDTH width of the hover preview popup in px
+        % width of the hover preview popup, in pixels
         PopupWidth (1,1) double {mustBePositive} = 200
 
-        % > POPUPHEIGHT height of the hover preview popup in px
+        % height of the hover preview popup, in pixels
         PopupHeight (1,1) double {mustBePositive} = 150
 
-        % > OBJECTFIT CSS object-fit for the preview image
+        % CSS [object-fit](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/object-fit#browser_compatibility) for the preview image
         ObjectFit (1,1) string {mustBeMember(ObjectFit, [ ...
             "contain", "cover", "fill", "none", "scale-down" ...
             ])} = "contain"

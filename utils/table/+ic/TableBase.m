@@ -1,73 +1,109 @@
 classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
-    % > TABLEBASE Abstract base for table components.
-    %
-    %   Provides shared column configuration, sorting state, row selection,
-    %   and common events/methods for Table and TreeTable.
+    % abstract base for table components.
+    % Provides shared column configuration, sorting, filtering, row selection, and cell interaction for #ic.Table and #ic.VirtualTable
+    % {superclass}
+    % #ic.mixin.HasContextMenu
+    % {/superclass}
 
     properties (SetObservable, Description = "Reactive")
-        % > COLUMNS column definitions
+        % column definitions that control how each data field is displayed, sorted, and filtered
         Columns ic.table.Column = ic.table.Column.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > DISABLED whether the control is disabled
+        % whether all table interactions are disabled
         Disabled (1,1) logical = false
 
-        % > SIZE size of the control
+        % dimension of the table rows and text relative to the component font size
         Size (1,1) string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
 
-        % > HEIGHT height of the table (number for px, or CSS string like "100%")
+        % height of the table, in pixels or as a CSS string
         Height {ic.check.CssValidators.mustBeSize(Height)} = "auto"
 
-        % > SELECTABLE whether rows, columns, and cells can be selected
+        % whether rows, columns, and cells can be selected by clicking on them (rows can only be selected if #ic.TableBase.ShowRowNumbers is true)
         Selectable (1,1) logical = false
 
-        % > SHOWROWNUMBERS whether to show a row number column
+        % whether to show a row number column on the left edge
         ShowRowNumbers (1,1) logical = false
 
-        % > STRIPED whether to show alternating row colors
+        % whether to alternate row background colors for readability
         Striped (1,1) logical = false
 
-        % > SORTFIELD currently sorted column field ("" = no sort)
+        % field name of the currently sorted column ("" means no sort active)
         SortField (1,1) string = ""
 
-        % > SORTDIRECTION sort direction
+        % direction of the current sort
         SortDirection (1,1) string {mustBeMember(SortDirection, ...
             ["none", "asc", "desc"])} = "none"
 
-        % > SELECTION current selection state (struct with .type and .value)
+        % current selection state as a struct with fields 'type' ("none", "row", "column", or "cell") and 'value'
         Selection (1,1) struct = struct('type', 'none', 'value', [])
 
-        % > FILTERS active column filters (field → filterValue)
+        % active column filters as a struct mapping field names to filter values
         Filters (1,1) struct = struct()
     end
 
     events (Description = "Reactive")
-        % > SELECTIONCHANGED fires when the user changes the selection
+        % fires when the user changes the selection (row, column, or cell click)
+        % {payload}
+        % selection | struct: struct with fields 'type' (char) and 'value'
+        % {/payload}
         SelectionChanged
 
-        % > SORTCHANGED fires when the user clicks a sortable column header
+        % fires when the user clicks a sortable column header
+        % {payload}
+        % field | char: field name of the sorted column
+        % direction | char: sort direction ('asc' or 'desc')
+        % {/payload}
         SortChanged
 
-        % > FILTERCHANGED fires when the user changes a column filter
+        % fires when the user changes a column filter
+        % {payload}
+        % field | char: field name of the filtered column
+        % value | any: the filter value (type depends on column type)
+        % filters | struct: full filters state after the change
+        % {/payload}
         FilterChanged
 
-        % > CELLCLICKED fires when the user clicks any cell
+        % fires when the user clicks any cell
+        % {payload}
+        % field | char: column field name
+        % rowIndex | double: row index
+        % value | any: cell value
+        % rowData | struct: full row data
+        % {/payload}
         CellClicked
 
-        % > ROWCLICKED fires when the user clicks any row
+        % fires when the user clicks any row
+        % {payload}
+        % rowIndex | double: row index
+        % rowData | struct: full row data
+        % {/payload}
         RowClicked
 
-        % > COLUMNCLICKED fires when the user clicks a column header
+        % fires when the user clicks a column header
+        % {payload}
+        % field | char: field name of the clicked column
+        % column | struct: column definition
+        % {/payload}
         ColumnClicked
-
     end
 
     events
-        % > COLUMNRESIZED fires when the user finishes resizing a column
+        % fires when the user finishes resizing a column
+        % {payload}
+        % field | char: field name of the resized column
+        % width | double: new column width in pixels
+        % {/payload}
         ColumnResized
 
-        % > CELLEDITED fires when the user edits a cell value inline
+        % fires when the user edits a cell value inline (non-reactive, dispatched from MATLAB)
+        % {payload}
+        % field | char: field name of the edited column
+        % rowIndex | double: row index
+        % oldValue | any: previous cell value
+        % newValue | any: new cell value after editing
+        % {/payload}
         CellEdited
     end
 
@@ -97,7 +133,7 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
 
     methods (Access = protected)
         function dispatchCellAction(this, data)
-            % > DISPATCHCELLACTION route a cell action to the column's callback.
+            % route a cell action to the column's OnCellAction callback
             field = string(data.field);
             cols = this.Columns;
             idx = find(arrayfun(@(c) c.Field == field, cols), 1);
@@ -106,13 +142,13 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
             col = cols(idx);
             if isempty(col.OnCellAction), return; end
 
-            % Convert 0-based row index from view to 1-based
+            % convert 0-based row index from view to 1-based
             rowIndex = double(data.rowIndex) + 1;
             col.OnCellAction(col, rowIndex, data.data);
         end
 
         function handleColumnResized(this, data)
-            % > HANDLECOLUMNRESIZED update column Width and fire event.
+            % update column Width and fire ColumnResized event
             field = string(data.field);
             width = double(data.width);
             cols = this.Columns;
@@ -126,7 +162,7 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
         end
 
         function handleCellEdited(this, data)
-            % > HANDLECELLEDITED update Data silently and fire CellEdited event.
+            % update Data silently and fire CellEdited event
             field = string(data.field);
             rowIndex = double(data.rowIndex) + 1;  % 0-based → 1-based
             newValue = data.newValue;
@@ -158,29 +194,35 @@ classdef (Abstract) TableBase < ic.core.Component & ic.mixin.HasContextMenu
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the table container
+            % programmatically focus the table container
             out = this.publish("focus", []);
         end
 
         function out = clearSelection(this)
-            % > CLEARSELECTION clear the current selection
+            % clear the current selection
             this.setValueSilently('Selection', struct('type', 'none', 'value', []));
             out = this.publish("clearSelection", []);
         end
 
         function out = scrollToRow(this, rowKey)
-            % > SCROLLTOROW scroll to a specific row by key
-            %   t.scrollToRow(5)       % flat table — row index
-            %   t.scrollToRow("1-3")   % tree table — positional key
+            % scroll to a specific row by key.
+            arguments
+                this
+                % value of the row key field to scroll to
+                % For #ic.Table and #ic.VirtualTable, pass a row index.
+                % For #ic.TreeTable and #ic.VirtualTreeTable, pass the positional key string
+                rowKey (1,1) string
+            end
             out = this.publish("scrollToRow", struct('key', rowKey));
         end
 
         function out = focusCell(this, rowIndex, field)
-            % > FOCUSCELL scroll to and focus a specific cell
-            %   t.focusCell(3, "Name")
+            % scroll to and focus a specific cell
             arguments
                 this
+                % row index
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
+                % column field name
                 field (1,1) string
             end
             out = this.publish("focusCell", struct( ...

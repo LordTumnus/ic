@@ -1,20 +1,11 @@
 classdef EnumColumn < ic.table.Column
-    % > ENUMCOLUMN Categorical column with fixed values, per-value coloring,
-    %   and ordinal sorting.
-    %
-    %   Displays cell values as colored tag pills. Sorting uses the Items
-    %   array order (first = lowest). Filtering shows a checkbox dropdown.
-    %
-    %   Example:
-    %       c = ic.table.EnumColumn("Status", ...
-    %           Items=["Active","Inactive","Pending","Archived"], ...
-    %           Colors=["#4ade80","#f87171","#facc15","#94a3b8"])
+    % categorical column with a fixed set of values displayed as colored tag pills.
 
     properties
-        % > ITEMS ordered set of allowed values (also defines sort priority)
+        % ordered set of allowed values. Item order defines sorting priority
         Items (1,:) string = string.empty
 
-        % > COLORS hex color per item (parallel to Items). "" = no color.
+        % hex color per item, parallel to Items. An empty value or missing color means "default text color
         Colors (1,:) string = string.empty
     end
 
@@ -51,7 +42,7 @@ classdef EnumColumn < ic.table.Column
 
     methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
-            % Membership check: filterValue is a string/cell array of selected items
+            % membership check: filterValue is a string/cell array of selected items
             selected = string(filterValue);
             if isempty(selected)
                 mask = true(numel(columnData), 1);
@@ -61,14 +52,14 @@ classdef EnumColumn < ic.table.Column
         end
 
         function keys = sortKey(this, columnData)
-            % Sort by ordinal position in Items (first = lowest)
+            % sort by ordinal position in Items (first = lowest)
             items = this.Items;
             if isempty(items)
                 keys = string(columnData);
                 return;
             end
             [~, keys] = ismember(string(columnData), items);
-            % Unmapped values (0 from ismember) sort to end
+            % unmapped values (0 from ismember) sort to end
             keys(keys == 0) = numel(items) + 1;
         end
     end

@@ -1,38 +1,25 @@
 classdef ProgressBarColumn < ic.table.Column
-    % > PROGRESSBARCOLUMN Progress-bar column definition.
-    %
-    %   Displays cell values as an inline progress bar with optional label.
-    %   Supports variant colors, conditional bar coloring via ColorRules,
-    %   and sprintf-style label formatting.
-    %
-    %   Example:
-    %       c = ic.table.ProgressBarColumn("completion", Max=100, ...
-    %               ShowLabel=true, Variant="success")
-    %       c = ic.table.ProgressBarColumn("score", ...
-    %               ColorRules=[
-    %                   ic.table.ColorRule(">=", 80, "#4ade80")
-    %                   ic.table.ColorRule("<",  40, "#f87171")
-    %               ])
+    % inline progress bar column for numeric values within a range.
 
     properties
-        % > MIN minimum value of the range
+        % minimum value of the range (maps to 0% fill)
         Min (1,1) double = 0
 
-        % > MAX maximum value of the range
+        % maximum value of the range (maps to 100% fill)
         Max (1,1) double = 100
 
-        % > SHOWLABEL display formatted value beside the bar
+        % whether to display the formatted value next to the bar
         ShowLabel (1,1) logical = false
 
-        % > LABELFORMAT sprintf-style format (%d, %f, %.Nf, %% for literal %)
+        % sprintf-style format for the label (supports %d, %f, %.Nf, %% for literal %)
         LabelFormat (1,1) string = "%d%%"
 
-        % > VARIANT bar fill color variant
+        % bar fill color variant
         Variant (1,1) string {mustBeMember(Variant, [ ...
             "primary", "secondary", "success", "warning", "destructive" ...
             ])} = "primary"
 
-        % > COLORRULES conditional bar color rules (first match wins)
+        % conditional bar color rules evaluated against the cell value. First matching rule wins
         ColorRules ic.table.ColorRule = ic.table.ColorRule.empty
     end
 
@@ -63,7 +50,7 @@ classdef ProgressBarColumn < ic.table.Column
 
     methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
-            % Range check (same as NumberColumn)
+            % range check (same as NumberColumn)
             data = double(columnData);
             mask = true(numel(data), 1);
             if isfield(filterValue, 'min') && ~isempty(filterValue.min)

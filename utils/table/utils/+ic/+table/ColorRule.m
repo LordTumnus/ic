@@ -1,36 +1,36 @@
 classdef ColorRule
-    % > COLORRULE Conditional color rule for table columns.
-    %
-    %   Defines a condition and a color to apply when the condition is met.
-    %   First matching rule wins.
-    %
-    %   Example (numeric):
-    %       rules = [
-    %           ic.table.ColorRule(">",  90, "#4ade80")   % green
-    %           ic.table.ColorRule("<",  50, "#f87171")   % red
-    %           ic.table.ColorRule("between", [60 80], "#facc15")
-    %       ];
-    %
-    %   Example (datetime):
-    %       ic.table.ColorRule("<", datetime(2024,1,1), "#fca5a5")
+    % conditional color rule for table columns.
+    % Defines a comparison condition that is evaluated for all the cells in the column. When the condition is met, the specified color is applied.
+    % When multiple rules are defined on a column (as an array of #ic.table.ColorRule), the first successful rule for a specific cell wins (early return)
 
     properties
-        % > OPERATOR comparison operator
+        % comparison operator
         Operator (1,1) string {mustBeMember(Operator, ...
             [">", ">=", "<", "<=", "==", "~=", "between"])} = ">"
 
-        % > VALUE threshold (scalar or [lo hi] for "between")
+        % threshold value. Scalar for most operators, or [lo hi] for "between"
         Value = 0
 
-        % > COLOR hex color string, e.g. "#4ade80"
+        % hex color string applied when the condition matches
         Color (1,1) string = ""
     end
 
     methods
         function this = ColorRule(op, val, color)
+            % construct a color rule.
+            % {example}
+            %   rules = [
+            %       ic.table.ColorRule(">",  90, "#4ade80")
+            %       ic.table.ColorRule("<",  50, "#f87171")
+            %       ic.table.ColorRule("between", [60 80], "#facc15")
+            %   ];
+            % {/example}
             arguments
+                % comparison operator
                 op    (1,1) string = ">"
+                % threshold value (scalar or [lo hi] for "between")
                 val = 0
+                % hex color string
                 color (1,1) string = ""
             end
             this.Operator = op;
@@ -39,7 +39,6 @@ classdef ColorRule
         end
 
         function s = toStruct(this)
-            % > TOSTRUCT Convert array to struct array for JSON.
             n = numel(this);
             if n == 0
                 s = struct('op',{},'value',{},'color',{});

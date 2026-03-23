@@ -1,9 +1,5 @@
 classdef Panel < ic.core.ComponentContainer
-    % > PANEL Simple container for grouping child components.
-    %
-    % The Panel provides a minimal container that can hold child components.
-    % It serves as a basic building block for organizing UI layouts.
-    % Created with display:block, by default fills the width of its container
+    % simple container for grouping child components.
 
     methods
         function this = Panel(props)

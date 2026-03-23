@@ -1,32 +1,20 @@
 classdef NumberColumn < ic.table.Column
-    % > NUMBERCOLUMN Numeric column definition.
-    %
-    %   Displays cell values as formatted numbers with optional prefix/suffix,
-    %   thousands separator, and conditional background coloring.
-    %
-    %   Example:
-    %       c = ic.table.NumberColumn("Price", Prefix="$", Decimals=2, ...
-    %               ThousandsSeparator=true)
-    %       c = ic.table.NumberColumn("Score", Suffix="%", Decimals=1, ...
-    %               ColorRules=[
-    %                   ic.table.ColorRule(">",  90, "#4ade80")
-    %                   ic.table.ColorRule("<",  50, "#f87171")
-    %               ])
+    % numeric column with formatting, prefix/suffix, and conditional coloring.
 
     properties
-        % > DECIMALS number of decimal places (-1 = auto, no rounding)
+        % number of decimal places to display (-1 = auto, no rounding)
         Decimals (1,1) double = -1
 
-        % > PREFIX string prepended to the formatted number (e.g. "$")
+        % string prepended to the formatted number
         Prefix (1,1) string = ""
 
-        % > SUFFIX string appended to the formatted number (e.g. "%")
+        % string appended to the formatted number
         Suffix (1,1) string = ""
 
-        % > THOUSANDSSEPARATOR add comma separators for thousands
+        % whether to add comma separators for thousands
         ThousandsSeparator (1,1) logical = false
 
-        % > COLORRULES conditional background color rules (first match wins)
+        % conditional background color rules evaluated against the cell value
         ColorRules ic.table.ColorRule = ic.table.ColorRule.empty
     end
 
@@ -56,7 +44,7 @@ classdef NumberColumn < ic.table.Column
 
     methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
-            % Range check: filterValue has optional .min and .max
+            % range check: filterValue has optional .min and .max
             data = double(columnData);
             mask = true(numel(data), 1);
             if isfield(filterValue, 'min') && ~isempty(filterValue.min)

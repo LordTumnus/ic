@@ -1,39 +1,39 @@
 classdef CellButton
-    % > CELLBUTTON Definition of a single button inside a ButtonColumn cell.
-    %
-    %   Value class defining a button's appearance and identity.
-    %   Used in arrays to populate ButtonColumn.Buttons.
-    %
-    %   Example:
-    %       btns = [
-    %           ic.table.CellButton("edit",   Label="Edit",   Icon="pencil")
-    %           ic.table.CellButton("delete", Icon="trash-2", Variant="destructive")
-    %       ];
+    % definition of a single button inside a #ic.table.ButtonColumn cell.
+    % When clicked, the button's #ic.table.CellButton.Key is passed to the column's #ic.TableBase.OnCellAction callback via the data.action field.
 
     properties
-        % > KEY unique action identifier (returned in OnCellAction payload)
+        % unique action identifier passed in the #ic.TableBase.OnCellAction callback
         Key (1,1) string
 
-        % > LABEL button text (empty = icon-only)
+        % button text
         Label (1,1) string = ""
 
-        % > ICON icon source (Lucide name, file path, or URL)
+        % icon displayed in the button
         Icon ic.asset.Asset = ic.asset.Asset.empty
 
-        % > TOOLTIP hover tooltip text
+        % text displayed on hover
         Tooltip (1,1) string = ""
 
-        % > VARIANT visual style
+        % visual style variant
         Variant (1,1) string {mustBeMember(Variant, ...
             ["default", "primary", "destructive"])} = "default"
 
-        % > DISABLED whether the button is disabled
+        % whether the button is disabled
         Disabled (1,1) logical = false
     end
 
     methods
         function this = CellButton(key, opts)
+            % construct a cell button definition.
+            % {example}
+            %   btns = [
+            %       ic.table.CellButton("edit", Label="Edit", Icon="pencil")
+            %       ic.table.CellButton("delete", Icon="trash-2", Variant="destructive")
+            %   ];
+            % {/example}
             arguments
+                % unique action key
                 key (1,1) string
                 opts.?ic.table.CellButton
             end
@@ -47,7 +47,6 @@ classdef CellButton
         end
 
         function s = toStruct(this)
-            % > TOSTRUCT Convert array to struct array for JSON.
             n = numel(this);
             if n == 0
                 s = struct('key',{},'label',{},'icon',{}, ...

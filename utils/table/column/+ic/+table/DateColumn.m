@@ -1,23 +1,13 @@
 classdef DateColumn < ic.table.Column
-    % > DATECOLUMN Date/datetime column with format presets.
-    %
-    %   Displays date values formatted using named presets. Sorting is
-    %   chronological. Filter uses a date-range picker.
-    %
-    %   MATLAB datetime arrays serialize to ISO 8601 via jsonencode,
-    %   which the frontend parses natively.
-    %
-    %   Example:
-    %       c = ic.table.DateColumn("BirthDate", ...
-    %           Format="short", Sortable=true, Filterable=true)
+    % date/datetime column with format presets and chronological sorting.
 
     properties
-        % > FORMAT display format preset
+        % display format preset
         Format (1,1) string {mustBeMember(Format, [ ...
             "short", "long", "numeric", "iso", "datetime", "time" ...
             ])} = "short"
 
-        % > COLORRULES conditional background color rules (first match wins)
+        % conditional background color rules evaluated against the date value
         ColorRules ic.table.ColorRule = ic.table.ColorRule.empty
     end
 
@@ -46,7 +36,7 @@ classdef DateColumn < ic.table.Column
 
     methods (Access = {?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function mask = filterColumn(~, columnData, filterValue)
-            % Date range check: filterValue has optional .min and .max (ISO strings)
+            % date range check: filterValue has optional .min and .max (ISO strings)
             mask = true(numel(columnData), 1);
             if isfield(filterValue, 'min') && ~isempty(filterValue.min)
                 minDate = datetime(string(filterValue.min), ...
@@ -62,7 +52,7 @@ classdef DateColumn < ic.table.Column
                 if ~isempty(columnData.TimeZone)
                     maxDate.TimeZone = columnData.TimeZone;
                 end
-                % End of day inclusive
+                % end of day inclusive
                 maxDate = maxDate + days(1) - milliseconds(1);
                 mask = mask & (columnData <= maxDate);
             end

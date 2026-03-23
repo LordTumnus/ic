@@ -1,23 +1,10 @@
 classdef Table < ic.TableBase
-    % > TABLE Flat data table with rich column types.
-    %
-    %   Displays tabular data from a MATLAB table with sortable/filterable
-    %   columns. Supports text, number, badge, sparkline, progress, boolean,
-    %   button, link, icon, and avatar cell renderers.
-    %
-    %   Example:
-    %       t = ic.Table();
-    %       t.Data = table(["Alice";"Bob"], [30;25], ...
-    %           'VariableNames', ["Name","Age"]);
-    %       t.Columns = [
-    %           ic.table.Column("Name", Sortable=true)
-    %           ic.table.Column("Age", Type="number", Sortable=true)
-    %       ];
-    %       t.Striped = true;
-    %       addlistener(t, 'RowClicked', @(~,e) disp(e.Data));
+    % flat data table with rich column types.
+    % Suitable for small-to-medium datasets (up to ~5000 rows). For larger datasets, use #ic.VirtualTable which virtualizes scrolling and performs server-side sort/filter.
+    % {note} Avoid modifying the #ic.Table.Data property directly for large tables, as it triggers a full re-render. Instead, use the #ic.Table.editCell, #ic.Table.removeRow, and #ic.Table.removeColumn methods which update the data more efficiently and preserve selection state. {/note}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > DATA the table data (MATLAB table)
+        % the table data as a MATLAB table. Columns are auto-inferred on first assignment if #ic.TableBase.Columns is empty
         Data table = table()
     end
 
@@ -31,7 +18,7 @@ classdef Table < ic.TableBase
         end
 
         function set.Data(this, val)
-            % Clear selection when data changes
+            % clear selection when data changes
             this.setValueSilently('Selection', struct('type', 'none', 'value', []));
             % auto-infer columns if empty
             if isempty(this.Columns) && ~isempty(val) && height(val) > 0
@@ -43,9 +30,10 @@ classdef Table < ic.TableBase
 
     methods (Description = "Reactive")
         function out = removeRow(this, rowIndex)
-            % > REMOVEROW Remove a row by 1-based index
+            % remove a row
             arguments
                 this
+                % row index to remove
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
             end
             assert(rowIndex <= height(this.Data), "ic:Table:RowOutOfRange", ...
@@ -91,9 +79,10 @@ classdef Table < ic.TableBase
         end
 
         function out = removeColumn(this, field)
-            % > REMOVECOLUMN Remove a column by field name
+            % remove a column by field name
             arguments
                 this
+                % field name of the column to remove
                 field (1,1) string
             end
             assert(ismember(field, this.Data.Properties.VariableNames), ...
@@ -141,11 +130,14 @@ classdef Table < ic.TableBase
         end
 
         function out = editCell(this, rowIndex, field, value)
-            % > EDITCELL Update a single cell
+            % update a single cell value programmatically
             arguments
                 this
+                % row index
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
+                % column field name
                 field (1,1) string
+                % new cell value
                 value
             end
             assert(rowIndex <= height(this.Data), "ic:Table:RowOutOfRange", ...

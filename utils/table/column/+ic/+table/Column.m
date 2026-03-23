@@ -1,69 +1,64 @@
-classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
-    % > COLUMN Definition of a single table column.
-    %
-    %   Specifies how a column of data is displayed, including its
-    %   header text, cell renderer type, width, sort/filter behavior,
-    %   alignment, and type-specific configuration.
+classdef Column < matlab.mixin.Heterogeneous & ...
+                  ic.event.TransportData
+    % definition of a single table column.
+    % Specifies how a data field is displayed, including its header text, cell renderer, width, sort/filter behavior, alignment, and type-specific configuration
 
     properties
-        % > FIELD data field name (table variable or struct field)
+        % data field name (table variable name or struct field name) that this column reads from
         Field (1,1) string
 
-        % > HEADER display text in the column header (defaults to Field)
+        % display text in the column header. Defaults to #ic.table.Column.Field if empty
         Header (1,1) string = ""
 
-        % > TYPE cell renderer type
+        % cell renderer type that determines how values are displayed
         Type (1,1) string {mustBeMember(Type, [ ...
             "text", "number", "boolean", "progressbar", "sparkline", ...
             "image", "enum", "rating", "date", "button", "color" ...
             ])} = "text"
 
-        % > WIDTH column width — number for px, or string for CSS (e.g. "20%")
+        % column width, in pixels or as a CSS string. If empty, width is automatic based on content.
         Width = ""
 
-        % > MINWIDTH minimum column width in px (0 = no minimum)
+        % minimum column width in pixels (0 = no minimum)
         MinWidth (1,1) double {mustBeNonnegative} = 0
 
-        % > SORTABLE whether clicking the header sorts by this column
+        % whether clicking the header sorts the table by this column
         Sortable (1,1) logical = false
 
-        % > FILTERABLE whether the header shows a filter button
+        % whether the header shows a filter button
         Filterable (1,1) logical = false
 
-        % > RESIZABLE whether the column can be resized by dragging
+        % whether the column can be resized by dragging one of its header edges
         Resizable (1,1) logical = true
 
-        % > ALIGN cell text alignment ("auto" infers from Type)
+        % cell text alignment. "auto" infers from the column Type (e.g. numbers align right)
         Align (1,1) string {mustBeMember(Align, [ ...
             "left", "center", "right", "auto" ...
             ])} = "auto"
 
-        % > PINNED pin column to left or right edge
+        % pin the column to the left or right edge of the table, so that it remains visible when horizontally scrolling
         Pinned (1,1) string {mustBeMember(Pinned, [ ...
             "none", "left", "right" ...
             ])} = "none"
 
-        % > VISIBLE whether this column is shown (false hides it)
+        % whether this column is visible
         Visible (1,1) logical = true
 
-        % > EDITABLE whether cells in this column can be edited inline
+        % whether cells in this column can be edited inline by double-clicking
         Editable (1,1) logical = false
 
-        % > CONFIG type-specific configuration struct (use typed subclasses instead)
+        % type-specific configuration struct. Prefer using typed subclasses instead of setting this directly
         Config (1,1) struct = struct()
 
-        % > ONCELLACTION callback: @(column, rowIndex, data)
+        % callback invoked when a cell action is triggered. The callback signature should be @(column, rowIndex, data) callback(column, rowIndex, data)
         OnCellAction function_handle = function_handle.empty
 
-        % > CONTEXTMENU right-click context menu entries for this column
+        % context menu entries shown on right-click in this column's cells
         ContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     methods
         function this = Column(field, opts)
-            % > COLUMN Construct a column definition.
-            %   c = ic.table.Column("name")
-            %   c = ic.table.Column("age", Type="number", Sortable=true)
             arguments
                 field (1,1) string = ""
                 opts.?ic.table.Column
@@ -81,7 +76,6 @@ classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
 
     methods (Sealed)
         function s = toStruct(this)
-            % > TOSTRUCT Convert column array to struct array for JSON.
             n = numel(this);
             if n == 0
                 s = struct('field',{},'header',{},'type',{}, ...
@@ -125,16 +119,14 @@ classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
         end
 
         function json = jsonencode(this, varargin)
-            % > JSONENCODE Serialize to JSON via struct conversion.
             json = jsonencode(this.toStruct(), varargin{:});
         end
     end
 
     methods (Access = protected)
         function this = initFromOpts(this, type, opts)
-            % > INITFROMOPTS Set common + type-specific properties, lock Type.
-            %   Filters out Type and Config (managed internally by subclasses),
-            %   then applies all remaining name-value pairs.
+            % set common + type-specific properties, lock Type.
+            % Used by typed subclass constructors
             opts = rmfield(opts, ...
                 intersect(fieldnames(opts), {'Type','Config'}));
             fns = fieldnames(opts);
@@ -148,18 +140,16 @@ classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
         end
 
         function cfg = buildConfig(this)
-            % > BUILDCONFIG Return type-specific config struct for JSON.
-            %   Base class returns raw Config property (backward compat).
-            %   Subclasses override to construct config from named properties.
+            % return type-specific config struct for JSON.
+            % Subclasses override to construct config from named properties
             cfg = this.Config;
         end
     end
 
     methods (Access={?ic.TableBase, ?ic.TreeBase, ?ic.table.Column})
         function val = coerceEditValue(~, rawValue, colData)
-            % > COERCEEDITVALUE Convert a raw JSON value to the column's MATLAB type.
-            %   Subclasses override for type-specific conversions (e.g. datetime).
-            %   Default: convert char → string; categorical wrapping.
+            % convert a raw JSON edit value to the column's MATLAB type.
+            % Subclasses override for type-specific conversions (e.g. datetime)
             val = rawValue;
             if ischar(val), val = string(val); end
             if iscategorical(colData)
@@ -168,25 +158,14 @@ classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
         end
 
         function mask = filterColumn(~, columnData, ~)
-            % > FILTERCOLUMN Server-side filter: return logical mask.
-            %   Vectorized operation on the full column vector. Returns a
-            %   logical array where true = row passes the filter.
-            %
-            %   Subclasses override for type-specific logic. Base returns
-            %   all-true (column type does not support filtering).
-            %
-            %   Universal isEmpty/isNotEmpty are handled by the caller
-            %   (VirtualTable.recomputeView) before dispatching here.
+            % server-side filter: return logical mask over the column data.
+            % Base returns all-true (unsupported column type). Subclasses override for type-specific logic
             mask = true(numel(columnData), 1);
         end
 
         function keys = sortKey(~, columnData)
-            % > SORTKEY Server-side sort key extraction.
-            %   Returns a vector suitable for MATLAB's sort(). Base returns
-            %   data as-is (works for numeric, string, datetime).
-            %
-            %   Subclasses override when sort order differs from natural
-            %   order (e.g. EnumColumn sorts by ordinal position).
+            % server-side sort key extraction.
+            % Returns a vector suitable for MATLAB's sort(). Subclasses override when sort order differs from natural order
             keys = columnData;
         end
     end
@@ -199,9 +178,13 @@ classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
 
     methods (Static)
         function cols = fromTable(t)
-            % > FROMTABLE Auto-infer typed columns from a MATLAB table.
-            %   cols = ic.table.Column.fromTable(myTable)
+            % auto-infer typed columns from a MATLAB table.
+            % {returns} an array of #ic.table.Column objects with Field set to the table variable names, and Type inferred from the variable data type {/returns}
+            % {example}
+            %   cols = ic.table.Column.fromTable(myTable);
+            % {/example}
             arguments
+                % table from which to infer columns
                 t table
             end
             varNames = t.Properties.VariableNames;
@@ -228,9 +211,12 @@ classdef Column < matlab.mixin.Heterogeneous & ic.event.TransportData
         end
 
         function cols = fromStruct(s)
-            % > FROMSTRUCT Auto-infer columns from a struct's field names.
-            %   cols = ic.table.Column.fromStruct(struct('name',"A",'age',30))
+            % auto-infer text columns from a struct's field names.
+            % {example}
+            %   cols = ic.table.Column.fromStruct(struct('name', "A", 'age', 30));
+            % {/example}
             arguments
+                % struct from which to infer columns
                 s (1,1) struct
             end
             fields = fieldnames(s);
