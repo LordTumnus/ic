@@ -1,7 +1,6 @@
 classdef TabPanel < ic.core.ComponentContainer
-    % > TABPANEL Content container for a tab within ic.TabContainer.
-    %
-    % Users add children to the panel returned by addTab().
+    % content container for a tab within an #ic.TabContainer or #ic.TileLayout.
+    % Add child components to the panel returned by #ic.TabContainer.addTab or #ic.TileLayout.addTab.
 
     methods (Access = {?ic.TabContainer, ?ic.TileLayout})
         function this = TabPanel(props)

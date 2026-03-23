@@ -1,55 +1,43 @@
 classdef Accordion < ic.core.ComponentContainer
-    % > ACCORDION Collapsible panel container with expandable sections.
-    %
-    % Each section is an AccordionPanel with its own Label, Icon, and
-    % Open state. Panels are added via addPanel() and hold child
-    % components in their default slot.
-    %
-    % Example:
-    %   acc = ic.Accordion(Multiple=false, Size="md");
-    %   p1 = acc.addPanel("General", Icon="settings");
-    %   p1.addChild(ic.InputText(Label="Name"));
-    %
-    %   p2 = acc.addPanel("Advanced", Icon="sliders");
-    %   p2.addChild(ic.Slider(Label="Speed"));
-    %
-    %   p1.Open = true;
-    %   addlistener(acc, 'PanelToggled', @(~, e) disp(e.Data));
+    % collapsible panel container with expandable sections.
+    % Each section is an AccordionPanel with its own Label, Icon, and Open state. Panels are added via #ic.Accordion.addPanel and hold child components in their content area.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > MULTIPLE allow multiple panels open simultaneously
+        % whether multiple panels can be open at the same time. When false, opening a panel closes any other open panel
         Multiple (1,1) logical = true
 
-        % > SIZE header size: 'sm', 'md', or 'lg'
+        % dimension of the panel headers relative to the component font size
         Size (1,1) string {mustBeMember(Size, ...
             ["sm", "md", "lg"])} = "md"
 
-        % > DISABLED disable all panel interactions when true
+        % whether all panel interactions are disabled
         Disabled (1,1) logical = false
     end
 
     properties (Dependent, SetAccess = private)
-        % > PANELS array of AccordionPanel children (read-only)
+        % array of #ic.accordion.AccordionPanel children
         Panels
     end
 
     properties (Access = private)
-        % Monotonic counter — never decremented, ensures unique targets
+        % monotonic counter
         NextPanelIndex (1,1) double = 0
 
-        % Guard flag: prevents handlePanelDestroyed from duplicating
+        % guard flag: prevents handlePanelDestroyed from duplicating
         % cleanup that removePanel already handles.
         IsRemovingPanel (1,1) logical = false
     end
 
     events (Description = "Reactive")
-        % > PANELTOGGLED fires when a panel is opened or closed from the UI
+        % fires when a panel is opened or closed by the user
+        % {payload}
+        % value | struct: struct with fields 'target' (char) and 'open' (logical)
+        % {/payload}
         PanelToggled
     end
 
     methods
         function this = Accordion(props)
-            % > ACCORDION Create an accordion container.
             arguments
                 props.?ic.Accordion
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
@@ -68,16 +56,22 @@ classdef Accordion < ic.core.ComponentContainer
         end
 
         function panel = addPanel(this, name, props)
-            % > ADDPANEL Add a new panel, returns the AccordionPanel.
-            %
-            % Example:
+            % add a new panel to the accordion.
+            % {returns} the created #ic.accordion.AccordionPanel {/returns}
+            % {example}
+            %   acc = ic.Accordion();
             %   p = acc.addPanel("General", Icon="settings", Open=true);
-            %   p.addChild(ic.InputText(Label="Name"));
+            %   p.addChild(ic.InputText(Placeholder="Name"));
+            % {/example}
             arguments
                 this
+                % name of the new panel
                 name (1,1) string = ""
+                % whether the panel is open by default
                 props.Open (1,1) logical = false
+                % whether the panel is disabled
                 props.Disabled (1,1) logical = false
+                % optional icon for the panel header
                 props.Icon ic.asset.Asset = ic.asset.Asset.empty
             end
 
@@ -86,7 +80,7 @@ classdef Accordion < ic.core.ComponentContainer
 
             panelTarget = sprintf("panel-%d", idx);
 
-            % Build AccordionPanel
+            % build AccordionPanel
             panelProps = struct();
             panelProps.ID = this.ID + "-panel-" + idx;
             panelProps.Label = name;
@@ -97,25 +91,23 @@ classdef Accordion < ic.core.ComponentContainer
             args = namedargs2cell(panelProps);
             panel = ic.accordion.AccordionPanel(args{:});
 
-            % Register target and add child
+            % register target and add child
             this.Targets = [this.Targets, panelTarget];
             this.addChild(panel, panelTarget);
 
-            % Listen for direct delete(panel) — clean up targets
+            % listen for direct delete(panel) and clean up targets
             addlistener(panel, 'ObjectBeingDestroyed', ...
                 @(src, ~) this.handlePanelDestroyed(src));
         end
 
         function removePanel(this, panelOrTarget)
-            % > REMOVEPANEL Remove and delete a panel from the container.
-            %
-            % Accepts an AccordionPanel handle or a target string.
-            %
-            % Example:
-            %   acc.removePanel(panel);
-            %   acc.removePanel("panel-2");
+            % remove and delete a panel from the accordion.
+            % {example}
+            %   acc.removePanel(p);
+            % {/example}
             arguments
                 this
+                % #ic.accordion.AccordionPanel handle or target string to remove
                 panelOrTarget
             end
 
@@ -137,7 +129,7 @@ classdef Accordion < ic.core.ComponentContainer
         end
 
         function expandAll(this)
-            % > EXPANDALL Open all panels.
+            % open all panels
             panels = this.Panels;
             for i = 1:numel(panels)
                 panels(i).Open = true;
@@ -145,7 +137,7 @@ classdef Accordion < ic.core.ComponentContainer
         end
 
         function collapseAll(this)
-            % > COLLAPSEALL Close all panels.
+            % close all panels
             panels = this.Panels;
             for i = 1:numel(panels)
                 panels(i).Open = false;
@@ -153,9 +145,8 @@ classdef Accordion < ic.core.ComponentContainer
         end
     end
 
-    methods (Access = public)
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD only AccordionPanel allowed as children
             assert(isa(child, "ic.accordion.AccordionPanel"), ...
                 "ic:Accordion:InvalidChild", ...
                 "Accordion only accepts AccordionPanel children. " + ...
@@ -167,7 +158,6 @@ classdef Accordion < ic.core.ComponentContainer
 
     methods (Access = private)
         function handlePanelDestroyed(this, panel)
-            % Called via ObjectBeingDestroyed listener on each panel.
             if ~isvalid(this), return; end
             if this.IsRemovingPanel, return; end
 
@@ -176,7 +166,6 @@ classdef Accordion < ic.core.ComponentContainer
         end
 
         function panel = findPanelByTarget(this, target)
-            % > FINDPANELBYTARGET look up a panel by its target string.
             panels = this.Panels;
             mask = arrayfun(@(p) p.Target == target, panels);
             idx = find(mask, 1);

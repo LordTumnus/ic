@@ -1,33 +1,30 @@
 classdef GridContainer < ic.core.ComponentContainer
-    % > GRIDCONTAINER CSS Grid-based layout container for arranging child components.
-    %
-    % The GridContainer provides a two-dimensional grid layout model
-    % for organizing child components with configurable columns, rows,
-    %  alignment, spacing, and auto-placement behavior.
+    % css grid layout container for arranging child components in a two-dimensional grid
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > COLUMNS grid-template-columns: defines column track sizes
+        % column track sizes as a CSS [grid-template-columns](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/grid-template-columns) string
         Columns {ic.check.CssValidators.mustBeGridTemplate} = "1fr"
 
-        % > ROWS grid-template-rows: defines row track sizes
+        % row track sizes as a CSS [grid-template-rows](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/grid-template-rows) string
+
         Rows {ic.check.CssValidators.mustBeGridTemplate} = "auto"
 
-        % > GAP spacing between grid items
+        % spacing between grid cells, in pixels or as a CSS string
         Gap {ic.check.CssValidators.mustBeGap} = 8
 
-        % > ALIGNITEMS align-items: vertical alignment of items within their cells
+        % vertical alignment of items within their grid cells
         AlignItems string {mustBeMember(AlignItems, ...
             ["start", "center", "end", "stretch", "baseline"])} = "stretch"
 
-        % > JUSTIFYITEMS justify-items: horizontal alignment of items within their cells
+        % horizontal alignment of items within their grid cells
         JustifyItems string {mustBeMember(JustifyItems, ...
             ["start", "center", "end", "stretch"])} = "stretch"
 
-        % > AUTOFLOW grid-auto-flow: controls auto-placement algorithm
+        % auto-placement algorithm used when items are not explicitly positioned
         AutoFlow string {mustBeMember(AutoFlow, ...
             ["row", "column", "dense", "row-dense", "column-dense"])} = "row"
 
-        % > PADDING internal padding
+        % internal padding, in pixels or as a CSS string
         Padding {ic.check.CssValidators.mustBeSpacing} = 0
     end
 

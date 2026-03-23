@@ -1,42 +1,32 @@
 classdef SplitterPane < ic.core.ComponentContainer
-    % > SPLITTERPANE A single pane within a Splitter container.
-    %
-    % SplitterPane holds sizing constraints and user content for one
-    % pane of a Splitter. Create panes via Splitter.addPane(), not
-    % directly.
-    %
-    % Example:
-    %   s = ic.Splitter();
-    %   pane = s.addPane();
-    %   pane.Size = 30;
-    %   pane.MinSize = 10;
-    %   pane.SnapSize = 5;
-    %   pane.collapse();
+    % single pane within an #ic.Splitter container.
+    % Holds sizing constraints and user content for one pane. Create panes via #ic.Splitter.addPane, not directly.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > SIZE percentage size (0-100). NaN = auto-distribute
+        % percentage size of this pane (0-100). NaN means the size is auto-distributed among remaining panes
         Size (1,1) double = NaN
 
-        % > MINSIZE minimum percentage size
+        % minimum percentage size that this pane can be resized to
         MinSize (1,1) double = 0
 
-        % > MAXSIZE maximum percentage size
+        % maximum percentage size that this pane can be resized to
         MaxSize (1,1) double = 100
 
-        % > SNAPSIZE snap threshold percentage; snaps to min when within minSize + snapSize
+        % snap threshold percentage. When the pane is dragged within #ic.SplitterPane.MinSize + #ic.SplitterPane.SnapSize, it snaps to its minimum
         SnapSize (1,1) double = 0
     end
 
-    methods
+    methods (Access = ?ic.Splitter)
         function this = SplitterPane(props)
-            % > SPLITTERPANE Create a splitter pane.
             arguments
                 props.?ic.SplitterPane
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
         end
+    end
 
+    methods
         function set.Size(this, val)
             if ~isnan(val)
                 val = max(this.MinSize, min(this.MaxSize, val));
@@ -59,13 +49,10 @@ classdef SplitterPane < ic.core.ComponentContainer
         end
 
         function collapse(this, direction)
-            % > COLLAPSE collapse this pane to its minimum size
-            %
-            % Direction controls which neighbor absorbs the freed space:
-            %   "left"  — left/above neighbor (default)
-            %   "right" — right/below neighbor
+            % collapse this pane to its minimum size.
             arguments
                 this
+                % controls which neighbor absorbs the freed space: "left" means the left or above neighbor (default), "right" means the right or below neighbor.
                 direction (1,1) string {mustBeMember(direction, ...
                     ["left", "right"])} = "left"
             end

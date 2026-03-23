@@ -1,73 +1,68 @@
 classdef TileLayout < ic.core.ComponentContainer
-    % > TILELAYOUT Tiling tab layout with draggable split areas.
-    %
-    % A VSCode-style layout where tabs can be dragged to edges to create
-    % new split areas. Each area is a tab group with its own selection.
-    % The split tree is managed by the frontend; MATLAB manages tabs.
-    %
-    % Example:
-    %   tl = ic.TileLayout(Size="sm");
-    %   [p1, t1] = tl.addTab("Editor", Icon="code", Closable=true);
-    %   p1.addChild(ic.CodeEditor(Language="matlab"));
-    %
-    %   [p2, t2] = tl.addTab("Console", Icon="terminal", Closable=true);
-    %   p2.addChild(ic.Label(Text="Output"));
-    %
-    %   % Tabs are auto-deleted when closed from the UI.
+    % tiling tab layout with draggable split areas.
+    % A VSCode-style layout where tabs can be dragged to edges to create new split areas. Each area is a tab group with its own selection.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > GUTTERSIZE size of resize gutter between groups (pixels)
+        % size of the resize gutter between groups, in pixels
         GutterSize (1,1) double = 3
 
-        % > SIZE tab header size: 'sm', 'md', or 'lg'
+        % dimension of the tab headers relative to the component font size
         Size (1,1) string {mustBeMember(Size, ...
             ["sm", "md", "lg"])} = "sm"
 
-        % > DISABLED disable all interactions when true
+        % whether all interactions are disabled
         Disabled (1,1) logical = false
 
-        % > DRAGENABLED enable cross-group drag-and-drop
+        % whether tabs can be dragged between groups
         DragEnabled (1,1) logical = true
     end
 
     properties (Dependent, SetAccess = private)
-        % > TABS array of Tab children (read-only)
+        % array of #ic.tab.Tab children
         Tabs
 
-        % > PANELS array of TabPanel children (read-only)
+        % array of #ic.tab.TabPanel children
         Panels
     end
 
     properties (Access = private)
-        % Monotonic counter — never decremented, ensures unique targets
+        % monotonic counter
         NextTabIndex (1,1) double = 0
 
-        % Guard flag: prevents handleTabDestroyed from duplicating
+        % guard flag: prevents handleTabDestroyed from duplicating
         % cleanup that removeTab already handles.
         IsRemovingTab (1,1) logical = false
     end
 
     events (Description = "Reactive")
-        % > TABCLOSED fires when a tab's close button is clicked
+        % fires when a tab's close button is clicked. The tab is automatically deleted after this event
+        % {payload}
+        % value | char: target string of the closed tab
+        % {/payload}
         TabClosed
 
-        % > TABMOVED fires when a tab is moved between groups
+        % fires when a tab is moved between groups via drag-and-drop
+        % {payload}
+        % value | struct: struct with fields 'tab' (char), 'fromGroup' (char), and 'toGroup' (char)
+        % {/payload}
         TabMoved
 
-        % > LAYOUTCHANGED fires on any layout change (split/merge/resize/move)
+        % fires on any layout change (split, merge, resize, or move)
+        % {payload}
+        % value | char: JSON string representing the current split tree
+        % {/payload}
         LayoutChanged
     end
 
     methods
         function this = TileLayout(props)
-            % > TILELAYOUT Create a tiling tab layout.
             arguments
                 props.?ic.TileLayout
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
 
-            % Auto-delete tabs when closed from the UI
+            % auto-delete tabs when closed from the UI
             addlistener(this, 'TabClosed', ...
                 @(~, e) this.removeTab(e.Data.value));
         end
@@ -91,16 +86,22 @@ classdef TileLayout < ic.core.ComponentContainer
         end
 
         function [panel, tab] = addTab(this, name, props)
-            % > ADDTAB Add a new tab, returns [panel, tab].
-            %
-            % Example:
+            % add a new tab to the layout.
+            % {returns} [panel, tab] — the #ic.tab.TabPanel (content area) and #ic.tab.Tab (header) {/returns}
+            % {example}
+            %   tl = ic.TileLayout();
             %   [panel, tab] = tl.addTab("Home", Icon="home", Closable=true);
             %   panel.addChild(ic.Button(Label="Click me"));
+            % {/example}
             arguments
                 this
+                % name of the new tab
                 name (1,1) string = ""
+                % whether the tab is closable
                 props.Closable (1,1) logical = false
+                % whether the tab is disabled
                 props.Disabled (1,1) logical = false
+                % optional icon for the tab header
                 props.Icon ic.asset.Asset = ic.asset.Asset.empty
             end
 
@@ -132,17 +133,17 @@ classdef TileLayout < ic.core.ComponentContainer
             this.addChild(tab, tabTarget);
             this.addChild(panel, panelTarget);
 
-            % Listen for direct delete(tab) — clean up selection/targets
+            % Listen for direct delete(tab) and clean up selection/targets
             addlistener(tab, 'ObjectBeingDestroyed', ...
                 @(src, ~) this.handleTabDestroyed(src));
         end
 
         function removeTab(this, tabOrTarget)
-            % > REMOVETAB Remove and delete a tab from the layout.
-            %
-            % Accepts a Tab handle or a target string ("tab-0").
+            % remove and delete a tab from the layout.
+            % Accepts a Tab handle or a target string (e.g. "tab-0").
             arguments
                 this
+                % tab handle or target string of the tab to remove
                 tabOrTarget
             end
 
@@ -157,21 +158,20 @@ classdef TileLayout < ic.core.ComponentContainer
             panel = tab.Panel;
             panelTarget = panel.Target;
 
-            % Guard and delete
+            % guard and delete
             this.IsRemovingTab = true;
             delete(tab);
             if isvalid(panel), delete(panel); end
             this.IsRemovingTab = false;
 
-            % Remove both targets
+            % remove both targets
             this.Targets(this.Targets == target | ...
                          this.Targets == panelTarget) = [];
         end
     end
 
-    methods (Access = public)
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD only Tab and TabPanel allowed as children
             assert(isa(child, "ic.tab.Tab") || isa(child, "ic.tab.TabPanel"), ...
                 "ic:TileLayout:InvalidChild", ...
                 "TileLayout only accepts Tab and TabPanel children. " + ...
@@ -189,14 +189,14 @@ classdef TileLayout < ic.core.ComponentContainer
             target = tab.Target;
             panel = tab.Panel;
 
-            % Remove panel
+            % remove panel
             if ~isempty(panel) && isvalid(panel)
                 panelTarget = panel.Target;
                 delete(panel);
                 this.Targets(this.Targets == panelTarget) = [];
             end
 
-            % Remove tab target
+            % remove tab target
             this.Targets(this.Targets == target) = [];
         end
 

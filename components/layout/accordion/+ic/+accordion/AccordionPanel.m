@@ -1,27 +1,18 @@
 classdef AccordionPanel < ic.core.ComponentContainer
-    % > ACCORDIONPANEL Collapsible content panel within ic.Accordion.
-    %
-    % AccordionPanel holds the header configuration (Label, Icon, Open)
-    % and acts as a container for child components. Users add children
-    % to the panel returned by Accordion.addPanel().
-    %
-    % Example:
-    %   acc = ic.Accordion();
-    %   p = acc.addPanel("Settings", Icon="settings");
-    %   p.addChild(ic.InputText(Label="Name"));
-    %   p.Open = true;
+    % collapsible content panel within an #ic.Accordion.
+    % Holds the header configuration (label, icon and open state) and acts as a container for child components. Create panels via #ic.Accordion.addPanel, not directly.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > LABEL text displayed in the panel header
+        % text displayed in the panel header
         Label (1,1) string = ""
 
-        % > ICON icon displayed before the label (Lucide name, .svg file, or URL)
+        % icon displayed before the label
         Icon ic.asset.Asset = ic.asset.Asset.empty
 
-        % > OPEN whether the panel content is expanded
+        % whether the panel content is expanded
         Open (1,1) logical = false
 
-        % > DISABLED whether the panel header is disabled (cannot be toggled)
+        % whether the panel is disabled and cannot be toggled
         Disabled (1,1) logical = false
     end
 

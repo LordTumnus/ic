@@ -1,75 +1,82 @@
 classdef TabContainer < ic.core.ComponentContainer
-    % > TABCONTAINER Tabbed container with closable tabs.
-    %
-    % Both Tab and TabPanel are direct children. Targets use a monotonic
-    % counter ("tab-0", "panel-0", "tab-3", "panel-3") so indices are
-    % stable across deletes — no renumbering.
+    % tabbed container with closable, renamable, and reorderable tabs.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > TABOVERFLOW how tabs overflow: 'scroll', 'wrap', or 'menu'
+        % how tabs behave when they overflow the tab bar. When "scroll", tab headers remain in a single line and can be scrolled; when "wrap", the tab header bar is wrapped to multiple lines; "menu" makes overflowed tabs are collapsed into a dropdown menu.
         TabOverflow (1,1) string {mustBeMember(TabOverflow, ...
             ["scroll", "wrap", "menu"])} = "scroll"
 
-        % > DISABLED disable all tab interactions when true
+        % whether all tab interactions are disabled
         Disabled (1,1) logical = false
 
-        % > DRAGENABLED enable drag-and-drop tab reordering
+        % whether tabs can be reordered via drag-and-drop
         DragEnabled (1,1) logical = true
 
-        % > SIZE tab header size: 'sm', 'md', or 'lg'
+        % dimension of the tab headers relative to the component font size
         Size (1,1) string {mustBeMember(Size, ...
             ["sm", "md", "lg"])} = "md"
     end
 
     properties (SetObservable, AbortSet, SetAccess = {?ic.TabContainer, ?ic.mixin.Reactive}, Description = "Reactive")
-        % > SELECTEDTAB target string of the selected tab ("tab-0", etc.)
+        % target string of the currently selected tab (e.g. "tab-0"). Set by the framework when the user clicks a tab
         SelectedTab (1,1) string = ""
     end
 
     properties (Dependent, SetAccess = private)
-        % > TABS array of Tab children (read-only)
+        % array of #ic.tab.Tab children (read-only)
         Tabs
 
-        % > PANELS array of TabPanel children (read-only)
+        % array of #ic.tab.TabPanel children (read-only)
         Panels
 
-        % > SELECTED the currently selected Tab handle, or empty
+        % the currently selected Tab handle, or empty if none. Use #ic.TabContainer.selectTab() to programmatically select a tab.
         Selected
     end
 
     properties (Access = private)
-        % Monotonic counter — never decremented, ensures unique targets
+        % monotonic counter
         NextTabIndex (1,1) double = 0
 
-        % Guard flag: prevents handleTabDestroyed from duplicating
+        % guard flag: prevents handleTabDestroyed from duplicating
         % cleanup that removeTab already handles.
         IsRemovingTab (1,1) logical = false
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the selected tab changes
+        % fires when the selected tab changes
+        % {payload}
+        % value | char: target string of the newly selected tab (e.g. 'tab-0')
+        % {/payload}
         ValueChanged
 
-        % > TABCLOSED fires when a tab's close button is clicked
+        % fires when a tab's close button is clicked. The tab is automatically deleted after this event
+        % {payload}
+        % value | char: target string of the closed tab
+        % {/payload}
         TabClosed
 
-        % > TABREORDERED fires when tabs are reordered via drag-and-drop
+        % fires when tabs are reordered via drag-and-drop
+        % {payload}
+        % value | cell array: ordered list of tab target strings after reordering
+        % {/payload}
         TabReordered
 
-        % > TABRENAMED fires when a tab label is edited via double-click
+        % fires when a tab label is edited via double-click
+        % {payload}
+        % value | struct: struct with fields 'target' (char) and 'label' (char)
+        % {/payload}
         TabRenamed
     end
 
     methods
         function this = TabContainer(props)
-            % > TABCONTAINER Create a tabbed container.
             arguments
                 props.?ic.TabContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
 
-            % Auto-delete tabs when closed from the UI
+            % auto-delete tabs when closed from the UI
             addlistener(this, 'TabClosed', ...
                 @(~, e) this.removeTab(e.Data.value));
         end
@@ -93,7 +100,7 @@ classdef TabContainer < ic.core.ComponentContainer
         end
 
         function tab = get.Selected(this)
-            % > SELECTED returns the currently selected Tab, or empty.
+            % returns the currently selected Tab, or empty
             tabs = this.Tabs;
             if isempty(tabs) || this.SelectedTab == ""
                 tab = ic.tab.Tab.empty();
@@ -109,16 +116,22 @@ classdef TabContainer < ic.core.ComponentContainer
         end
 
         function [panel, tab] = addTab(this, name, props)
-            % > ADDTAB Add a new tab, returns [panel, tab].
-            %
-            % Example:
+            % add a new tab to the container.
+            % {returns} [panel, tab] — the #ic.tab.TabPanel (content area) and #ic.tab.Tab (header) {/returns}
+            % {example}
+            %   tc = ic.TabContainer();
             %   [panel, tab] = tc.addTab("Home", Icon="home", Closable=true);
             %   panel.addChild(ic.Button(Label="Click me"));
+            % {/example}
             arguments
                 this
+                % label for the new tab
                 name (1,1) string = ""
+                % whether the tab can be closed by the user
                 props.Closable (1,1) logical = false
+                % whether the tab is disabled
                 props.Disabled (1,1) logical = false
+                % optional icon for the tab header
                 props.Icon ic.asset.Asset = ic.asset.Asset.empty
             end
 
@@ -128,48 +141,54 @@ classdef TabContainer < ic.core.ComponentContainer
             tabTarget = sprintf("tab-%d", idx);
             panelTarget = sprintf("panel-%d", idx);
 
-            % Build Tab
+            % build Tab
             tabProps = struct();
             tabProps.ID = this.ID + "-tab-" + idx;
             tabProps.Label = name;
-            if isfield(props, 'Closable'), tabProps.Closable = props.Closable; end
-            if isfield(props, 'Disabled'), tabProps.Disabled = props.Disabled; end
-            if isfield(props, 'Icon'), tabProps.Icon = props.Icon; end
+            if isfield(props, 'Closable')
+                 tabProps.Closable = props.Closable;
+            end
+            if isfield(props, 'Disabled')
+                tabProps.Disabled = props.Disabled;
+            end
+            if isfield(props, 'Icon')
+                 tabProps.Icon = props.Icon;
+            end
 
             args = namedargs2cell(tabProps);
             tab = ic.tab.Tab(args{:});
 
-            % Build TabPanel
+            % build TabPanel
             panel = ic.tab.TabPanel(ID = this.ID + "-panel-" + idx);
 
-            % Link Tab → Panel
+            % link Tab to Panel
             tab.Panel = panel;
 
-            % Register targets before adding children
+            % register targets before adding children
             this.Targets = [this.Targets, tabTarget, panelTarget];
             this.addChild(tab, tabTarget);
             this.addChild(panel, panelTarget);
 
-            % Listen for direct delete(tab) — clean up selection/targets
+            % listen for direct delete(tab) and clean up selection/targets
             addlistener(tab, 'ObjectBeingDestroyed', ...
                 @(src, ~) this.handleTabDestroyed(src));
 
-            % Auto-select first tab
+            % auto-select first tab
             if this.SelectedTab == ""
                 this.SelectedTab = tabTarget;
             end
         end
 
         function removeTab(this, tabOrTarget)
-            % > REMOVETAB Remove and delete a tab from the container.
-            %
-            % Accepts a Tab handle or a target string ("tab-0").
-            %
-            % Example:
+            % remove and delete a tab from the container.
+            % Accepts a #ic.tab.Tab handle or a target string
+            % {example}
             %   tc.removeTab(tab);
             %   tc.removeTab("tab-2");
+            % {/example}
             arguments
                 this
+                % handle of the tab to remove, or target string
                 tabOrTarget
             end
 
@@ -185,22 +204,22 @@ classdef TabContainer < ic.core.ComponentContainer
             panelTarget = panel.Target;
             wasSelected = (this.SelectedTab == target);
 
-            % Find adjacent tab for re-selection
+            % find adjacent tab for re-selection
             tabs = this.Tabs;
             tabTargets = arrayfun(@(t) t.Target, tabs);
             pos = find(tabTargets == target, 1);
 
-            % Guard and delete
+            % guard and delete
             this.IsRemovingTab = true;
             delete(tab);
             if isvalid(panel), delete(panel); end
             this.IsRemovingTab = false;
 
-            % Remove both targets
+            % remove both targets
             this.Targets(this.Targets == target | ...
                          this.Targets == panelTarget) = [];
 
-            % Adjust selection: prefer previous tab, fall back to first
+            % adjust selection: prefer previous tab, fall back to first
             if wasSelected
                 remainingTabs = this.Tabs;
                 n = numel(remainingTabs);
@@ -214,21 +233,21 @@ classdef TabContainer < ic.core.ComponentContainer
         end
 
         function selectTab(this, tab)
-            % > SELECTTAB Programmatically select a tab.
-            %
-            % Example:
+            % programmatically select a tab
+            % {example}
             %   tc.selectTab(t2);
+            % {/example}
             arguments
                 this
+                % handle of the tab to select
                 tab (1,1) ic.tab.Tab
             end
             this.SelectedTab = tab.Target;
         end
     end
 
-    methods (Access = public)
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD only Tab and TabPanel allowed as children
             assert(isa(child, "ic.tab.Tab") || isa(child, "ic.tab.TabPanel"), ...
                 "ic:TabContainer:InvalidChild", ...
                 "TabContainer only accepts Tab and TabPanel children. " + ...
@@ -240,11 +259,6 @@ classdef TabContainer < ic.core.ComponentContainer
 
     methods (Access = private)
         function handleTabDestroyed(this, tab)
-            % Called via ObjectBeingDestroyed listener on each Tab.
-            %
-            % Two cases:
-            %   1. removeTab called delete → IsRemovingTab=true → skip.
-            %   2. User called delete(tab) directly → clean up.
             if ~isvalid(this), return; end
             if this.IsRemovingTab, return; end
 
@@ -252,21 +266,21 @@ classdef TabContainer < ic.core.ComponentContainer
             panel = tab.Panel;
             wasSelected = (this.SelectedTab == target);
 
-            % Find position before removing (for previous-tab selection)
+            % find position before removing (for previous-tab selection)
             tabTargets = this.Targets(startsWith(this.Targets, "tab-"));
             pos = find(tabTargets == target, 1);
 
-            % Remove panel
+            % remove panel
             if ~isempty(panel) && isvalid(panel)
                 panelTarget = panel.Target;
                 delete(panel);
                 this.Targets(this.Targets == panelTarget) = [];
             end
 
-            % Remove tab target
+            % remove tab target
             this.Targets(this.Targets == target) = [];
 
-            % Adjust selection: prefer previous tab
+            % adjust selection: prefer previous tab
             if wasSelected
                 remainingTabs = this.Tabs;
                 n = numel(remainingTabs);
@@ -280,7 +294,6 @@ classdef TabContainer < ic.core.ComponentContainer
         end
 
         function tab = findTabByTarget(this, target)
-            % > FINDTABBYTARGET look up a Tab child by its target string.
             tabs = this.Tabs;
             mask = arrayfun(@(t) t.Target == target, tabs);
             idx = find(mask, 1);

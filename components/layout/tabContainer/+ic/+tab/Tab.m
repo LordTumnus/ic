@@ -1,29 +1,26 @@
 classdef Tab < ic.core.Component
-    % > TAB Header configuration for a tab within ic.TabContainer.
-    %
-    % Tab is a plain component (not a container). It holds the reactive
-    % properties for its tab header (label, icon, closable, disabled) and
-    % a reference to its paired TabPanel set by TabContainer.addTab().
+    % header configuration for a tab within an #ic.TabContainer or #ic.TileLayout.
+    % Tab is not a container — it holds the reactive properties for its tab header (label, icon, closable, disabled) and a reference to its paired #ic.tab.TabPanel. Create tabs via #ic.TabContainer.addTab or #ic.TileLayout.addTab, not directly.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > LABEL text displayed in the tab header
+        % text displayed in the tab header
         Label (1,1) string = ""
 
-        % > CLOSABLE whether the tab shows a close button
+        % whether the tab shows a close button
         Closable (1,1) logical = false
 
-        % > DISABLED whether the tab is disabled (cannot be selected)
+        % whether the tab is disabled and cannot be selected
         Disabled (1,1) logical = false
 
-        % > ICON icon displayed before the label (Lucide name, .svg file, or URL)
+        % icon displayed before the label
         Icon ic.asset.Asset = ic.asset.Asset.empty
 
-        % > EDITABLE allow double-click to rename the tab label
+        % whether the tab label can be renamed by double-clicking on it
         Editable (1,1) logical = false
     end
 
     properties (SetAccess = {?ic.TabContainer, ?ic.TileLayout})
-        % > PANEL reference to the paired TabPanel (set by addTab)
+        % reference to the paired #ic.tab.TabPanel
         Panel
     end
 
