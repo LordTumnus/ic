@@ -1,44 +1,45 @@
 classdef MultiSelect < ic.core.Component
-    % > MULTISELECT Multi-value dropdown selector with tags.
-    %
-    %   Displays selected items as closable tags inside the input field.
-    %   Provides a searchable dropdown with checkboxes for item selection.
-    %   Tags can be reordered with keyboard shortcuts.
-    %
-    %   Example:
-    %       ms = ic.MultiSelect();
-    %       ms.Items = ["Alpha", "Beta", "Gamma", "Delta"];
-    %       ms.Clearable = true;
-    %       ms.Value = ["Alpha", "Gamma"];
+    % multi-value dropdown selector with tags.
+    % Provides a searchable dropdown with checkboxes for item selection. Selected items are then displayed as closable tags inside the input field.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS list of selectable options
+        % list of selectable options that will appear in the dropdown. They should be unique
         Items (1,:) string = ["Option 1", "Option 2", "Option 3"]
-        % > VALUE currently selected items (string.empty = no selection)
+
+        % list of currently selected items
         Value string = string.empty
-        % > PLACEHOLDER text shown when no items are selected
+
+        % ghost text shown when no items are selected
         Placeholder string = "Select..."
-        % > DISABLED whether the control is disabled
+
+        % whether the control is disabled and cannot be interacted with
         Disabled logical = false
-        % > CLEARABLE whether all selections can be cleared via an X button
+
+        % whether a closing "x" button should appear on the input field to clear all selected values at once
         Clearable logical = false
-        % > SIZE size of the control
+
+        % dimension of the input field and tags relative to the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary"])} = "primary"
-        % > MAXPOPUPHEIGHT maximum height in pixels of the dropdown list
+
+        % maximum height of the dropdown popup, in pixels. Content that exceeds this height will be scrollable
         MaxPopupHeight double = 200
-        % > MAXSELECTEDITEMS maximum number of selectable items (Inf = unlimited)
+
+        % maximum number of selectable items (Inf = unlimited)
         MaxSelectedItems double {mustBePositive} = Inf
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
+        % triggered when the user changes the selection
         ValueChanged
-        % > OPENED fires when the dropdown opens
+
+        % fires when the dropdown opens
         Opened
-        % > CLOSED fires when the dropdown closes
+
+        % fires when the dropdown closes
         Closed
     end
 
@@ -52,11 +53,11 @@ classdef MultiSelect < ic.core.Component
         end
 
         function set.Value(this, val)
-            % Normalize "" to string.empty (canonical "no selection")
+            % normalize "" to string.empty (canonical "no selection")
             if isscalar(val) && val == ""
                 val = string.empty;
             end
-            % Validate: every selected value must be in Items
+            % validate: every selected value must be in Items
             if ~isempty(val) && ~isempty(this.Items) %#ok<MCSUP>
                 for i = 1:numel(val)
                     assert(ismember(val(i), this.Items), ...  %#ok<MCSUP>
@@ -68,7 +69,7 @@ classdef MultiSelect < ic.core.Component
         end
 
         function set.Items(this, val)
-            % Remove any selected values that are no longer in the new Items
+            % remove any selected values that are no longer in the new Items
             if ~isempty(this.Value) %#ok<MCSUP>
                 keep = ismember(this.Value, val); %#ok<MCSUP>
                 if any(keep)
@@ -83,22 +84,22 @@ classdef MultiSelect < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the input field
+            % programmatically focus the input field
             out = this.publish("focus", []);
         end
 
         function out = clear(this)
-            % > CLEAR programmatically clear all selected values
+            % programmatically clear all selected values
             out = this.publish("clear", []);
         end
 
         function out = open(this)
-            % > OPEN programmatically open the dropdown
+            % programmatically open the dropdown
             out = this.publish("open", []);
         end
 
         function out = close(this)
-            % > CLOSE programmatically close the dropdown
+            % programmatically close the dropdown
             out = this.publish("close", []);
         end
     end

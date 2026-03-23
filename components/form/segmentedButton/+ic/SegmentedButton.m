@@ -1,29 +1,36 @@
 classdef SegmentedButton < ic.core.ComponentContainer
-    % > SEGMENTEDBUTTON Group of connected toggle segments with optional icons.
+    % group of connected toggle segments, from which one or more can be selected
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS labels for each segment
+        % text labels for each segment
         Items (1,:) string = ["Option 1", "Option 2", "Option 3"]
-        % > VALUE currently selected item(s)
+
+        % list of currently selected items (in #ic.SegmentedButton.Items)
         Value (1,:) string = "Option 1"
-        % > MULTISELECT whether multiple segments can be selected
+
+        % whether multiple segments can be selected at the same time
         Multiselect logical = false
-        % > SHOWLABELS whether to display text labels (disable for icon-only)
+
+        % whether to display text labels. If disabled, only the icons will be shown
         ShowLabels logical = true
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > SIZE size of the segments
+
+        % size of the segments relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the control is disabled
+
+        % whether the control is disabled and cannot be interacted with
         Disabled logical = false
-        % > ICONPOSITION position of the icon relative to the label
+
+        % position of the icon relative to the text label of each toggle segment
         IconPosition string {mustBeMember(IconPosition, ...
             ["left", "right"])} = "left"
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user selects or deselects a segment
+        % triggered when the user selects or deselects a segment
         ValueChanged
     end
 
@@ -36,13 +43,13 @@ classdef SegmentedButton < ic.core.ComponentContainer
             this@ic.core.ComponentContainer(props);
             this.Targets = this.Items;
 
-            % When Multiselect is turned off, truncate existing Value
+            % when Multiselect is turned off, truncate existing Value
             addlistener(this, 'Multiselect', 'PostSet', ...
                 @(~,~) this.onMultiselectChanged());
         end
 
         function set.Items(this, val)
-            % Delete icons in targets that are being removed
+            % delete icons in targets that are being removed
             removed = setdiff(this.Items, val);
             for child = this.Children
                 if ismember(child.Target, removed)
@@ -54,7 +61,7 @@ classdef SegmentedButton < ic.core.ComponentContainer
         end
 
         function set.Value(this, val)
-            % Block multi-value assignment when Multiselect is off
+            % block multi-value assignment when Multiselect is off
             if ~this.Multiselect && numel(val) > 1 %#ok<MCSUP>
                 error("ic:SegmentedButton:ScalarRequired", ...
                     "Value must be scalar when Multiselect is false. " + ...
@@ -64,52 +71,51 @@ classdef SegmentedButton < ic.core.ComponentContainer
         end
 
         function setIcon(this, idx, icon)
-            % > SETICON Set or replace the icon for a segment by index.
-            %   sb.setIcon(1, ic.Icon.fromName("bold"))
-            %   sb.setIcon(2, ic.Icon.fromName("italic"))
-            %   sb.setIcon(1, [])  % removes the icon
+            % set, replace or remove the icon for a segment by index.
+
             arguments
                 this
+                % index of the segment to set the icon for
                 idx (1,1) double {mustBePositive, mustBeInteger}
-                icon
+                % icon to display in the segment, or empty to remove the icon
+                icon ic.Icon {mustBeScalarOrEmpty} = ic.Icon.empty
             end
             assert(idx <= numel(this.Items), "ic:SegmentedButton:InvalidIndex", ...
                 "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
             item = this.Items(idx);
 
-            % Remove existing icon in this slot
-            for child = this.Children
-                if child.Target == item
-                    delete(child);
-                end
-            end
+            % remove existing icon in this slot
+            mask = arrayfun(@(child) child.Target == item, this.Children);
+            delete(this.Children(mask));
 
-            % Add new icon if provided
+            % add new icon, if provided
             if ~isempty(icon)
                 this.addChild(icon, item);
             end
         end
 
         function icon = getIcon(this, idx)
-            % > GETICON Get the icon for a segment by index, or [] if none.
+            % get the icon for a segment by index
+            % {returns} the #ic.Icon object in the segment, or empty if there is no icon {/returns}
             arguments
                 this
+                % index of the segment to get the icon for
                 idx (1,1) double {mustBePositive, mustBeInteger}
             end
             assert(idx <= numel(this.Items), "ic:SegmentedButton:InvalidIndex", ...
                 "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
             item = this.Items(idx);
-            for child = this.Children
-                if child.Target == item
-                    icon = child;
-                    return;
-                end
+            mask = arrayfun(@(child) child.Target == item, this.Children);
+            if any(mask)
+                icon = this.Children(mask);
+                return;
             end
             icon = [];
         end
-
+    end
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD ensures only ic.Icon children in item-named targets
+            % ensures only ic.Icon children in item-named targets
             assert(isa(child, "ic.Icon"), "ic:SegmentedButton:InvalidChild", ...
                 "SegmentedButton only accepts ic.Icon children.");
             assert(ismember(target, this.Items), "ic:SegmentedButton:InvalidTarget", ...
@@ -128,7 +134,7 @@ classdef SegmentedButton < ic.core.ComponentContainer
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the segmented button
+            % programmatically focus the segmented button
             out = this.publish("focus", []);
         end
     end

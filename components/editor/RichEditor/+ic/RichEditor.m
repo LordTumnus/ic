@@ -102,9 +102,7 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
 
         function out = getMarkdown(this)
             % convert current content to Markdown
-            % {returns}
-            %   an #ic.Promise that resolves to the Markdown string
-            % {/returns}
+            % {returns} an #ic.Promise that resolves to the Markdown string {/returns}
             out = this.publish("getMarkdown", []);
         end
 

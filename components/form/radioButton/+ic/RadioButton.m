@@ -1,41 +1,37 @@
 classdef RadioButton < ic.core.ComponentContainer
-    % > RADIOBUTTON Single-select radio group with optional per-item icons.
-    %
-    % Create a radio group:
-    %   rb = ic.RadioButton();
-    %   rb.Items = ["Option A", "Option B", "Option C"];
-    %   rb.Value = "Option A";
-    %
-    % Horizontal layout:
-    %   rb.Orientation = "horizontal";
-    %
-    % With icons per item:
-    %   rb.setIcon("Option A", ic.Icon.fromName("star"));
+    % single-select radio group
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS labels for each radio option
+        % labels for each radio option
         Items (1,:) string = ["Option 1", "Option 2", "Option 3"]
-        % > VALUE currently selected item (scalar)
+
+        % currently selected item
         Value (1,1) string = "Option 1"
-        % > LABEL optional group label displayed above the options
+
+        % optional group label displayed above the options
         Label string = ""
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > SIZE size of the radio buttons
+
+        % dimension of the radio buttons relative to the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the control is disabled
+
+        % whether the control is disabled and cannot be interacted with
         Disabled logical = false
-        % > LABELPOSITION position of the label relative to the circle
+
+        % position of each row label relative to its button
         LabelPosition string {mustBeMember(LabelPosition, ...
             ["right", "left"])} = "right"
-        % > ORIENTATION layout direction of the radio group
+
+        % layout direction of the radio group
         Orientation string {mustBeMember(Orientation, ...
             ["vertical", "horizontal"])} = "vertical"
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user selects a different option
+        % triggered when the user selects a different option
         ValueChanged
     end
 
@@ -50,7 +46,7 @@ classdef RadioButton < ic.core.ComponentContainer
         end
 
         function set.Items(this, val)
-            % Delete icons in targets that are being removed
+            % delete icons in targets that are being removed
             removed = setdiff(this.Items, val);
             for child = this.Children
                 if ismember(child.Target, removed)
@@ -62,54 +58,59 @@ classdef RadioButton < ic.core.ComponentContainer
         end
 
         function set.Value(this, val)
-            % Value must be scalar for radio buttons
+            % value must be scalar for radio buttons
             assert(isscalar(val), "ic:RadioButton:ScalarRequired", ...
                 "Value must be a scalar string for RadioButton.");
             this.Value = val;
         end
 
         function setIcon(this, item, icon)
-            % > SETICON Set or replace the icon for a radio item.
-            %   rb.setIcon("Option A", ic.Icon.fromName("star"))
-            %   rb.setIcon("Option A", [])  % removes the icon
+            % set or replace the icon for a radio item
+            % {example}
+            % rb = ic.RadioButton("Items", ["A", "B", "C"]);
+            % icon = ic.Icon("Source", "star");
+            % rb.setIcon("B", icon);
+            % {/example}
             arguments
                 this
+                % one of the #ic.RadioButton.Items to set the icon for
                 item (1,1) string
-                icon
+                % the icon to display for the item, or empty to remove the existing icon
+                icon ic.Icon {mustBeScalarOrEmpty} = ic.Icon.empty()
             end
             assert(ismember(item, this.Items), "ic:RadioButton:InvalidItem", ...
                 "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
 
-            % Remove existing icon in this slot
-            for child = this.Children
-                if child.Target == item
-                    delete(child);
-                end
-            end
+            % remove existing icon in this slot
+            mask = arrayfun(@(c) c.Target == item, this.Children);
+            delete(this.Children(mask));
 
-            % Add new icon if provided
+            % add new icon if provided
             if ~isempty(icon)
                 this.addChild(icon, item);
             end
         end
 
         function icon = getIcon(this, item)
-            % > GETICON Get the icon for a radio item, or [] if none.
+            % get the icon for a radio item
+            % {returns} the #ic.Icon currently set for the item, or an empty value if no icon is set {/returns}
             arguments
                 this
+                % one of the #ic.RadioButton.Items to get the icon for
                 item (1,1) string
             end
-            for child = this.Children
-                if child.Target == item
-                    icon = child;
-                    return;
-                end
+            mask = arrayfun(@(c) c.Target == item, this.Children);
+            if any(mask)
+                icon = this.Children(mask);
+                return;
             end
-            icon = [];
+            icon = ic.Icon.empty();
         end
 
+    end
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD ensures only ic.Icon children in item-named targets
+            % ensures only ic.Icon children in item-named targets
             assert(isa(child, "ic.Icon"), "ic:RadioButton:InvalidChild", ...
                 "RadioButton only accepts ic.Icon children.");
             assert(ismember(target, this.Items), "ic:RadioButton:InvalidTarget", ...
@@ -120,7 +121,7 @@ classdef RadioButton < ic.core.ComponentContainer
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the radio group
+            % programmatically focus the radio group
             out = this.publish("focus", []);
         end
     end

@@ -1,47 +1,44 @@
 classdef Password < ic.core.Component
-    % > PASSWORD Masked text input with visibility toggle.
-    %
-    %   Password input field with show/hide toggle, lock icon, and
-    %   validation states. Suitable for authentication forms and
-    %   sensitive data entry in engineering UIs.
-    %
-    %   Example:
-    %       p = ic.Password();
-    %       p.Placeholder = "Enter password...";
-    %       addlistener(p, 'Submitted', @(~,e) authenticate(e.Data.value));
-    %
-    %   Events:
-    %       ValueChanged - Fires on every keystroke with current value
-    %       Submitted    - Fires when Enter is pressed
+    % masked text input with visibility toggle.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current text value of the password input
+        % current text value of the password input
         Value string = ""
-        % > PLACEHOLDER placeholder text when input is empty
+
+        % ghost text displayed when the #ic.Password.Value is empty
         Placeholder string = ""
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary"])} = "primary"
-        % > SIZE size of the input
+
+        % dimension of the input relative to the text font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the input is disabled
+
+        % whether the input is disabled and cannot be interacted with
         Disabled logical = false
-        % > READONLY whether the input is read-only
+
+        % whether the input is read-only
         Readonly logical = false
-        % > INVALID whether the input is in an invalid state
+
+        % whether the input is in an invalid state. When true, the input will be styled with error colors and the #ic.Password.ErrorMessage will be displayed below the input.
         Invalid logical = false
-        % > ERRORMESSAGE error message displayed below the input when invalid
+
+        % error message displayed below the input when invalid
         ErrorMessage string = ""
-        % > HELPERTEXT helper text displayed below the input
+
+        % helper text displayed below the input
         HelperText string = ""
-        % > SHOWTOGGLE whether to show the visibility toggle button
+
+        % whether to show the visibility toggle button that allows the user to switch between masked and unmasked input
         ShowToggle logical = true
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires on every keystroke with current value
+        % triggered when the value changes
         ValueChanged
-        % > SUBMITTED fires when Enter key is pressed
+
+        % fires when the Enter key is pressed
         Submitted
     end
 
@@ -57,22 +54,22 @@ classdef Password < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the input
+            %programmatically focus the input
             out = this.publish("focus", []);
         end
 
         function out = blur(this)
-            % > BLUR programmatically blur (unfocus) the input
+            % programmatically blur (unfocus) the input
             out = this.publish("blur", []);
         end
 
         function out = selectAll(this)
-            % > SELECTALL select all text in the input
+            % select all text in the input
             out = this.publish("selectAll", []);
         end
 
         function out = clear(this)
-            % > CLEAR clear the input value
+            % clear the input value
             out = this.publish("clear", []);
         end
     end

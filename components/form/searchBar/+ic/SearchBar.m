@@ -1,44 +1,39 @@
 classdef SearchBar < ic.core.Component
-    % > SEARCHBAR Tag-based search input with separator-driven tag creation.
-    %
-    %   Displays a search field where typing the separator character
-    %   (default ",") converts the typed text into a tag. Tags can have
-    %   icons assigned via prefix triggers: if the text starts with a
-    %   trigger string, it is stripped and the corresponding icon is shown.
-    %
-    %   Example:
-    %       sb = ic.SearchBar();
-    %       sb.Placeholder = "Add filters...";
-    %       sb.Clearable = true;
-    %       sb.Separator = ",";
-    %       sb.IconTriggers = containers.Map(["/", "@"], ["folder", "user"]);
-    %       % User types: hello,/docs,@admin,
-    %       % Creates tags: [hello] [folder+docs] [user+admin]
+    % tag-based search input.
+    % Displays a search field where typing the separator character converts the typed text into a tag. Tags can have icons assigned via prefix triggers: if the text starts with a trigger string, it is stripped and the corresponding icon is shown.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current tags as a string array (string.empty = no tags)
+        % current tags as a string array
         Value string = string.empty
-        % > SEPARATOR character that triggers tag creation from typed text
+
+        % character that triggers closing a tag and starting a new one
         Separator string = ","
-        % > PLACEHOLDER text shown when no tags and input is empty
+
+        % ghost text shown when there are no tags and the input is empty
         Placeholder string = "Search..."
-        % > DISABLED whether the control is disabled
+
+        % whether the control is disabled and cannot be interacted with
         Disabled logical = false
-        % > CLEARABLE whether all tags can be cleared via an X button
+
+        % whether to display a "x" close button in the input field to remove all tags at once
         Clearable logical = false
-        % > SIZE size of the control
+
+        % dimensions of the control relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary"])} = "primary"
-        % > ICONTRIGGERS map of prefix strings to Lucide icon names
-        IconTriggers
+
+        % map of prefix strings to Lucide icon names. If the user types a tag that starts with one of the prefix strings, that prefix is stripped and the corresponding icon is shown in the tag
+        IconTriggers containers.Map
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the tag list changes
+        % triggered when the tag list changes
         ValueChanged
-        % > SUBMITTED fires when Enter is pressed
+
+        % fires when Enter is pressed
         Submitted
     end
 
@@ -53,7 +48,7 @@ classdef SearchBar < ic.core.Component
         end
 
         function set.Value(this, val)
-            % Normalize "" to string.empty (canonical "no tags")
+            % normalize "" to string.empty (canonical "no tags")
             if isscalar(val) && val == ""
                 val = string.empty;
             end
@@ -63,12 +58,12 @@ classdef SearchBar < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the search input
+            % programmatically focus the search input
             out = this.publish("focus", []);
         end
 
         function out = clear(this)
-            % > CLEAR programmatically clear all tags
+            % programmatically clear all tags
             out = this.publish("clear", []);
         end
     end
