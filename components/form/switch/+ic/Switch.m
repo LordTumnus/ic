@@ -1,24 +1,29 @@
 classdef Switch < ic.core.Component
-    % > SWITCH Slide switch that maintains on/off state.
+    % switch slider that maintains on/off state
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE switch state (on or off)
+        % switch state
         Value matlab.lang.OnOffSwitchState = "off"
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > SHAPE shape of the switch track and thumb
+
+        % shape of the switch track and thumb
         Shape string {mustBeMember(Shape, ["square", "pill"])} = "square"
-        % > SIZE size of the switch
+
+        % dimension of the switch relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > SHOWLABEL whether to display the on/off state label
+
+        % whether to display the on/off state label next to the switch
         ShowLabel logical = false
-        % > DISABLED whether the switch is disabled
+
+        % whether the switch is disabled and cannot be interacted with
         Disabled logical = false
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user toggles the switch
+        % triggered when the user toggles the switch
         ValueChanged
     end
 
@@ -34,7 +39,7 @@ classdef Switch < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the switch
+            % programmatically focus the switch
             out = this.publish("focus", []);
         end
     end

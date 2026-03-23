@@ -1,43 +1,56 @@
 classdef Slider < ic.core.Component
-    % > SLIDER Numeric slider input control.
+    % numeric slider input control
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current value of the slider
+        % current value of the slider
         Value double = 0
-        % > MIN minimum value
+
+        % minimum value achieved when the thumb is at the leftmost (or bottommost) position
         Min double = 0
-        % > MAX maximum value
+
+        % maximum value achieved when the thumb is at the rightmost (or topmost) position
         Max double = 100
-        % > STEP step increment
+
+        % step increment for snapping the thumb
         Step double = 1
-        % > DISABLED whether the slider is disabled
+
+        % whether the slider is disabled and cannot be interacted with
         Disabled logical = false
-        % > ORIENTATION layout direction of the slider
+
+        % layout direction of the slider
         Orientation string {mustBeMember(Orientation, ...
             ["horizontal", "vertical"])} = "horizontal"
-        % > SHOWVALUE whether to display the current value label
+
+        % whether to display a text label with the current value of the slider thumb
         ShowValue logical = false
-        % > LABELPOSITION position of the value label relative to the slider
+
+        % position of the value label relative to the slider (if #ic.Slider.ShowValue is true)
         LabelPosition string {mustBeMember(LabelPosition, ...
             ["top", "bottom", "left", "right"])} = "top"
-        % > SIZE size of the slider track and thumb
+
+        % dimension of the slider track and thumb relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT color variant of the slider
+
+        % color variant of the slider
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "success", "warning", "destructive"])} = "primary"
-        % > THUMB style of the slider thumb
+
+        % style of the slider thumb
         Thumb string {mustBeMember(Thumb, ...
             ["fader", "circle", "square"])} = "fader"
-        % > SHOWTICKS whether to display graduation tick marks
+
+        % whether to display graduation tick marks along the slider track
         ShowTicks logical = false
-        % > TICKINTERVAL spacing between tick marks (0 = auto from Step)
+
+        % spacing between tick marks. If the interval is 0, tick marks automatically align with the step increments.
         TickInterval double {mustBeNonnegative(TickInterval)} = 0
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGING fires continuously during drag with current value
+        % triggered continuously during drag with current value
         ValueChanging
-        % > VALUECHANGED fires on drag-end or keyboard step with final value
+
+        % fires on drag-end or keyboard step with final value
         ValueChanged
     end
 
@@ -53,7 +66,7 @@ classdef Slider < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the slider thumb
+            % programmatically focus the slider thumb
             out = this.publish("focus", []);
         end
     end

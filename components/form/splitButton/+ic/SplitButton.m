@@ -1,54 +1,46 @@
 classdef SplitButton < ic.core.ComponentContainer
-    % > SPLITBUTTON Button with a dropdown for additional actions.
-    %
-    %   Displays a main button (always showing the first item) with a
-    %   chevron trigger that opens a dropdown listing all items with
-    %   optional icons/images and descriptions.
-    %
-    %   Clicking the main button fires ItemSelected for the first item.
-    %   Clicking a dropdown item fires ItemSelected for that item.
-    %
-    %   Example:
-    %       sb = ic.SplitButton();
-    %       sb.Items = ["Run", "Debug", "Profile"];
-    %       sb.ItemDescriptions = ["Execute script", "Debug mode", "Run profiler"];
-    %       sb.setIcon(1, ic.Icon.fromName("play"));
-    %       sb.setIcon(2, ic.Icon.fromName("bug"));
-    %       sb.setIcon(3, ic.Icon.fromName("activity"));
-    %
-    %   Listen to events:
-    %       addlistener(sb, 'ItemSelected', @(~,e) disp(e.Data));
+    % button with a dropdown for additional actions.
+    % Displays a main button with a chevron trigger that opens a dropdown listing all items with optional icons/images and descriptions.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS labels for each action (first item is always the main button label)
+        % list of labels for each action. The first item is considered the "main" action and is triggered when the main button (not the chevron) is clicked
         Items (1,:) string = "Action"
-        % > ITEMDESCRIPTIONS optional descriptions shown below each item label
+
+        %optional descriptions shown below each item label in the dropdown
         ItemDescriptions (1,:) string = string.empty
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > FILL fill style of the button
+
+        % fill style of the button
         Fill string {mustBeMember(Fill, ...
             ["solid", "outline", "ghost"])} = "solid"
-        % > SIZE size of the button
+
+        % dimensions of the button relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the control is disabled
+
+        % whether the control is disabled and cannot be interacted with
         Disabled logical = false
-        % > SPLITDIRECTION chevron trigger position relative to the main button
+
+        % opening position of the dropdown relative to the main button
         SplitDirection string {mustBeMember(SplitDirection, ...
             ["right", "bottom"])} = "right"
     end
 
     properties (Dependent)
-        MainIcon  % Convenient access to the main button icon child
+        % the icon of the main action button
+        MainIcon ic.Icon
     end
 
     events (Description = "Reactive")
-        % > ITEMSELECTED fires when an item is selected (main button or dropdown)
+        % triggered when an item is selected (the main button or an item in the dropdown)
         ItemSelected
-        % > OPENED fires when the dropdown opens
+
+        % fires when the dropdown opens
         Opened
-        % > CLOSED fires when the dropdown closes
+
+        % fires when the dropdown closes
         Closed
     end
 
@@ -62,15 +54,13 @@ classdef SplitButton < ic.core.ComponentContainer
             this.Targets = ["icon", this.Items];
         end
 
-        % --- MainIcon dependent property ---
         function icon = get.MainIcon(this)
-            for child = this.Children
-                if child.Target == "icon"
-                    icon = child;
-                    return;
-                end
+            mask = arrayfun(@(c) c.Target == "icon", this.Children);
+            if any(mask)
+                icon = this.Children(mask);
+            else
+                icon = ic.Icon.empty();
             end
-            icon = [];
         end
 
         function set.MainIcon(this, icon)
@@ -80,7 +70,6 @@ classdef SplitButton < ic.core.ComponentContainer
             end
         end
 
-        % --- Items setter: update targets, clean up removed ---
         function set.Items(this, val)
             removed = setdiff(this.Items, val);
             for child = this.Children
@@ -92,34 +81,35 @@ classdef SplitButton < ic.core.ComponentContainer
             this.Targets = ["icon", val];
         end
 
-        % --- Per-item icon management (index-based) ---
         function setIcon(this, idx, icon)
-            % > SETICON Set or replace the icon/image for a dropdown item by index.
-            %   sb.setIcon(1, ic.Icon.fromName("play"))
-            %   sb.setIcon(2, ic.Image())
-            %   sb.setIcon(1, [])  % removes the icon
+            % set, replace or remove the for the item at the selected index.
+            % {example}
+            % btn = ic.SplitButton("Items", ["New", "Edit", "Delete"]);
+            % btn.setIcon(2, ic.Icon("edit"));
+            % {/example}
             arguments
                 this
+                % index of the item to set the icon for
                 idx (1,1) double {mustBePositive, mustBeInteger}
-                icon
+                % icon to display for the item, or empty to remove the icon
+                icon ic.Icon {mustBeScalarOrEmpty} = ic.Icon.empty()
             end
             assert(idx <= numel(this.Items), "ic:SplitButton:InvalidIndex", ...
                 "Index %d exceeds number of Items (%d).", idx, numel(this.Items));
             item = this.Items(idx);
-            for child = this.Children
-                if child.Target == item
-                    delete(child);
-                end
-            end
+            mask = arrayfun(@(child) child.Target == item, this.Children);
+            delete(this.Children(mask));
             if ~isempty(icon)
                 this.addChild(icon, item);
             end
         end
 
         function icon = getIcon(this, idx)
-            % > GETICON Get the icon/image for a dropdown item by index, or [] if none.
+            % get the icon for a dropdown item by index
+            % {returns} the #ic.Icon object for the item, or empty if there is no icon {/returns}
             arguments
                 this
+                % index of the item to get the icon for
                 idx (1,1) double {mustBePositive, mustBeInteger}
             end
             assert(idx <= numel(this.Items), "ic:SplitButton:InvalidIndex", ...
@@ -133,10 +123,10 @@ classdef SplitButton < ic.core.ComponentContainer
             end
             icon = [];
         end
-
-        % --- Child validation ---
+    end
+    methods (Hidden)
         function validateChild(this, child, target)
-            % > VALIDATECHILD ensures children are icons/images in valid targets
+            % ensures children are icons/images in valid targets
             assert(isa(child, "ic.Icon") || isa(child, "ic.Image"), ...
                 "ic:SplitButton:InvalidChild", ...
                 "SplitButton only accepts ic.Icon or ic.Image children.");
@@ -149,7 +139,7 @@ classdef SplitButton < ic.core.ComponentContainer
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the main button
+            % programmatically focus the main button
             out = this.publish("focus", []);
         end
     end

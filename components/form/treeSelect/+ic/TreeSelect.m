@@ -1,47 +1,39 @@
 classdef TreeSelect < ic.TreeBase
-    % > TREESELECT Hierarchical multi-value selector with cascading menus.
-    %
-    %   Displays selected items as closable tags inside the input field.
-    %   Opens cascading sub-menus for hierarchical item selection.
-    %   Items are ic.tree.Node objects; selection is done via Node handles.
-    %
-    %   Example:
-    %       ts = ic.TreeSelect();
-    %       fruits = ic.tree.Node("Fruits", Icon="apple");
-    %       apple  = fruits.add("Apple");
-    %       citrus = fruits.add("Citrus");
-    %       orange = citrus.add("Orange");
-    %       lemon  = citrus.add("Lemon");
-    %       ts.Items = fruits;
-    %       ts.Selection = [apple, lemon];
-    %
-    %       % Incremental operations:
-    %       ts.addNode(citrus, "Grape");
-    %       ts.removeNode(orange);
-    %       ts.updateNode(apple, Label="Green Apple");
+    % hierarchical multi-value selector with cascading menus.
+    % Opens cascading sub-menus for hierarchical item selection; and displays selected items as closable tags inside the input field.
+    % {properties}
+    % #ic.TreeBase
+    % {/properties}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > PLACEHOLDER text shown when no items are selected
+        % text shown when no items are selected
         Placeholder string = "Select..."
-        % > CLEARABLE whether all selections can be cleared via an X button
+
+        % whether an "x" icon appears on the input field, allowing the user to clear all selected items with one click
         Clearable logical = false
-        % > SIZE size of the control
+
+        % dimension of the component relative to the font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary"])} = "primary"
-        % > MAXPOPUPHEIGHT maximum height of the dropdown (number for px, or CSS string)
+
+        % maximum height of the dropdown, in pixels or as a CSS string. Content that exceeds this height will cause the dropdown to scroll.
         MaxPopupHeight {ic.check.CssValidators.mustBeSize(MaxPopupHeight)} = 200
-        % > MAXPANELWIDTH maximum width of each cascade panel (number for px, or CSS string)
+
+        % maximum width of each cascade panel, in pixels or as a CSS string. Panels that exceed this width will truncate content with an ellipsis.
         MaxPanelWidth {ic.check.CssValidators.mustBeSize(MaxPanelWidth)} = 240
-        % > OPENONHOVER whether hovering a folder row auto-opens its sub-panel
+
+        % whether hovering a folder row auto-opens its sub-panel
         OpenOnHover logical = false
     end
 
     events (Description = "Reactive")
-        % > OPENED fires when the dropdown opens
+        % fires when the dropdown opens
         Opened
-        % > CLOSED fires when the dropdown closes
+
+        % fires when the dropdown closes
         Closed
     end
 
@@ -57,17 +49,17 @@ classdef TreeSelect < ic.TreeBase
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the input field
+            % programmatically focus the input field
             out = this.publish("focus", []);
         end
 
         function out = open(this)
-            % > OPEN programmatically open the dropdown
+            % programmatically open the dropdown
             out = this.publish("open", []);
         end
 
         function out = close(this)
-            % > CLOSE programmatically close the dropdown
+            % programmatically close the dropdown
             out = this.publish("close", []);
         end
     end

@@ -1,22 +1,26 @@
 classdef ToggleButton < ic.core.Component
-    % > TOGGLEBUTTON Latching button that maintains on/off state.
+    % latching button that maintains on/off state
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > LABEL text label of the button
+        % text label of the button
         Label string = ""
-        % > VALUE toggle state (true = pressed, false = released)
+
+        % toggle state
         Value logical = false
-        % > VARIANT visual style variant
+
+        % visual style variant
         Variant string {mustBeMember(Variant, ...
             ["primary", "secondary", "destructive"])} = "primary"
-        % > SIZE size of the button -> affects padding
+
+        % dimension of the button relative to the component font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > DISABLED whether the button is disabled
+
+        % whether the button is disabled and cannot be interacted with
         Disabled logical = false
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user toggles the button
+        % triggered when the user toggles the button
         ValueChanged
     end
 
@@ -32,7 +36,7 @@ classdef ToggleButton < ic.core.Component
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the button
+            % programmatically focus the button
             out = this.publish("focus", []);
         end
     end

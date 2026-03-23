@@ -1,5 +1,5 @@
 classdef InputText < ic.core.Component
-    % Single-line text input field with optional prefix/suffix, validation, and character counter
+    % single-line text input field with optional prefix/suffix, validation, and character counter
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % current text content
