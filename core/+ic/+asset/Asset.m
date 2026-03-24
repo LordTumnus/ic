@@ -1,20 +1,22 @@
 classdef Asset < ic.event.TransportData
-   % > ASSET Universal source: Lucide name, local file, or URL.
-   %   ic.asset.Asset("home")           → name (Lucide)
-   %   ic.asset.Asset("photo.png")      → file (isfile=true)
-   %   ic.asset.Asset("https://...")    → url
-   %   ic.asset.Asset() or ic.asset.Asset("") → empty
+   % universal source type for icons, images, and files.
+   % Accepts a:
+   %   - Lucide icon name
+   %   - A local file path
+   %   - A HTTP/HTTPS URL
+   % Any of these types are automatically detected when constructing from a string, so components that type a property as ic.asset.Asset get implicit string conversion.
+   % Assets from urls or files are hashed and cached in the #ic.asset.AssetRegistry to avoid redundant uploads to the frontend. If an asset has been sent before (hash match), only the hash is sent to the frontend; otherwise, the raw bytes are sent along with the hash and MIME type.
 
-   properties (SetAccess = immutable)
-      % > TYPE source kind: "" | "name" | "file" | "url"
+   properties (SetAccess = immutable, Hidden)
+      % source kind: "" (empty), "name" (Lucide), "file" (local path), or "url"
       Type (1,1) string = ""
-      % > VALUE Lucide name, absolute file path, or URL
+
+      % Lucide icon name, absolute file path, or URL
       Value (1,1) string = ""
    end
 
    methods
       function this = Asset(source)
-         % > ASSET Construct from a string. Auto-detects source kind.
          arguments
             source (1,1) string = ""
          end
@@ -39,8 +41,6 @@ classdef Asset < ic.event.TransportData
       end
 
       function s = toStruct(this)
-         % > TOSTRUCT Convert to plain struct for bridge transport.
-         % Returns: string (Lucide name), struct (file/url hash stub), or [].
          if isempty(this) || this.Type == ""
             s = [];
             return
@@ -67,15 +67,13 @@ classdef Asset < ic.event.TransportData
       end
 
       function json = jsonencode(this, varargin)
-         % > JSONENCODE Encode asset for JSON transmission.
          json = jsonencode(this.toStruct(), varargin{:});
       end
    end
 
    methods (Static, Access = private)
       function [raw, ext, hash] = cachedUrlDownload(url)
-         % > CACHEDURLDOWNLOAD Download a URL, caching the result.
-         %   Subsequent calls for the same URL skip the HTTP request.
+         % download a URL and return its bytes; caches by URL to skip repeated HTTP requests.
          cache = ic.asset.AssetRegistry.getUrlCache();
          key = char(url);
          if cache.isKey(key)
@@ -89,7 +87,7 @@ classdef Asset < ic.event.TransportData
       end
 
       function [raw, ext] = readFile(path)
-         % > READFILE Read a local file into raw bytes.
+         % read a local file into raw bytes.
          absPath = string(path);
          fid = fopen(absPath, 'rb');
          raw = fread(fid, Inf, '*uint8');
@@ -98,7 +96,7 @@ classdef Asset < ic.event.TransportData
       end
 
       function [raw, ext] = downloadUrl(url)
-         % > DOWNLOADURL Download a URL to a temp file, read raw bytes.
+         % download a URL to a temp file and return raw bytes.
          [~, ~, ext] = fileparts(url);
          ext = regexprep(ext, '\?.*$', '');
          tmpFile = string(tempname) + ext;
@@ -110,7 +108,7 @@ classdef Asset < ic.event.TransportData
       end
 
       function h = computeHash(data)
-         % > COMPUTEHASH Pure-MATLAB fingerprint. No Java.
+         % compute a pure-MATLAB fingerprint for deduplication (no Java dependency).
          data = uint8(data(:));
          n = numel(data);
          d = double(data);
@@ -120,7 +118,7 @@ classdef Asset < ic.event.TransportData
       end
 
       function mime = mimeFromExt(ext)
-         % > MIMEFROMEXT Map file extension to MIME type.
+         % map a file extension to a MIME type string; falls back to "application/octet-stream".
          ext = lower(ext);
          map = dictionary( ...
             [".svg", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico", ...

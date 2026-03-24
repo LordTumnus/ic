@@ -1,12 +1,6 @@
 classdef NodeEditor < ic.core.ComponentContainer & ic.mixin.Requestable
-    % > NODEEDITOR Canvas for draggable nodes connected by edges.
-    %
-    %   editor = ic.NodeEditor(Height="500px");
-    %   n1 = ic.node.Transform(Label="Source", Position=[100 150]);
-    %   n2 = ic.node.Transform(Label="Sink", Position=[400 150]);
-    %   editor.addNode(n1);
-    %   editor.addNode(n2);
-    %   e = n1.connect(n2);
+    % {wip} {/wip}
+    % canvas for draggable nodes connected by edges.
 
     events (Description = "Reactive")
         % > NODEMOVED fires when user finishes dragging a node

@@ -1,21 +1,22 @@
 classdef AssetRegistry < handle
-   % > ASSETREGISTRY Singleton per-View dedup tracker.
-   % Tracks which asset hashes have been sent to each View, so that
-   % repeated references only transmit {hash} instead of the full payload.
-   % Single-threaded MATLAB: only one View encodes at a time.
+   % per-view (uihtml) asset deduplication tracker.
+   % tracks which #ic.asset.Asset hashes have been sent to each #ic.core.View so that repeated references only transmit a {hash} stub instead of the full base64 payload.
+   % The #ic.core.View is responsible for activating the registry before encoding assets and for ensuring that view references in the registry are properly cleaned up on destruction.
 
    properties (Constant, Access = private)
-      % > INSTANCE Singleton — evaluated once when the class first loads.
+      % singleton instance
       Instance = ic.asset.AssetRegistry()
    end
 
    properties (Access = private)
-      % > VIEWMAP containers.Map: double(view) → containers.Map (sent hashes)
-      ViewMap % containers.Map()
-      % > CURRENTSENT handle ref to the active View's sent-hash map
-      CurrentSent % containers.Map()
-      % > URLCACHE URL → struct(raw, ext, hash): avoids repeated HTTP downloads
-      UrlCache % containers.Map()
+      % map from double(view) → containers.Map of sent hashes for that view
+      ViewMap % containers.Map
+
+      % handle ref to the currently active view's sent-hash map
+      CurrentSent % containers.Map
+
+      % shared URL download cache: URL string → struct(raw, ext, hash)
+      UrlCache % containers.Map
    end
 
    methods (Access = private)
@@ -26,7 +27,7 @@ classdef AssetRegistry < handle
       end
 
       function cleanup(this, key)
-         % > CLEANUP Remove a destroyed View from the map.
+         % remove a destroyed view's sent-hash map.
          if this.ViewMap.isKey(key)
             this.ViewMap.remove(key);
          end
@@ -35,14 +36,16 @@ classdef AssetRegistry < handle
 
    methods (Static, Access = private)
       function r = getInstance()
-         % > GETINSTANCE Return the singleton.
+         % return the singleton instance.
          r = ic.asset.AssetRegistry.Instance;
       end
    end
 
    methods (Static, Access = {?ic.core.View})
       function activate(view)
-         % > ACTIVATE Set the active View. Creates its sent map on first call.
+         % set the active view for the current encoding pass.
+         % creates the view's sent-hash map on first call and registers a
+         % cleanup listener for when the view is destroyed.
          r = ic.asset.AssetRegistry.getInstance();
          key = double(view);
          if ~r.ViewMap.isKey(key)
@@ -55,17 +58,17 @@ classdef AssetRegistry < handle
 
    methods (Static, Access = {?ic.asset.Asset})
       function m = getUrlCache()
-         % > GETURLCACHE Return the shared URL download cache (handle ref).
+         % return the shared URL download cache (handle ref, safe to write to).
          m = ic.asset.AssetRegistry.getInstance().UrlCache;
       end
 
       function tf = hasSent(hash)
-         % > HASSENT Check if this hash was already sent to the active View.
+         % return true if this hash has already been sent to the active view.
          tf = ic.asset.AssetRegistry.getInstance().CurrentSent.isKey(hash);
       end
 
       function markSent(hash)
-         % > MARKSENT Record that this hash has been sent to the active View.
+         % record that this hash has been sent to the active view.
          r = ic.asset.AssetRegistry.getInstance();
          r.CurrentSent(hash) = true;
       end
