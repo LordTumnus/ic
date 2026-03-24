@@ -1,25 +1,24 @@
 classdef FlowchartConfig < ic.event.TransportData
-    % > FLOWCHARTCONFIG Mermaid flowchart diagram configuration.
-    %
-    %   m.Config = ic.mermaid.FlowchartConfig(NodeSpacing=100, Curve="linear")
+    % configuration for Mermaid flowchart diagrams.
+    % Pass an instance to #ic.Mermaid.Config to customize layout and appearance.
 
     properties
-        % > NODESPACING horizontal gap between nodes on the same level
+        % horizontal gap between nodes on the same level, in pixels
         NodeSpacing (1,1) double {mustBeNonnegative} = 50
 
-        % > RANKSPACING vertical gap between nodes on different levels
+        % vertical gap between nodes on different levels, in pixels
         RankSpacing (1,1) double {mustBeNonnegative} = 50
 
-        % > CURVE edge drawing style
+        % edge drawing style
         Curve string {mustBeMember(Curve, ["basis","linear","rounded","monotoneX"])} = "rounded"
 
-        % > PADDING space between label text and node border
+        % space between label text and node border, in pixels
         Padding (1,1) double {mustBeNonnegative} = 15
 
-        % > DIAGRAMPADDING padding around the entire diagram
+        % padding around the entire diagram, in pixels
         DiagramPadding (1,1) double {mustBeNonnegative} = 20
 
-        % > WRAPPINGWIDTH max text width before wrapping inside nodes
+        % maximum text width before wrapping inside nodes, in pixels
         WrappingWidth (1,1) double {mustBePositive} = 200
     end
 

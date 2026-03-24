@@ -1,69 +1,53 @@
 classdef Latex < ic.core.Component & ic.mixin.Requestable
-    % > LATEX Renders LaTeX markup as formatted PDF pages.
+    % renders LaTeX markup as formatted PDF pages.
+    % Compilation happens client-side via [SwiftLaTeX](https://www.swiftlatex.com/)'s PdfTeX WASM engine (no internet required). Images referenced in the source are resolved by MATLAB and embedded as a binary #ic.asset.Asset
     %
-    % Compilation happens client-side via SwiftLaTeX's PdfTeX WASM engine.
-    % Packages are bundled locally (no internet required).
+    % bundled packages:
+    %   - math: amsmath, amssymb, mathtools, bm, xfrac, eucal, eufrak
+    %   - structure: geometry, fancyhdr, enumitem, booktabs, multicol, tabularx, caption, subcaption, longtable, lscape
+    %   - graphics: tikz (+pgf, shapes, positioning, arrows), graphicx, xcolor
+    %   - listings: listings (+lstlang1/2/3)
+    %   - refs: hyperref, nameref, url, backref
+    %   - utils: etoolbox, calc, xparse, expl3, verbatim, makeidx
+    %   - classes: article, report, book, letter, proc, slides
     %
-    % BUNDLED PACKAGES
-    %
-    %   Math:
-    %     amsmath, amssymb, amsfonts, amsthm, amstext, amscd, amsxtra,
-    %     mathtools, bm, centernot, eucal, eufrak, euscript, xfrac
-    %
-    %   Document Structure:
-    %     geometry, fancyhdr, enumitem, booktabs, float, setspace, parskip,
-    %     longtable, multicol, tabularx, caption, subcaption, rotating,
-    %     lscape, indentfirst, varioref, xr
-    %
-    %   Graphics & Color:
-    %     tikz (+ pgf, shapes.geometric, positioning, arrows libraries),
-    %     graphicx, xcolor, epstopdf-base
-    %
-    %   Code Listings:
-    %     listings (+ lstlang1, lstlang2, lstlang3 language definitions)
-    %
-    %   References & Links:
-    %     hyperref, nameref, url, backref, xr-hyper
-    %
-    %   Utilities:
-    %     etoolbox, calc, ifthen, xparse, expl3, keyval, array,
-    %     verbatim, shortvrb, showkeys, makeidx, xspace, theorem
-    %
-    %   Document Classes:
-    %     article, report, book, letter, proc, slides
-    %
-    % NOTE: Packages not listed above are NOT available. If compilation
-    % fails with "File 'xxx.sty' not found", the package is not bundled.
+    % packages not in this list are not available and compilation will fail with "File 'xxx.sty' not found"
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE LaTeX source text
+        % source text that will be compiled as LaTeX
         Value string = ""
 
-        % > HEIGHT container height (CSS value: number=px, string=any unit)
+        % height of the container, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
 
-        % > TOOLBARONHOVER show zoom/export toolbar on mouse hover
+        % whether to show the zoom/export toolbar on mouse hover
         ToolbarOnHover (1,1) logical = true
 
-        % > PAGEGAP vertical gap between rendered pages in pixels
+        % vertical gap between rendered pages, in pixels
         PageGap (1,1) double {mustBeNonnegative} = 16
 
-        % > RENDERONCHANGE automatically render when Value changes (default true)
+        % whether to automatically re-render when Value changes
         RenderOnChange (1,1) logical = true
     end
 
     properties (SetObservable, AbortSet, ...
             SetAccess = {?ic.Latex, ?ic.mixin.Reactive}, ...
             Description = "Reactive")
-        % > NUMPAGES total number of rendered pages (read-only, set by frontend)
+        % total number of rendered pages (set by the view after compilation)
         NumPages (1,1) double = 0
     end
 
     events (Description = "Reactive")
-        % > COMPILED fires after successful compilation
+        % fires after successful compilation
+        % {payload}
+        % value | struct: compilation result — value.numPages (double) is the page count
+        % {/payload}
         Compiled
 
-        % > ERROR fires when compilation fails
+        % fires when compilation fails
+        % {payload}
+        % value | struct: error details — value.message (char) is the error message
+        % {/payload}
         Error
     end
 
@@ -82,42 +66,52 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
 
     methods (Description = "Reactive")
         function out = zoomIn(this)
-            % > ZOOMIN increase zoom level by one step
+            % increase zoom level by one step
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomIn", []);
         end
 
         function out = zoomOut(this)
-            % > ZOOMOUT decrease zoom level by one step
+            % decrease zoom level by one step
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomOut", []);
         end
 
         function out = resetView(this)
-            % > RESETVIEW reset to initial zoom level
+            % reset to initial zoom level
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("resetView", []);
         end
 
         function out = scrollToPage(this, pageNum)
-            % > SCROLLTOPAGE scroll to a specific page number
+            % scroll to a specific page number
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             arguments
                 this
+                % page number to scroll to
                 pageNum (1,1) double {mustBePositive, mustBeInteger}
             end
             out = this.publish("scrollToPage", pageNum);
         end
 
         function out = exportPdf(this, filepath)
-            % > EXPORTPDF save the compiled PDF to file
-            %   l.exportPdf("output.pdf")
-            %   l.exportPdf()              % opens save dialog
+            % save the compiled PDF to a file, or open a save dialog if no path is given
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            % {example}
+            %   l.exportPdf("output.pdf")  % save to path
+            %   l.exportPdf()              % open save dialog
+            % {/example}
             arguments
                 this
+                % destination file path; omit to open a save dialog
                 filepath (1,1) string = ""
             end
             out = this.publish("exportPdf", filepath);
         end
 
         function out = render(this)
-            % > RENDER trigger a render of the current Value
+            % trigger a render of the current Value
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("render", []);
         end
     end
@@ -130,7 +124,7 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleResolveImages(data)
-            % Resolve image files requested by the LaTeX WASM compiler.
+            % resolve image files requested by the LaTeX WASM compiler.
             paths = string(data.paths);
             outPaths = string.empty;
             outAssets = {};
@@ -162,7 +156,7 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
                         [~, ~, ext] = fileparts(resolved);
                     end
 
-                    % Hash (pure-MATLAB fingerprint)
+                    % hash (pure-MATLAB fingerprint)
                     d = double(uint8(raw(:)));
                     n = numel(d);
                     s1 = mod(sum(d .* mod((1:n)', 65521)), 2^52);
@@ -205,7 +199,7 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
         function result = handleSavePdf(~, data)
             filepath = string(data.filepath);
 
-            % No filepath provided — open save dialog
+            % no filepath provided — open save dialog
             if filepath == ""
                 [f, p] = uiputfile('*.pdf', 'Export LaTeX as PDF');
                 if isequal(f, 0)
@@ -215,7 +209,7 @@ classdef Latex < ic.core.Component & ic.mixin.Requestable
                 filepath = fullfile(p, f);
             end
 
-            % Decode base64 and write to file
+            % decode base64 and write to file
             bytes = matlab.net.base64decode(string(data.base64));
             fid = fopen(filepath, 'wb');
             if fid == -1

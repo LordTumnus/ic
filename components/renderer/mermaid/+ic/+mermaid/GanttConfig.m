@@ -1,40 +1,39 @@
 classdef GanttConfig < ic.event.TransportData
-    % > GANTTCONFIG Mermaid Gantt chart configuration.
-    %
-    %   m.Config = ic.mermaid.GanttConfig(BarHeight=30, AxisFormat="%b %d")
+    % configuration for Mermaid Gantt chart diagrams.
+    % Pass an instance to #ic.Mermaid.Config to customize layout and appearance.
 
     properties
-        % > BARHEIGHT height of task bars (px)
+        % height of task bars, in pixels
         BarHeight (1,1) double {mustBeNonnegative} = 20
 
-        % > BARGAP gap between task bars (px)
+        % gap between task bars, in pixels
         BarGap (1,1) double {mustBeNonnegative} = 4
 
-        % > TOPPADDING space above the chart area (px)
+        % space above the chart area, in pixels
         TopPadding (1,1) double {mustBeNonnegative} = 50
 
-        % > LEFTPADDING space for section labels on the left (px)
+        % space reserved for section labels on the left, in pixels
         LeftPadding (1,1) double {mustBeNonnegative} = 75
 
-        % > RIGHTPADDING space for section labels on the right (px)
+        % space reserved for section labels on the right, in pixels
         RightPadding (1,1) double {mustBeNonnegative} = 75
 
-        % > FONTSIZE font size for text in the chart (px)
+        % font size for text in the chart, in pixels
         FontSize (1,1) double {mustBePositive} = 11
 
-        % > SECTIONFONTSIZE font size for section labels (px)
+        % font size for section labels, in pixels
         SectionFontSize (1,1) double {mustBePositive} = 11
 
-        % > AXISFORMAT date/time format string for the x-axis (d3 time format)
+        % d3 time format string for the x-axis labels
         AxisFormat string = "%Y-%m-%d"
 
-        % > TOPAXIS show date labels on top instead of bottom
+        % whether to show date labels on the top axis instead of the bottom
         TopAxis (1,1) logical = false
 
-        % > DISPLAYMODE "" for default, "compact" to pack tasks on fewer rows
+        % row packing mode: "" for default, "compact" to pack tasks on fewer rows
         DisplayMode string {mustBeMember(DisplayMode, ["","compact"])} = ""
 
-        % > WEEKDAY which day starts the week for week-based intervals
+        % which day starts the week for week-based intervals
         Weekday string {mustBeMember(Weekday, ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"])} = "sunday"
     end
 

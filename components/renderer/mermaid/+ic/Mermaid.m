@@ -1,49 +1,31 @@
 classdef Mermaid < ic.core.Component
-    % > MERMAID Interactive diagram renderer using Mermaid.js.
-    %
-    %   m = ic.Mermaid(Value="graph LR; A-->B; B-->C;")
-    %   m = ic.Mermaid(Value="sequenceDiagram; Alice->>Bob: Hello")
-    %
-    % Renders Mermaid diagram definitions as interactive SVGs with
-    % pan/zoom controls. Supports all Mermaid diagram types: flowcharts,
-    % sequence diagrams, class diagrams, state diagrams, ER diagrams,
-    % Gantt charts, pie charts, and more.
-    %
-    % Diagram colors are derived from IC theme variables automatically.
-    % Customize via style():
-    %   m.style(".ic-mermaid", "--ic-mermaid-primary", "#8b5cf6")
-    %
-    % All rendering is client-side (no external resources needed).
+    % interactive diagram renderer using [Mermaid.js v10](https://mermaid.js.org/).
+    % Renders diagram definitions as interactive SVGs with pan/zoom. Supports all Mermaid diagram types: flowcharts, sequence, class, state, ER, Gantt, pie, and more. Colors derive from IC theme variables automatically. All rendering is client-side.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE Mermaid diagram definition text
+        % Mermaid diagram definition text
         Value string = ""
 
-        % > HEIGHT container height (CSS value: number=px, string=any unit)
+        % height of the container, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
 
-        % > TOOLBARONHOVER show zoom/reset toolbar on mouse hover
+        % whether to show the zoom/reset toolbar on mouse hover
         ToolbarOnHover (1,1) logical = true
 
-        % > HTMLLABELS use HTML labels in nodes (richer text wrapping)
+        % whether to use HTML labels in nodes for richer text wrapping
         HtmlLabels (1,1) logical = true
 
-        % > WRAP auto-wrap long text in nodes and messages
+        % whether to auto-wrap long text in nodes and messages
         Wrap (1,1) logical = true
 
-        % > DARKMODE affects Mermaid's internal color derivation
+        % whether to use Mermaid's dark color scheme
         DarkMode (1,1) logical = false
 
-        % > CONFIG diagram-specific Mermaid configuration
-        %   Use typed config classes for validation and autocomplete:
-        %     m.Config = ic.mermaid.FlowchartConfig(NodeSpacing=100)
-        %     m.Config = ic.mermaid.SequenceConfig(MirrorActors=false)
-        %     m.Config = ic.mermaid.GanttConfig(BarHeight=30)
-        %   Or plain structs with camelCase keys for other diagram types:
-        %     m.Config = struct('pie', struct('textPosition', 0.75))
+        % diagram-specific Mermaid configuration.
+        % {note} Use typed config classes for validation: #ic.mermaid.FlowchartConfig, #ic.mermaid.SequenceConfig, #ic.mermaid.GanttConfig. {/note}
         Config = struct()
 
-        % > RENDERONCHANGE automatically render when Value changes (default true)
+        % whether to automatically re-render when Value changes
         RenderOnChange (1,1) logical = true
     end
 
@@ -59,22 +41,26 @@ classdef Mermaid < ic.core.Component
 
     methods (Description = "Reactive")
         function out = zoomIn(this)
-            % > ZOOMIN increase zoom level by one step
+            % increase zoom level by one step
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomIn", []);
         end
 
         function out = zoomOut(this)
-            % > ZOOMOUT decrease zoom level by one step
+            % decrease zoom level by one step
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomOut", []);
         end
 
         function out = resetView(this)
-            % > RESETVIEW reset to initial pan/zoom state
+            % reset pan and zoom to the initial state
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("resetView", []);
         end
 
         function out = render(this)
-            % > RENDER trigger a render of the current Value
+            % programmatically trigger a render of the current Value
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("render", []);
         end
     end

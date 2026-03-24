@@ -1,46 +1,45 @@
 classdef SequenceConfig < ic.event.TransportData
-    % > SEQUENCECONFIG Mermaid sequence diagram configuration.
-    %
-    %   m.Config = ic.mermaid.SequenceConfig(MirrorActors=false, ShowSequenceNumbers=true)
+    % configuration for Mermaid sequence diagrams.
+    % Pass an instance to #ic.Mermaid.Config to customize layout and appearance.
 
     properties
-        % > ACTORMARGIN horizontal gap between actor boxes
+        % horizontal gap between actor boxes, in pixels
         ActorMargin (1,1) double {mustBeNonnegative} = 50
 
-        % > MESSAGEMARGIN vertical gap between messages
+        % vertical gap between messages, in pixels
         MessageMargin (1,1) double {mustBeNonnegative} = 35
 
-        % > MIRRORACTORS repeat actor boxes at the bottom of the diagram
+        % whether to repeat actor boxes at the bottom of the diagram
         MirrorActors (1,1) logical = true
 
-        % > SHOWSEQUENCENUMBERS number each message arrow
+        % whether to number each message arrow
         ShowSequenceNumbers (1,1) logical = false
 
-        % > RIGHTANGLES use square corners instead of curved arrows
+        % whether to use square corners instead of curved arrows
         RightAngles (1,1) logical = false
 
-        % > WRAP auto-wrap long message text
+        % whether to auto-wrap long message text
         Wrap (1,1) logical = false
 
-        % > HIDEUNUSEDPARTICIPANTS hide actors with no messages
+        % whether to hide actors with no messages
         HideUnusedParticipants (1,1) logical = false
 
-        % > ACTIVATIONWIDTH width of activation rectangles (px)
+        % width of activation rectangles, in pixels
         ActivationWidth (1,1) double {mustBeNonnegative} = 10
 
-        % > NOTEMARGIN margin around note boxes (px)
+        % margin around note boxes, in pixels
         NoteMargin (1,1) double {mustBeNonnegative} = 10
 
-        % > MESSAGEALIGN multiline message text alignment
+        % text alignment for multiline messages
         MessageAlign string {mustBeMember(MessageAlign, ["left","center","right"])} = "center"
 
-        % > NOTEALIGN note text alignment
+        % text alignment for notes
         NoteAlign string {mustBeMember(NoteAlign, ["left","center","right"])} = "center"
 
-        % > WIDTH width of actor boxes (px)
+        % width of actor boxes, in pixels
         Width (1,1) double {mustBePositive} = 150
 
-        % > HEIGHT height of actor boxes (px)
+        % height of actor boxes, in pixels
         Height (1,1) double {mustBePositive} = 50
     end
 

@@ -1,58 +1,47 @@
 classdef Typst < ic.core.Component & ic.mixin.Requestable
-    % > TYPST Renders Typst markup as formatted SVG pages.
-    %
-    %   t = ic.Typst(Value="= Hello Typst" + newline + "This is a #emph[test].")
-    %   t = ic.Typst(Value="#lorem(500)", Height=600)
-    %
-    % Uses Typst's default page layout (A4). Control pagination with
-    % #set page(...) rules in the markup, or via PageWidth/PageHeight
-    % properties. All compilation happens client-side via WASM.
-    %
-    % Export to PDF:
-    %   t.exportPdf("output.pdf")   % saves PDF to file
+    % renders [Typst](https://typst.app/) markup as formatted SVG pages.
+    % Compilation happens client-side via [typst.ts](https://github.com/Myriad-Dreamin/typst.ts) v0.7 WASM. [Typst Universe](https://typst.app/universe/) packages are downloaded by MATLAB on demand as they appear in the value. Images referenced in the source are resolved by MATLAB and embedded as binary #ic.asset.Asset.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE Typst source text
+        % Typst source text
         Value string = ""
 
-        % > HEIGHT container height (CSS value: number=px, string=any unit)
+        % height of the container, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
 
-        % > TOOLBARONHOVER show zoom/export toolbar on mouse hover
+        % whether to show the zoom/export toolbar on mouse hover
         ToolbarOnHover (1,1) logical = true
 
-        % > PAGEWIDTH Typst page width (e.g. "210mm", "8.5in"); empty = Typst default
+        % Typst page width override (e.g. "210mm", "8.5in"); empty = Typst default
         PageWidth string = ""
 
-        % > PAGEHEIGHT Typst page height (e.g. "297mm", "11in"); empty = Typst default
+        % Typst page height override (e.g. "297mm", "11in"); empty = Typst default
         PageHeight string = ""
 
-        % > PAGEMARGIN Typst page margin (e.g. "1cm", "(x: 1cm, y: 2cm)")
+        % Typst page margin override (e.g. "1cm", "(x: 1cm, y: 2cm)")
         PageMargin string = ""
 
-        % > FONTSIZE base font size (e.g. "11pt", "14pt")
+        % base font size override (e.g. "11pt", "14pt")
         FontSize string = ""
 
-        % > FONTFAMILY font family name (must be available in the WASM renderer)
+        % font family name override (must be available in the WASM renderer)
         FontFamily string = ""
 
-        % > PAGEGAP vertical gap between rendered pages in pixels
+        % vertical gap between rendered pages, in pixels
         PageGap (1,1) double {mustBeNonnegative} = 16
 
-        % > PACKAGES Typst universe packages to pre-load (supplements auto-detection)
-        %   Example: ["@preview/cetz:0.3.4", "@preview/fletcher:0.5.0"]
-        %   Packages referenced via #import in the source are detected
-        %   automatically; use this property for transitive deps or pre-warming.
+        % [Typst Universe](https://typst.app/universe/) packages to pre-load, as version-pinned spec strings (e.g. "@preview/cetz:0.3.4").
+        % {note} Packages referenced via #import in the source are detected automatically; use this property for transitive dependencies or pre-warming. {/note}
         Packages (1,:) string = string.empty
 
-        % > RENDERONCHANGE automatically render when Value changes (default true)
+        % whether to automatically re-render when Value changes
         RenderOnChange (1,1) logical = true
     end
 
     properties (SetObservable, AbortSet, ...
             SetAccess = {?ic.Typst, ?ic.mixin.Reactive}, ...
             Description = "Reactive")
-        % > NUMPAGES total number of rendered pages (read-only, set by frontend)
+        % total number of rendered pages (set by the view after compilation)
         NumPages (1,1) double = 0
     end
 
@@ -62,10 +51,16 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
     end
 
     events (Description = "Reactive")
-        % > COMPILED fires after successful compilation
+        % fires after successful compilation
+        % {payload}
+        % value | struct: compilation result — value.numPages (double) is the page count
+        % {/payload}
         Compiled
 
-        % > ERROR fires when compilation fails
+        % fires when compilation fails
+        % {payload}
+        % value | struct: error details — value.message (char) is the error message
+        % {/payload}
         Error
     end
 
@@ -87,42 +82,52 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
 
     methods (Description = "Reactive")
         function out = zoomIn(this)
-            % > ZOOMIN increase zoom level by one step
+            % increase zoom level by one step
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomIn", []);
         end
 
         function out = zoomOut(this)
-            % > ZOOMOUT decrease zoom level by one step
+            % decrease zoom level by one step
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomOut", []);
         end
 
         function out = resetView(this)
-            % > RESETVIEW reset to initial zoom level
+            % reset to initial zoom level
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("resetView", []);
         end
 
         function out = scrollToPage(this, pageNum)
-            % > SCROLLTOPAGE scroll to a specific page number
+            % scroll to a specific page number
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             arguments
                 this
+                % page number to scroll to
                 pageNum (1,1) double {mustBePositive, mustBeInteger}
             end
             out = this.publish("scrollToPage", pageNum);
         end
 
         function out = exportPdf(this, filepath)
-            % > EXPORTPDF compile to PDF and save to file
-            %   t.exportPdf("output.pdf")
-            %   t.exportPdf()              % opens save dialog
+            % compile to PDF and save to a file, or open a save dialog if no path is given
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            % {example}
+            %   t.exportPdf("output.pdf")  % save to path
+            %   t.exportPdf()              % open save dialog
+            % {/example}
             arguments
                 this
+                % destination file path; omit to open a save dialog
                 filepath (1,1) string = ""
             end
             out = this.publish("exportPdf", filepath);
         end
 
         function out = render(this)
-            % > RENDER trigger a render of the current Value
+            % trigger a render of the current Value
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("render", []);
         end
     end

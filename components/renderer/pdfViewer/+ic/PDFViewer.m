@@ -1,45 +1,66 @@
 classdef PDFViewer < ic.core.Component
-    % > PDFVIEWER Displays a PDF document with zoom and page navigation.
-    %
-    %   viewer = ic.PDFViewer(Value="report.pdf")
-    %   viewer = ic.PDFViewer(Value="https://example.com/doc.pdf", ToolbarMode="hover")
+    % PDF viewer with zoom and page navigation controls, powered by [pdf.js v4](https://mozilla.github.io/pdf.js/).
+    % Accepts a local file path or URL as #ic.PDFViewer.Value. The toolbar can be fixed or shown only on hover.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE PDF source (file path or URL)
+        % PDF source as a file path or URL
         Value ic.asset.Asset {ic.assets.mustBePdf} = ic.asset.Asset()
-        % > TOOLBARMODE controls display mode: "toolbar" (fixed top bar) or "hover" (floating on hover)
+
+        % toolbar display mode: "toolbar" (always visible) or "hover" (appears on mouse hover)
         ToolbarMode string {mustBeMember(ToolbarMode, ["toolbar", "hover"])} = "toolbar"
-        % > SHOWZOOMCONTROLS show zoom in/out buttons and zoom percentage
+
+        % whether to show zoom in/out buttons and zoom percentage
         ShowZoomControls logical = true
-        % > SHOWPAGECONTROLS show page navigation buttons and page indicator
+
+        % whether to show page navigation buttons and page indicator
         ShowPageControls logical = true
-        % > SHOWFITBUTTON show fit-to-width button
+
+        % whether to show the fit-to-width button
         ShowFitButton logical = true
-        % > SHOWROTATEBUTTON show rotate button
+
+        % whether to show the rotate button
         ShowRotateButton logical = false
-        % > PAGE current page number
+
+        % current page number
         Page double {mustBePositive, mustBeInteger} = 1
-        % > ZOOM zoom level in percent (100 = actual size)
+
+        % zoom level as a percentage (100 = actual size)
         Zoom double {mustBePositive} = 100
-        % > HEIGHT height of the viewer (CSS value: number=px, string=any unit)
+
+        % height of the viewer, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
     end
 
     properties (SetObservable, AbortSet, ...
             SetAccess = {?ic.PDFViewer, ?ic.mixin.Reactive}, ...
             Description = "Reactive")
-        % > NUMPAGES total number of pages in the document (read-only)
+        % total number of pages in the document (set by the view after loading)
         NumPages double = 0
     end
 
     events (Description = "Reactive")
-        % > PAGECHANGED fires when the user navigates to a different page
+        % fires when the user navigates to a different page
+        % {payload}
+        % value | double: the new page number
+        % {/payload}
         PageChanged
-        % > ZOOMCHANGED fires when the user changes the zoom level
+
+        % fires when the user changes the zoom level
+        % {payload}
+        % value | double: the new zoom level as a percentage
+        % {/payload}
         ZoomChanged
-        % > LOADED fires when the PDF document has been loaded successfully
+
+        % fires when the PDF document finishes loading
+        % {payload}
+        % numPages | double: total number of pages in the document
+        % {/payload}
         Loaded
-        % > ERROR fires when the PDF document fails to load
+
+        % fires when the PDF document fails to load
+        % {payload}
+        % error | char: error message string
+        % {/payload}
         Error
     end
 
@@ -55,32 +76,38 @@ classdef PDFViewer < ic.core.Component
 
     methods (Description = "Reactive")
         function out = nextPage(this)
-            % > NEXTPAGE navigate to the next page
+            % navigate to the next page
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("nextPage", []);
         end
 
         function out = previousPage(this)
-            % > PREVIOUSPAGE navigate to the previous page
+            % navigate to the previous page
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("previousPage", []);
         end
 
         function out = zoomIn(this)
-            % > ZOOMIN increase zoom level by 25%
+            % increase zoom level by 25%
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomIn", []);
         end
 
         function out = zoomOut(this)
-            % > ZOOMOUT decrease zoom level by 25%
+            % decrease zoom level by 25%
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("zoomOut", []);
         end
 
         function out = fitWidth(this)
-            % > FITWIDTH fit the page width to the viewer width
+            % fit the page width to the viewer width
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("fitWidth", []);
         end
 
         function out = fitPage(this)
-            % > FITPAGE fit the entire page within the viewer
+            % fit the entire page within the viewer
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("fitPage", []);
         end
     end

@@ -1,75 +1,62 @@
 classdef Markdown < ic.core.Component & ic.mixin.Requestable
-    % > MARKDOWN Renders Markdown text as formatted HTML.
-    %
-    %   md = ic.Markdown(Value="# Hello World")
-    %   md = ic.Markdown(Value="**bold** and _italic_", Height=400)
-    %
-    % Extensions are lazy-loaded on demand. Each toggle property controls
-    % whether its plugin is active. Disabled plugins are never fetched,
-    % keeping the base bundle small.
-    %
-    % Images referenced by URL or local file path are fetched by MATLAB
-    % and delivered as base64 data URIs (the embedded browser blocks
-    % external resources and local file access).
+    % renders Markdown text as formatted HTML using [markdown-it v14](https://github.com/markdown-it/markdown-it).
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE markdown source text
+        % markdown source text
         Value string = ""
 
-        % > HEIGHT container height (CSS value: number=px, string=any unit)
+        % height of the container, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize} = "100%"
 
-        % > LINEWRAPPING soft-wrap long lines vs horizontal scroll
+        % whether to soft-wrap long lines (false = horizontal scroll)
         LineWrapping (1,1) logical = true
 
-        % > SANITIZE strip raw HTML tags when true (safer)
+        % whether to strip raw HTML tags from the rendered output
         Sanitize (1,1) logical = true
 
-        % ── Extension toggles ──────────────────────────────────────────
-
-        % > CODEHIGHLIGHT syntax highlighting in fenced code blocks
+        % syntax highlighting in fenced code blocks (uses [highlight.js v11](https://highlightjs.org/))
         CodeHighlight (1,1) logical = true
 
-        % > MATH KaTeX math rendering: $inline$ and $$block$$
+        % [KaTeX v0.16](https://katex.org/) math rendering: $inline$ and $$block$$
         Math (1,1) logical = false
 
-        % > TASKLISTS GitHub-style task lists: - [x] done
+        % GitHub-style task lists: - [x] done  (uses [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) internally)
         TaskLists (1,1) logical = true
 
-        % > FOOTNOTES footnote syntax: [^1]
+        % footnote syntax: [^1]  (uses [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) internally)
         Footnotes (1,1) logical = true
 
-        % > SUBSUPERSCRIPT subscript H~2~O and superscript x^2^
+        % subscript H~2~O and superscript x^2^  (uses [markdown-it-sub](https://github.com/markdown-it/markdown-it-sub) and [markdown-it-sup](https://github.com/markdown-it/markdown-it-sup) internally)
         SubSuperscript (1,1) logical = true
 
-        % > EMOJI emoji shortcodes: :smile: → 😄
+        % emoji shortcodes: :smile: → 😄  (uses [markdown-it-emoji](https://github.com/markdown-it/markdown-it-emoji) internally)
         Emoji (1,1) logical = true
 
-        % > CONTAINERS admonition blocks: :::warning
+        % admonition blocks: :::warning  (uses [markdown-it-container](https://github.com/markdown-it/markdown-it-container) internally)
         Containers (1,1) logical = true
 
-        % > MARK highlighted text: ==marked==
+        % highlighted text: ==marked==  (uses [markdown-it-mark](https://github.com/markdown-it/markdown-it-mark) internally)
         Mark (1,1) logical = true
 
-        % > DEFINITIONLISTS definition list syntax: Term\n: Definition
+        % definition list syntax: Term\n: Definition  (uses [markdown-it-deflist](https://github.com/markdown-it/markdown-it-deflist) internally)
         DefinitionLists (1,1) logical = true
 
-        % > ABBREVIATIONS abbreviation tooltips: *[HTML]: Hyper Text Markup Language
+        % abbreviation tooltips: *[HTML]: Hyper Text Markup Language  (uses [markdown-it-abbr](https://github.com/markdown-it/markdown-it-abbr))
         Abbreviations (1,1) logical = true
 
-        % > INSERT underlined/inserted text: ++inserted++
+        % underlined/inserted text: ++inserted++  (uses [markdown-it-ins](https://github.com/markdown-it/markdown-it-ins) internally)
         Insert (1,1) logical = true
 
-        % > HEADINGANCHORS auto-generate id anchors on headings
+        % auto-generate id anchors on headings  (uses [markdown-it-anchor](https://github.com/valeriangalliat/markdown-it-anchor) internally)
         HeadingAnchors (1,1) logical = true
 
-        % > ATTRIBUTES custom classes/attributes: {.class #id attr=val}
+        % custom classes/attributes: {.class #id attr=val}  (uses [markdown-it-attrs](https://github.com/arve0/markdown-it-attrs) internally)
         Attributes (1,1) logical = false
 
-        % > TABLEOFCONTENTS render a table of contents via [[toc]]
+        % render a table of contents via [[toc]]  (uses [markdown-it-table-of-contents](https://www.npmjs.com/package/markdown-it-table-of-contents) internally)
         TableOfContents (1,1) logical = false
 
-        % > MERMAID render ```mermaid code blocks as diagrams
+        % render ```mermaid code blocks as diagrams (uses [Mermaid.js v10](https://mermaid.js.org/) internally)
         Mermaid (1,1) logical = false
     end
 
@@ -95,16 +82,16 @@ classdef Markdown < ic.core.Component & ic.mixin.Requestable
         function result = handleFetchImage(~, data)
             src = string(data.url);
 
-            % Read bytes — URL or local file
+            % read bytes, URL or local file
             if startsWith(src, "http://") || startsWith(src, "https://")
                 opts = weboptions('ContentType', 'binary', 'Timeout', 10);
                 bytes = webread(src, opts);
             else
-                % Local file path
+                % local file path
                 bytes = fileread(src, Encoding="bytes");
             end
 
-            % Detect MIME from extension
+            % detect MIME from extension
             [~, ~, ext] = fileparts(src);
             ext = lower(extractBefore(ext + "?", "?")); % strip query params
             mimeMap = dictionary( ...
