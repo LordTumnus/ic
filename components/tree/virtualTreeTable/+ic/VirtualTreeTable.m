@@ -1,157 +1,156 @@
 classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasContextMenu
-    % > VIRTUALTRETABLE Virtual-scrolling tree table for massive datasets.
-    %
-    %   Combines tree navigation with table columns, virtual scrolling, and
-    %   on-demand data fetching. Only visible rows exist in the DOM (~30-40
-    %   elements). Sorting and filtering are performed server-side in MATLAB.
-    %
-    %   Folder nodes render as full-width expand/collapse rows.
-    %   Leaf nodes render with per-column cells (text, number, etc.).
-    %
-    %   Example:
-    %       vtt = ic.VirtualTreeTable();
-    %       vtt.Columns = [
-    %           ic.table.TextColumn("Name", Width=250, Sortable=true)
-    %           ic.table.NumberColumn("Size", Sortable=true, Filterable=true)
-    %           ic.table.TextColumn("Type", Filterable=true)
-    %       ];
-    %       vtt.ExpanderColumn = "Name";
-    %
-    %       root = ic.tree.Node("Documents", Icon="folder");
-    %       reports = root.add("Reports", Icon="folder");
-    %       reports.add("Q1.pdf", Icon="file-text", ...
-    %           Data=struct('Size', 1024, 'Type', "PDF"));
-    %       vtt.Items = root;
+    % virtual-scrolling tree table for large datasets.
+    % Combines a tree with table columns, virtual scrolling, and on-demand data fetching. Only visible rows exist in the DOM. MATLAB owns the full tree; the frontend fetches data on demand via the request/response protocol, requesting root stubs and child chunks as folders are expanded or the user scrolls
 
-    % ─── Column definitions (NO AbortSet — isequal bug on heterogeneous) ───
     properties (SetObservable, Description = "Reactive")
-        % > COLUMNS column definitions
+        % column definitions
         Columns ic.table.Column = ic.table.Column.empty
 
-        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        % context menu entries for leaf nodes
         LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
 
-        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+        % context menu entries for folder nodes
         FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
-    % ─── Reactive properties ───────────────────────────────────────────────
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > EXPANDERCOLUMN field name of the column with tree indentation ("" = first)
+        % field name of the column with tree indentation ("" = first)
         ExpanderColumn (1,1) string = ""
 
-        % > DISABLED whether the control is disabled
+        % whether the control is disabled and cannot be interacted with
         Disabled (1,1) logical = false
 
-        % > SELECTABLE whether nodes can be selected
+        % whether nodes can be selected
         Selectable (1,1) logical = true
 
-        % > SIZE row density
+        % size of the control relative to its font size
         Size (1,1) string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
 
-        % > HEIGHT height of the container (number for px, or CSS string)
+        % height of the container, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize(Height)} = 400
 
-        % > SHOWLINE whether to display tree connector lines
+        % whether to display tree connector lines
         ShowLine (1,1) logical = true
 
-        % > STRIPED whether to show alternating row colors
+        % whether to show alternating row colors
         Striped (1,1) logical = false
 
-        % > MAXSELECTEDITEMS maximum number of selectable items (Inf = unlimited)
+        % maximum number of selectable items (Inf = unlimited)
         MaxSelectedItems (1,1) double {mustBePositive} = Inf
 
-        % > PLACEHOLDER text shown while loading
+        % text shown while loading new nodes
         Placeholder (1,1) string = "Loading..."
 
-        % > SORTFIELD currently sorted column field ("" = no sort)
+        % currently sorted column field ("" = no sort)
         SortField (1,1) string = ""
 
-        % > SORTDIRECTION sort direction
+        % sort direction
         SortDirection (1,1) string {mustBeMember(SortDirection, ...
             ["none", "asc", "desc"])} = "none"
 
-        % > FILTERS active column filters (field → filterValue)
+        % active column filters
         Filters (1,1) struct = struct()
     end
 
-    % ─── Hidden reactive (selection + cache-buster) ────────────────────────
     properties (SetObservable, AbortSet, Description = "Reactive", ...
             Access = ?ic.mixin.Reactive, Hidden)
-        % > VALUE positional key strings (Svelte bridge — hidden from user)
+        % positional key strings
         Value string = string.empty
 
-        % > ROWCOUNT total number of nodes in the current view
+        % total number of nodes in the current view
         RowCount (1,1) double = 0
 
-        % > VIEWVERSION cache-buster — Svelte clears its caches when this changes
+        % cache-buster — Svelte clears its caches when this changes
         ViewVersion (1,1) double = 0
 
-        % > INITIALEXPANDEDKEYS all folder keys in the view tree (for initial expand)
+        % all folder keys in the view tree (for initial expand)
         InitialExpandedKeys string = string.empty
     end
 
-    % ─── Non-reactive ──────────────────────────────────────────────────────
     properties
-        % > ITEMS tree nodes (NOT reactive — pull-based via request/response)
+        % tree nodes, pulled into the view on demand
         Items ic.tree.Node = ic.tree.Node.empty
     end
 
     properties (Hidden)
-        % > VERBOSE print request info to the command window
+        % print request info to the command window
         Verbose (1,1) logical = false
     end
 
     properties (Dependent)
-        % > SELECTION currently selected nodes (user-facing API)
+        % currently selected #ic.tree.Node handles
         Selection
     end
 
-    % ─── Private state ─────────────────────────────────────────────────────
+    % private state
     properties (Access = private)
-        % Sorted + filtered tree: struct array {node, children}
+        % sorted + filtered tree: struct array {node, children}
         % node = ic.tree.Node handle, children = same struct (recursive)
-        ViewTree_
+        ViewTree
 
-        % Map: view positional key (char) → ic.tree.Node handle
-        ViewKeyMap_
+        % map: view positional key (char) -> ic.tree.Node handle
+        ViewKeyMap
 
-        % Guard flag: when true, recomputeView skips selection clear
+        % guard flag: when true, recomputeView skips selection clear
         InCellEdit (1,1) logical = false
 
         % PostSet listener handles
         ViewListeners event.listener
     end
 
-    % ─── Events ────────────────────────────────────────────────────────────
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
+        % fires when the user changes the selection
+        % {payload}
+        % value | cell: positional key strings of selected nodes, or empty if cleared
+        % {/payload}
         ValueChanged
 
-        % > SORTCHANGED fires when the user clicks a sortable column header
+        % fires when the user clicks a sortable column header
+        % {payload}
+        % field | char: field name of the sorted column
+        % direction | char: sort direction ('asc' or 'desc')
+        % {/payload}
         SortChanged
 
-        % > FILTERCHANGED fires when the user changes a column filter
+        % fires when the user changes a column filter
+        % {payload}
+        % field | char: field name of the filtered column
+        % value | any: the filter value (type depends on column type)
+        % filters | struct: all current active filters
+        % {/payload}
         FilterChanged
 
-        % > CELLCLICKED fires when the user clicks a leaf cell
+        % fires when the user clicks a leaf cell
+        % {payload}
+        % key | char: positional key string of the clicked node
+        % field | char: column field name
+        % {/payload}
         CellClicked
     end
 
     events
-        % > SELECTIONCHANGED fires when the selection changes (carries Selection)
+        % fires when the user changes the selection (non-reactive). dispatches the resolved Node handles from #ic.VirtualTreeTable.ValueChanged
+        % {payload}
+        % Selection | ic.tree.Node[]: resolved node handles of the current selection
+        % {/payload}
         SelectionChanged
 
-        % > CELLEDITED fires when the user edits a cell value inline
+        % fires when the user edits a cell value inline (non-reactive, dispatched from MATLAB)
+        % {payload}
+        % key | char: positional key string of the edited node
+        % field | char: field name of the edited column
+        % oldValue | any: previous cell value
+        % newValue | any: new cell value after editing
+        % {/payload}
         CellEdited
 
-        % > COLUMNRESIZED fires when the user finishes resizing a column
+        % fires when the user finishes resizing a column (non-reactive, dispatched from MATLAB)
+        % {payload}
+        % field | char: field name of the resized column
+        % width | double: new column width in pixels
+        % {/payload}
         ColumnResized
     end
-
-    % ═══════════════════════════════════════════════════════════════════════
-    %  PUBLIC METHODS
-    % ═══════════════════════════════════════════════════════════════════════
 
     methods
         function this = VirtualTreeTable(props)
@@ -190,9 +189,9 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             ];
 
             % Initialize state
-            this.ViewKeyMap_ = containers.Map('KeyType', 'char', ...
+            this.ViewKeyMap = containers.Map('KeyType', 'char', ...
                 'ValueType', 'any');
-            this.ViewTree_ = struct('node', {}, 'children', {});
+            this.ViewTree = struct('node', {}, 'children', {});
 
             this.recomputeView();
         end
@@ -200,8 +199,6 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         function delete(this)
             delete(this.ViewListeners);
         end
-
-        % --- Items setter (triggers view rebuild) ---
 
         function set.Items(this, val)
             this.Items = val;
@@ -216,8 +213,6 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             this.recomputeView();
         end
 
-        % --- SortField setter (auto-reset direction) ---
-
         function set.SortField(this, val)
             if val ~= this.SortField
                 this.setValueSilently('SortDirection', 'asc');
@@ -225,16 +220,12 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             this.SortField = val;
         end
 
-        % --- Value setter (normalize) ---
-
         function set.Value(this, val)
             if isscalar(val) && val == ""
                 val = string.empty;
             end
             this.Value = val;
         end
-
-        % --- Selection accessors ---
 
         function nodes = get.Selection(this)
             vals = this.Value;
@@ -245,8 +236,8 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             nodes = ic.tree.Node.empty;
             for i = 1:numel(vals)
                 k = char(vals(i));
-                if this.ViewKeyMap_.isKey(k)
-                    nodes(i) = this.ViewKeyMap_(k);
+                if this.ViewKeyMap.isKey(k)
+                    nodes(i) = this.ViewKeyMap(k);
                 end
             end
         end
@@ -267,25 +258,28 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
     end
 
-    % ═══════════════════════════════════════════════════════════════════════
-    %  REACTIVE METHODS (published to Svelte)
-    % ═══════════════════════════════════════════════════════════════════════
-
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the tree table container
+            % programmatically focus the tree table container
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("focus", []);
         end
 
         function out = clearSelection(this)
-            % > CLEARSELECTION Clear all selected items.
+            % clear all selected items
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.Value = string.empty;
             out = this.publish("clearSelection", []);
         end
 
         function out = expandNode(this, node)
-            % > EXPANDNODE Programmatically expand a folder node.
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically expand a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            arguments
+                this
+                % the node to expand
+                node (1,1) ic.tree.Node
+            end
             key = this.viewKeyOf(node);
             assert(key ~= "", "ic:VirtualTreeTable:NodeNotInView", ...
                 "Node '%s' is not in the current view.", node.Label);
@@ -293,8 +287,13 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function out = collapseNode(this, node)
-            % > COLLAPSENODE Programmatically collapse a folder node.
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically collapse a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            arguments
+                this
+                % the node to collapse
+                node (1,1) ic.tree.Node
+            end
             key = this.viewKeyOf(node);
             assert(key ~= "", "ic:VirtualTreeTable:NodeNotInView", ...
                 "Node '%s' is not in the current view.", node.Label);
@@ -302,21 +301,27 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function out = expandAll(this)
-            % > EXPANDALL Expand all folder nodes.
+            % expand all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("expandAll", []);
         end
 
         function out = collapseAll(this)
-            % > COLLAPSEALL Collapse all folder nodes.
+            % collapse all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("collapseAll", []);
         end
 
         function out = editCell(this, node, field, value)
-            % > EDITCELL Programmatically edit a leaf cell.
+            % programmatically edit a leaf cell. Prefer this method to directly editing the #ic.VirtualTreeTable.Items, as it triggers a view recompute if the cell is in the viewport
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             arguments
                 this
+                % the node containing the cell to edit
                 node (1,1) ic.tree.Node
+                % the field name of the cell's column
                 field (1,1) string
+                % the new value to set. Its type depends on the column definition
                 value
             end
             key = this.viewKeyOf(node);
@@ -348,25 +353,19 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function out = refresh(this)
-            % > REFRESH Manually recompute the view.
+            % manually force a recompute of the view
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.recomputeView();
             out = [];
         end
     end
 
-    % ═══════════════════════════════════════════════════════════════════════
-    %  PRIVATE METHODS
-    % ═══════════════════════════════════════════════════════════════════════
-
     methods (Access = private)
-
-        % ── View rebuild ───────────────────────────────────────────────
-
         function recomputeView(this)
-            % Build sorted + filtered tree projection.
+            % build sorted + filtered tree projection.
             if isempty(this.Items)
-                this.ViewTree_ = struct('node', {}, 'children', {});
-                this.ViewKeyMap_ = containers.Map('KeyType', 'char', ...
+                this.ViewTree = struct('node', {}, 'children', {});
+                this.ViewKeyMap = containers.Map('KeyType', 'char', ...
                     'ValueType', 'any');
                 this.RowCount = 0;
                 this.InitialExpandedKeys = string.empty;
@@ -374,18 +373,18 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                 return;
             end
 
-            % Build the view tree (filter + sort, recursive)
-            this.ViewTree_ = this.buildViewTree(this.Items);
+            % build the view tree (filter + sort, recursive)
+            this.ViewTree = this.buildViewTree(this.Items);
 
-            % Populate key map eagerly + collect folder keys
-            this.ViewKeyMap_ = containers.Map('KeyType', 'char', ...
+            % populate key map eagerly + collect folder keys
+            this.ViewKeyMap = containers.Map('KeyType', 'char', ...
                 'ValueType', 'any');
-            this.buildKeyMap(this.ViewTree_, "");
-            this.InitialExpandedKeys = this.collectFolderKeys(this.ViewTree_, "");
+            this.buildKeyMap(this.ViewTree, "");
+            this.InitialExpandedKeys = this.collectFolderKeys(this.ViewTree, "");
 
-            this.RowCount = this.countNodes(this.ViewTree_);
+            this.RowCount = this.countNodes(this.ViewTree);
 
-            % Clear selection (keys change on sort/filter)
+            % clear selection (keys change on sort/filter)
             if ~this.InCellEdit
                 this.setValueSilently('Value', string.empty);
             end
@@ -399,7 +398,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function viewNodes = buildViewTree(this, nodes)
-            % Recursively build sorted + filtered view tree.
+            % recursively build sorted + filtered view tree.
             n = numel(nodes);
             if n == 0
                 viewNodes = struct('node', {}, 'children', {});
@@ -409,7 +408,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             activeFields = this.getActiveFilterFields();
             hasFilter = ~isempty(activeFields);
 
-            % Step 1: Filter + recurse into children
+            % step 1: Filter + recurse into children
             result = cell(1, n);
             nKeep = 0;
 
@@ -418,7 +417,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                 ch = nd.Children;
 
                 if ~isempty(ch)
-                    % Folder: recurse (children already sorted/filtered)
+                    % folder: recurse (children already sorted/filtered)
                     childView = this.buildViewTree(ch);
                     if hasFilter && isempty(childView)
                         continue;
@@ -427,7 +426,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                     result{nKeep} = struct('node', nd, ...
                         'children', childView);
                 else
-                    % Leaf: test against all active filters
+                    % leaf: test against all active filters
                     if hasFilter && ~this.passesFilters(nd, activeFields)
                         continue;
                     end
@@ -444,7 +443,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
 
             viewNodes = [result{1:nKeep}];
 
-            % Step 2: Sort this level (children already sorted by recursion)
+            % step 2: Sort this level (children already sorted by recursion)
             if this.SortField ~= "" && this.SortDirection ~= "none" ...
                     && numel(viewNodes) > 1
                 viewNodes = this.sortViewLevel(viewNodes);
@@ -452,7 +451,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function sorted = sortViewLevel(this, viewNodes)
-            % Sort a single level of view nodes by the current sort field.
+            % sort a single level of view nodes by the current sort field.
             colIdx = find(arrayfun(@(c) c.Field == this.SortField, ...
                 this.Columns), 1);
             if isempty(colIdx)
@@ -502,7 +501,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function tf = passesFilters(this, node, activeFields)
-            % Test a leaf node against all active column filters.
+            % test a leaf node against all active column filters.
             expander = this.getExpanderField();
             filters = this.Filters;
 
@@ -552,7 +551,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                     return;
                 end
 
-                % Type-specific filter
+                % type-specific filter
                 if ~col.filterColumn(cellVal, fv)
                     tf = false;
                     return;
@@ -562,17 +561,16 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             tf = true;
         end
 
-        % ── Request handlers ───────────────────────────────────────────
 
         function result = handleGetRoots(this)
-            if isempty(this.ViewTree_)
+            if isempty(this.ViewTree)
                 result = [];
             else
-                result = this.serializeLevel(this.ViewTree_);
+                result = this.serializeLevel(this.ViewTree);
             end
             if this.Verbose
                 fprintf("[VirtualTreeTable] getRoots → %d root(s)\n", ...
-                    numel(this.ViewTree_));
+                    numel(this.ViewTree));
             end
         end
 
@@ -606,7 +604,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function stubs = serializeLevel(this, viewNodes, parentKey, offset)
-            % Serialize view nodes to lightweight stubs for the frontend.
+            % serialize view nodes to lightweight stubs for the frontend.
             % Leaf stubs include a .data field with column values.
             arguments
                 this
@@ -620,7 +618,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                 return;
             end
 
-            % Generate positional keys
+            % generate positional keys
             indices = string(offset + (1:n));
             if parentKey == ""
                 keys = indices;
@@ -628,7 +626,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                 keys = parentKey + "-" + indices;
             end
 
-            % Preallocate struct array
+            % preallocate struct array
             stubs = repmat(struct('key', '', 'name', '', 'icon', [], ...
                 'isFolder', false, 'childCount', 0, 'data', []), 1, n);
 
@@ -646,28 +644,28 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                 stubs(i).isFolder = ~isempty(ch);
                 stubs(i).childCount = numel(ch);
 
-                % Leaf nodes: include column data
+                % leaf nodes: include column data
                 if isempty(ch) && ~isempty(nd.Data)
                     stubs(i).data = nd.Data;
                 end
 
-                % Update key map
-                this.ViewKeyMap_(k) = nd;
+                % update key map
+                this.ViewKeyMap(k) = nd;
             end
         end
 
         function viewNode = resolveViewNode(this, key)
-            % Navigate ViewTree_ by positional key (e.g. "1-2-3").
+            % navigate ViewTree by positional key (e.g. "1-2-3").
             parts = str2double(split(string(key), "-"));
             if isempty(parts) || isnan(parts(1))
                 viewNode = [];
                 return;
             end
-            if parts(1) > numel(this.ViewTree_)
+            if parts(1) > numel(this.ViewTree)
                 viewNode = [];
                 return;
             end
-            viewNode = this.ViewTree_(parts(1));
+            viewNode = this.ViewTree(parts(1));
             for j = 2:numel(parts)
                 if isempty(viewNode.children) ...
                         || parts(j) > numel(viewNode.children)
@@ -678,8 +676,6 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             end
         end
 
-        % ── Cell edit handling ─────────────────────────────────────────
-
         function handleCellEdited(this, data)
             key = string(data.key);
             field = string(data.field);
@@ -687,10 +683,10 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             oldValue = data.oldValue;
 
             k = char(key);
-            if ~this.ViewKeyMap_.isKey(k)
+            if ~this.ViewKeyMap.isKey(k)
                 return;
             end
-            node = this.ViewKeyMap_(k);
+            node = this.ViewKeyMap(k);
 
             expander = this.getExpanderField();
 
@@ -713,7 +709,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
                 node.Data = s;
             end
 
-            % Conditional recompute (only if edit affects sort/filter)
+            % conditional recompute (only if edit affects sort/filter)
             needsRecompute = false;
             if this.SortField == field && this.SortDirection ~= "none"
                 needsRecompute = true;
@@ -757,16 +753,14 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
             col = cols(idx);
             if isempty(col.OnCellAction), return; end
             k = char(data.key);
-            if this.ViewKeyMap_.isKey(k)
-                node = this.ViewKeyMap_(k);
+            if this.ViewKeyMap.isKey(k)
+                node = this.ViewKeyMap(k);
                 col.OnCellAction(col, node, data.data);
             end
         end
 
-        % ── Helpers ────────────────────────────────────────────────────
-
         function expander = getExpanderField(this)
-            % Get the effective expander column field name.
+            % get the effective expander column field name.
             if this.ExpanderColumn ~= ""
                 expander = this.ExpanderColumn;
             elseif ~isempty(this.Columns)
@@ -777,7 +771,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function fields = getActiveFilterFields(this)
-            % Get the list of fields with active (non-empty) filters.
+            % get the list of fields with active (non-empty) filters.
             fields = {};
             fnames = fieldnames(this.Filters);
             for k = 1:numel(fnames)
@@ -789,10 +783,10 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function key = viewKeyOf(this, targetNode)
-            % Find the view tree positional key for a node handle.
-            allKeys = this.ViewKeyMap_.keys();
+            % find the view tree positional key for a node handle.
+            allKeys = this.ViewKeyMap.keys();
             for j = 1:numel(allKeys)
-                if this.ViewKeyMap_(allKeys{j}) == targetNode
+                if this.ViewKeyMap(allKeys{j}) == targetNode
                     key = string(allKeys{j});
                     return;
                 end
@@ -801,7 +795,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function n = countNodes(this, viewNodes)
-            % Count total nodes in the view tree (recursive).
+            % count total nodes in the view tree (recursive).
             n = numel(viewNodes);
             for i = 1:numel(viewNodes)
                 if ~isempty(viewNodes(i).children)
@@ -811,14 +805,14 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function buildKeyMap(this, viewNodes, parentKey)
-            % Populate ViewKeyMap_ by walking the view tree.
+            % populate ViewKeyMap by walking the view tree.
             for i = 1:numel(viewNodes)
                 if parentKey == ""
                     key = string(i);
                 else
                     key = parentKey + "-" + string(i);
                 end
-                this.ViewKeyMap_(char(key)) = viewNodes(i).node;
+                this.ViewKeyMap(char(key)) = viewNodes(i).node;
                 if ~isempty(viewNodes(i).children)
                     this.buildKeyMap(viewNodes(i).children, key);
                 end
@@ -826,7 +820,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         end
 
         function keys = collectFolderKeys(this, viewNodes, parentKey)
-            % Collect all folder positional keys from the view tree.
+            % collect all folder positional keys from the view tree.
             keys = string.empty;
             for i = 1:numel(viewNodes)
                 if parentKey == ""
@@ -843,12 +837,8 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
     end
 end
 
-% ═══════════════════════════════════════════════════════════════════════
-%  LOCAL FUNCTIONS
-% ═══════════════════════════════════════════════════════════════════════
-
 function leaf = findFirstLeaf(nodes)
-    % Find the first leaf node (no children) in a tree.
+    % find the first leaf node (no children) in a tree.
     leaf = ic.tree.Node.empty;
     for i = 1:numel(nodes)
         if isempty(nodes(i).Children)

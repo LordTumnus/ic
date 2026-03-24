@@ -1,56 +1,55 @@
 classdef FilterTree < ic.TreeBase & ic.mixin.HasContextMenu
-    % > FILTERTREE Tree with client-side tag-based filtering.
-    %
-    %   Displays a SearchBar above a Tree view. Typing filter tags
-    %   narrows the visible tree using prefix-based operators:
-    %     (none) = contains, | = OR, ~ = NOT, : = folder-only,
-    %     @ = leaf-only, = = exact, / = ancestor path, ^ = starts-with
-    %
-    %   Example:
-    %       ft = ic.FilterTree();
-    %       root = ic.tree.Node("Root");
-    %       src  = root.add("src");
-    %       src.add("main.m");
-    %       src.add("util.m");
-    %       root.add("README.md");
-    %       ft.Items = root;
+    % tree with client-side tag-based filtering.
+    % Displays a #ic.SearchBar above a #ic.Tree view. Typing filter tags narrows the visible tree using prefix-based operators: (none)=contains, |=OR, ~=NOT, :=folder-only, @=leaf-only, ==exact, /=ancestor path, ^=starts-with.
+    % {/superclass}
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > PLACEHOLDER text shown in the search bar when empty
+        % ghost text shown in the search bar when empty
         Placeholder string = "Search..."
-        % > CLEARABLE whether the search bar can be cleared via X button
+
+        % whether to display an "x" button to clear the search input when pressed
         Clearable logical = true
-        % > SELECTABLE whether tree items can be selected
+
+        % whether tree items can be selected
         Selectable logical = true
-        % > SIZE size of the control
+
+        % size of the control relative to its font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > HEIGHT height of the tree panel (number for px, or CSS string)
+
+        % height of the tree panel, in pixels or a CSS size string
         Height {ic.check.CssValidators.mustBeSize(Height)} = 400
-        % > SHOWLINE whether to display tree connector lines
+
+        % whether to display tree connector lines
         ShowLine logical = true
-        % > LAZYLOAD when true, child nodes rendered on demand
+
+        % when true, child nodes rendered on demand
         LazyLoad logical = true
-        % > CASESENSITIVE whether filtering is case-sensitive
+
+        % whether filtering is case-sensitive
         CaseSensitive logical = false
-        % > AUTOEXPAND auto-expand ancestors of matching nodes during filter
+
+        % auto-expand ancestors of matching nodes during filter
         AutoExpand logical = true
     end
 
     properties (SetObservable, Description = "Reactive")
-        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        % context menu entries for leaf nodes
         LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
-        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+
+        % context menu entries for folder nodes
         FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
-    properties (SetObservable, AbortSet, Description = "Reactive", ...
-            Access = ?ic.mixin.Reactive, Hidden)
-        % > SEARCHVALUE current filter tags (Svelte bridge — hidden from user)
+    properties (SetObservable, AbortSet, Description = "Reactive")
+        % active filter tags as a string array. Each tag is an optional operator prefix followed by a search term. See #ic.FilterTree for supported operators.
         SearchValue string = string.empty
     end
 
     events (Description = "Reactive")
-        % > SEARCHCHANGED fires when the filter tags change
+        % fires when the filter tags change
+        % {payload}
+        % value | cell[]: current filter tags
+        % {/payload}
         SearchChanged
     end
 
@@ -73,12 +72,14 @@ classdef FilterTree < ic.TreeBase & ic.mixin.HasContextMenu
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the search input
+            % programmatically focus the search input
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("focus", []);
         end
 
         function out = clearSearch(this)
-            % > CLEARSEARCH programmatically clear all filter tags
+            % programmatically clear all filter tags
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.SearchValue = string.empty;
             out = this.publish("clearSearch", []);
         end

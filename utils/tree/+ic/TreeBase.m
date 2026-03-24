@@ -1,39 +1,42 @@
 classdef (Abstract) TreeBase < ic.core.Component
-    % > TREEBASE Abstract base for tree-backed components.
-    %
-    %   Provides shared tree node management (Items, Value/Selection),
-    %   incremental operations (addNode, removeNode, updateNode),
-    %   and expand/collapse control.
-    %
-    %   Subclasses: ic.TreeSelect, ic.Tree, (future) ic.FilterTree, ic.TreeTable
+    % abstract base for tree-backed components.
+    % Provides shared tree node management, incremental node operations, and expand/collapse control
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS tree nodes
+        % root tree node(s) that define the hierarchical structure
         Items ic.tree.Node = ic.tree.Node.empty
-        % > DISABLED whether the control is disabled
+
+        % whether the whole tree view is disabled
         Disabled logical = false
-        % > MAXSELECTEDITEMS maximum number of selectable items (Inf = unlimited)
+
+        % maximum number of nodes that can be selected simultaneously (Inf = unlimited)
         MaxSelectedItems double {mustBePositive} = Inf
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
             Access = ?ic.mixin.Reactive, Hidden)
-        % > VALUE positional key strings (Svelte bridge — hidden from user)
+        % positional key strings for the Svelte bridge. See #ic.TreeBase.Selection for the resolved Node handles.
         Value string = string.empty
     end
 
     properties (Dependent)
-        % > SELECTION currently selected nodes (user-facing API)
+        % currently selected nodes as an array of #ic.tree.Node handles
         Selection
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
+        % fires when the user changes the selection
+        % {payload}
+        % value | cell array or empty: positional key strings of selected nodes, or empty if cleared
+        % {/payload}
         ValueChanged
     end
 
     events
-        % > SELECTIONCHANGED fires when the user changes the selection (convenience: carries Selection)
+        % fires when the user changes the selection. This method is a non-reactive convenience event dispatched that listens to #ic.TreeBase.ValueChanged and dispatches the resolved Node handles of the current selection.
+        % {payload}
+        % Selection | ic.tree.Node[]: resolved node handles of the current selection
+        % {/payload}
         SelectionChanged
     end
 
@@ -47,11 +50,11 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function set.Value(this, val)
-            % Normalize "" to string.empty (canonical "no selection")
+            % normalize "" to string.empty (canonical "no selection")
             if isscalar(val) && val == ""
                 val = string.empty;
             end
-            % Validate: every positional key must resolve in the tree
+            % validate: every positional key must resolve in the tree
             if ~isempty(val) && ~isempty(this.Items) %#ok<MCSUP>
                 for i = 1:numel(val)
                     this.Items.resolve(val(i)); %#ok<MCSUP>
@@ -66,7 +69,7 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function nodes = get.Selection(this)
-            % Resolve positional key strings → Node handles
+            % resolve positional key strings to Node handles
             nodes = ic.tree.Node.empty;
             for i = 1:numel(this.Value)
                 nodes(i) = this.Items.resolve(this.Value(i));
@@ -74,7 +77,7 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function set.Selection(this, val)
-            % Convert Node handles → positional key strings via keyOf
+            % convert Node handles to positional key strings
             if isempty(val)
                 this.Value = string.empty;
                 return;
@@ -92,14 +95,21 @@ classdef (Abstract) TreeBase < ic.core.Component
 
     methods (Description = "Reactive")
         function [child, out] = addNode(this, parent, label, opts)
-            % > ADDNODE Add a child node to the tree incrementally.
-            %   ts.addNode(ic.tree.Node.empty, "Root")   % add root node
-            %   ts.addNode(citrus, "Grape")               % add under citrus
+            % add a child node to the tree incrementally.
+            % {returns} The new child #ic.tree.Node and a #ic.async.Promise with the fulfillment status from the view{/returns}
+            % {example}
+            %   [root, ~] = t.addNode(ic.tree.Node.empty, "Root");
+            %   [child, ~] = t.addNode(root, "Child", Icon="file");
+            % {/example}
             arguments
                 this
+                % parent node to add under, or empty to create a root node
                 parent ic.tree.Node
+                % display text for the new node
                 label (1,1) string
+                % optional icon for the new node
                 opts.Icon ic.asset.Asset = ic.asset.Asset()
+                % optional data payload for the new node
                 opts.Data struct = struct.empty
             end
             child = ic.tree.Node(label, Icon=opts.Icon, Data=opts.Data);
@@ -129,9 +139,13 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function out = removeNode(this, node)
-            % > REMOVENODE Remove a node from the tree incrementally.
-            %   ts.removeNode(orange)
-            arguments, this, node (1,1) ic.tree.Node, end
+            % remove a node from the tree incrementally
+            % {returns} a #ic.async.Promise with the fulfillment status from the view{/returns}
+            arguments
+                this
+                % the node to remove
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:TreeBase:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -152,40 +166,45 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function out = updateNode(this, node, opts)
-            % > UPDATENODE Update a node's label or icon incrementally.
-            %   ts.updateNode(apple, Label="Green Apple")
+            % update a node's label, icon, or data incrementally
+            % {returns} a #ic.async.Promise with the fulfillment status from the view{/returns}
             arguments
                 this
+                % the node to update
                 node (1,1) ic.tree.Node
-                opts.Label (1,1) string = ""
-                opts.Icon = []
-                opts.Data struct = struct.empty
+                % new label
+                opts.Label (1,1) string = node.Label
+                % new icon
+                opts.Icon = node.Icon
+                % new data struct
+                opts.Data struct = node.Data
             end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:TreeBase:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
-            if opts.Label ~= "", node.Label = opts.Label; end
-            if ~isempty(opts.Icon), node.Icon = opts.Icon; end
-            if ~isempty(opts.Data), node.Data = opts.Data; end
-            if isempty(node.Icon), icon = [];
-            else, icon = struct('type', node.Icon.Type, 'value', node.Icon.Value);
-            end
+            node.Label = opts.Label;
+            node.Icon = opts.Icon;
             out = this.publish("updateNode", struct( ...
                 'key', char(key), ...
                 'label', char(node.Label), ...
-                'icon', icon));
+                'icon', node.Icon));
         end
 
         function out = clearSelection(this)
-            % > CLEARSELECTION Clear all selected items.
+            % clear all selected items
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.Value = string.empty;
             out = this.publish("clearSelection", []);
         end
 
         function out = expandNode(this, node)
-            % > EXPANDNODE Programmatically expand a folder node.
-            %   t.expandNode(citrus)
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically expand a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            arguments
+                this
+                % the folder node to expand with its children
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:TreeBase:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -193,9 +212,13 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function out = collapseNode(this, node)
-            % > COLLAPSENODE Programmatically collapse a folder node.
-            %   t.collapseNode(citrus)
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically collapse a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            arguments
+                this
+                % the folder node to collapse
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:TreeBase:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -203,12 +226,14 @@ classdef (Abstract) TreeBase < ic.core.Component
         end
 
         function out = expandAll(this)
-            % > EXPANDALL Expand all folder nodes.
+            % expand all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("expandAll", []);
         end
 
         function out = collapseAll(this)
-            % > COLLAPSEALL Collapse all folder nodes.
+            % collapse all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("collapseAll", []);
         end
     end

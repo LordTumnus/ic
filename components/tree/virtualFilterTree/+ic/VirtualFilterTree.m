@@ -1,91 +1,102 @@
 classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasContextMenu
-    % > VIRTUALFILTERTREE Virtual-scrolling tree with server-side filtering.
-    %
-    %   Renders a VirtualTree for normal browsing. When filter tags are
-    %   entered, sends a filter request to MATLAB, which walks the full
-    %   tree and returns matching nodes as a regular tree structure.
-    %
-    %   Operators:
-    %     (none) = contains, | = OR, ~ = NOT, : = folder-only,
-    %     @ = leaf-only, = = exact, / = ancestor path, ^ = starts-with
-    %
-    %   Example:
-    %       vft = ic.VirtualFilterTree();
-    %       root = ic.tree.Node("Root");
-    %       for i = 1:10000, root.add("Child " + i); end
-    %       vft.Items = root;
+    % virtual-scrolling tree with MATLAB-side tag-based filtering.
+    % See #ic.FilterTree for the same component with client-side filtering. VirtualFilterTree adds support for larger trees by rendering only visible nodes and serving tree data on demand via request handlers
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > DISABLED whether the control is disabled
+        % whether the control is disabled and cannot be interacted with
         Disabled logical = false
-        % > SELECTABLE whether items can be selected
+
+        % whether items can be selected
         Selectable logical = true
-        % > SIZE size of the control
+
+        % size of the control relative to its font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > HEIGHT height of the tree (number for px, or CSS string)
+
+        % height of the tree, in pixels or a CSS size string
         Height {ic.check.CssValidators.mustBeSize(Height)} = 400
-        % > SHOWLINE whether to display tree connector lines
+
+        % whether to display tree connector lines
         ShowLine logical = true
-        % > MAXSELECTEDITEMS maximum number of selectable items (Inf = unlimited)
+
+        % maximum number of selectable items (Inf = unlimited)
         MaxSelectedItems double {mustBePositive} = Inf
-        % > PLACEHOLDER text shown while loading in VirtualTree mode
+
+        % text shown while loading new rows
         Placeholder string = "Loading..."
-        % > SEARCHPLACEHOLDER text shown in the search bar when empty
+
+        % ghost text shown in the search bar when empty
         SearchPlaceholder string = "Search..."
-        % > CLEARABLE whether the search bar can be cleared via X button
+
+        % whether to display an "x" button to clear the search input when pressed
         Clearable logical = true
-        % > CASESENSITIVE whether filtering is case-sensitive
+
+        % whether filtering is case-sensitive
         CaseSensitive logical = false
-        % > AUTOEXPAND auto-expand ancestors of matches in filtered view
+
+        % auto-expand ancestors of matches in filtered view
         AutoExpand logical = true
     end
 
     properties (SetObservable, Description = "Reactive")
-        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        % context menu entries for leaf nodes
         LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
-        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+
+        % context menu entries for folder nodes
         FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
             Access = ?ic.mixin.Reactive, Hidden)
-        % > VALUE positional key strings (Svelte bridge — hidden from user)
+        % positional key strings for the Svelte bridge. See #ic.VirtualFilterTree.Selection for the resolved Node handles.
         Value string = string.empty
-        % > SEARCHVALUE current filter tags (Svelte bridge — hidden from user)
+    end
+
+    properties (SetObservable, AbortSet, Description = "Reactive")
+        % active filter tags as a string array. Each tag is an optional operator prefix followed by a search term. See #ic.FilterTree for supported operators.
         SearchValue string = string.empty
     end
 
     properties
-        % > ITEMS tree nodes (not reactive — pull-based)
+        % tree nodes. These are **not** reactive
         Items ic.tree.Node = ic.tree.Node.empty
     end
 
     properties (Hidden)
-        % > VERBOSE print request info to the command window
+        % print request info to the command window
         Verbose logical = false
     end
 
     properties (Access = private)
         FilterActive_ logical = false
-        FilterRoots_ = []            % struct array of VirtualNode stubs (top-level)
-        FilterChildMap_              % containers.Map: parentKey → struct array of child stubs
-        FilterExpandKeys_ = {}       % cell array of folder keys to auto-expand
+        FilterRoots_ = []            % struct array of VirtualNode stubs
+        FilterChildMap              % containers.Map: parentKey → struct array of child stubs
+        FilterExpandKeys = {}       % cell array of folder keys to auto-expand
     end
 
     properties (Dependent)
-        % > SELECTION currently selected nodes (user-facing API)
+        % currently selected nodes (user-facing API)
         Selection
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
+        % fires when the user changes the selection
+        % {payload}
+        % value | cell: positional key strings of selected nodes, or empty if cleared
+        % {/payload}
         ValueChanged
-        % > SEARCHCHANGED fires when the filter tags change
+
+        % fires when the filter tags change
+        % {payload}
+        % value | cell: current filter tags
+        % {/payload}
         SearchChanged
     end
 
     events
-        % > SELECTIONCHANGED fires when the user changes the selection (carries Selection)
+        % fires when the user changes the selection (non-reactive). dispatches the resolved Node handles from #ic.VirtualFilterTree.ValueChanged
+        % {payload}
+        % Selection | ic.tree.Node[]: resolved node handles of the current selection
+        % {/payload}
         SelectionChanged
     end
 
@@ -96,7 +107,7 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.Component(props);
-            this.FilterChildMap_ = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            this.FilterChildMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
             addlistener(this, 'Value', 'PostSet', @(~, ~) notify( ...
                 this, ...
                 'SelectionChanged', ...
@@ -161,25 +172,33 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the search input
+            % programmatically focus the search input
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("focus", []);
         end
 
         function out = clearSelection(this)
-            % > CLEARSELECTION Clear all selected items.
+            % clear all selected items
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.Value = string.empty;
             out = this.publish("clearSelection", []);
         end
 
         function out = clearSearch(this)
-            % > CLEARSEARCH programmatically clear all filter tags
+            % programmatically clear all filter tags
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.SearchValue = string.empty;
             out = this.publish("clearSearch", []);
         end
 
         function out = expandNode(this, node)
-            % > EXPANDNODE Programmatically expand a folder node.
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically expand a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            arguments
+                this
+                % node to expand. Must be a handle to a node in the #ic.VirtualTree.Items tree
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:VirtualFilterTree:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -187,8 +206,13 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
         end
 
         function out = collapseNode(this, node)
-            % > COLLAPSENODE Programmatically collapse a folder node.
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically collapse a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            arguments
+                this
+                % node to collapse. Must be a handle to a node in the #ic.VirtualTree.Items tree
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:VirtualFilterTree:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -196,12 +220,14 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
         end
 
         function out = expandAll(this)
-            % > EXPANDALL Expand all folder nodes.
+            % expand all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("expandAll", []);
         end
 
         function out = collapseAll(this)
-            % > COLLAPSEALL Collapse all folder nodes.
+            % collapse all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("collapseAll", []);
         end
     end
@@ -226,8 +252,8 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
             if this.FilterActive_
                 % Serve from filter cache
                 k = char(data.key);
-                if this.FilterChildMap_.isKey(k)
-                    stubs = this.FilterChildMap_(k);
+                if this.FilterChildMap.isKey(k)
+                    stubs = this.FilterChildMap(k);
                     result = this.paginateStubs(stubs, data.offset, data.count);
                     if this.Verbose
                         fprintf("[VirtualFilterTree] getChildren (filtered) key=%s → %d stub(s)\n", ...
@@ -260,7 +286,7 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
         end
 
         function result = handleFilter(this, data)
-            % Walk the full tree applying filter logic, cache results,
+            % walk the full tree applying filter logic, cache results,
             % and return a summary (not the full tree).
             if this.Verbose
                 fprintf("[VirtualFilterTree] filter request\n");
@@ -268,12 +294,12 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
             groups = data.groups;
             cs = logical(data.caseSensitive);
 
-            % Build nested filtered struct
+            % build nested filtered struct
             nested = this.filterNodes(this.Items, groups, cs, {}, "");
 
             % Flatten into cache: roots + child map
-            this.FilterChildMap_ = containers.Map('KeyType', 'char', 'ValueType', 'any');
-            this.FilterExpandKeys_ = {};
+            this.FilterChildMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            this.FilterExpandKeys = {};
             if isempty(nested)
                 this.FilterRoots_ = [];
             else
@@ -284,19 +310,19 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
             n = numel(this.FilterRoots_);
             if this.Verbose
                 fprintf("[VirtualFilterTree] filter cached → %d root(s), %d folder(s)\n", ...
-                    n, numel(this.FilterExpandKeys_));
+                    n, numel(this.FilterExpandKeys));
             end
 
-            % Return summary — Svelte uses this to re-key VirtualTree
-            result = struct('count', n, 'expandKeys', {this.FilterExpandKeys_});
+            % return summary
+            result = struct('count', n, 'expandKeys', {this.FilterExpandKeys});
         end
 
         function result = handleClearFilter(this)
-            % Clear the filter cache, reverting to full Items tree.
+            % clear the filter cache, reverting to full Items tree.
             this.FilterActive_ = false;
             this.FilterRoots_ = [];
-            this.FilterChildMap_ = containers.Map('KeyType', 'char', 'ValueType', 'any');
-            this.FilterExpandKeys_ = {};
+            this.FilterChildMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            this.FilterExpandKeys = {};
             if this.Verbose
                 fprintf("[VirtualFilterTree] filter cleared\n");
             end
@@ -338,8 +364,8 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
         end
 
         function stubs = buildFilterStubs(this, nodes)
-            % Flatten nested filter struct into VirtualNode stubs.
-            % Populates FilterChildMap_ and FilterExpandKeys_ as side effects.
+            % flatten nested filter struct into VirtualNode stubs.
+            % Populates FilterChildMap and FilterExpandKeys as side effects.
             n = numel(nodes);
             stubs = repmat(struct('key', '', 'name', '', 'icon', [], ...
                 'isFolder', false, 'childCount', 0), 1, n);
@@ -353,14 +379,14 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
                     'childCount', childCount);
                 if hasChildren
                     childStubs = this.buildFilterStubs(nd.children);
-                    this.FilterChildMap_(char(nd.key)) = childStubs;
-                    this.FilterExpandKeys_{end+1} = char(nd.key);
+                    this.FilterChildMap(char(nd.key)) = childStubs;
+                    this.FilterExpandKeys{end+1} = char(nd.key);
                 end
             end
         end
 
         function result = paginateStubs(~, stubs, offset, count)
-            % Return a paginated slice of a stub array.
+            % return a paginated slice of a stub array.
             n = numel(stubs);
             startIdx = offset + 1;
             if startIdx > n
@@ -372,13 +398,13 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
         end
 
         function result = filterNodes(this, nodes, groups, cs, ancestorPath, parentKey)
-            % Recursively filter nodes, preserving positional keys.
+            % recursively filter nodes, preserving positional keys.
             % Returns struct array in TreeNode format (key, name, icon, children).
             result = [];
             for i = 1:numel(nodes)
                 nd = nodes(i);
 
-                % Compute positional key inline
+                % compute positional key inline
                 if parentKey == ""
                     key = string(i);
                 else
@@ -387,7 +413,7 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
 
                 isFolder = ~isempty(nd.Children);
 
-                % Recurse into children
+                % recurse into children
                 if isFolder
                     childPath = [ancestorPath, {char(nd.Label)}];
                     filteredChildren = this.filterNodes( ...
@@ -396,7 +422,7 @@ classdef VirtualFilterTree < ic.core.Component & ic.mixin.Requestable & ic.mixin
                     filteredChildren = [];
                 end
 
-                % Check if this node matches
+                % check if this node matches
                 selfMatch = this.matchNodeMATLAB( ...
                     nd.Label, isFolder, ancestorPath, groups, cs);
 

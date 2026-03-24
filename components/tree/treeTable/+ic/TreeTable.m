@@ -1,69 +1,49 @@
 classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
-    % > TREETABLE Hierarchical tree with aligned table columns.
-    %
-    %   Displays tree-structured data with sortable/filterable columns.
-    %   Folder nodes render as full-width expand/collapse rows.
-    %   Leaf nodes render with per-column cells (text, number, etc.).
-    %
-    %   Example:
-    %       tt = ic.TreeTable();
-    %       tt.Columns = [
-    %           ic.table.TextColumn("Name", Width=250, Sortable=true)
-    %           ic.table.NumberColumn("Size", Sortable=true)
-    %           ic.table.TextColumn("Type", Filterable=true)
-    %       ];
-    %       tt.ExpanderColumn = "Name";
-    %
-    %       root = ic.tree.Node("Documents", Icon="folder");
-    %       reports = root.add("Reports", Icon="folder");
-    %       reports.add("Q1.pdf", Icon="file-text", ...
-    %           Data=struct('Size', 1024, 'Type', "PDF"));
-    %       reports.add("Q2.pdf", Icon="file-text", ...
-    %           Data=struct('Size', 2048, 'Type', "PDF"));
-    %       tt.Items = root;
-
+    % hierarchical tree with aligned table columns.
+    % Folder nodes render as full-width expand/collapse rows; leaf nodes render per-column cells
     properties (SetObservable, Description = "Reactive")
-        % > COLUMNS column definitions
+        % column definitions that control how each data field is displayed, sorted, and filtered
         Columns ic.table.Column = ic.table.Column.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > EXPANDERCOLUMN field name of the column with tree indentation ("" = first)
+        % field name of the column with tree indentation ("" = first)
         ExpanderColumn (1,1) string = ""
 
-        % > SELECTABLE whether nodes can be selected
+        % whether nodes can be selected
         Selectable (1,1) logical = true
 
-        % > SIZE row density
+        % size of the tree table relative to its font size
         Size (1,1) string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
 
-        % > HEIGHT height of the container (number for px, or CSS string)
+        % height of the container, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize(Height)} = 400
 
-        % > SHOWLINE whether to display tree connector lines
+        % whether to display tree connector lines
         ShowLine (1,1) logical = true
 
-        % > STRIPED whether to show alternating row colors
+        % whether to show alternating row colors
         Striped (1,1) logical = false
 
-        % > LAZYLOAD when true, children only render when parent is expanded
+        % when true, children only render when their parent is expanded
         LazyLoad (1,1) logical = true
 
-        % > SORTFIELD currently sorted column field ("" = no sort)
+        % currently sorted column field ("" = no sort)
         SortField (1,1) string = ""
 
-        % > SORTDIRECTION sort direction
+        % sort direction
         SortDirection (1,1) string {mustBeMember(SortDirection, ...
             ["none", "asc", "desc"])} = "none"
 
-        % > FILTERS active column filters (field → filterValue)
+        % active column filters
         Filters (1,1) struct = struct()
     end
 
     properties (SetObservable, Description = "Reactive")
-        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        % context menu entries for leaf nodes
         LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
-        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+
+        % context menu entries for folder nodes
         FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
@@ -72,21 +52,43 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
     end
 
     events (Description = "Reactive")
-        % > SORTCHANGED fires when the user clicks a sortable column header
+        % fires when the user clicks a sortable column header
+        % {payload}
+        % field | char: field name of the sorted column
+        % direction | char: sort direction ('asc' or 'desc')
+        % {/payload}
         SortChanged
 
-        % > FILTERCHANGED fires when the user changes a column filter
+        % fires when the user changes a column filter
+        % {payload}
+        % field | char: field name of the filtered column
+        % value | any: the filter value (type depends on column type)
+        % {/payload}
         FilterChanged
 
-        % > CELLCLICKED fires when the user clicks a leaf cell
+        % fires when the user clicks a leaf cell
+        % {payload}
+        % key | char: positional key string of the clicked node
+        % field | char: column field name
+        % {/payload}
         CellClicked
     end
 
     events
-        % > CELLEDITED fires when the user edits a cell value inline
+        % fires when the user edits a cell value inline (non-reactive, dispatched from MATLAB)
+        % {payload}
+        % key | char: positional key string of the edited node
+        % field | char: field name of the edited column
+        % oldValue | any: previous cell value
+        % newValue | any: new cell value after editing
+        % {/payload}
         CellEdited
 
-        % > COLUMNRESIZED fires when the user finishes resizing a column
+        % fires when the user finishes resizing a column (non-reactive, dispatched from MATLAB)
+        % {payload}
+        % field | char: field name of the resized column
+        % width | double: new column width in pixels
+        % {/payload}
         ColumnResized
     end
 
@@ -98,11 +100,11 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
             end
             this@ic.TreeBase(props);
 
-            % Auto-infer columns when Items is set and Columns is empty
+            % auto-infer columns when Items is set and Columns is empty
             this.ItemsListener = addlistener(this, 'Items', 'PostSet', ...
                 @(~, ~) this.autoInferColumns());
 
-            % Subscribe to view events
+            % subscribe to view events
             this.subscribe('cellEdited', ...
                 @(comp, ~, data) comp.handleCellEdited(data));
             this.subscribe('columnResized', ...
@@ -125,7 +127,7 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
 
     methods (Access = protected)
         function autoInferColumns(this)
-            % Auto-infer columns from first leaf's Data when Columns is empty.
+            % auto-infer columns from first leaf's Data when Columns is empty.
             if ~isempty(this.Columns) || isempty(this.Items), return; end
             leaf = findFirstLeaf(this.Items);
             if ~isempty(leaf) && ~isempty(leaf.Data)
@@ -134,7 +136,7 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
         end
 
         function handleCellEdited(this, data)
-            % Update Node.Data or Node.Label and fire CellEdited event.
+            % update Node.Data or Node.Label and fire CellEdited event.
             key = string(data.key);
             field = string(data.field);
             newValue = data.newValue;
@@ -142,7 +144,7 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
 
             node = this.Items.resolve(key);
 
-            % Determine effective expander column
+            % determine effective expander column
             if this.ExpanderColumn ~= ""
                 expander = this.ExpanderColumn;
             elseif ~isempty(this.Columns)
@@ -152,12 +154,12 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
             end
 
             if field == expander
-                % Edit the node label
+                % edit the node label
                 node.Label = string(newValue);
             else
-                % Edit node data field
+                % edit node data field
                 s = node.Data;
-                % Coerce value via column definition
+                % coerce value via column definition
                 cols = this.Columns;
                 colIdx = find(arrayfun(@(c) c.Field == field, cols), 1);
                 if ~isempty(colIdx)
@@ -206,16 +208,21 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the tree table container
+            % programmatically focus the tree table container
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("focus", []);
         end
 
         function out = editCell(this, node, field, value)
-            % > EDITCELL Programmatically edit a leaf cell
+            % programmatically edit a leaf cell
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             arguments
                 this
+                % the node of the cell to edit
                 node (1,1) ic.tree.Node
+                % the field name of the column to edit
                 field (1,1) string
+                % the new value to set (type depends on column definition)
                 value
             end
             key = this.Items.keyOf(node);
@@ -259,7 +266,7 @@ classdef TreeTable < ic.TreeBase & ic.mixin.HasContextMenu
 end
 
 function leaf = findFirstLeaf(nodes)
-    % Find the first leaf node (no children) in a tree.
+    % find the first leaf node (no children) in a tree.
     leaf = ic.tree.Node.empty;
     for i = 1:numel(nodes)
         if isempty(nodes(i).Children)

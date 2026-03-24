@@ -1,70 +1,74 @@
-classdef VirtualTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasContextMenu
-    % > VIRTUALTREE Virtual-scrolling tree for massive datasets.
-    %
-    %   Renders a tree view with virtual scrolling and on-demand data
-    %   fetching. Only visible rows exist in the DOM (~30-40 elements).
-    %   MATLAB owns the full tree; the frontend requests chunks via
-    %   request/response protocol.
-    %
-    %   Example:
-    %       vt = ic.VirtualTree();
-    %       root = ic.tree.Node("Root");
-    %       for i = 1:10000, root.add("Child " + i); end
-    %       vt.Items = root;
-    %       vt.Selection = root.Children(1);
+classdef VirtualTree < ic.core.Component & ...
+                       ic.mixin.Requestable & ...
+                       ic.mixin.HasContextMenu
+    % virtual-scrolling tree for massive datasets.
+    % Renders only the visible rows in the DOM using fixed-height virtual scrolling. MATLAB owns the full tree; the frontend fetches data on demand via the request/response protocol, requesting root stubs and child chunks as folders are expanded or the user scrolls.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > DISABLED whether the control is disabled
+        % whether the tree is disabled and cannot be interacted with
         Disabled logical = false
-        % > SELECTABLE whether items can be selected
+
+        % whether items can be selected
         Selectable logical = true
-        % > SIZE size of the control
+
+        % size of the tree relative to its font size
         Size string {mustBeMember(Size, ["sm", "md", "lg"])} = "md"
-        % > HEIGHT height of the tree (number for px, or CSS string)
+
+        % height of the tree, in pixels or as a CSS size string
         Height {ic.check.CssValidators.mustBeSize(Height)} = 400
-        % > SHOWLINE whether to display tree connector lines
+
+        % whether to display tree connector lines
         ShowLine logical = true
-        % > MAXSELECTEDITEMS maximum number of selectable items (Inf = unlimited)
+
+        % maximum number of selectable items (Inf = unlimited)
         MaxSelectedItems double {mustBePositive} = Inf
-        % > PLACEHOLDER text shown while loading
+
+        % ghost text shown while loading
         Placeholder string = "Loading..."
     end
 
     properties (SetObservable, Description = "Reactive")
-        % > LEAFCONTEXTMENU context menu entries for leaf nodes
+        % context menu entries for leaf nodes
         LeafContextMenu ic.menu.Entry = ic.menu.Entry.empty
-        % > FOLDERCONTEXTMENU context menu entries for folder nodes
+
+        % context menu entries for folder nodes
         FolderContextMenu ic.menu.Entry = ic.menu.Entry.empty
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", ...
             Access = ?ic.mixin.Reactive, Hidden)
-        % > VALUE positional key strings (Svelte bridge — hidden from user)
+        % positional key strings for the Svelte bridge (hidden from user)
         Value string = string.empty
     end
 
     properties
-        % > ITEMS tree nodes
+        % root tree nodes that form the basis of the tree structure
         Items ic.tree.Node = ic.tree.Node.empty
     end
 
     properties (Hidden)
-        % > VERBOSE print request info to the command window
+        % print request info to the command window
         Verbose logical = false
     end
 
     properties (Dependent)
-        % > SELECTION currently selected nodes (user-facing API)
+        % currently selected nodes as an array of #ic.tree.Node handles
         Selection
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user changes the selection
+        % fires when the user changes the selection
+        % {payload}
+        % value | cell array or empty: positional key strings of selected nodes, or empty if cleared
+        % {/payload}
         ValueChanged
     end
 
     events
-        % > SELECTIONCHANGED fires when the user changes the selection (carries Selection)
+        % fires when the user changes the selection. This event is a non-reactive convenience event dispatched with the resolved selection from #ic.VirtualTree.ValueChanged
+        % {payload}
+        % Selection | ic.tree.Node array: resolved node handles of the current selection
+        % {/payload}
         SelectionChanged
     end
 
@@ -132,19 +136,26 @@ classdef VirtualTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasCo
 
     methods (Description = "Reactive")
         function out = focus(this)
-            % > FOCUS programmatically focus the tree container
+            % programmatically focus the tree container
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("focus", []);
         end
 
         function out = clearSelection(this)
-            % > CLEARSELECTION Clear all selected items.
+            % clear all selected items
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             this.Value = string.empty;
             out = this.publish("clearSelection", []);
         end
 
         function out = expandNode(this, node)
-            % > EXPANDNODE Programmatically expand a folder node.
-            arguments, this, node (1,1) ic.tree.Node, end
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+            % programmatically expand a folder node
+            arguments
+                this
+                % the node to expand
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:VirtualTree:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -152,8 +163,14 @@ classdef VirtualTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasCo
         end
 
         function out = collapseNode(this, node)
-            % > COLLAPSENODE Programmatically collapse a folder node.
-            arguments, this, node (1,1) ic.tree.Node, end
+            % programmatically collapse a folder node
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
+
+            arguments
+                this
+                % the node to collapse
+                node (1,1) ic.tree.Node
+            end
             key = this.Items.keyOf(node);
             assert(~isempty(key), "ic:VirtualTree:NodeNotInTree", ...
                 "Node '%s' is not in the Items tree.", node.Label);
@@ -161,12 +178,14 @@ classdef VirtualTree < ic.core.Component & ic.mixin.Requestable & ic.mixin.HasCo
         end
 
         function out = expandAll(this)
-            % > EXPANDALL Expand all folder nodes.
+            % expand all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("expandAll", []);
         end
 
         function out = collapseAll(this)
-            % > COLLAPSEALL Collapse all folder nodes.
+            % collapse all folder nodes
+            % {returns} a #ic.async.Promise with the fulfillment status from the view {/returns}
             out = this.publish("collapseAll", []);
         end
     end
