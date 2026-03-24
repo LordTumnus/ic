@@ -1,130 +1,117 @@
-% > COMPONENTBASE is the abstract base class for interactive components.
-%
-% Composes the core mixins that every component needs:
-%   - Publishable  — event messaging (pub/sub)
-%   - Reactive     — automatic property/event sync with the frontend
-%
-% Capability mixins (Stylable, Effectable) are added by Component, not here,
-% so that non-Component roots like Frame can pick only what they need.
-%
-% Optional mixins (Requestable) are inherited by individual component
-% classes that need them.
-% > superdoc
 classdef (Abstract) ComponentBase < handle & matlab.mixin.Heterogeneous & ...
                                     ic.mixin.Publishable & ...
                                     ic.mixin.Reactive
+   % abstract root of the IC class hierarchy; shared by all components and the #ic.Frame.
+   % Defines the common ID property and the publish() method for sending events to the frontend.
 
-    properties (SetAccess = immutable)
-        % > ID unique identifier of the component
-        ID (1,1) string
-    end
+   properties (SetAccess = immutable)
+      % unique identifier; used as the HTMLElement id in the DOM and as the Registry key on the frontend to enable event routing and state management for the component.
+      ID (1,1) string
+   end
 
-    methods
-        function this = ComponentBase(id)
-            arguments (Input)
-                % > ID unique identifier for the component
-                id (1,1) string {mustBeValidCssIdent} = ...
-                    "ic-" + matlab.lang.internal.uuid();
-            end
+   methods
+      function this = ComponentBase(id)
+         % create a component with the given identifier and wire up reactivity.
+         arguments (Input)
+            % identifier for this component; defaults to "ic-<uuid>"
+            id (1,1) string {mustBeValidCssIdent} = ...
+                "ic-" + matlab.lang.internal.uuid();
+         end
+         arguments (Output)
+            this (1,1) ic.core.ComponentBase
+         end
 
-            arguments (Output)
-                % > THIS the component
-                this (1,1) ic.core.ComponentBase
-            end
+         this.ID = id;
+         this.setupReactivity();
+      end
+   end
 
-            this.ID = id;
-            this.setupReactivity();
-        end
-    end
+   methods (Access = public, Hidden)
+      function promise = publish(this, name, data)
+         % send an event to the frontend.
+         % {note} only @-prefixed internal events (e.g. "@prop/Label", "@insert") and reactive method names may be published. Attempting to publish a reactive method name directly is an error {/note}
+         % {returns} optional #ic.async.Promise that resolves to #ic.async.Resolution when the frontend responds {/returns}
 
-    methods (Access = public)
-        function promise = publish(this, name, data)
-            % > PUBLISH sends an event to the view with a reactive method guard.
-            % Only @-prefixed internal events and reactive methods are allowed.
+         arguments (Input)
+            this (1,1) ic.core.ComponentBase
+            % event name
+            name (1,1) string
+            % event payload
+            data % any
+         end
 
-            arguments (Input)
-                this (1,1) ic.core.ComponentBase
-                name (1,1) string
-                data % any
-            end
+         arguments (Output)
+            promise ic.async.Promise
+         end
 
-            arguments (Output)
-                promise ic.async.Promise
-            end
+         if ~startsWith(name, "@") && ~this.isReactiveMethod(name)
+            error("ic:core:ComponentBase:PublishReactiveMethod", ...
+                  "Cannot publish reactive method '%s'. Reactive methods are invoked directly on the component instance.", name);
+         end
 
-            if ~startsWith(name, "@") && ~this.isReactiveMethod(name)
-                error("ic:core:ComponentBase:PublishReactiveMethod", ...
-                      "Cannot publish reactive method '%s'. Reactive methods are invoked directly on the component instance.", name);
-            end
+         if nargout == 1
+            promise = publish@ic.mixin.Publishable(this, name, data);
+         else
+            publish@ic.mixin.Publishable(this, name, data);
+         end
+      end
+   end
 
-            if nargout == 1
-                promise = publish@ic.mixin.Publishable(this, name, data);
-            else
-                publish@ic.mixin.Publishable(this, name, data);
-            end
-        end
-    end
+   methods (Access = {?ic.core.Container})
+      function definition = getComponentDefinition(this)
+         % serialize this component's schema for the JS Factory.
+         % the returned struct is sent as the payload of every @insert event and
+         % tells the frontend which Svelte component to mount, which props/events/methods to wire, and which mixin capabilities are active.
+         % {returns} struct with fields: id, type, mixins, props, events, methods {/returns}
 
-    methods (Access = {?ic.core.Container})
-        function definition = getComponentDefinition(this)
-            % > GETCOMPONENTDEFINITION returns a struct with the component
-            % schema for the JavaScript side, including which mixins
-            % (capabilities) are present.
+         definition = struct(...
+             'id', this.ID, ...
+             'type', string(class(this)));
 
-            definition = struct(...
-                'id', this.ID, ...
-                'type', string(class(this)));
+         % auto-discover mixins from the class hierarchy
+         allSupers = string(superclasses(class(this)));
+         mixinMask = startsWith(allSupers, "ic.mixin.");
+         definition.mixins = lower(extractAfter( ...
+             allSupers(mixinMask), "ic.mixin."));
 
-            % Auto-discover mixins from the class hierarchy
-            allSupers = string(superclasses(class(this)));
-            mixinMask = startsWith(allSupers, "ic.mixin.");
-            definition.mixins = lower(extractAfter( ...
-                allSupers(mixinMask), "ic.mixin."));
-
-            % Reactive contributes props / events / methods
-            [definition.props, definition.events, definition.methods] = ...
-                this.gatherReactiveDefinition();
-        end
-    end
+         % reactive mixin contributes props / events / methods arrays
+         [definition.props, definition.events, definition.methods] = ...
+             this.gatherReactiveDefinition();
+      end
+   end
 
 end
 
 function mustBeValidCssIdent(id)
-% MUSTBEVALIDCSSIDENT validates that the given string is a valid CSS identifier.
-%
-% CSS identifiers (idents) allow: letters (A-Z, a-z), digits (0-9),
-% hyphens (-), underscores (_), and Unicode characters >= U+00A0.
-%
-% Restrictions:
-%   - Cannot be empty
-%   - Cannot start with a digit
-%   - Cannot start with a hyphen followed by a digit
-%
-% See: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/ident
+% validate that id is a valid CSS identifier.
+% CSS idents allow letters (A-Z, a-z), digits (0-9), hyphens, and underscores.
+% the string cannot be empty, cannot start with a digit, and cannot start with
+% a hyphen followed by a digit.
+% see: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/ident
 
-    % Build pattern for valid CSS ident characters
+    % build pattern for valid CSS ident characters
     validChar = lettersPattern(1) | digitsPattern(1) | characterListPattern("-_");
 
-    % Check non-empty
+    % check non-empty
     if strlength(id) == 0
         error("ic:core:ComponentBase:InvalidId", ...
               "Component ID cannot be empty.");
     end
 
-    % Check all characters are valid (letters, digits, hyphens, underscores)
+    % check all characters are valid (letters, digits, hyphens, underscores)
     if ~matches(id, asManyOfPattern(validChar, 1))
         error("ic:core:ComponentBase:InvalidId", ...
               "Component ID '%s' contains invalid characters. " + ...
               "Valid characters are: letters, digits, hyphens, and underscores.", id);
     end
 
-    % Cannot start with a digit
+    % cannot start with a digit
     if startsWith(id, digitsPattern(1))
         error("ic:core:ComponentBase:InvalidId", ...
               "Component ID '%s' cannot start with a digit.", id);
     end
 
-    % Cannot start with hyphen followed by digit
+    % cannot start with hyphen followed by digit
     if startsWith(id, "-" + digitsPattern(1))
         error("ic:core:ComponentBase:InvalidId", ...
               "Component ID '%s' cannot start with a hyphen followed by a digit.", id);

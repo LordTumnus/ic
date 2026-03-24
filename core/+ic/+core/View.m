@@ -1,24 +1,40 @@
-% VIEW bridges MATLAB components to the HTML frontend via uihtml.
-%
-% MATLAB → JS: sendEventToHTMLSource("ic", payload) — as native struct/cell
-% JS → MATLAB: sendEventToMATLAB("ic", events)      — via HTMLEventReceivedFcn
-%
-% On startup, events are queued until the frontend sends "ic-ready".
 classdef View < matlab.ui.componentcontainer.ComponentContainer
+   % uihtml bridge between the MATLAB component tree and the Svelte frontend. Created and owned by #ic.Frame, users never instantiate View directly.
+   %
+   % Wraps a uihtml element that serves front/dist/index.html over a local
+   % HTTPS server, and opens it in an <iframe> inside a uifigure.
+   % Communication uses two named event channels:
+   %   MATLAB → JS: components propagate their #ic.event.JsEvent up the tree until the view, responsible for calling __sendEventToHTMLSource(h, "ic", payload)__
+   %   JS → MATLAB: uihtmls __HTMLEventReceivedFcn__ captures frontend events and routes them to the appropriate component handler via #ic.Frame.Registry lookup.
+   %
+   % On startup, all outgoing events are buffered in a queue until the Svelte
+   % app fires notifies its readiness. The entire queue is then flushed
+   %
+   % Before each send, #ic.asset.AssetRegistry.activate is called so
+   % that asset deduplication (hash-only stubs for repeated assets) is
+   % tracked for each view instance
 
    properties (SetAccess = private, Hidden)
+      % uigridlayout that fills the panel area with a single 1×1 cell (no padding)
       GridLayout matlab.ui.container.GridLayout
+
+      % uihtml element that hosts the compiled frontend app
       HTMLElement matlab.ui.control.HTML
+
+      % flag indicating whether the frontend has signaled readiness to receive events
       Ready logical = false
+
+      % events buffered before the frontend is ready
       Queue = ic.event.JsEvent.empty()
    end
 
    properties (SetAccess = private)
-      Frame % ic.core.Frame
+      % the #ic.Frame instance that owns this view
+      Frame % ic.Frame
    end
 
    properties (Constant, Hidden)
-      % TODO: fix the path of the source file
+      % absolute path to the compiled Svelte entry point (front/dist/index.html)
       HTMLSource = fullfile(fileparts(mfilename("fullpath")), "..", "..", "..", "front", "dist", "index.html");
    end
 
@@ -26,6 +42,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    methods
       function this = View(frame, args)
          arguments (Input)
+            % owning #ic.Frame instance
             frame % ic.Frame
          end
          arguments (Input, Repeating)
@@ -38,6 +55,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
 
    methods (Access = protected)
       function setup(this)
+         % create the uigridlayout and uihtml elements and wire the event callback.
          this.GridLayout = uigridlayout( ...
             "Parent", this, ...
             "ColumnWidth", {'1x'}, "RowHeight",{'1x'}, "Padding", 0);
@@ -49,12 +67,20 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
       end
 
       function update(~)
+         % required by matlab.ui.componentcontainer.ComponentContainer. Intentionally empty.
       end
    end
 
 
    methods (Access = {?ic.Frame})
       function send(this, events)
+         % send one or more events to the Svelte frontend.
+         % Converts the event array to transport format via #ic.utils.toTransport, and then calls uihtml native __sendEventToHTMLSource__. If the frontend is not yet ready, buffers all events in Queue instead.
+         arguments
+            this
+            % array of #ic.event.JsEvent to send to the frontend
+            events (1,:) ic.event.JsEvent
+         end
          if this.Ready
             ic.asset.AssetRegistry.activate(this);
             payload = ic.utils.toTransport(events.toStruct());
@@ -67,6 +93,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
 
    methods (Access = private)
       function onHTMLEvent(this, evt)
+         % route raw __HTMLEventReceivedFcn__ events to the appropriate handler.
          if evt.HTMLEventName == "ic-ready"
             this.Ready = true;
             if ~isempty(this.Queue)
@@ -82,6 +109,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
       end
 
       function onReceive(this, raw)
+         % parse and dispatch incoming events from the Svelte frontend to their respective MATLAB component handlers
          if isempty(raw)
             return;
          end
