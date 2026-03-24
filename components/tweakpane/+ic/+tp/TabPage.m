@@ -1,8 +1,8 @@
 classdef TabPage < ic.tp.ContainerBlade
-    % > TABPAGE A single tab page within a TabGroup.
+    % a single tab page within a #ic.tp.TabGroup.
 
     properties (SetObservable, AbortSet, Description = "Reactive", Hidden)
-        % > PAGEINDEX index within the parent TabGroup (set by TabGroup)
+        % index within the parent TabGroup
         PageIndex (1,1) double = 0
     end
 

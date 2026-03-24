@@ -1,17 +1,23 @@
 classdef Textarea < ic.tp.Blade
-    % > TEXTAREA Multi-line text input blade for TweakPane (plugin-textarea).
+    % multi-line text input blade for TweakPane.
+    % uses [@pangenerator/tweakpane-textarea-plugin](https://github.com/pangenerator/tweakpane-textarea-plugin).
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current text value (may contain newlines)
+        % current text value (may contain newlines)
         Value (1,1) string = ""
-        % > ROWS number of visible text rows
+
+        % number of visible text rows
         Rows (1,1) double = 3
-        % > PLACEHOLDER helper text shown when empty
+
+        % ghost text shown when the field is empty
         Placeholder (1,1) string = ""
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires on each text change
+        % fires on each text change
+        % {payload}
+        % value | char: current text content
+        % {/payload}
         ValueChanged
     end
 

@@ -1,17 +1,23 @@
 classdef RadioGrid < ic.tp.Blade
-    % > RADIOGRID Grid of radio buttons (plugin-essentials).
+    % grid of radio buttons blade for TweakPane.
+    % uses [@tweakpane/plugin-essentials](https://github.com/tweakpane/plugin-essentials).
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE currently selected item
+        % currently selected item
         Value (1,1) string = ""
-        % > ITEMS list of options
+
+        % list of options displayed as radio buttons
         Items (1,:) string = string.empty
-        % > COLUMNS number of grid columns
+
+        % number of grid columns
         Columns (1,1) double = 2
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the selection changes
+        % fires when the selection changes
+        % {payload}
+        % value | char: selected item
+        % {/payload}
         ValueChanged
     end
 

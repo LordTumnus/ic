@@ -1,21 +1,24 @@
 classdef Monitor < ic.tp.Blade
-    % > MONITOR Read-only value display blade for TweakPane.
-    %
-    % Push values from MATLAB via the Value property. Tweakpane renders
-    % the value as text or a scrolling graph depending on the View prop.
+    % read-only value display blade for TweakPane.
+    % Push updates to the #ic.tp.Monitor.Value property to update the display
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE the monitored value (number, string, or boolean)
+        % the monitored value (number, string, or boolean)
         Value = 0
-        % > VIEW display mode: "text" or "graph"
+
+        % display mode: "text" shows the current #ic.tp.Monitor.Value; "graph" shows a scrolling history plot whose last value updates at a constant polling #ic.tp.Monitor.Interval
         View (1,1) string {mustBeMember(View, ["text", "graph"])} = "text"
-        % > GRAPHMIN minimum for graph view
+
+        % minimum of the graph y-axis (only applies when #ic.tp.Monitor.View is "graph")
         GraphMin (1,1) double = -1
-        % > GRAPHMAX maximum for graph view
+
+        % maximum of the graph y-axis (only applies when #ic.tp.Monitor.View is "graph")
         GraphMax (1,1) double = 1
-        % > BUFFERSIZE number of samples in graph buffer
+
+        % number of samples retained in the graph buffer (only applies when #ic.tp.Monitor.View is "graph")
         BufferSize (1,1) double = 64
-        % > INTERVAL update interval in milliseconds
+
+        % polling interval in milliseconds for updating the graph (only applies when #ic.tp.Monitor.View is "graph")
         Interval (1,1) double = 200
     end
 

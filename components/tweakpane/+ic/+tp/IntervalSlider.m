@@ -1,19 +1,23 @@
 classdef IntervalSlider < ic.tp.Blade
-    % > INTERVALSLIDER Dual-handle range slider (plugin-essentials).
-    %
-    % Value is a struct with fields 'min' and 'max'.
+    % dual-handle range slider blade for TweakPane.
+    % uses [@tweakpane/plugin-essentials](https://github.com/tweakpane/plugin-essentials).
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE range struct: {min, max}
+        % selected range as a struct with fields min and max
         Value (1,1) struct = struct('min', 0, 'max', 100)
-        % > MIN absolute minimum of the range
+
+        % absolute minimum of the range
         Min (1,1) double = 0
-        % > MAX absolute maximum of the range
+
+        % absolute maximum of the range
         Max (1,1) double = 100
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the range changes
+        % fires when the range changes
+        % {payload}
+        % value | struct: selected range — value.min and value.max as doubles
+        % {/payload}
         ValueChanged
     end
 

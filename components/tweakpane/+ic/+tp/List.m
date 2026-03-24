@@ -1,15 +1,19 @@
 classdef List < ic.tp.Blade
-    % > LIST Dropdown select blade for TweakPane.
+    % dropdown select blade for TweakPane.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE currently selected item
+        % currently selected item
         Value (1,1) string = ""
-        % > ITEMS list of selectable options
+
+        % list of selectable options
         Items (1,:) string = string.empty
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the selection changes
+        % fires when the selection changes
+        % {payload}
+        % value | char: selected item
+        % {/payload}
         ValueChanged
     end
 

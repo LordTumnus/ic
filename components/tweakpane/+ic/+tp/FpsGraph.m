@@ -1,5 +1,7 @@
 classdef FpsGraph < ic.tp.Blade
-    % > FPSGRAPH Auto-updating FPS graph blade (plugin-essentials).
+    % auto-updating FPS graph blade for TweakPane.
+    % Measures and plots the uihtml iframe frame rate.
+    % uses [@tweakpane/plugin-essentials](https://github.com/tweakpane/plugin-essentials).
 
     methods
         function this = FpsGraph(props)

@@ -1,21 +1,31 @@
 classdef Slider < ic.tp.Blade
-    % > SLIDER Numeric slider blade for TweakPane.
+    % numeric slider blade for TweakPane.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current numeric value
+        % current numeric value
         Value (1,1) double = 0
-        % > MIN minimum value
+
+        % minimum value
         Min (1,1) double = 0
-        % > MAX maximum value
+
+        % maximum value
         Max (1,1) double = 100
-        % > STEP step increment
+
+        % step increment
         Step (1,1) double = 1
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGING fires during slider drag
+        % fires continuously during slider drag
+        % {payload}
+        % value | double: current value
+        % {/payload}
         ValueChanging
-        % > VALUECHANGED fires when drag ends or value commits
+
+        % fires when drag ends or value commits
+        % {payload}
+        % value | double: committed value
+        % {/payload}
         ValueChanged
     end
 

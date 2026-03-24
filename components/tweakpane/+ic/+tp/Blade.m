@@ -1,21 +1,19 @@
 classdef (Abstract) Blade < ic.core.Component
-    % > BLADE Abstract base for all TweakPane leaf controls.
-    %
-    % Subclasses: Slider, Checkbox, Text, Color, Point, List, Button,
-    % Separator, Monitor, IntervalSlider, FpsGraph, RadioGrid, ButtonGrid,
-    % CubicBezier, Ring, Wheel, Rotation, Textarea, Image.
+    % abstract base for all TweakPane leaf controls.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > LABEL display label for this blade
+        % display label shown next to the control
         Label (1,1) string = ""
-        % > DISABLED whether this blade is disabled
+
+        % whether this blade is disabled
         Disabled (1,1) logical = false
-        % > HIDDEN whether this blade is hidden
+
+        % whether this blade is hidden
         Hidden (1,1) logical = false
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", Hidden)
-        % > BLADEINDEX insertion order within the parent container (set by parent)
+        % insertion order within the parent container (set by the parent container or pane)
         BladeIndex (1,1) double = 0
     end
 

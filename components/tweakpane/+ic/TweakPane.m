@@ -1,27 +1,18 @@
 classdef TweakPane < ic.core.ComponentContainer
-    % > TWEAKPANE Compact parameter control panel using Tweakpane.
-    %
-    % Create a pane and add controls:
-    %   tp = ic.TweakPane(Title="Parameters");
-    %   slider = tp.addSlider(Label="Speed", Min=0, Max=100, Value=50);
-    %   tp.addCheckbox(Label="Enabled", Value=true);
-    %   folder = tp.addFolder(Label="Advanced");
-    %   folder.addSlider(Label="Detail", Min=0, Max=10, Value=5);
-    %
-    % Supports all ic.tp.* blade types: Slider, Checkbox, Text, Color,
-    % Point, List, Button, Separator, Monitor, Folder, TabGroup,
-    % IntervalSlider, FpsGraph, RadioGrid, ButtonGrid, CubicBezier,
-    % Ring, Wheel, Rotation, Textarea, Image.
+    % compact parameter control panel powered by [Tweakpane v4](https://tweakpane.info/).
+    % add blades to build a live inspector: sliders, checkboxes, color pickers,
+    % folders, tabs, and more. all blade types are in the ic.tp.* namespace.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > TITLE optional title displayed at the top of the pane
+        % optional title displayed at the top of the pane
         Title (1,1) string = ""
-        % > EXPANDED whether the pane is expanded
+
+        % whether the pane is expanded
         Expanded (1,1) logical = true
     end
 
     properties (Access = private)
-        % > NEXTBLADEINDEX monotonic counter for stable blade targets
+        % monotonic counter for stable blade targets
         NextBladeIndex (1,1) double = 0
     end
 
@@ -36,13 +27,13 @@ classdef TweakPane < ic.core.ComponentContainer
         end
     end
 
-    % --- Blade creation API (mirrors ContainerBlade) ---------------------
-
     methods (Access = public)
         function blade = addSlider(this, props)
-            % > ADDSLIDER add a numeric slider blade
+            % add a numeric slider blade
+            % {returns} the new #ic.tp.Slider {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Slider properties
                 props.?ic.tp.Slider
             end
             args = namedargs2cell(props);
@@ -51,9 +42,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addCheckbox(this, props)
-            % > ADDCHECKBOX add a boolean checkbox blade
+            % add a boolean checkbox blade
+            % {returns} the new #ic.tp.Checkbox {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Checkbox properties
                 props.?ic.tp.Checkbox
             end
             args = namedargs2cell(props);
@@ -62,9 +55,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addText(this, props)
-            % > ADDTEXT add a text input blade
+            % add a text input blade
+            % {returns} the new #ic.tp.Text {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Text properties
                 props.?ic.tp.Text
             end
             args = namedargs2cell(props);
@@ -73,9 +68,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addColor(this, props)
-            % > ADDCOLOR add a color picker blade
+            % add a color picker blade
+            % {returns} the new #ic.tp.Color {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Color properties
                 props.?ic.tp.Color
             end
             args = namedargs2cell(props);
@@ -84,9 +81,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addPoint(this, props)
-            % > ADDPOINT add a 2D/3D/4D point input blade
+            % add a 2D/3D/4D point input blade
+            % {returns} the new #ic.tp.Point {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Point properties
                 props.?ic.tp.Point
             end
             args = namedargs2cell(props);
@@ -95,9 +94,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addList(this, props)
-            % > ADDLIST add a dropdown list blade
+            % add a dropdown list blade
+            % {returns} the new #ic.tp.List {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.List properties
                 props.?ic.tp.List
             end
             args = namedargs2cell(props);
@@ -106,9 +107,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addButton(this, props)
-            % > ADDBUTTON add a clickable button blade
+            % add a clickable button blade
+            % {returns} the new #ic.tp.Button {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Button properties
                 props.?ic.tp.Button
             end
             args = namedargs2cell(props);
@@ -117,9 +120,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addSeparator(this, props)
-            % > ADDSEPARATOR add a visual separator
+            % add a visual separator
+            % {returns} the new #ic.tp.Separator {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Separator properties
                 props.?ic.tp.Separator
             end
             args = namedargs2cell(props);
@@ -128,9 +133,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addMonitor(this, props)
-            % > ADDMONITOR add a read-only monitor blade
+            % add a read-only value monitor blade
+            % {returns} the new #ic.tp.Monitor {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Monitor properties
                 props.?ic.tp.Monitor
             end
             args = namedargs2cell(props);
@@ -139,9 +146,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addFolder(this, props)
-            % > ADDFOLDER add a collapsible folder
+            % add a collapsible folder container
+            % {returns} the new #ic.tp.Folder {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Folder properties
                 props.?ic.tp.Folder
             end
             args = namedargs2cell(props);
@@ -150,9 +159,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addTabGroup(this, props)
-            % > ADDTABGROUP add a tab group container
+            % add a tab group container
+            % {returns} the new #ic.tp.TabGroup {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.TabGroup properties
                 props.?ic.tp.TabGroup
             end
             args = namedargs2cell(props);
@@ -161,9 +172,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addIntervalSlider(this, props)
-            % > ADDINTERVALSLIDER add a dual-handle range slider
+            % add a dual-handle range slider
+            % {returns} the new #ic.tp.IntervalSlider {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.IntervalSlider properties
                 props.?ic.tp.IntervalSlider
             end
             args = namedargs2cell(props);
@@ -172,9 +185,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addFpsGraph(this, props)
-            % > ADDFPSGRAPH add an FPS graph blade
+            % add an FPS graph blade
+            % {returns} the new #ic.tp.FpsGraph {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.FpsGraph properties
                 props.?ic.tp.FpsGraph
             end
             args = namedargs2cell(props);
@@ -183,9 +198,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addRadioGrid(this, props)
-            % > ADDRADIOGRID add a grid of radio buttons
+            % add a grid of radio buttons
+            % {returns} the new #ic.tp.RadioGrid {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.RadioGrid properties
                 props.?ic.tp.RadioGrid
             end
             args = namedargs2cell(props);
@@ -194,9 +211,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addButtonGrid(this, props)
-            % > ADDBUTTONGRID add a grid of buttons
+            % add a grid of buttons
+            % {returns} the new #ic.tp.ButtonGrid {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.ButtonGrid properties
                 props.?ic.tp.ButtonGrid
             end
             args = namedargs2cell(props);
@@ -205,9 +224,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addCubicBezier(this, props)
-            % > ADDCUBICBEZIER add a cubic bezier curve editor
+            % add a cubic bezier curve editor
+            % {returns} the new #ic.tp.CubicBezier {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.CubicBezier properties
                 props.?ic.tp.CubicBezier
             end
             args = namedargs2cell(props);
@@ -216,9 +237,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addRing(this, props)
-            % > ADDRING add a radial dial blade (plugin-camerakit)
+            % add a radial dial blade
+            % {returns} the new #ic.tp.Ring {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Ring properties
                 props.?ic.tp.Ring
             end
             args = namedargs2cell(props);
@@ -227,9 +250,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addWheel(this, props)
-            % > ADDWHEEL add a jog wheel blade (plugin-camerakit)
+            % add a jog wheel blade
+            % {returns} the new #ic.tp.Wheel {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Wheel properties
                 props.?ic.tp.Wheel
             end
             args = namedargs2cell(props);
@@ -238,9 +263,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addRotation(this, props)
-            % > ADDROTATION add a 3D rotation input blade (plugin-rotation)
+            % add a 3D rotation input blade
+            % {returns} the new #ic.tp.Rotation {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Rotation properties
                 props.?ic.tp.Rotation
             end
             args = namedargs2cell(props);
@@ -249,9 +276,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addTextarea(this, props)
-            % > ADDTEXTAREA add a multi-line text input blade (plugin-textarea)
+            % add a multi-line text input blade
+            % {returns} the new #ic.tp.Textarea {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Textarea properties
                 props.?ic.tp.Textarea
             end
             args = namedargs2cell(props);
@@ -260,9 +289,11 @@ classdef TweakPane < ic.core.ComponentContainer
         end
 
         function blade = addImage(this, props)
-            % > ADDIMAGE add a read-only image display blade
+            % add a read-only image display blade
+            % {returns} the new #ic.tp.Image {/returns}
             arguments
                 this
+                % name-value pairs for #ic.tp.Image properties
                 props.?ic.tp.Image
             end
             args = namedargs2cell(props);
@@ -273,7 +304,7 @@ classdef TweakPane < ic.core.ComponentContainer
 
     methods (Access = private)
         function insertBlade(this, blade)
-            % > INSERTBLADE internal — assigns index, target, and adds child
+            % assigns index, target, and registers child
             idx = this.NextBladeIndex;
             this.NextBladeIndex = idx + 1;
             target = sprintf("blade-%d", idx);

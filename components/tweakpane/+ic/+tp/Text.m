@@ -1,15 +1,21 @@
 classdef Text < ic.tp.Blade
-    % > TEXT String input blade for TweakPane.
+    % string input blade for TweakPane.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current text value
+        % current text value
         Value (1,1) string = ""
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires on each text change
+        % fires on each keystroke
+        % {payload}
+        % value | char: current text
+        % {/payload}
         ValueChanged
-        % > SUBMITTED fires when Enter is pressed
+        % fires when Enter is pressed
+        % {payload}
+        % value | char: submitted text
+        % {/payload}
         Submitted
     end
 

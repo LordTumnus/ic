@@ -1,16 +1,17 @@
 classdef Point < ic.tp.Blade
-    % > POINT 2D/3D/4D point input blade for TweakPane.
-    %
-    % Value is a struct with fields x, y (and optionally z, w).
-    % Tweakpane auto-detects dimensionality from the struct fields.
+    % 2D/3D/4D point input blade for TweakPane.
+    % dimensionality is auto-detected from the struct fields in Value.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE point struct: {x,y} or {x,y,z} or {x,y,z,w}
+        % point coordinates: {x,y} for 2D, {x,y,z} for 3D, {x,y,z,w} for 4D
         Value (1,1) struct = struct('x', 0, 'y', 0)
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the point value changes
+        % fires when any coordinate changes
+        % {payload}
+        % value | struct: coordinate struct matching the Value fields (x, y[, z[, w]])
+        % {/payload}
         ValueChanged
     end
 

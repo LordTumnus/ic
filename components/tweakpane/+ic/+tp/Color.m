@@ -1,17 +1,25 @@
 classdef Color < ic.tp.Blade
-    % > COLOR Color picker blade for TweakPane.
+    % color picker blade for TweakPane
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE hex color string (e.g. "#3b82f6")
+        % hex color string
         Value (1,1) string = "#3b82f6"
-        % > SHOWALPHA whether to show the alpha channel
+
+        % whether to show the alpha channel slider
         ShowAlpha (1,1) logical = false
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGING fires during color picking
+        % fires continuously while the color picker is open
+        % {payload}
+        % value | char: current hex color string
+        % {/payload}
         ValueChanging
-        % > VALUECHANGED fires when color is committed
+
+        % fires when the color is committed (picker closed)
+        % {payload}
+        % value | char: committed hex color string
+        % {/payload}
         ValueChanged
     end
 

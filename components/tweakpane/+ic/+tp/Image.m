@@ -1,23 +1,19 @@
 classdef Image < ic.tp.Blade
-    % > IMAGE Read-only image display blade for TweakPane.
-    %
-    % MATLAB pushes image data via ic.Asset (file path, URL, or base64).
-    % The Svelte side renders it inline in the TweakPane panel.
-    %
-    % Example:
-    %   tp.addImage(Label="Preview", Source="photo.png", Height=120);
+    % read-only image display blade for TweakPane.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > SOURCE image source (file path, URL, asset)
+        % image source
         Source (1,1) ic.asset.Asset
-        % > HEIGHT display height in pixels
+
+        % display height in pixels
         Height (1,1) double = 100
-        % > OBJECTFIT CSS object-fit mode
+
+        % CSS object-fit mode controlling how the image fills the display area
         ObjectFit (1,1) string {mustBeMember(ObjectFit, ["contain","cover","fill"])} = "contain"
     end
 
     events (Description = "Reactive")
-        % > CLICKED fires when the image is clicked
+        % fires when the image is clicked
         Clicked
     end
 

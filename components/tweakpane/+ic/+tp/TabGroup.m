@@ -1,11 +1,9 @@
 classdef TabGroup < ic.tp.ContainerBlade
-    % > TABGROUP Tab container blade for TweakPane.
-    %
-    %   tabs = pane.addTabGroup();
-    %   page1 = tabs.addTabPage("General");
-    %   page1.addSlider("Volume", Min=0, Max=100);
+    % tab container blade for TweakPane.
+    % add pages via #ic.tp.TabGroup.addTabPage. each page can hold its own set of blades.
 
     properties (Access = private)
+        % monotonic counter for tab page indices
         NextPageIndex (1,1) double = 0
     end
 
@@ -19,9 +17,17 @@ classdef TabGroup < ic.tp.ContainerBlade
         end
 
         function page = addTabPage(this, props)
-            % > ADDTABPAGE add a tab page to this group
+            % add a tab page to this group
+            % {returns} the new #ic.tp.TabPage {/returns}
+            % {example}
+            %   tabs = pane.addTabGroup();
+            %   general = tabs.addTabPage(Label="General");
+            %   general.addSlider(Label="Speed", Min=0, Max=100);
+            %   advanced = tabs.addTabPage(Label="Advanced");
+            % {/example}
             arguments
                 this
+                % name-value pairs for #ic.tp.TabPage properties
                 props.?ic.tp.TabPage
             end
             idx = this.NextPageIndex;

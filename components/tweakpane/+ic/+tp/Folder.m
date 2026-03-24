@@ -1,12 +1,9 @@
 classdef Folder < ic.tp.ContainerBlade
-    % > FOLDER Collapsible folder container for TweakPane.
-    %
-    % A folder can hold any blade type, including nested folders.
-    %   folder = pane.addFolder("Advanced");
-    %   folder.addSlider("Detail", Min=0, Max=10);
+    % collapsible folder container for TweakPane.
+    % Can hold any blade type, including nested folders.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > EXPANDED whether the folder is open
+        % whether the folder is open
         Expanded (1,1) logical = true
     end
 

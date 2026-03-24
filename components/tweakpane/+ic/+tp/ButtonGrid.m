@@ -1,15 +1,20 @@
 classdef ButtonGrid < ic.tp.Blade
-    % > BUTTONGRID Grid of buttons (plugin-essentials).
+    % grid of buttons blade for TweakPane.
+    % Uses [@tweakpane/plugin-essentials](https://github.com/tweakpane/plugin-essentials)
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > ITEMS button labels
+        % button labels
         Items (1,:) string = string.empty
-        % > COLUMNS number of grid columns
+
+        % number of grid columns
         Columns (1,1) double = 2
     end
 
     events (Description = "Reactive")
-        % > CLICKED fires when a button is clicked (value = button label)
+        % fires when any button in the grid is clicked
+        % {payload}
+        % value | char: label of the clicked button
+        % {/payload}
         Clicked
     end
 

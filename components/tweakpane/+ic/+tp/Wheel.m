@@ -1,20 +1,26 @@
 classdef Wheel < ic.tp.Blade
-    % > WHEEL Jog wheel blade for TweakPane (plugin-camerakit).
-    %
-    % A scroll-wheel control for fine-grained unbounded adjustment.
-    % Think jog wheel on a mixing console or frequency tuner.
+    % jog wheel blade for TweakPane, for fine-grained unbounded adjustment.
+    % uses [@tweakpane/plugin-camerakit](https://github.com/tweakpane/plugin-camerakit).
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE current numeric value
+        % current numeric value
         Value (1,1) double = 0
-        % > AMOUNT value change per pixel of movement (sensitivity)
+
+        % value change per pixel of wheel movement
         Amount (1,1) double = 1
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGING fires during wheel interaction
+        % fires continuously during wheel interaction
+        % {payload}
+        % value | double: current value
+        % {/payload}
         ValueChanging
-        % > VALUECHANGED fires when interaction ends
+
+        % fires when wheel interaction ends
+        % {payload}
+        % value | double: committed value
+        % {/payload}
         ValueChanged
     end
 

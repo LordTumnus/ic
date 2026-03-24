@@ -1,13 +1,16 @@
 classdef Checkbox < ic.tp.Blade
-    % > CHECKBOX Boolean toggle blade for TweakPane.
+    % boolean toggle blade for TweakPane.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
-        % > VALUE boolean state
+        % checked state
         Value (1,1) logical = false
     end
 
     events (Description = "Reactive")
-        % > VALUECHANGED fires when the user toggles the checkbox
+        % fires when the user toggles the checkbox
+        % {payload}
+        % value | logical: new checked state
+        % {/payload}
         ValueChanged
     end
 

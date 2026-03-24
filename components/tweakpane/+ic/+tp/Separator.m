@@ -1,5 +1,5 @@
 classdef Separator < ic.tp.Blade
-    % > SEPARATOR Visual divider blade for TweakPane.
+    % visual divider blade for TweakPane
 
     methods
         function this = Separator(props)

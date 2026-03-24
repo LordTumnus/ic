@@ -1,8 +1,8 @@
 classdef Button < ic.tp.Blade
-    % > BUTTON Action button blade for TweakPane.
+    % action button blade for TweakPane
 
     events (Description = "Reactive")
-        % > CLICKED fires when the button is clicked
+        % fires when the button is clicked
         Clicked
     end
 
