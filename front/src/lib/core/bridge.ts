@@ -164,8 +164,6 @@ class Bridge {
       const events = [...this.queue];
       this.queue = [];
 
-      logger.debug('Bridge', `processQueue: ${events.length} events`);
-
       // Pre-load ALL component modules before dispatching any events.
       // After this, Factory.createSync() succeeds for every type, so
       // handlers run fully synchronously with no microtask yields.
@@ -184,7 +182,6 @@ class Bridge {
       setBatchMode(false);
       flushSync();
 
-      logger.debug('Bridge', `processQueue done. Remaining in queue: ${this.queue.length}`);
     } catch (error) {
       logger.error('Bridge', 'processQueue failed', {
         error: error instanceof Error ? error.message : String(error),
