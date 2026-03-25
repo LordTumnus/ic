@@ -1,21 +1,10 @@
 classdef CssValidators
-    % > CSSVALIDATORS Static validation functions for CSS-related properties.
-    %
-    % Provides reusable validators for properties that accept flexible CSS
-    % values.
-
+    % static validation functions for CSS-related properties.
 
     methods (Static)
         function mustBeGridTemplate(value)
-            % > MUSTBEGRIDTEMPLATE Validates grid-template-columns/rows values.
-            %
-            % Accepts:
-            %   - Numeric array: interpreted as pixel values
-            %     [100, 200, 100] → "100px 200px 100px"
-            %   - String: passed as-is to CSS
-            %     "1fr 2fr", "repeat(3, 1fr)", "minmax(100px, 1fr)"
-            %
-            % Throws error if value is neither numeric nor string.
+            % validate grid-template-columns/rows values.
+            % Accepts a numeric array (pixel values) or a string (CSS syntax).
 
             if isnumeric(value)
                 if any(value < 0)
@@ -29,17 +18,8 @@ classdef CssValidators
         end
 
         function mustBeGap(value)
-            % > MUSTBEGAP Validates gap values (row-gap, column-gap).
-            %
-            % Accepts:
-            %   - Number: single value in pixels (same for rows and columns)
-            %     10 → "10px"
-            %   - Numeric array: 1-2 values
-            %     [10, 20] → "10px 20px" (row-gap, column-gap)
-            %   - String: passed as-is to CSS
-            %     "1rem", "10px 20px"
-            %
-            % Throws error if value is invalid.
+            % validate gap values (row-gap, column-gap).
+            % Accepts a number (pixels), a 1–2 element numeric array, or a string.
 
             if isnumeric(value)
                 if any(value < 0)
@@ -57,18 +37,8 @@ classdef CssValidators
         end
 
         function mustBeSpacing(value)
-            % > MUSTBESPACING Validates spacing values (padding, margin).
-            %
-            % Accepts:
-            %   - Number: single value in pixels
-            %     10 → "10px"
-            %   - Numeric array: CSS shorthand (1-4 values)
-            %     [10, 20] → "10px 20px" (vertical, horizontal)
-            %     [10, 20, 30, 40] → "10px 20px 30px 40px" (top, right, bottom, left)
-            %   - String: passed as-is to CSS
-            %     "1rem", "10px 20px", "5%"
-            %
-            % Throws error if value is invalid.
+            % validate spacing values (padding, margin).
+            % Accepts a number (pixels), a 1–4 element numeric array (CSS shorthand), or a string.
 
             if isnumeric(value)
                 if any(value < 0)
@@ -86,15 +56,8 @@ classdef CssValidators
         end
 
         function mustBeSize(value)
-            % > MUSTBESIZE Validates size values (width, height, icon size).
-            %
-            % Accepts:
-            %   - Number: single value in pixels
-            %     16 → "16px"
-            %   - String: passed as-is to CSS
-            %     "1.5rem", "24px", "100%"
-            %
-            % Throws error if value is invalid.
+            % validate size values (width, height, icon size).
+            % Accepts a non-negative scalar (pixels) or a string (CSS value).
 
             if isnumeric(value)
                 if ~isscalar(value) || value < 0

@@ -1,15 +1,6 @@
 function mustBePdf(asset)
-   % > MUSTBEPDF Validates that an asset is a valid PDF source.
-   %
-   % Use as a property validator after implicit conversion:
-   %   Value ic.asset.Asset {ic.assets.mustBePdf} = ic.asset.Asset()
-   %
-   % Accepts:
-   %   - empty: no document
-   %   - file: must have .pdf extension
-   %   - url: accepted (assumes PDF content)
-   %
-   % Rejects name-type assets (Lucide icons are not PDFs).
+% validate that an asset is a valid PDF source.
+% Accepts empty (no document), file (must be .pdf), or url
    if asset.Type == ""
       return
    end
@@ -21,7 +12,7 @@ function mustBePdf(asset)
    if asset.Type == "url"
       return
    end
-   % file -> check extension
+   % file → check extension
    [~, ~, ext] = fileparts(asset.Value);
    if ~strcmpi(ext, ".pdf")
       error('ic:assets:InvalidPdf', ...

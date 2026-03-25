@@ -1,11 +1,7 @@
 function mustBeIconOrImage(asset)
-   % > MUSTBEICONORIMAGE Validates that an asset is a valid icon or image.
-   %
-   % Use as a property validator after implicit conversion:
-   %   Icon ic.asset.Asset {ic.assets.mustBeIconOrImage} = ic.asset.Asset()
-   %
-   % Accepts anything that passes mustBeIcon OR mustBeImage.
-   % Lucide name format is validated by ic.asset.Asset constructor.
+% validate that an asset is a valid icon or image.
+% Accepts anything that passes #ic.assets.mustBeIcon or #ic.assets.mustBeImage
+
    try
       ic.assets.mustBeIcon(asset);
       return

@@ -1,14 +1,6 @@
 function mustBeImage(asset)
-   % > MUSTBEIMAGE Validates that an asset is a valid image source.
-   %
-   % Use as a property validator after implicit conversion:
-   %   Source ic.asset.Asset {ic.assets.mustBeImage} = ic.asset.Asset()
-   %
-   % Accepts:
-   %   - empty: no image
-   %   - file: must have image extension
-   %
-   % Rejects name-type assets (Lucide icons are not images).
+% validate that an asset is a valid image source.
+% Accepts empty (no image), file (must have image extension), or url
    if asset.Type == ""
       return
    end
