@@ -298,6 +298,10 @@ export async function compileLaTeX(
   try {
     await ensureEngine();
 
+    // Clear stale .aux from previous compilation to avoid errors when
+    // switching document classes (e.g. letter's \@mlabel is undefined in article)
+    engine!.writeMemFSFile('main.aux', '');
+
     engine!.writeMemFSFile('main.tex', injectPreamble(source));
     engine!.setEngineMainFile('main.tex');
 
