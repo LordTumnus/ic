@@ -1,40 +1,37 @@
-% > PUBLISHABLE mixin providing event messaging infrastructure.
-%
-% Provides the pub/sub communication layer that all components use to
-% exchange events with the frontend view. Components can:
-%   - Publish events to the view
-%   - Subscribe to events from the view
-%   - Queue events until the component is attached
-%
-% Host class must implement:
-%   - isAttached() — whether the component is connected to a view
-%   - send(evt)    — dispatch event(s) towards the view
 classdef (Abstract) Publishable < handle
+    % base class establishing the communication layer for exchanging events with the frontend.
+    % Components can publish events to the view, subscribe to events from the
+    % view, and queue events until the component is attached
 
     properties (SetAccess = protected)
-        % > QUEUE list of javascript events that will be published when the component is attached
+        % queued #ic.event.JsEvent objects awaiting attachment to a view
         Queue = ic.event.JsEvent.empty();
-        % > SUBSCRIPTIONS map between event names and callbacks that will be executed upon receiving those events
+
+        % map of event names to their callback handlers
         Subscriptions = dictionary(string.empty(), function_handle.empty());
     end
 
     methods (Abstract, Access = public)
-        % > ISATTACHED returns whether the component is connected to a view
+        % returns whether the component is connected to a view
         tf = isAttached(this)
     end
 
     methods (Abstract, Access = protected)
-        % > SEND dispatches an event towards the view
+        % dispatches one or more #ic.event.JsEvent towards the view
         send(this, evt)
     end
 
     methods (Access = public)
         function promise = publish(this, name, data)
-            % > PUBLISH sends an event with the specified name and data to the view
+            % sends a named event with data to the frontend view.
+            % {note} The name of the event is converted to camelCase before dispatch {/note}
+            % {returns} when called with an output argument, am #ic.async.Promise that resolves with the view response {/returns}
 
             arguments (Input)
                 this (1,1) ic.mixin.Publishable
+                % event name
                 name (1,1) string
+                % payload to send
                 data % any
             end
 
@@ -58,26 +55,30 @@ classdef (Abstract) Publishable < handle
         end
 
         function subscribe(this, name, callback)
-            % > SUBSCRIBE registers a callback for events with the given name
+            % registers a callback for events with the given name
             arguments (Input)
                 this (1,1) ic.mixin.Publishable
+                % event name to listen for
                 name (1,1) string
+                % handler invoked as callback with signature @(comp, name, data) callback(comp, name, data), where comp is the component receiving the event, name is the event name, and data is the event payload
                 callback (1,1) function_handle
             end
             this.Subscriptions(name) = callback;
         end
 
         function unsubscribe(this, name)
-            % > UNSUBSCRIBE stops listening to events with the specified name
+            % stops listening to events with the specified name.
             arguments (Input)
                 this (1,1) ic.mixin.Publishable
+                % event name to stop listening for
                 name (1,1) string
             end
             this.Subscriptions(name) = [];
         end
 
         function queue = flush(this)
-            % > FLUSH sends all queued events and clears the queue
+            % sends all queued events to the parent component and clears the queue. If and when the component is linked to a #ic.core.View, the events will reach the frontend
+            % {returns} the flushed #ic.event.JsEvent array {/returns}
             if ~this.isAttached()
                 return;
             end
@@ -89,10 +90,12 @@ classdef (Abstract) Publishable < handle
 
     methods (Access = {?ic.core.View, ?matlab.uitest.TestCase}, Hidden)
         function receive(this, name, data)
-            % > RECEIVE finds an event in the subscriptions and executes its callback
+            % dispatches an incoming event to the matching subscription callback.
             arguments
                 this (1,1) ic.mixin.Publishable
+                % event name received from the frontend
                 name (1,1) string
+                % event payload
                 data % any
             end
 
@@ -105,7 +108,7 @@ classdef (Abstract) Publishable < handle
 
     methods (Access = {?ic.Frame, ?ic.core.Component})
         function resolveAndUnsubscribe(this, promise, name, evtData)
-            % > RESOLVEANDUNSUBSCRIBE resolves a publish promise and stops listening
+            % resolves a publish promise and removes the @resp subscription.
             promise.resolve(ic.async.Resolution(evtData.success, evtData.data));
             this.Subscriptions(name) = [];
         end

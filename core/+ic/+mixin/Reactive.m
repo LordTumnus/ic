@@ -1,41 +1,30 @@
-% > REACTIVE mixin providing automatic property/event synchronization with the frontend.
-%
-% Handles the "magic" that keeps MATLAB properties and the Svelte view
-% in sync. Properties marked with Description="Reactive" + SetObservable
-% automatically publish changes to the frontend, and events marked with
-% Description="Reactive" are forwarded as MATLAB events when the frontend
-% dispatches them.
-%
-% Host class must implement:
-%   - publish(name, data) — send event to the view (from Publishable)
-%   - subscribe(name, cb)  — listen for events from the view (from Publishable)
 classdef (Abstract) Reactive < handle
+    % automatic bidirectional synchronization of properties and events with the frontend.
+    % Properties marked with Description = "Reactive" and SetObservable publish changes via events to the view, and subscribe to changes from the view. The view debounces property changes at 50ms to avoid flooding the communication channel, so rapid changes in the frontend only trigger one update.
+    % Events marked with Description="Reactive" are forwarded from the frontend, and reach the component as a #ic.event.MEvent. One important property of events is that the view only starts publishing them once  a MATLAB listener is attached, and they stop being published when the last listener is removed.
 
     properties (Access = private)
+        % PostSet listeners for reactive properties, keyed by property name
         ReactivePropListeners = ...
             dictionary(string.empty(), event.listener.empty());
-        % > REACTIVEEVENTLISTENERCOUNT tracks how many MATLAB listeners
-        % exist per reactive event, so the view is only notified when the
-        % first listener is added or the last one is removed.
+
+        % reference count of MATLAB listeners per reactive event, used for
+        % lazy activation
         ReactiveEventListenerCount = ...
             dictionary(string.empty(), double.empty());
     end
 
-    % --- Dependencies (satisfied by Publishable in the final class) ------
     methods (Abstract, Access = public)
         promise = publish(this, name, data)
         subscribe(this, name, callback)
     end
 
-    % --- Public API -------------------------------------------------------
     methods
         function l = addlistener(this, varargin)
-            % > ADDLISTENER adds a listener. When the first listener for a
-            % reactive event is added, the view starts publishing that event.
-            % When the last listener is removed, the view stops publishing.
+            % overrides MATALBs addlistener to track reactive event listeners.
             l = addlistener@handle(this, varargin{:});
 
-            % Only handle scalar source, simple event form
+            % only handle scalar source, simple event form
             if ~isscalar(this) || numel(varargin) ~= 2
                 return
             end
@@ -45,7 +34,7 @@ classdef (Abstract) Reactive < handle
                 return
             end
 
-            % Increment listener count
+            % increment listener count
             if this.ReactiveEventListenerCount.isKey(eventName)
                 count = this.ReactiveEventListenerCount(eventName);
             else
@@ -53,26 +42,25 @@ classdef (Abstract) Reactive < handle
             end
             this.ReactiveEventListenerCount(eventName) = count + 1;
 
-            % Notify view on first listener
+            % notify view on first listener
             if count == 0
                 this.publish("@listenEvent", ...
                     ic.utils.toCamelCase(eventName));
             end
 
-            % When this listener is destroyed, decrement and notify
+            % when this listener is destroyed, decrement and notify
             addlistener(l, 'ObjectBeingDestroyed', ...
                 @(~,~) this.onReactiveListenerRemoved(eventName));
         end
     end
 
-    % --- Setup (called from ComponentBase constructor) --------------------
     methods (Access = protected)
         function setupReactivity(this)
-            % > SETUPREACTIVITY introspects the class metadata and wires up
-            % reactive properties and events.
+            % introspects the class metadata and wires up all reactive
+            % properties and events
             mc = meta.class.fromName(class(this));
 
-            % Properties marked Reactive + SetObservable
+            % properties marked Reactive + SetObservable
             metaProps = mc.PropertyList;
             reactiveProps = metaProps(...
                 all([strcmp({metaProps.Description}, "Reactive"); ...
@@ -82,7 +70,7 @@ classdef (Abstract) Reactive < handle
                 this.subscribeToReactiveProperty(reactiveProps(ii).Name);
             end
 
-            % Events marked Reactive
+            % events marked Reactive
             metaEvents = mc.EventList;
             reactiveEvents = metaEvents(...
                 strcmp({metaEvents.Description}, "Reactive"));
@@ -92,26 +80,26 @@ classdef (Abstract) Reactive < handle
         end
     end
 
-    % --- Reactive property wiring -----------------------------------------
     methods (Access = protected, Hidden)
         function addPropReactivity(this, propertyName)
-            % > ADDPROPREACTIVITY establishes a PostSet listener that
-            % publishes property changes to the view.
+            % attaches a PostSet listener that publishes property changes
+            % to the view
             this.ReactivePropListeners(propertyName) = ...
                 addlistener(this, propertyName, "PostSet", ...
                 @(src, ~) this.sendReactiveProperty(src.Name));
         end
 
         function addEventReactivity(this, eventName)
-            % > ADDEVENTREACTIVITY subscribes to events from the view and
-            % re-notifies them as MATLAB events.
+            % subscribes to events from the view and re-notifies
+            % as a MATLAB event with #ic.event.MEvent data.
             camelName = ic.utils.toCamelCase("@event/" + eventName);
             this.subscribe(camelName, ...
                 @(~,~,data) notify(this, eventName, ic.event.MEvent(data)));
         end
 
         function setValueSilently(this, propName, value)
-            % > SETVALUESILENTLY sets a reactive property without notifying the view.
+            % sets a reactive property without triggering a publish back
+            % to the view, preventing echo loops.
             task = onCleanup(@() reenableListener(this, propName));
             this.ReactivePropListeners(propName).Enabled = false;
             this.(propName) = value;
@@ -121,25 +109,23 @@ classdef (Abstract) Reactive < handle
         end
     end
 
-    % --- Overridable by Component / Frame ---------------------------------
     methods (Access = protected)
         function sendReactiveProperty(this, propertyName)
-            % > SENDREACTIVEPROPERTY publishes an event with the name of
-            % the property being changed to the view.
+            % publishes the property with the current value to the view.
             this.publish("@prop/" + propertyName, this.(propertyName));
         end
 
         function subscribeToReactiveProperty(this, propertyName)
-            % > SUBSCRIBETOREACTIVEPROPERTY subscribes to property changes
-            % from the view, and sets the component property silently.
+            % subscribes to property events from the view and sets the
+            % property silently (without echoing back).
             camelName = ic.utils.toCamelCase("@prop/" + propertyName);
             this.subscribe(camelName, ...
                 @(~,~,data) this.setValueSilently(propertyName, data))
         end
 
         function tf = isReactiveMethod(this, methodName)
-            % > ISREACTIVEMETHOD returns whether the specified method is
-            % marked as reactive.
+            % returns whether the specified method is marked as reactive
+            % (Description="Reactive").
             mc = meta.class.fromName(class(this));
             metaMethods = mc.MethodList;
             reactiveMethods = metaMethods(...
@@ -150,14 +136,13 @@ classdef (Abstract) Reactive < handle
         end
     end
 
-    % --- Definition helper (called from ComponentBase aggregator) ---------
     methods (Access = protected)
         function [props, events, methods] = gatherReactiveDefinition(this)
-            % > GATHERREACTIVEDEFINITION returns struct arrays of reactive
-            % properties, events, and methods for serialization.
+            % collects reactive properties, events, and methods into struct
+            % arrays for serialization in the component definition payload.
             mc = meta.class.fromName(class(this));
 
-            % Reactive properties
+            % reactive properties
             metaProps = mc.PropertyList;
             reactiveProps = metaProps(...
                 strcmp({metaProps.Description}, "Reactive") & ...
@@ -170,7 +155,7 @@ classdef (Abstract) Reactive < handle
                 props(ii).value = this.(propName);
             end
 
-            % Reactive events
+            % reactive events
             metaEvents = mc.EventList;
             reactiveEvents = metaEvents(...
                 strcmp({metaEvents.Description}, "Reactive"));
@@ -180,7 +165,7 @@ classdef (Abstract) Reactive < handle
                 events(jj).name = ic.utils.toCamelCase(reactiveEvents(jj).Name);
             end
 
-            % Reactive methods
+            % reactive methods
             metaMethods = mc.MethodList;
             reactiveMethods_ = metaMethods(...
                 strcmp({metaMethods.Description}, "Reactive"));
@@ -190,19 +175,17 @@ classdef (Abstract) Reactive < handle
                 methods(kk).name = ic.utils.toCamelCase(reactiveMethods_(kk).Name);
             end
 
-            % Wrap as cells to ensure JSON arrays
+            % wrap as cells to ensure JSON arrays
             props = num2cell(props);
             events = num2cell(events);
             methods = num2cell(methods);
         end
     end
 
-    % --- Private helpers --------------------------------------------------
     methods (Access = private)
         function onReactiveListenerRemoved(this, eventName)
-            % > ONREACTIVELISTENERREMOVED decrements the listener count for
-            % the given event and notifies the view when the last listener
-            % is removed.
+            % decrements the listener count and publishes an event
+            % when the last MATLAB listener for a reactive event is removed.
             if ~isvalid(this)
                 return
             end
@@ -217,8 +200,8 @@ classdef (Abstract) Reactive < handle
         end
 
         function tf = isReactiveEvent(this, eventName)
-            % > ISREACTIVEEVENT returns whether the specified event is
-            % marked as reactive.
+            % returns whether the specified event is marked as reactive
+            % (Description="Reactive").
             mc = meta.class.fromName(class(this));
             metaEvents = mc.EventList;
             reactiveEvents = metaEvents(...

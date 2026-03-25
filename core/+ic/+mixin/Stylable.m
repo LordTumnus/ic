@@ -1,38 +1,31 @@
-% > STYLABLE mixin providing dynamic CSS styling capabilities for components.
-%
-% This mixin adds the ability to dynamically apply CSS styles to components.
-% Use the `css` property for convenient fluent styling:
-%
-%   component.css.fillWidth().flexGrow(1).margin(8)
-%
-% Or use the `style` method directly for custom selectors:
-%
-%   component.style("> *", "color", "red")
 classdef (Abstract) Stylable < handle
+    % dynamic CSS styling capabilities for components.
+    % Styles are scoped to the component wrapper DOM element (tagged with its #ic.core.ComponentBase.ID). Internally, it uses constructable stylesheets ([CSSStyleSheet](https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleSheet)) for performant rule injection.
+    % Note that styles shouldn't be applied to the wrapper element itself. Instead, children or descendants should be targeted via selectors
 
     properties (SetAccess = private, Hidden)
-        % > STYLES stores dynamic CSS styles per selector (selector → struct of properties)
+        % dynamic CSS styles per selector
         Styles = dictionary(string.empty(), struct.empty());
     end
 
     properties (Dependent, SetAccess = private)
-        % > CSS fluent style builder for convenient chaining
+        % util #ic.mixin.StyleBuilder class that simplifies common style update patterns with a fluent syntax
         css
     end
 
     properties (Access = private, Hidden)
-        % > STYLEBUILDER_ cached StyleBuilder instance
+        % cached #ic.mixin.StyleBuilder instance
         StyleBuilder
     end
 
     methods (Abstract, Access = public)
-        % > PUBLISH sends an event to the view (must be implemented by host class)
         publish(this, name, data)
     end
 
     methods
         function builder = get.css(this)
-            % > CSS returns a StyleBuilder for fluent styling
+            % returns a style builder object that allows chaining style updates in a fluent syntax.
+            % {returns} a #ic.mixin.StyleBuilder bound to this component {/returns}
             if isempty(this.StyleBuilder)
                 this.StyleBuilder = ic.mixin.StyleBuilder(this);
             end
@@ -41,22 +34,20 @@ classdef (Abstract) Stylable < handle
     end
 
     methods (Access = public)
-        function style(this, selector, varargin)
-            % > STYLE applies CSS styles to elements matching the selector.
-            % Styles are merged with existing styles for that selector.
-            % To remove a property, set its value to "".
-            %
-            % The selector is scoped to the component wrapper (#componentId).
-            % Since the wrapper uses `display: contents`, use "> *" to
-            % target the actual component root element for layout styles.
-            %
-            % Examples:
-            %   comp.style("> *", "width", "100%")        % targets component root
-            %   comp.style(".label", "color", "red")      % targets .label inside
-            %   comp.style("> *", struct("flex", "1"))    % using struct
+        function this = style(this, selector, varargin)
+            % applies CSS styles to elements matching the CSS selector.
+            % Styles are merged with any existing styles for the selector, and properties set to "" are removed. The complete style object for the selector is published to the view on each update, so it's recommended to batch multiple style changes together by passing an object or using the css builder.
+            % The selector should target children or descendants of the component wrapper, not the wrapper itself. For example, to set styles on all direct children, use "> *". See the [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Selectors) reference for more details and examples
+            % {returns} the component itself, for chaining {/returns}
+            % {example}
+            %   comp.style("> *", "width", "100%")
+            %   comp.style(".label", "color", "red")
+            %   comp.style("> *", struct("flex", "1", "margin", "5px"))
+            % {/example}
 
             arguments (Input)
                 this (1,1) ic.mixin.Stylable
+                % CSS selector scoped to the component wrapper
                 selector (1,1) string
             end
 
@@ -64,7 +55,7 @@ classdef (Abstract) Stylable < handle
                 varargin
             end
 
-            % Parse input into a struct of new styles
+            % parse input into a struct of new styles
             if isscalar(varargin) && isstruct(varargin{1})
                 newStyles = varargin{1};
             else
@@ -77,20 +68,20 @@ classdef (Abstract) Stylable < handle
                 newStyles = struct(varargin{:});
             end
 
-            % Merge with existing styles for this selector
+            % merge with existing styles for this selector
             if this.Styles.isKey(selector)
                 existingStyles = this.Styles(selector);
             else
                 existingStyles = struct();
             end
 
-            % Apply new styles (merge), removing properties set to ""
+            % apply new styles (merge), removing properties set to ""
             fields = fieldnames(newStyles);
             for jj = 1:numel(fields)
                 fname = fields{jj};
                 fvalue = newStyles.(fname);
                 if isstring(fvalue) && fvalue == ""
-                    % Remove property
+                    % remove property
                     if isfield(existingStyles, fname)
                         existingStyles = rmfield(existingStyles, fname);
                     end
@@ -99,10 +90,10 @@ classdef (Abstract) Stylable < handle
                 end
             end
 
-            % Store merged styles
+            % store merged styles
             this.Styles(selector) = existingStyles;
 
-            % Convert property names to kebab-case for CSS
+            % convert property names to kebab-case for CSS
             mergedFields = fieldnames(existingStyles);
             kebabKeys = cell(1, numel(mergedFields));
             values = cell(1, numel(mergedFields));
@@ -112,17 +103,18 @@ classdef (Abstract) Stylable < handle
             end
             cssStyles = containers.Map(kebabKeys, values);
 
-            % Publish the complete styles for this selector
+            % publish the complete styles for this selector
             this.publish("@style", struct( ...
                 "selector", selector, ...
                 "styles", cssStyles));
         end
 
         function styles = getStyle(this, selector)
-            % > GETSTYLE returns the current styles for a selector.
-            % Returns an empty struct if no styles are set for the selector.
+            % returns the current styles for a selector.
+            % {returns} the style struct, or an empty struct if none set {/returns}
             arguments (Input)
                 this (1,1) ic.mixin.Stylable
+                % CSS selector to query
                 selector (1,1) string
             end
 
@@ -138,9 +130,10 @@ classdef (Abstract) Stylable < handle
         end
 
         function clearStyle(this, selector)
-            % > CLEARSTYLE removes all styles for a specific selector.
+            % removes all styles for a specific selector.
             arguments (Input)
                 this (1,1) ic.mixin.Stylable
+                % CSS selector whose styles should be cleared
                 selector (1,1) string
             end
 
@@ -152,7 +145,7 @@ classdef (Abstract) Stylable < handle
         end
 
         function clearStyles(this)
-            % > CLEARSTYLES removes all dynamic styles for the component.
+            % removes all dynamic styles for the component
             arguments (Input)
                 this (1,1) ic.mixin.Stylable
             end
@@ -162,7 +155,8 @@ classdef (Abstract) Stylable < handle
         end
 
         function result = getAllStyles(this)
-            % > GETALLSTYLES returns all dynamic styles as a containers.Map (serializable)
+            % returns all dynamic styles as an object mapping selectors to their style structs.
+            % {returns} a containers.Map mapping selectors to style structs {/returns}
             result = containers.Map('KeyType', 'char', 'ValueType', 'any');
             selectors = keys(this.Styles);
             for ii = 1:numel(selectors)

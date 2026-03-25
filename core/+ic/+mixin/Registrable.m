@@ -1,14 +1,10 @@
-% > REGISTRABLE mixin providing Frame registry operations for containers.
-%
-% When a component is inserted into a container, it must be registered
-% with the root Frame for O(1) event dispatch. This mixin encapsulates
-% the tree-walking registration and deregistration logic.
 classdef (Abstract) Registrable < handle
+    % tree-walking registration and deregistration of components in the #ic.Frame registry.
+    % When a component is inserted into or removed from a container, this mixin recursively registers or deregisters the subtree for O(1) event dispatch.
 
     methods (Access = protected)
         function registerSubtree(this, component)
-            % > REGISTERSUBTREE registers a component and all its
-            % descendants in the Frame registry.
+            % registers a component and all its descendants in the #ic.Frame registry.
             if isa(this, "ic.core.Component")
                 frame = this.getFrame(); %#ok<MCNPN>
             else
@@ -16,7 +12,7 @@ classdef (Abstract) Registrable < handle
             end
             if ~isempty(frame)
                 ic.mixin.Registrable.registerSubtreeWithFrame(component, frame);
-                % Also register static children added before attachment
+                % also register static children added before attachment
                 if isa(component, "ic.core.Container")
                     for child = component.Children
                         if child.IsStatic
@@ -28,8 +24,7 @@ classdef (Abstract) Registrable < handle
         end
 
         function deregisterSubtree(this, component)
-            % > DEREGISTERSUBTREE removes a component and all its
-            % descendants from the Frame registry.
+            % removes a component and all its descendants from the #ic.Frame registry.
             if isa(this, "ic.core.Component")
                 frame = this.getFrame(); %#ok<MCNPN>
             else
@@ -43,8 +38,7 @@ classdef (Abstract) Registrable < handle
 
     methods (Access = protected, Static)
         function registerSubtreeWithFrame(component, frame)
-            % > REGISTERSUBTREEWITHFRAME registers a component and its
-            % descendants using the given Frame.
+            % recursively registers a component and its descendants using the given #ic.Frame.
             frame.registerDescendant(component);
             if isa(component, "ic.core.Container")
                 for ii = 1:numel(component.Children)
@@ -55,8 +49,7 @@ classdef (Abstract) Registrable < handle
         end
 
         function deregisterSubtreeWithFrame(component, frame)
-            % > DEREGISTERSUBTREEWITHFRAME deregisters a component and its
-            % descendants using the given Frame.
+            % recursively deregisters a component and its descendants using the given #ic.Frame.
             try
                 frame.deregisterDescendant(component.ID);
                 if isa(component, "ic.core.Container")
@@ -66,7 +59,7 @@ classdef (Abstract) Registrable < handle
                     end
                 end
             catch
-                % Silently ignore errors during destruction
+                % silently ignore errors during destruction
             end
         end
     end

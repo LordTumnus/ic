@@ -1,16 +1,7 @@
-% > REQUESTABLE mixin providing frontend-initiated request/response.
-%
-% Enables the Svelte frontend to send requests to MATLAB and receive
-% responses. Used for load-on-demand patterns (e.g., VirtualTree).
-%
-%   comp.onRequest("LoadChunk", @(comp, data) comp.getChunk(data))
-%
-% Host class must implement:
-%   - subscribe(name, cb) — listen for events from the view (from Publishable)
-%   - send(evt)           — dispatch event towards the view (from Publishable)
 classdef (Abstract) Requestable < handle
+    % frontend-initiated request/response communication.
+    % Enables the Svelte frontend to send named requests to MATLAB and receive responses asynchronously. Used for load-on-demand patterns where the frontend pulls data (e.g., lazy loading of #ic.VirtualTree). Internally subscribes to a request event with a unique name, and on receiving, publishes a response event with the same unique ID
 
-    % --- Dependencies (satisfied by Publishable in the final class) ------
     methods (Abstract, Access = public)
         subscribe(this, name, callback)
     end
@@ -19,15 +10,14 @@ classdef (Abstract) Requestable < handle
         send(this, evt)
     end
 
-    % --- Public API -------------------------------------------------------
     methods (Access = public)
         function onRequest(this, name, callback)
-            % > ONREQUEST registers a handler for frontend requests.
+            % registers a handler for frontend requests.
             arguments (Input)
                 this (1,1) ic.mixin.Requestable
-                % > NAME the request name (PascalCase, e.g. "LoadChunk")
+                % request name
                 name (1,1) string
-                % > CALLBACK function that processes the request: result = callback(comp, data)
+                % handler invoked as result, with signature @(comp, data) callback(comp, data)
                 callback (1,1) function_handle
             end
 
@@ -37,11 +27,9 @@ classdef (Abstract) Requestable < handle
         end
     end
 
-    % --- Private ----------------------------------------------------------
     methods (Access = private)
         function handleFrontendRequest(this, payload, callback)
-            % > HANDLEFRONTENDREQUEST processes an incoming request from
-            % the Svelte frontend and sends back a response.
+            % processes an incoming request and sends the response back
             try
                 result = callback(this, payload.data);
                 response = struct('success', true, 'data', []);
@@ -51,6 +39,7 @@ classdef (Abstract) Requestable < handle
             end
             evt = ic.event.JsEvent(this.ID, ...
                 "@resp/" + string(payload.id), response);
+            % send directly to bypass publish
             this.send(evt);
         end
     end

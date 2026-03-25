@@ -1,5 +1,5 @@
-% > ALLOWSOVERLAY mixin that grants a container the addOverlay method.
 classdef (Abstract) AllowsOverlay < handle
+    % grants a container the ability to host overlay components in the "overlay" target.
 
     methods (Abstract, Access = {?ic.core.Container, ?ic.mixin.AllowsOverlay})
         insertChild
@@ -7,10 +7,11 @@ classdef (Abstract) AllowsOverlay < handle
 
     methods (Access = public)
         function addOverlay(this, child)
-            % > ADDOVERLAY inserts a child into the implicit "overlay" target.
-            % Only components inheriting ic.mixin.Overlay are accepted.
+            % inserts a child into the implicit "overlay" target.
+            % Only components inheriting #ic.mixin.Overlay are accepted.
             arguments
                 this
+                % component to insert as an overlay
                 child ic.core.Component
             end
             if ~isa(child, 'ic.mixin.Overlay')

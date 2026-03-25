@@ -1,19 +1,16 @@
-% > STYLEBUILDER fluent builder for applying CSS styles to components.
-%
-% Accessed via the `css` property on Stylable components:
-%   component.css.fillWidth().flexGrow(1).margin(8)
-%
-% All methods return the builder for chaining.
 classdef StyleBuilder < handle
+    % fluent builder for applying common CSS styles to components.
+    %
 
     properties (SetAccess = immutable, GetAccess = private)
-        % > COMPONENT reference to the Stylable component
+        % the #ic.mixin.Stylable component this builder operates on
         Component
     end
 
     methods
         function this = StyleBuilder(component)
             arguments
+                % target component
                 component (1,1) ic.mixin.Stylable
             end
             this.Component = component;
@@ -22,40 +19,42 @@ classdef StyleBuilder < handle
 
     methods
         function this = fillWidth(this)
-            % > FILLWIDTH sets the component to fill available width (100%)
+            % sets width to 100%.
             this.Component.style("> *", "width", "100%");
         end
 
         function this = fillHeight(this)
-            % > FILLHEIGHT sets the component to fill available height (100%)
+            % sets height to 100%.
             this.Component.style("> *", "height", "100%");
         end
 
         function this = fill(this)
-            % > FILL sets the component to fill both width and height (100%)
+            % sets both width and height to 100%.
             this.Component.style("> *", "width", "100%", "height", "100%");
         end
 
         function this = width(this, value)
-            % > WIDTH sets the component width
+            % sets the component width, in pixels or as a CSS size string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
+                % size value (numeric → px, string → verbatim CSS)
                 value {ic.check.CssValidators.mustBeSize}
             end
             this.Component.style("> *", "width", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = height(this, value)
-            % > HEIGHT sets the component height
+            % sets the component height, in pixels or as a CSS size string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
+                % size value (numeric → px, string → verbatim CSS)
                 value {ic.check.CssValidators.mustBeSize}
             end
             this.Component.style("> *", "height", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = minWidth(this, value)
-            % > MINWIDTH sets the component minimum width
+            % sets the minimum width, in pixels or as a CSS size string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
@@ -64,7 +63,7 @@ classdef StyleBuilder < handle
         end
 
         function this = minHeight(this, value)
-            % > MINHEIGHT sets the component minimum height
+            % sets the minimum height, in pixels or as a CSS size string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
@@ -73,7 +72,7 @@ classdef StyleBuilder < handle
         end
 
         function this = maxWidth(this, value)
-            % > MAXWIDTH sets the component maximum width
+            % sets the maximum width, in pixels or as a CSS size string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
@@ -82,7 +81,7 @@ classdef StyleBuilder < handle
         end
 
         function this = maxHeight(this, value)
-            % > MAXHEIGHT sets the component maximum height
+            % sets the maximum height, in pixels or as a CSS size string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
@@ -91,11 +90,14 @@ classdef StyleBuilder < handle
         end
 
         function this = flex(this, grow, shrink, basis)
-            % > FLEX sets the flex shorthand property (grow, shrink, basis)
+            % sets the flex shorthand (grow, shrink, basis).
             arguments
                 this (1,1) ic.mixin.StyleBuilder
+                % flex grow factor
                 grow (1,1) double {mustBeNonnegative} = 1
+                % flex shrink factor
                 shrink (1,1) double {mustBeNonnegative} = 1
+                % initial main size before growing/shrinking
                 basis = "auto"
             end
             basisValue = ic.mixin.StyleBuilder.toCssValue(basis);
@@ -103,7 +105,7 @@ classdef StyleBuilder < handle
         end
 
         function this = flexGrow(this, value)
-            % > FLEXGROW sets flex-grow (how much the item grows relative to siblings)
+            % sets how much the item grows relative to siblings.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeNonnegative} = 1
@@ -112,7 +114,7 @@ classdef StyleBuilder < handle
         end
 
         function this = flexShrink(this, value)
-            % > FLEXSHRINK sets flex-shrink (how much the item shrinks relative to siblings)
+            % sets how much the item shrinks relative to siblings.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeNonnegative} = 1
@@ -121,7 +123,7 @@ classdef StyleBuilder < handle
         end
 
         function this = flexBasis(this, value)
-            % > FLEXBASIS sets the initial main size before growing/shrinking
+            % sets the initial main size before growing/shrinking.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value = "auto"
@@ -130,7 +132,7 @@ classdef StyleBuilder < handle
         end
 
         function this = alignSelf(this, value)
-            % > ALIGNSELF overrides parent's align-items for this component
+            % overrides the parent's align-items for this component.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) string {mustBeMember(value, ...
@@ -140,7 +142,7 @@ classdef StyleBuilder < handle
         end
 
         function this = margin(this, value)
-            % > MARGIN sets the component margin
+            % sets the component margin, in pixels or as a CSS spacing string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSpacing}
@@ -149,7 +151,7 @@ classdef StyleBuilder < handle
         end
 
         function this = padding(this, value)
-            % > PADDING sets the component padding
+            % sets the component padding, in pixels or as a CSS spacing string.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSpacing}
@@ -158,12 +160,12 @@ classdef StyleBuilder < handle
         end
 
         function this = hide(this)
-            % > HIDE hides the component (display: none)
+            % hides the component (display: none).
             this.Component.style("> *", "display", "none");
         end
 
         function this = show(this, displayType)
-            % > SHOW shows the component with specified display type
+            % shows the component with the specified display type.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 displayType (1,1) string = "block"
@@ -172,17 +174,17 @@ classdef StyleBuilder < handle
         end
 
         function this = invisible(this)
-            % > INVISIBLE makes the component invisible but keeps its space
+            % makes the component invisible but preserves its layout space.
             this.Component.style("> *", "visibility", "hidden");
         end
 
         function this = visible(this)
-            % > VISIBLE makes the component visible
+            % makes the component visible.
             this.Component.style("> *", "visibility", "visible");
         end
 
         function this = opacity(this, value)
-            % > OPACITY sets the component opacity (0 to 1)
+            % sets the component opacity (0 = transparent, 1 = opaque).
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeInRange(value, 0, 1)}
@@ -191,7 +193,7 @@ classdef StyleBuilder < handle
         end
 
         function this = position(this, type)
-            % > POSITION sets the positioning type
+            % sets the CSS positioning type.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 type (1,1) string {mustBeMember(type, ...
@@ -201,7 +203,7 @@ classdef StyleBuilder < handle
         end
 
         function this = zIndex(this, value)
-            % > ZINDEX sets the z-index (stacking order)
+            % sets the z-index (stacking order).
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeInteger}
@@ -210,7 +212,7 @@ classdef StyleBuilder < handle
         end
 
         function this = overflow(this, value)
-            % > OVERFLOW sets overflow behavior for both axes
+            % sets overflow behavior for both axes.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) string {mustBeMember(value, ...
@@ -220,7 +222,7 @@ classdef StyleBuilder < handle
         end
 
         function this = overflowX(this, value)
-            % > OVERFLOWX sets horizontal overflow behavior
+            % sets horizontal overflow behavior.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) string {mustBeMember(value, ...
@@ -230,7 +232,7 @@ classdef StyleBuilder < handle
         end
 
         function this = overflowY(this, value)
-            % > OVERFLOWY sets vertical overflow behavior
+            % sets vertical overflow behavior.
             arguments
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) string {mustBeMember(value, ...
