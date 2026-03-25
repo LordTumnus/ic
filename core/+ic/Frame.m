@@ -1,82 +1,98 @@
-% > FRAME is the root component that holds other interactive components and bridges them to the HTML view
 classdef Frame < ic.core.ComponentBase & ...
                  ic.core.Container & ...
                  ic.mixin.Stylable & ...
                  ic.mixin.AllowsOverlay
+    % root of the IC component tree. Every IC application starts with a single Frame.
+    % The Frame owns the #ic.core.View bridge and the component registry. Components are added via #ic.core.Container.addChild, which serializes their definition and sends it over the frontend.
+    % Frames also handle theming via their #ic.Frame.Theme and #ic.FrameColorScheme properties, and styling for all components of a given type via the #ic.Frame.globalStyle method
 
     properties (SetAccess = private)
-        % > VIEW the view bridge that handles HTML communication
+        % bridge that wraps uihtml and handles MATLAB↔JS communication
         View ic.core.View
-        % > REGISTRY map of component IDs to components for O(1) event dispatch
+
+        % id to component dictionary for O(1) event dispatch from the frontend
         Registry = dictionary(string.empty(), ic.core.ComponentBase.empty())
-        % > GLOBALSTYLES nested dictionary: componentType → (selector → styles struct)
+
+        % dictionary mapping component type to style rules applied to all the children of that type
         GlobalStyles = configureDictionary("string", "dictionary")
-        % > LOGGER stores frontend logs for this frame
+
+        % collects frontend log entries
         Logger ic.core.Logger
     end
 
     properties (SetAccess = private, SetObservable, Description = "Reactive")
-        % > THEME CSS custom property values (syncs to frontend automatically via jsonencode)
+        % theme tokens synced to the frontend
         Theme ic.style.Theme = ic.style.Theme()
     end
 
     properties (SetObservable, Description = "Reactive")
-        % > COLORSCHEME active color scheme
+        % active color scheme
         ColorScheme (1,1) string {mustBeMember(ColorScheme, ["light", "dark"])} = "light"
-        % > DEBUG enables frontend logging to MATLAB
+
+        % when true, the frontend forwards log entries to MATLAB and prints
+        % them in the command window
         Debug (1,1) logical = false
-        % > LOGLEVEL minimum log level to display: "debug" | "info" | "warn" | "error"
+
+        % minimum severity that the #ic.core.Logger accepts (used when #ic.Frame.Debug is true)
         LogLevel (1,1) string {mustBeMember(LogLevel, ["debug", "info", "warn", "error"])} = "debug"
     end
 
     properties (Dependent)
+        % position of the underlying uihtml container, in current Units
         Position (1,4) double
+
+        % whether the frame is visible
         Visible (1,1) matlab.lang.OnOffSwitchState
+
+        % coordinate units for Position
         Units (1,1) string
+
+        % grid layout options when placed inside a uigridlayout
         Layout matlab.ui.layout.GridLayoutOptions
+
+        % parent uicontainer or uifigure
         UIParent (1,1) matlab.ui.container.Container
     end
 
     properties (Dependent, Hidden)
+        % do not use. Frame objects do not appear as Children of their uicontainer, so using Parent is misleading.
         Parent (1,1) matlab.ui.container.Container
     end
 
 
     methods
         function this = Frame(args)
-            % > FRAME creates a frame component that can hold other interactive components
+            % create a frame and its backing #ic.core.View.
             arguments (Input)
-                % > ARGS optional name-value pairs of properties of the frame
+                % name-value pairs forwarded to the underlying uihtml container
                 args.?matlab.ui.componentcontainer.ComponentContainer
             end
             arguments (Output)
-                % > THIS the frame
                 this (1,1) ic.Frame
             end
 
-            % call superclass constructor with frame ID
+            % fixed ID — only one frame per view
             this@ic.core.ComponentBase("ic-frame");
 
-            % initialize the view
+            % create the view bridge (uihtml inside a uigridlayout)
             args = namedargs2cell(args);
             this.View = ic.core.View(this, args{:});
 
             addlistener(this.View, "ObjectBeingDestroyed", ...
                 @(~,~) this.delete());
 
-            % Initialize logger
+            % initialize logger and keep it in sync with LogLevel
             this.Logger = ic.core.Logger();
 
-            % Sync LogLevel changes to Logger
             addlistener(this, "LogLevel", "PostSet", ...
                 @(~,~) this.Logger.setLogLevel(this.LogLevel));
 
-            % Subscribe to @log events from frontend
+            % listen for frontend log entries
             this.subscribe("@log", @(~, ~, data) this.onLog(data));
         end
 
         function delete(this)
-            % DELETE cleans up the Frame and its View
+            % destroy the frame and its view, cascading deletion to all children.
             if isvalid(this.View)
                 this.View.delete();
             end
@@ -138,21 +154,29 @@ classdef Frame < ic.core.ComponentBase & ...
 
     methods (Access = public)
         function tf = isAttached(~)
-            % > ISATTACHED Frame is always attached (it's the root)
+            % {returns} true {/returns}
             tf = true;
         end
 
         function theme(this, name, value)
-            % > THEME sets CSS custom property values.
-            % theme("name", "value") - sets value for the ACTIVE color scheme
-            % theme("name", ["light", "dark"]) - sets both light and dark values
+            % set one or more #ic.style.Theme properties by name.
+            % - if a scalar value is applied, it will impact the active #ic.Frame.ColorScheme only
+            % - if a two-element array is set, it sets both [light, dark]
+            %
+            % {example}
+            %   f.theme("primary", "#ff6600")
+            %   f.theme("primary-foreground", ["#000", "#fff"])
+            %   f.theme("Muted", "#eee", "border", "#ccc")
+            % {/example}
 
             arguments (Input)
                 this (1,1) ic.Frame
             end
 
             arguments (Input, Repeating)
+                % theme property name. Supports any casing (snake_case, kebab-case, camelCase, PascalCase)
                 name (1,1) string
+                % color value, or [light, dark] pair
                 value string
             end
 
@@ -168,7 +192,7 @@ classdef Frame < ic.core.ComponentBase & ...
 
                 val = value{ii};
                 if isscalar(val)
-                    % Single value: apply to active scheme only
+                    % single value → apply to active scheme only
                     currentValues = currentTheme.(propName);
                     if this.ColorScheme == "light"
                         currentTheme.(propName) = [val, currentValues(2)];
@@ -176,21 +200,28 @@ classdef Frame < ic.core.ComponentBase & ...
                         currentTheme.(propName) = [currentValues(1), val];
                     end
                 else
-                    % Array [light, dark]: set both values
+                    % [light, dark] → set both values
                     currentTheme.(propName) = val;
                 end
             end
 
-            % Assign back to trigger reactive sync (Theme.jsonencode serializes to CSS)
+            % assign back to trigger reactive sync (Theme.jsonencode → CSS)
             this.Theme = currentTheme;
         end
 
         function globalStyle(this, componentType, selector, varargin)
-            % > GLOBALSTYLE applies CSS styles to all components of a type.
+            % apply CSS styles to every instance of a component type. Setting a property to "" removes it.
+            %
+            % {example}
+            %   f.globalStyle("ic.Button", ".ic-btn", "backgroundColor", "#000")
+            %   f.globalStyle("ic.Button", ".ic-btn__label", struct("color", "red"))
+            % {/example}
 
             arguments (Input)
                 this (1,1) ic.Frame
+                % fully qualified class name
                 componentType (1,1) string
+                % CSS selector scoped to the component wrapper
                 selector (1,1) string
             end
 
@@ -198,7 +229,7 @@ classdef Frame < ic.core.ComponentBase & ...
                 varargin
             end
 
-            % Parse styles (same logic as ComponentBase.style)
+            % parse styles into a struct
             if isscalar(varargin) && isstruct(varargin{1})
                 newStyles = varargin{1};
             else
@@ -211,14 +242,14 @@ classdef Frame < ic.core.ComponentBase & ...
                 newStyles = struct(varargin{:});
             end
 
-            % Get or create selector dictionary for this component type
+            % get or create the selector dictionary for this type
             if this.GlobalStyles.isKey(componentType)
                 selectorDict = this.GlobalStyles(componentType);
             else
                 selectorDict = dictionary(string.empty(), struct.empty());
             end
 
-            % Merge with existing styles for this selector
+            % merge with existing styles for this selector
             if selectorDict.isKey(selector)
                 existingStyles = selectorDict(selector);
             else
@@ -241,7 +272,7 @@ classdef Frame < ic.core.ComponentBase & ...
             selectorDict(selector) = existingStyles;
             this.GlobalStyles(componentType) = selectorDict;
 
-            % Convert to kebab-case for CSS
+            % convert to kebab-case for CSS and publish
             mergedFields = fieldnames(existingStyles);
             kebabKeys = cell(1, numel(mergedFields));
             values = cell(1, numel(mergedFields));
@@ -258,11 +289,12 @@ classdef Frame < ic.core.ComponentBase & ...
         end
 
         function clearGlobalStyle(this, componentType, selector)
-            % > CLEARGLOBALSTYLE removes styles for a specific selector on a component type.
-
+            % remove styles for a specific selector on a component type.
             arguments (Input)
                 this (1,1) ic.Frame
+                % fully qualified class name
                 componentType (1,1) string
+                % CSS selector to clear
                 selector (1,1) string
             end
 
@@ -280,10 +312,10 @@ classdef Frame < ic.core.ComponentBase & ...
         end
 
         function clearGlobalStyles(this, componentType)
-            % > CLEARGLOBALSTYLES removes all styles for a component type.
-
+            % remove all styles for every selector on a component type.
             arguments (Input)
                 this (1,1) ic.Frame
+                % fully qualified class name
                 componentType (1,1) string
             end
 
@@ -295,8 +327,7 @@ classdef Frame < ic.core.ComponentBase & ...
         end
 
         function clearAllGlobalStyles(this)
-            % > CLEARALLGLOBALSTYLES removes all global styles.
-
+            % remove every global style rule across all component types.
             arguments (Input)
                 this (1,1) ic.Frame
             end
@@ -306,19 +337,18 @@ classdef Frame < ic.core.ComponentBase & ...
         end
 
         function logger = logs(this)
-            % > LOGS returns the Logger instance for log inspection
+            % return the logger instance for log inspection.
+            % {returns} the #ic.core.Logger that collects frontend log entries {/returns}
             logger = this.Logger;
         end
     end
 
     methods (Access = private)
         function onLog(this, data)
-            % > ONLOG handles incoming @log events from the frontend
-
-            % Add to logger (Logger handles level filtering)
+            % handle incoming log events from the frontend.
             added = this.Logger.add(data);
 
-            % Print to command window if Debug is on and log was added
+            % print to command window when Debug is enabled
             if this.Debug && added
                 this.Logger.show(1);
             end
@@ -327,31 +357,31 @@ classdef Frame < ic.core.ComponentBase & ...
 
     methods (Access = {?ic.core.Container, ?ic.core.Component, ?ic.mixin.Registrable}, Hidden)
         function frame = getFrame(this)
-            % > GETFRAME returns self since Frame is the root
+            % return the same frame
             frame = this;
         end
     end
 
     methods (Access = protected)
         function send(this, evt)
-            % > SEND delegates to the View instead of parent
+            % forward events to the #ic.core.View for transmission via uihtml.
             this.View.send(evt);
         end
 
         function registerSubtree(this, component)
-            % > REGISTERSUBTREE registers a component and its subtree (Frame is the registry)
+            % add a component and its descendants to the registry.
             ic.mixin.Registrable.registerSubtreeWithFrame(component, this);
         end
 
         function deregisterSubtree(this, component)
-            % > DEREGISTERSUBTREE deregisters a component and its subtree (Frame is the registry)
+            % remove a component and its descendants from the registry.
             ic.mixin.Registrable.deregisterSubtreeWithFrame(component, this);
         end
     end
 
     methods (Access = protected)
         function sendReactiveProperty(this, propertyName)
-            % > SENDREACTIVEPROPERTY publishes an event with the name of the property being changed to the view
+            % publish the current value of a reactive property to the frontend.
             if ~this.isAttached()
                 return;
             end
@@ -361,12 +391,12 @@ classdef Frame < ic.core.ComponentBase & ...
 
     methods (Access = {?ic.core.Container, ?ic.mixin.Registrable})
         function registerDescendant(this, component)
-            % > REGISTERDESCENDANT adds a component to the registry for O(1) event dispatch
+            % add a component to the id→component registry for O(1) event routing.
             this.Registry(component.ID) = component;
         end
 
         function deregisterDescendant(this, id)
-            % > DEREGISTERDESCENDANT removes a component from the registry
+            % remove a component from the registry.
             if this.Registry.isKey(id)
                 this.Registry(id) = [];
             end
