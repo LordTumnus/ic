@@ -60,7 +60,7 @@ classdef VirtualTreeTable < ic.core.Component & ic.mixin.Requestable & ic.mixin.
         % total number of nodes in the current view
         RowCount (1,1) double = 0
 
-        % cache-buster — Svelte clears its caches when this changes
+        % cache-buster
         ViewVersion (1,1) double = 0
 
         % all folder keys in the view tree (for initial expand)

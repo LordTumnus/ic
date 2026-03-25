@@ -97,7 +97,7 @@ classdef VirtualTable < ic.TableBase & ic.mixin.Requestable
                 oldMatlabVal = colData(rowIndex);
             end
 
-            % modify cell — guard prevents set.Data from recomputing
+            % modify cell: guard prevents set.Data from recomputing
             this.InCellEdit = true;
             if iscell(colData)
                 this.Data.(char(field)){rowIndex} = newValue;

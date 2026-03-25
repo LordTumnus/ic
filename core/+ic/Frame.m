@@ -71,7 +71,7 @@ classdef Frame < ic.core.ComponentBase & ...
                 this (1,1) ic.Frame
             end
 
-            % fixed ID — only one frame per view
+            % fixed ID
             this@ic.core.ComponentBase("ic-frame");
 
             % create the view bridge (uihtml inside a uigridlayout)

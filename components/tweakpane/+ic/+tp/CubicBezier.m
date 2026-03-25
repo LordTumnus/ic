@@ -10,7 +10,7 @@ classdef CubicBezier < ic.tp.Blade
     events (Description = "Reactive")
         % fires when the curve changes
         % {payload}
-        % value | struct: control points — value.x1, value.y1, value.x2, value.y2 as doubles
+        % value | struct: control points with value.x1, value.y1, value.x2, value.y2 as doubles
         % {/payload}
         ValueChanged
     end

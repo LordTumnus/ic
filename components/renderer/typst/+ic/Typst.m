@@ -53,13 +53,13 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
     events (Description = "Reactive")
         % fires after successful compilation
         % {payload}
-        % value | struct: compilation result — value.numPages (double) is the page count
+        % value | struct: compilation result. value.numPages (double) is the page count
         % {/payload}
         Compiled
 
         % fires when compilation fails
         % {payload}
-        % value | struct: error details — value.message (char) is the error message
+        % value | struct: error details. value.message (char) is the error message
         % {/payload}
         Error
     end
@@ -355,7 +355,7 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
         function result = handleSavePdf(~, data)
             filepath = string(data.filepath);
 
-            % No filepath provided — open save dialog
+            % No filepath provided: open save dialog
             if filepath == ""
                 [f, p] = uiputfile('*.pdf', 'Export Typst as PDF');
                 if isequal(f, 0)

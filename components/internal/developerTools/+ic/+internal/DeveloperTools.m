@@ -1,22 +1,26 @@
 classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
-    % > DEVELOPERTOOLS Internal IC component for the inspector UI.
-    %
-    %   Hosts the inspected component as a static child and handles
-    %   metadata requests from the Svelte frontend.
+    % Chrome DevTools–style inspector for IC components.
+    % Renders the inspected component on the left as a static child and a tabbed inspector panel on the right with Properties, Events,
+    % Methods, Styles, DOM, and Console tabs.
+    % The frontend fetches component metadata via the request
+    % and can live-edit properties, apply CSS styles, and evaluate MATLAB
+    % commands in a sandboxed console workspace.
+
 
     properties (SetAccess = immutable, Hidden)
-        % > INSPECTEDCOMPONENT the component being inspected
+        % component being inspected
         InspectedComponent  ic.core.ComponentBase
     end
 
     properties (Access = private)
-        % > CONSOLEWORKSPACE persists user variables across console eval calls
+        % persists user-defined variables across console eval calls within this session
         ConsoleWorkspace struct = struct()
     end
 
     methods
         function this = DeveloperTools(component, props)
             arguments
+                % component to inspect
                 component (1,1) ic.core.ComponentBase
                 props.?ic.internal.DeveloperTools
                 props.ID (1,1) string = "ic-devtools-" + matlab.lang.internal.uuid()
@@ -26,6 +30,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
 
             this.addStaticChild(component, "component");
 
+            % register request handlers for the inspector frontend
             this.onRequest("getComponentInfo", @(comp, ~) comp.handleGetComponentInfo());
             this.onRequest("setNestedProp", @(comp, data) comp.handleSetNestedProp(data));
             this.onRequest("setStyle", @(comp, data) comp.handleSetStyle(data));
@@ -35,12 +40,14 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
 
     methods (Access = private)
         function result = handleEval(this, data)
-            % > HANDLEEVAL evaluate a MATLAB command in the console workspace.
+            % evaluate a MATLAB command in the console workspace.
+            % The workspace merges base workspace variables with
+            % console-local variables from prior commands
             command = string(data.command);
             try
                 [output, this.ConsoleWorkspace] = ic.internal.evalConsole( ...
                     command, this.InspectedComponent, this.ConsoleWorkspace);
-                % Strip MATLAB hyperlinks: <a href="matlab:...">text</a> → text
+                % strip MATLAB hyperlinks: <a href="matlab:...">text</a> → text
                 output = regexprep(output, '<a\s[^>]*>', '');
                 output = strrep(output, '</a>', '');
                 result = struct('output', char(strtrim(output)), 'isError', false);
@@ -50,16 +57,17 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function result = handleGetComponentInfo(this)
+            % return the full reactive API metadata tree for the inspected component.
             result = this.getInfoForComponent(this.InspectedComponent);
         end
 
         function info = getInfoForComponent(this, comp)
-            % > GETINFOFORCOMPONENT Introspect a component's reactive API.
-            %   Returns props, events, methods, mixins, and recursively
-            %   collects children info for containers.
+            % recursively introspect a component's reactive API.
+            % returns a struct with componentType, componentId, properties, events,
+            % methods, mixins, isStylable, and children (recursive for containers).
             mc = meta.class.fromName(class(comp));
 
-            % Reactive properties
+            % reactive properties
             metaProps = mc.PropertyList;
             reactiveFilter = strcmp({metaProps.Description}, "Reactive") ...
                 & [metaProps.SetObservable];
@@ -78,7 +86,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                     'typeInfo',   this.introspectType(comp.(mp.Name)));
             end
 
-            % Reactive events
+            % reactive events
             metaEvents = mc.EventList;
             reactiveEvents = metaEvents(strcmp({metaEvents.Description}, "Reactive"));
             eventInfos = cell(1, numel(reactiveEvents));
@@ -88,7 +96,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                     'matlabName', char(reactiveEvents(jj).Name));
             end
 
-            % Reactive methods
+            % reactive methods
             metaMethods = mc.MethodList;
             reactiveMethods = metaMethods(strcmp({metaMethods.Description}, "Reactive"));
             methodInfos = cell(1, numel(reactiveMethods));
@@ -100,12 +108,12 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                     'nInputs',    numel(mm.InputNames) - 1);
             end
 
-            % Mixins
+            % mixins
             allSupers = string(superclasses(class(comp)));
             mixinMask = startsWith(allSupers, "ic.mixin.");
             mixins = lower(extractAfter(allSupers(mixinMask), "ic.mixin."));
 
-            % Children (recursive)
+            % children (recursive for containers)
             childInfos = {};
             if isa(comp, 'ic.core.Container')
                 for tt = 1:numel(comp.Targets)
@@ -131,12 +139,13 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function info = extractValidation(~, metaProp)
+            % extract mustBeMember enum values from the class source for a property.
             info = struct();
             try
                 classFile = which(metaProp.DefiningClass.Name);
                 if isempty(classFile), return; end
                 src = string(fileread(classFile));
-                % Collapse line continuations so multi-line validators match
+                % collapse line continuations so multi-line validators match
                 src = regexprep(src, '\.\.\.\s*\n\s*', ' ');
                 propName = metaProp.Name;
 
@@ -152,9 +161,9 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function typeInfo = introspectType(this, value, depth)
-            % > INTROSPECTTYPE Recursively describe a value's structure.
-            %   Returns a struct with kind, className, size, children,
-            %   and elementTypeInfo. Depth-limited to prevent infinite loops.
+            % recursively describe a value's structure for the property editor.
+            % returns a struct with kind, className, size, children, and
+            % elementTypeInfo. Depth-limited to 4 levels to prevent infinite loops.
             arguments
                 this
                 value
@@ -165,20 +174,19 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             typeInfo = struct('kind', 'primitive', 'className', cls, ...
                 'size', size(value), 'children', {{}}, 'elementTypeInfo', []);
 
-            % Function handles are opaque (not serializable)
+            % function handles are opaque (not serializable)
             if isa(value, 'function_handle')
                 typeInfo.kind = 'function_handle';
                 return;
             end
 
-            % Complex base types with special subscripting (table, datetime, ...)
+            % complex base types with special subscripting (table, datetime, …)
             if this.isOpaqueType(value)
                 typeInfo.kind = 'opaque';
                 return;
             end
 
-            % Primitives: numeric, logical, string, char, OnOffSwitchState, Asset
-            % char vectors are single text values, not arrays of characters
+            % primitives: numeric, logical, string, char, OnOffSwitchState, Asset
             if this.isPrimitiveValue(value)
                 if ~isscalar(value) && ~ischar(value)
                     typeInfo.kind = 'array';
@@ -189,19 +197,19 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                 return;
             end
 
-            % Empty non-primitive
+            % empty non-primitive
             if isempty(value)
                 if isstruct(value), typeInfo.kind = 'struct'; end
                 return;
             end
 
-            % Depth limit
+            % depth limit
             if depth >= MAX_DEPTH
                 typeInfo.kind = 'truncated';
                 return;
             end
 
-            % Struct
+            % struct
             if isstruct(value)
                 if isscalar(value)
                     typeInfo.kind = 'struct';
@@ -219,7 +227,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                 return;
             end
 
-            % Cell array
+            % cell array
             if iscell(value)
                 typeInfo.kind = 'cell';
                 n = min(numel(value), 50);
@@ -232,7 +240,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                 return;
             end
 
-            % Object (non-primitive, non-struct, non-cell)
+            % object (non-primitive, non-struct, non-cell)
             if isobject(value)
                 if isscalar(value)
                     typeInfo.kind = 'object';
@@ -258,8 +266,8 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                     typeInfo.children = children;
                 else
                     typeInfo.kind = 'objectArray';
-                    % Introspect each element individually (heterogeneous
-                    % arrays like ic.table.Column have different subclasses).
+                    % introspect each element individually (heterogeneous
+                    % arrays like ic.table.Column have different subclasses)
                     n = min(numel(value), 50);
                     children = cell(1, n);
                     for i = 1:n
@@ -273,7 +281,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function tf = isPrimitiveValue(~, value)
-            % > ISPRIMITIVEVALUE True for types the frontend can edit directly.
+            % true for types the frontend property editor can display and edit directly.
             tf = isnumeric(value) || islogical(value) || ...
                 isstring(value) || ischar(value) || ...
                 isa(value, 'matlab.lang.OnOffSwitchState') || ...
@@ -281,8 +289,8 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function tf = isOpaqueType(~, value)
-            % > ISOPAQUETYPE True for complex base types that should not
-            %   be recursively introspected (special subscripting, etc.).
+            % true for complex base types that should not be recursively
+            % introspected (special subscripting, non-serializable, etc.).
             tf = istable(value) || istimetable(value) || ...
                 isdatetime(value) || isduration(value) || ...
                 iscalendarduration(value) || iscategorical(value) || ...
@@ -290,9 +298,9 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function value = coerceValue(~, value, currentVal)
-            % > COERCEVALUE Match the incoming JSON value to the MATLAB type
-            %   of the property it targets. JSON bridge delivers JS types
-            %   that may not match (e.g. logical arrives as 0/1 double).
+            % match the incoming JSON value to the MATLAB type of the target
+            % property. The JSON bridge delivers JS types that may not match
+            % (e.g. logical arrives as 0/1 double).
             if islogical(currentVal)
                 value = logical(value);
             elseif isnumeric(currentVal) && (ischar(value) || isstring(value))
@@ -305,13 +313,10 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function result = handleSetStyle(this, data)
-            % > HANDLESETSTYLE Apply CSS styles via the Stylable mixin.
-            %   data fields:
-            %     componentId  — target component ID (empty string = root)
-            %     selector     — CSS selector (e.g. "> *", ".label")
-            %     properties   — struct with camelCase keys and CSS values
-            %     cssVariables — (optional) struct array [{name, value}]
-            %                    for CSS custom properties (--var-name)
+            % apply CSS styles to a component via the #ic.mixin.Stylable mixin.
+            % handles both regular properties and CSS custom properties (--var).
+            % data fields: componentId, selector, properties (struct), cssVariables
+            % (optional struct array with name/value pairs).
             comp = this.resolveComponent(data.componentId);
             if ~isa(comp, 'ic.mixin.Stylable')
                 error('ic:devtools:notStylable', ...
@@ -324,13 +329,13 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             hasCssVars = isfield(data, 'cssVariables') ...
                 && ~isempty(data.cssVariables);
 
-            % Regular properties go through the normal style() path
+            % regular properties go through the normal style() path
             if hasRegular
                 comp.style(selector, data.properties);
             end
 
             % CSS custom properties (--var) can't be MATLAB struct fields.
-            % Build the full CSS map from internal state + variables and
+            % build the full CSS map from internal state + variables and
             % re-publish the @style event directly.
             if hasCssVars
                 existing = comp.getStyle(selector);
@@ -370,12 +375,9 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function result = handleSetNestedProp(this, data)
-            % > HANDLESETNESTEDPROP Set a nested property on a component.
-            %   data fields:
-            %     componentId — target component ID (empty string = root)
-            %     propName    — MATLAB property name (PascalCase)
-            %     path        — cell array of path segments: {key:""} or {index:N}
-            %     value       — the new leaf value
+            % set a possibly nested property on a component from the property editor.
+            % data fields: componentId, propName (PascalCase), path (cell array of
+            % {key:""} or {index:N} segments for nested access), value.
             comp = this.resolveComponent(data.componentId);
 
             propName = string(data.propName);
@@ -386,7 +388,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
                 comp.(propName) = this.coerceValue(data.value, currentVal);
             else
                 currentVal = comp.(propName);
-                % Build subsasgn S-struct from path segments.
+                % build subsasgn S-struct from path segments.
                 % jsondecode delivers struct array (homogeneous) or cell
                 % array (heterogeneous), so index with {} or () accordingly.
                 S = struct('type', {}, 'subs', {});
@@ -406,7 +408,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function comp = resolveComponent(this, componentId)
-            % > RESOLVECOMPONENT Find a component by ID in the inspected tree.
+            % find a component by ID in the inspected subtree.
             root = this.InspectedComponent;
             if isempty(componentId) || componentId == ""
                 comp = root;
@@ -424,7 +426,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
         end
 
         function comp = searchChildren(this, container, targetId)
-            % > SEARCHCHILDREN Recursively search children for a component ID.
+            % depth-first search through container children for a component ID.
             comp = [];
             if ~isa(container, 'ic.core.Container'), return; end
             for tt = 1:numel(container.Targets)

@@ -16,7 +16,7 @@ classdef IntervalSlider < ic.tp.Blade
     events (Description = "Reactive")
         % fires when the range changes
         % {payload}
-        % value | struct: selected range — value.min and value.max as doubles
+        % value | struct: selected range with value.min and value.max as doubles
         % {/payload}
         ValueChanged
     end

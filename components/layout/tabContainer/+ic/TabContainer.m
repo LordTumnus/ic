@@ -117,7 +117,7 @@ classdef TabContainer < ic.core.ComponentContainer
 
         function [panel, tab] = addTab(this, name, props)
             % add a new tab to the container.
-            % {returns} [panel, tab] — the #ic.tab.TabPanel (content area) and #ic.tab.Tab (header) {/returns}
+            % {returns} the #ic.tab.TabPanel (content area) and #ic.tab.Tab (header) {/returns}
             % {example}
             %   tc = ic.TabContainer();
             %   [panel, tab] = tc.addTab("Home", Icon="home", Closable=true);
