@@ -1,24 +1,24 @@
 function out = toTransport(data)
-% > TOTRANSPORT Recursively convert MATLAB data to bridge-ready form.
+% recursively convert MATLAB data to bridge-ready form.
+% Walks any MATLAB value and produces structs/cells with char/double/logical
+% leaves that sendEventToHTMLSource can transmit directly as JS objects.
 %
-%   payload = ic.utils.toTransport(data) walks any MATLAB value and
-%   produces structs/cells with char/double/logical leaves that
-%   sendEventToHTMLSource can transmit directly as JS objects.
-%
-%   Conversion rules:
-%     TransportData → call toStruct(), recurse result
-%     struct        → recurse each field
-%     cell          → recurse each element
-%     string scalar → char
-%     string array  → cell of char
-%     string.empty  → []  (JS null)
-%     Inf scalar    → []  (JS null)
-%     containers.Map→ struct (hyphens → underscores in keys)
-%     datetime      → char
-%     categorical   → char
-%     everything else (double, logical, char, uint8, …) → pass through
+% {note}
+% conversion rules:
+%   - #ic.event.TransportData → call toStruct(), recurse result
+%   - struct        → recurse each field
+%   - cell          → recurse each element
+%   - string scalar → char
+%   - string array  → cell of char
+%   - string.empty  → [] (JS null)
+%   - Inf scalar    → [] (JS null)
+%   - containers.Map→ struct (hyphens → underscores in keys)
+%   - datetime      → char
+%   - categorical   → char
+%   - everything else (double, logical, char, uint8, …) → pass through
+% {/note}
 
-   % --- Fast base cases (no allocation) ---
+   % fast base cases (no allocation)
    if ischar(data) || islogical(data)
       out = data;
       return
@@ -33,7 +33,7 @@ function out = toTransport(data)
       return
    end
 
-   % --- string → char ---
+   % string → char
    if isstring(data)
       if isempty(data)
          out = [];
@@ -45,13 +45,13 @@ function out = toTransport(data)
       return
    end
 
-   % --- TransportData protocol (Asset, Node, Column, Entry, Theme, …) ---
+   % TransportData protocol (Asset, Node, Column, Entry, Theme, …)
    if isa(data, 'ic.event.TransportData')
       out = ic.utils.toTransport(data.toStruct());
       return
    end
 
-   % --- containers.Map → struct (sanitize keys) ---
+   % containers.Map → struct (sanitize keys)
    if isa(data, 'containers.Map')
       keys = data.keys();
       out = struct();
@@ -63,7 +63,7 @@ function out = toTransport(data)
       return
    end
 
-   % --- struct (scalar or array) → recurse fields ---
+   % struct (scalar or array) → recurse fields
    if isstruct(data)
       fns = fieldnames(data);
       for ii = 1:numel(data)
@@ -75,7 +75,7 @@ function out = toTransport(data)
       return
    end
 
-   % --- cell → recurse elements ---
+   % cell → recurse elements
    if iscell(data)
       for ii = 1:numel(data)
          data{ii} = ic.utils.toTransport(data{ii});
@@ -84,7 +84,7 @@ function out = toTransport(data)
       return
    end
 
-   % --- datetime → char ---
+   % datetime → char
    if isa(data, 'datetime')
       if isscalar(data)
          out = char(string(data));
@@ -94,7 +94,7 @@ function out = toTransport(data)
       return
    end
 
-   % --- categorical → char ---
+   % categorical → char
    if iscategorical(data)
       if isscalar(data)
          out = char(string(data));
@@ -104,6 +104,6 @@ function out = toTransport(data)
       return
    end
 
-   % --- fallback: pass through ---
+   % fallback: pass through
    out = data;
 end

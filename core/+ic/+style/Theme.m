@@ -1,74 +1,82 @@
-% > THEME stores CSS custom property values with light/dark scheme support.
-% Color properties store [light, dark] pairs; non-color properties store single values.
 classdef Theme < handle & ic.event.TransportData
+    % CSS custom property values with light/dark scheme support. Changes to Theme properties trigger a event on the owning #ic.Frame, which sends the updated theme to the frontend to update the CSS variables. The frontend applies the appropriate value from each [light, dark] pair based on the current color scheme.
 
     properties (SetAccess = ?ic.Frame)
-        % Slate-based engineering palette with blue accents
-
-        % > BACKGROUND page and component background color
+        % page and component background color
         Background (1,2) string = ["#f8fafc", "#0f172a"]
-        % > FOREGROUND default text color
+
+        % default text color
         Foreground (1,2) string = ["#0f172a", "#f1f5f9"]
 
-        % > PRIMARY main brand/action color (engineering blue)
+        % main brand/action color
         Primary (1,2) string = ["#2563eb", "#3b82f6"]
-        % > PRIMARYFOREGROUND text on primary backgrounds
+
+        % text on primary backgrounds
         PrimaryForeground (1,2) string = ["#ffffff", "#ffffff"]
 
-        % > SECONDARY alternative action color
+        % alternative action color
         Secondary (1,2) string = ["#e2e8f0", "#1e293b"]
-        % > SECONDARYFOREGROUND text on secondary backgrounds
+
+        % text on secondary backgrounds
         SecondaryForeground (1,2) string = ["#0f172a", "#f1f5f9"]
 
-        % > MUTED subtle background for less prominent elements
+        % subtle background for less prominent elements
         Muted (1,2) string = ["#f1f5f9", "#1e293b"]
-        % > MUTEDFOREGROUND text on muted backgrounds
+
+        % text on muted backgrounds
         MutedForeground (1,2) string = ["#64748b", "#94a3b8"]
 
-        % > ACCENT highlight/emphasis color
+        % highlight/emphasis color
         Accent (1,2) string = ["#dbeafe", "#1e3a5f"]
-        % > ACCENTFOREGROUND text on accent backgrounds
+
+        % text on accent backgrounds
         AccentForeground (1,2) string = ["#1e40af", "#93c5fd"]
 
-        % > DESTRUCTIVE error/danger color
+        % error/danger color
         Destructive (1,2) string = ["#dc2626", "#ef4444"]
-        % > DESTRUCTIVEFOREGROUND text on destructive backgrounds
+
+        % text on destructive backgrounds
         DestructiveForeground (1,2) string = ["#ffffff", "#ffffff"]
 
-        % > SUCCESS positive/success color
+        % positive/success color
         Success (1,2) string = ["#16a34a", "#22c55e"]
-        % > SUCCESSFOREGROUND text on success backgrounds
+
+        % text on success backgrounds
         SuccessForeground (1,2) string = ["#ffffff", "#ffffff"]
 
-        % > WARNING caution/warning color
+        % caution/warning color
         Warning (1,2) string = ["#d97706", "#f59e0b"]
-        % > WARNINGFOREGROUND text on warning backgrounds
+
+        % text on warning backgrounds
         WarningForeground (1,2) string = ["#ffffff", "#18181b"]
 
-        % > INFO informational color
+        % informational color
         Info (1,2) string = ["#0284c7", "#38bdf8"]
-        % > INFOFOREGROUND text on info backgrounds
+
+        % text on info backgrounds
         InfoForeground (1,2) string = ["#ffffff", "#18181b"]
 
-        % > BORDER default border color
+        % default border color
         Border (1,2) string = ["#cbd5e1", "#334155"]
-        % > INPUT input field border color
+
+        % input field border color
         Input (1,2) string = ["#cbd5e1", "#475569"]
-        % > RING focus ring color
+
+        % focus ring color
         Ring (1,2) string = ["#2563eb", "#3b82f6"]
 
-        % > RADIUS default border radius
+        % default border radius
         Radius (1,1) string = "0.375rem"
     end
 
     properties (GetAccess = public, SetAccess = ?ic.Frame)
-        % > ACTIVESCHEME current color scheme
+        % current color scheme
         ActiveScheme (1,1) string {mustBeMember(ActiveScheme, ["light", "dark"])} = "light"
     end
 
     methods
         function s = toStruct(this)
-            % > TOSTRUCT Convert to plain struct with camelCase keys.
+            % convert to a plain struct with camelCase keys.
             colorProps = ["Background", "Foreground", ...
                           "Primary", "PrimaryForeground", ...
                           "Secondary", "SecondaryForeground", ...
@@ -89,10 +97,9 @@ classdef Theme < handle & ic.event.TransportData
         end
 
         function css = jsonencode(this, varargin)
-            % > JSONENCODE returns CSS custom properties as a JSON string.
-            % Called automatically when the Theme is serialized for the frontend.
-            % Color properties are sent as [light, dark] arrays.
-            % Frontend selects the value based on colorScheme.
+            % serialize as CSS custom properties in JSON form.
+            % color properties are sent as [light, dark] arrays; the frontend
+            % selects the value based on the active color scheme.
 
             colorProps = ["Background", "Foreground", ...
                           "Primary", "PrimaryForeground", ...
@@ -112,10 +119,10 @@ classdef Theme < handle & ic.event.TransportData
                 propName = colorProps(ii);
                 keys{ii} = char(ic.utils.toKebabCase(propName));
                 values = this.(propName);
-                vals{ii} = cellstr(values);  % [light, dark] array
+                vals{ii} = cellstr(values);
             end
 
-            % Non-color properties are set directly (as single values)
+            % non-color properties are set as single values
             keys{end} = 'radius';
             vals{end} = char(this.Radius);
 

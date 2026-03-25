@@ -1,7 +1,6 @@
 function out = toCamelCase(text)
-% > TOCAMELCASE converts a string to camelCase.
-%
-% Accepts string or char inputs. Returns a string.
+% convert a string to camelCase.
+
     out = arrayfun(@convert, ic.utils.toSnakeCase(string(text)));
 
     function result = convert(s)

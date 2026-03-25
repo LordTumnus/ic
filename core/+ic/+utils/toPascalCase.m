@@ -1,7 +1,6 @@
 function out = toPascalCase(text)
-% > TOPASCALCASE converts a string to PascalCase.
-%
-% Accepts string or char inputs. Returns a string.
+% convert a string to PascalCase.
+
     out = arrayfun(@convert, ic.utils.toSnakeCase(string(text)));
 
     function result = convert(s)
@@ -10,7 +9,7 @@ function out = toPascalCase(text)
         if isempty(parts)
             result = "";
         else
-            parts = capitalize(parts);  % all parts capitalized
+            parts = capitalize(parts);
             result = join(parts, "");
         end
     end
