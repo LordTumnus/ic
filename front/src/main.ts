@@ -9,9 +9,6 @@ import FrameComponent from './lib/core/frame-component.svelte';
 import Frame from './lib/components/core/frame/Frame.svelte';
 import type { MatlabHTML } from './lib/types';
 
-import MockMatlabHTML from '../test/mocks/matlab-html';
-
-
 declare global {
   interface Window {
     setup: (matlabHtml: MatlabHTML) => void;
@@ -35,6 +32,9 @@ window.setup = (matlabHtml: MatlabHTML) => {
   registry.register(frame);
   frame.mount(document.body);
 
-  // Wire dispatcher and drain any events that arrived during mount
-  bridge.setDispatcher((event) => registry.dispatch(event));
+  // Wire dispatchers and drain any events that arrived during mount
+  bridge.setDispatcher(
+    (event) => registry.dispatch(event),
+    (event) => registry.dispatchSync(event)
+  );
 };

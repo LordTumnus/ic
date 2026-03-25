@@ -15,14 +15,17 @@ import logger from './logger';
 
 
 type Dispatcher = (event: JsEvent) => Promise<void>;
+type SyncDispatcher = (event: JsEvent) => void;
 
 class Bridge {
   private static _instance: Bridge | null = null;
 
   private matlabElement: MatlabHTML | null = null;
   private dispatcher: Dispatcher | null = null;
+  private syncDispatcher: SyncDispatcher | null = null;
   private queue: JsEvent[] = [];
   private processing = false;
+  private drainScheduled = false;
 
   private constructor() {}
 
@@ -41,11 +44,18 @@ class Bridge {
     this.matlabElement.addEventListener('ic', this.onEvent);
   }
 
-  setDispatcher(dispatcher: Dispatcher): void {
+  setDispatcher(dispatcher: Dispatcher, syncDispatcher: SyncDispatcher): void {
     this.dispatcher = dispatcher;
+    this.syncDispatcher = syncDispatcher;
     // Drain any events that arrived before the dispatcher was wired
-    if (this.queue.length > 0 && !this.processing) {
-      this.processQueue();
+    if (this.queue.length > 0 && !this.processing && !this.drainScheduled) {
+      this.drainScheduled = true;
+      setTimeout(() => {
+        this.drainScheduled = false;
+        if (!this.processing && this.queue.length > 0) {
+          this.processQueue();
+        }
+      }, 0);
     }
   }
 
@@ -67,13 +77,21 @@ class Bridge {
     }
     this.matlabElement = null;
     this.dispatcher = null;
+    this.syncDispatcher = null;
     this.queue = [];
     this.processing = false;
+    this.drainScheduled = false;
   }
 
   /**
    * Receives events from MATLAB (single or batched array) and queues them.
-   * Kicks off sequential processing if not already running.
+   *
+   * Instead of calling processQueue() immediately, we schedule it via
+   * setTimeout(0).  This lets ALL events from the same MATLAB function
+   * call accumulate in the queue before processing starts — each
+   * sendEventToHTMLSource() posts a separate macrotask, but setTimeout(0)
+   * fires after all pending macrotasks.  One batch = one preload = one
+   * synchronous dispatch = one flushSync.
    */
   private onEvent = (event: Event): void => {
     const raw = (event as any).Data;
@@ -84,7 +102,15 @@ class Bridge {
     } else {
       this.queue.push(data);
     }
-    if (!this.processing) this.processQueue();
+    if (!this.processing && !this.drainScheduled) {
+      this.drainScheduled = true;
+      setTimeout(() => {
+        this.drainScheduled = false;
+        if (!this.processing && this.queue.length > 0) {
+          this.processQueue();
+        }
+      }, 0);
+    }
   };
 
   /**
@@ -106,9 +132,9 @@ class Bridge {
     return types;
   }
 
-  private async dispatchSafe(event: JsEvent): Promise<void> {
+  private dispatchSafeSync(event: JsEvent): void {
     try {
-      await this.dispatcher!(event);
+      this.syncDispatcher!(event);
     } catch (error) {
       logger.error('Bridge', 'dispatch failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -119,52 +145,64 @@ class Bridge {
   }
 
   /**
-   * Drains the queue in two phases:
-   * 1. Async — process events normally while pre-loading component modules.
-   * 2. Sync  — once modules are cached, dispatch remaining events without
-   *    microtask yields and flush the DOM once at the end.
+   * Drains the queue: preload all component modules first, then dispatch
+   * every event **synchronously** in a single run and flush the DOM once.
+   *
+   * Synchronous dispatch is critical — any `await` yields a microtask tick
+   * during which Svelte's reactive scheduler applies pending $state changes,
+   * causing intermediate renders.  Containers like Splitter that build up
+   * their targets and children across several events would be rendered in
+   * incomplete states, breaking components that need a fully-formed DOM on
+   * mount (e.g. CodeMirror inside CodeEditor).
    */
   private processQueue = async (): Promise<void> => {
     if (!this.dispatcher) return;
 
     this.processing = true;
 
-    const events = [...this.queue];
-    this.queue = [];
+    try {
+      const events = [...this.queue];
+      this.queue = [];
 
-    // Pre-load all component modules needed by @insert events
-    const types = this.collectTypes(events);
-    const preloadDone = types.size > 0
-      ? Factory.instance.preload(types)
-      : Promise.resolve();
+      logger.debug('Bridge', `processQueue: ${events.length} events`);
 
-    let preloaded = false;
-    preloadDone.then(() => { preloaded = true; });
+      // Pre-load ALL component modules before dispatching any events.
+      // After this, Factory.createSync() succeeds for every type, so
+      // handlers run fully synchronously with no microtask yields.
+      const types = this.collectTypes(events);
+      if (types.size > 0) {
+        await Factory.instance.preload(types);
+      }
 
-    // Phase 1: async — renders frame, loads first modules
-    let i = 0;
-    while (i < events.length && !preloaded) {
-      await this.dispatchSafe(events[i]);
-      i++;
-    }
-
-    await preloadDone;
-
-    // Phase 2: sync — no yields, single DOM flush at the end
-    if (i < events.length) {
+      // Dispatch all events synchronously — no await, no microtask gaps,
+      // no intermediate Svelte renders.  Uses the sync dispatch path
+      // (receiveSync) which invokes callbacks without awaiting them.
       setBatchMode(true);
-      for (; i < events.length; i++) {
-        this.dispatchSafe(events[i]);
+      for (const event of events) {
+        this.dispatchSafeSync(event);
       }
       setBatchMode(false);
       flushSync();
+
+      logger.debug('Bridge', `processQueue done. Remaining in queue: ${this.queue.length}`);
+    } catch (error) {
+      logger.error('Bridge', 'processQueue failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setBatchMode(false);
+    } finally {
+      this.processing = false;
     }
 
-    this.processing = false;
-
-    // Events may have arrived during async processing; drain them
-    if (this.queue.length > 0) {
-      this.processQueue();
+    // Events may have arrived during the async preload; drain them.
+    if (this.queue.length > 0 && !this.drainScheduled) {
+      this.drainScheduled = true;
+      setTimeout(() => {
+        this.drainScheduled = false;
+        if (!this.processing && this.queue.length > 0) {
+          this.processQueue();
+        }
+      }, 0);
     }
   };
 }

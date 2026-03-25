@@ -343,6 +343,7 @@ class Component implements Registrable {
   private _setupTargetsHandler(): void {
     this.subscribe('@prop/targets', (_id, _name, data) => {
       const newTargets = normalizeTargets(data);
+      const oldSlots = Object.keys(this._childEntries);
 
       // Add new target slots
       for (const target of newTargets) {
@@ -356,6 +357,12 @@ class Component implements Registrable {
       const newTargetSet = new Set(newTargets);
       for (const target of Object.keys(this._childEntries)) {
         if (target !== 'overlay' && !newTargetSet.has(target)) {
+          const hadChildren = this._childEntries[target].length > 0;
+          if (hadChildren) {
+            logger.warn('Component', `@prop/targets: removing slot "${target}" that has ${this._childEntries[target].length} children!`, {
+              componentId: this.id
+            });
+          }
           delete this._childEntries[target];
         }
       }
@@ -510,6 +517,21 @@ class Component implements Registrable {
     if (callbacks) {
       for (const callback of callbacks) {
         await callback(id, name, data);
+      }
+    }
+  }
+
+  /**
+   * Synchronous variant of receive().  Callbacks are invoked without
+   * awaiting — their side effects run synchronously.  Used by the Bridge
+   * after preloading, when all handlers are known to be synchronous, to
+   * avoid microtask yields that let Svelte render intermediate states.
+   */
+  receiveSync(id: string, name: string, data: unknown): void {
+    const callbacks = this.subscriptions.get(name);
+    if (callbacks) {
+      for (const callback of callbacks) {
+        callback(id, name, data);
       }
     }
   }

@@ -88,6 +88,25 @@ class Registry {
   }
 
   /**
+   * Synchronous dispatch — calls receiveSync() on the target component.
+   * Used by the Bridge after module preloading to avoid microtask yields.
+   */
+  dispatchSync(event: JsEvent): void {
+    const component = this.components.get(event.component);
+
+    if (!component) {
+      logger.warn('Registry', 'No component found for event', {
+        componentId: event.component,
+        eventName: event.name,
+        action: 'dropped'
+      });
+      return;
+    }
+
+    component.receiveSync(event.id, event.name, event.data);
+  }
+
+  /**
    * Check if a component is registered.
    *
    * @param id - The component ID to check

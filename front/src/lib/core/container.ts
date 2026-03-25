@@ -112,8 +112,8 @@ export async function handleInsert(
 ): Promise<void> {
   const { component: definition, target } = data as InsertEventData;
 
-  const child = Factory.instance.createSync(definition)
-    ?? await Factory.instance.create(definition);
+  const syncChild = Factory.instance.createSync(definition);
+  const child = syncChild ?? await Factory.instance.create(definition);
 
   Registry.instance.register(child);
   child._parentComponent = parent;
@@ -126,7 +126,20 @@ export async function handleInsert(
   child._snippet = snippet;
 
   if (!parent._childEntries[target]) {
-    throw new Error(`[Component] @insert: Target slot "${target}" not defined in component "${parent.id}"`);
+    // Auto-create the slot when @insert arrives before @prop/targets.
+    // This happens when an attached container sends events individually
+    // (each publish() is a separate sendEventToHTMLSource call) and the
+    // @prop/targets event hasn't been processed yet.
+    parent._childEntries[target] = [];
+
+    // Also update the 'targets' prop so Svelte templates that iterate
+    // over targets (e.g. Splitter's {#each targets}) render a slot for
+    // the new target immediately, rather than waiting for @prop/targets.
+    // Use setPropSilently to avoid echoing back to MATLAB.
+    const currentTargets = parent.svelteProps['targets'];
+    if (Array.isArray(currentTargets) && !currentTargets.includes(target)) {
+      parent.setPropSilently('targets', [...currentTargets, target]);
+    }
   }
 
   const childEntry: ChildEntry = { snippet, ...buildChildProxies(child) };
