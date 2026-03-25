@@ -39,11 +39,14 @@ class Bridge {
     }
     this.matlabElement = element;
     this.matlabElement.addEventListener('ic', this.onEvent);
-    this.matlabElement.sendEventToMATLAB('ic-ready');
   }
 
   setDispatcher(dispatcher: Dispatcher): void {
     this.dispatcher = dispatcher;
+    // Drain any events that arrived before the dispatcher was wired
+    if (this.queue.length > 0 && !this.processing) {
+      this.processQueue();
+    }
   }
 
   send(events: JsEvent[]): void {
@@ -158,6 +161,11 @@ class Bridge {
     }
 
     this.processing = false;
+
+    // Events may have arrived during async processing; drain them
+    if (this.queue.length > 0) {
+      this.processQueue();
+    }
   };
 }
 

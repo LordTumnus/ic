@@ -27,14 +27,14 @@ window.setup = (matlabHtml: MatlabHTML) => {
   const bridge = Bridge.instance;
   const registry = Registry.instance;
 
+  // Attach listener first — captures any events already buffered by uihtml
+  bridge.setup(matlabHtml);
+
   // Create, register and mount Frame into document body
   const frame = new FrameComponent(Frame);
   registry.register(frame);
   frame.mount(document.body);
 
-  // Wire incoming events from Bridge to Registry for dispatch
+  // Wire dispatcher and drain any events that arrived during mount
   bridge.setDispatcher((event) => registry.dispatch(event));
-
-  // Initialize the Bridge (starts listening for MATLAB events)
-  bridge.setup(matlabHtml);
 };

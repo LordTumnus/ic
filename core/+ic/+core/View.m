@@ -7,9 +7,6 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    %   MATLAB → JS: components propagate their #ic.event.JsEvent up the tree until the view, responsible for calling __sendEventToHTMLSource(h, "ic", payload)__
    %   JS → MATLAB: uihtmls __HTMLEventReceivedFcn__ captures frontend events and routes them to the appropriate component handler via #ic.Frame.Registry lookup.
    %
-   % On startup, all outgoing events are buffered in a queue until the Svelte
-   % app fires notifies its readiness. The entire queue is then flushed
-   %
    % Before each send, #ic.asset.AssetRegistry.activate is called so
    % that asset deduplication (hash-only stubs for repeated assets) is
    % tracked for each view instance
@@ -21,11 +18,6 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
       % uihtml element that hosts the compiled frontend app
       HTMLElement matlab.ui.control.HTML
 
-      % flag indicating whether the frontend has signaled readiness to receive events
-      Ready logical = false
-
-      % events buffered before the frontend is ready
-      Queue = ic.event.JsEvent.empty()
    end
 
    properties (SetAccess = private)
@@ -75,35 +67,22 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    methods (Access = {?ic.Frame})
       function send(this, events)
          % send one or more events to the Svelte frontend.
-         % Converts the event array to transport format via #ic.utils.toTransport, and then calls uihtml native __sendEventToHTMLSource__. If the frontend is not yet ready, buffers all events in Queue instead.
+         % Converts the event array to transport format via #ic.utils.toTransport, and then calls uihtml native __sendEventToHTMLSource__. Events sent before the page loads are buffered internally by uihtml.
          arguments
             this
             % array of #ic.event.JsEvent to send to the frontend
             events (1,:) ic.event.JsEvent
          end
-         if this.Ready
-            ic.asset.AssetRegistry.activate(this);
-            payload = ic.utils.toTransport(events.toStruct());
-            sendEventToHTMLSource(this.HTMLElement, "ic", payload);
-         else
-            this.Queue((end+1):(end+numel(events))) = events;
-         end
+         ic.asset.AssetRegistry.activate(this);
+         payload = ic.utils.toTransport(events.toStruct());
+         sendEventToHTMLSource(this.HTMLElement, "ic", payload);
       end
    end
 
    methods (Access = private)
       function onHTMLEvent(this, evt)
          % route raw __HTMLEventReceivedFcn__ events to the appropriate handler.
-         if evt.HTMLEventName == "ic-ready"
-            this.Ready = true;
-            if ~isempty(this.Queue)
-               ic.asset.AssetRegistry.activate(this);
-               data = this.Queue;
-               this.Queue = ic.event.JsEvent.empty();
-               payload = ic.utils.toTransport(data.toStruct());
-               sendEventToHTMLSource(this.HTMLElement, "ic", payload);
-            end
-         elseif evt.HTMLEventName == "ic"
+         if evt.HTMLEventName == "ic"
             this.onReceive(evt.HTMLEventData);
          end
       end
