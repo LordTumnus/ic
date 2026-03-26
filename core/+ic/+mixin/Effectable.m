@@ -39,7 +39,7 @@ classdef (Abstract) Effectable < handle
                 "jsEffect requires at least an expression");
 
             expression = string(varargin{end});
-            components = varargin(1:end-1);
+            components = [{this}, varargin(1:end-1)];
 
             % parse arrow function parameter names
             tokens = regexp(expression, ...

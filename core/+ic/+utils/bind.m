@@ -1,15 +1,13 @@
-function effect = bind(frame, source, sourceProp, target, targetProp, transform)
+function effect = bind(source, sourceProp, target, targetProp, transform)
     % create a one-way property binding between two components.
-    % wraps #ic.Frame.jsEffect with a concise source→target expression.
+    % wraps #ic.mixin.Effectable.jsEffect with a concise source→target expression.
     %
     % {example}
-    %   effect = ic.utils.bind(f, slider, "value", progress, "value")
-    %   effect = ic.utils.bind(f, slider, "value", label, "text", "x + '%'")
+    %   effect = ic.utils.bind(slider, "value", progress, "value")
+    %   effect = ic.utils.bind(slider, "value", label, "text", "x + '%'")
     % {/example}
 
     arguments
-        % #ic.Frame that owns the binding
-        frame (1,1) ic.Frame
         % component whose property drives the binding
         source (1,1) ic.core.ComponentBase
         % camelCase name of the source property
@@ -22,7 +20,7 @@ function effect = bind(frame, source, sourceProp, target, targetProp, transform)
         transform (1,1) string = "x"
     end
 
-    expr = sprintf("target.props.%s = (%s)", targetProp, ...
+    expr = sprintf("(source, target) => target.props.%s = (%s)", targetProp, ...
         strrep(transform, "x", sprintf("source.props.%s", sourceProp)));
-    effect = frame.jsEffect(source, target, expr);
+    effect = jsEffect(source, target, expr);
 end
