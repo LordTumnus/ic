@@ -63,19 +63,22 @@
     };
   });
 
-  // Sync MATLAB → Tweakpane
+  // Sync MATLAB → Tweakpane (read value before guard so it's always tracked)
   $effect(() => {
-    if (binding && params.value !== value) {
-      params.value = value;
+    const v = value;
+    if (binding && params.value !== v) {
+      params.value = v;
       binding.refresh();
     }
   });
 
-  // Sync blade meta props
+  // Sync blade meta props (read props before guard so they're always tracked)
   $effect(() => {
+    const d = disabled;
+    const h = hidden;
     if (binding) {
-      binding.disabled = disabled;
-      binding.hidden = hidden;
+      binding.disabled = d;
+      binding.hidden = h;
     }
   });
 </script>

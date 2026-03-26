@@ -65,25 +65,27 @@
 
   // Sync MATLAB → Tweakpane
   $effect(() => {
+    const v = value;
     if (!blade) return;
     const api = blade as BladeApi & { value: any };
     const current = api.value;
     if (
-      current.x1 === value.x1 &&
-      current.y1 === value.y1 &&
-      current.x2 === value.x2 &&
-      current.y2 === value.y2
+      current.x1 === v.x1 &&
+      current.y1 === v.y1 &&
+      current.x2 === v.x2 &&
+      current.y2 === v.y2
     )
       return;
-    // Must create a CubicBezier instance (has .toObject()), not a plain array
     const CubicBezierClass = current.constructor;
-    api.value = new CubicBezierClass(value.x1, value.y1, value.x2, value.y2);
+    api.value = new CubicBezierClass(v.x1, v.y1, v.x2, v.y2);
   });
 
   $effect(() => {
+    const d = disabled;
+    const h = hidden;
     if (blade) {
-      blade.disabled = disabled;
-      blade.hidden = hidden;
+      blade.disabled = d;
+      blade.hidden = h;
     }
   });
 </script>

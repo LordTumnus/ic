@@ -43,10 +43,13 @@
   });
 
   $effect(() => {
+    const l = label;
+    const d = disabled;
+    const h = hidden;
     if (button) {
-      button.title = label;
-      button.disabled = disabled;
-      button.hidden = hidden;
+      button.title = l;
+      button.disabled = d;
+      button.hidden = h;
     }
   });
 </script>

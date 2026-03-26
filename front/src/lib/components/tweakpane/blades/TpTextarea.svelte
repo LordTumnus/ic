@@ -54,18 +54,20 @@
     };
   });
 
-  // Sync MATLAB → Tweakpane
   $effect(() => {
-    if (binding && params.value !== value) {
-      params.value = value;
+    const v = value;
+    if (binding && params.value !== v) {
+      params.value = v;
       binding.refresh();
     }
   });
 
   $effect(() => {
+    const d = disabled;
+    const h = hidden;
     if (binding) {
-      binding.disabled = disabled;
-      binding.hidden = hidden;
+      binding.disabled = d;
+      binding.hidden = h;
     }
   });
 </script>

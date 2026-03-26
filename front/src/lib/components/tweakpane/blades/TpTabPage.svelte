@@ -30,7 +30,9 @@
   setContext('ic-tp', ctx);
 
   const bladeTargets = $derived(
-    Array.isArray(targets) ? targets.filter((t) => t.startsWith('blade-')) : [],
+    (Array.isArray(targets) ? targets : targets ? [targets] : []).filter((t: string) =>
+      t.startsWith('blade-'),
+    ),
   );
 
   $effect(() => {

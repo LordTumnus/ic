@@ -51,9 +51,11 @@
   });
 
   $effect(() => {
+    const d = disabled;
+    const h = hidden;
     if (blade) {
-      blade.disabled = disabled;
-      blade.hidden = hidden;
+      blade.disabled = d;
+      blade.hidden = h;
     }
   });
 </script>

@@ -23,6 +23,11 @@
     valueChanged?: (data: { value: Record<string, number> }) => void;
   } = $props();
 
+  function shallowEqual(a: Record<string, number>, b: Record<string, number>): boolean {
+    for (const k in b) { if (a[k] !== b[k]) return false; }
+    return true;
+  }
+
   const ctx = getContext<TpContext>('ic-tp');
   let binding: BindingApi | undefined;
   const params = { value: { ...value } };
@@ -49,16 +54,19 @@
   });
 
   $effect(() => {
-    if (binding) {
-      Object.assign(params.value, value);
+    const v = value;
+    if (binding && !shallowEqual(params.value, v)) {
+      Object.assign(params.value, v);
       binding.refresh();
     }
   });
 
   $effect(() => {
+    const d = disabled;
+    const h = hidden;
     if (binding) {
-      binding.disabled = disabled;
-      binding.hidden = hidden;
+      binding.disabled = d;
+      binding.hidden = h;
     }
   });
 </script>

@@ -34,7 +34,9 @@
   setContext('ic-tp', ctx);
 
   const bladeTargets = $derived(
-    Array.isArray(targets) ? targets.filter((t) => t.startsWith('blade-')) : [],
+    (Array.isArray(targets) ? targets : targets ? [targets] : []).filter((t: string) =>
+      t.startsWith('blade-'),
+    ),
   );
 
   let folder: FolderApi | undefined;
@@ -58,12 +60,14 @@
     };
   });
 
-  // Sync prop changes
   $effect(() => {
+    const e = expanded;
+    const d = disabled;
+    const h = hidden;
     if (folder) {
-      folder.expanded = expanded;
-      folder.disabled = disabled;
-      folder.hidden = hidden;
+      folder.expanded = e;
+      folder.disabled = d;
+      folder.hidden = h;
     }
   });
 </script>

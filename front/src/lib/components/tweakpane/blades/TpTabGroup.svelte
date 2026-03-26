@@ -38,7 +38,9 @@
   setContext('ic-tp-tabs', tabCtx);
 
   const bladeTargets = $derived(
-    Array.isArray(targets) ? targets.filter((t) => t.startsWith('blade-')) : [],
+    (Array.isArray(targets) ? targets : targets ? [targets] : []).filter((t: string) =>
+      t.startsWith('blade-'),
+    ),
   );
 
   let tab: TabApi | undefined;
@@ -78,9 +80,11 @@
   });
 
   $effect(() => {
+    const d = disabled;
+    const h = hidden;
     if (tab) {
-      tab.disabled = disabled;
-      tab.hidden = hidden;
+      tab.disabled = d;
+      tab.hidden = h;
     }
   });
 </script>
