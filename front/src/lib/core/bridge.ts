@@ -38,7 +38,7 @@ class Bridge {
 
   setup(element: MatlabHTML): void {
     if (this.matlabElement) {
-      throw new Error('Bridge.setup() called more than once.');
+      logger.error('Bridge', 'Setup called more than once.');
     }
     this.matlabElement = element;
     this.matlabElement.addEventListener('ic', this.onEvent);

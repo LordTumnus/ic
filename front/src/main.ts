@@ -37,4 +37,10 @@ window.setup = (matlabHtml: MatlabHTML) => {
     (event) => registry.dispatch(event),
     (event) => registry.dispatchSync(event)
   );
+
+  // Signal MATLAB that the frontend is fully initialized and ready
+  // to receive events. View queues all events until this handshake
+  // completes, ensuring sendEventToHTMLSource is only called after
+  // the page is loaded and the event listener is attached.
+  matlabHtml.sendEventToMATLAB('ready', '');
 };

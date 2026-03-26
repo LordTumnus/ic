@@ -18,6 +18,11 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
       % uihtml element that hosts the compiled frontend app
       HTMLElement matlab.ui.control.HTML
 
+      % true once the frontend has signalled that it is ready to receive
+      Ready (1,1) logical = false
+
+      % events queued while waiting for the frontend to become ready
+      Queue = ic.event.JsEvent.empty()
    end
 
    properties (SetAccess = private)
@@ -67,15 +72,21 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    methods (Access = {?ic.Frame})
       function send(this, events)
          % send one or more events to the Svelte frontend.
-         % Converts the event array to transport format via #ic.utils.toTransport, and then calls uihtml native __sendEventToHTMLSource__. Events sent before the page loads are buffered internally by uihtml.
+         % Before the frontend signals readiness, events are queued
+         % locally and flushed once the @ready handshake completes.
+         % After that, events are sent directly.
          arguments
             this
             % array of #ic.event.JsEvent to send to the frontend
             events (1,:) ic.event.JsEvent
          end
-         ic.asset.AssetRegistry.activate(this);
-         payload = ic.utils.toTransport(events.toStruct());
-         sendEventToHTMLSource(this.HTMLElement, "ic", payload);
+         if this.Ready
+            ic.asset.AssetRegistry.activate(this);
+            payload = ic.utils.toTransport(events.toStruct());
+            sendEventToHTMLSource(this.HTMLElement, "ic", payload);
+         else
+            this.Queue = [this.Queue, events];
+         end
       end
    end
 
@@ -84,6 +95,21 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
          % route raw __HTMLEventReceivedFcn__ events to the appropriate handler.
          if evt.HTMLEventName == "ic"
             this.onReceive(evt.HTMLEventData);
+         elseif evt.HTMLEventName == "ready"
+            this.onReady();
+         end
+      end
+
+      function onReady(this)
+         % called when the frontend signals that it is fully initialized
+         % and ready to receive events. Flushes all pending events.
+         this.Ready = true;
+         if ~isempty(this.Queue)
+            pending = this.Queue;
+            this.Queue = ic.event.JsEvent.empty();
+            ic.asset.AssetRegistry.activate(this);
+            payload = ic.utils.toTransport([pending.toStruct()]);
+            sendEventToHTMLSource(this.HTMLElement, "ic", payload);
          end
       end
 
