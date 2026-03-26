@@ -30,9 +30,11 @@ class StyleManager {
   /** Set styles for a selector within a component. */
   setStyles(componentId: string, selector: string, styles: Record<string, string>): void {
     const key = `${componentId}:${selector}`;
-    const scopedSelector = `#${CSS.escape(componentId)} ${selector}`;
+    const scopedSelector = selector
+      ? `#${CSS.escape(componentId)} ${selector}`
+      : `#${CSS.escape(componentId)}`;
     const cssText = Object.entries(styles)
-      .map(([prop, value]) => `${prop}: ${value}`)
+      .map(([prop, value]) => `${prop.replace(/_/g, '-')}: ${value}`)
       .join('; ');
     const rule = `${scopedSelector} { ${cssText} }`;
 

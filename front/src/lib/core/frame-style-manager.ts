@@ -37,7 +37,7 @@ class FrameStyleManager {
     const key = `${type}:${selector}`;
     const scopedSelector = `[data-ic-type="${type}"] ${selector}`;
     const cssText = Object.entries(styles)
-      .map(([prop, value]) => `${prop}: ${value}`)
+      .map(([prop, value]) => `${prop.replace(/_/g, '-')}: ${value}`)
       .join('; ');
     const rule = `${scopedSelector} { ${cssText} }`;
 
