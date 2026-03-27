@@ -59,7 +59,7 @@ class FrameComponent extends Component {
       [],
       [],
       svelteComponent,
-      ['publishable', 'reactive', 'stylable', 'registrable']
+      ['publishable', 'reactive', 'stylable', 'effectable', 'keyable', 'registrable']
     );
 
     FrameStyleManager.instance.init(this.id);

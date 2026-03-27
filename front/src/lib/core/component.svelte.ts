@@ -26,11 +26,13 @@ import type {
   StyleEventData,
   ClearStyleEventData,
   JsEffectEventData,
-  JsEffectRemoveEventData
+  JsEffectRemoveEventData,
+  KeyEventData
 } from '../types';
 import Bridge from './bridge';
 import { handleInsert, handleRemove, handleReorder, handleReparent } from './container';
 import EffectManager from './effect-manager.svelte';
+import { KeyboardManager } from './keyboard-manager';
 import StyleManager from './style-manager';
 import logger from './logger';
 
@@ -312,6 +314,25 @@ class Component implements Registrable {
         EffectManager.instance.removeEffect((data as JsEffectRemoveEventData).id);
       });
     }
+
+    // Keyboard shortcuts (only if component has Keyable mixin)
+    if (this.mixins.includes('keyable')) {
+      KeyboardManager.instance.register(this.id);
+      this.subscribe('@onKey', (_id, _name, data) => {
+        const { shortcut, preventDefault, stopPropagation } = data as KeyEventData;
+        KeyboardManager.instance.addShortcut(this.id, shortcut, { preventDefault, stopPropagation });
+      });
+      this.subscribe('@updateKey', (_id, _name, data) => {
+        const { shortcut, preventDefault, stopPropagation } = data as KeyEventData;
+        KeyboardManager.instance.updateShortcut(this.id, shortcut, { preventDefault, stopPropagation });
+      });
+      this.subscribe('@offKey', (_id, _name, data) => {
+        KeyboardManager.instance.removeShortcut(this.id, (data as KeyEventData).shortcut);
+      });
+      this.subscribe('@clearKeys', () => {
+        KeyboardManager.instance.clearShortcuts(this.id);
+      });
+    }
   }
 
   /**
@@ -393,6 +414,7 @@ class Component implements Registrable {
         // Return cleanup function
         return () => {
           StyleManager.instance.clearStyles(this.id);
+          KeyboardManager.instance.unregister(this.id);
           if (this._svelteInstance) {
             unmount(this._svelteInstance);
             this._svelteInstance = null;

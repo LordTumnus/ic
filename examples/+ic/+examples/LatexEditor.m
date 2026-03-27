@@ -34,29 +34,33 @@ tb = buildToolbar(root);
 sb = buildStatusBar(root);
 snippetDrawer = buildSnippetDrawer(frame, editor);
 
-% event wiring — toolbar actions
+% event wiring for toolbar actions
 addlistener(tb.compileBtn, 'Clicked', @(~,~) onCompile());
 addlistener(tb.exportBtn, 'Clicked', @(~,~) preview.exportPdf());
 addlistener(tb.templateSelect, 'ValueChanged', @(~,e) onTemplateChanged(e));
 addlistener(tb.captureBtn, 'Clicked', @(~,~) onCaptureFigure());
 addlistener(tb.snippetBtn, 'Clicked', @(~,~) snippetDrawer.open());
 
-% event wiring — formatting buttons
+% event wiring for formatting buttons
 addlistener(tb.boldBtn, 'Clicked',      @(~,~) wrapSelection("\\textbf{%s}"));
 addlistener(tb.italicBtn, 'Clicked',    @(~,~) wrapSelection("\\textit{%s}"));
 addlistener(tb.underlineBtn, 'Clicked', @(~,~) wrapSelection("\\underline{%s}"));
 
-% event wiring — insert buttons
+% event wiring for insert buttons
 addlistener(tb.sectionBtn, 'Clicked', @(~,~) insertRaw(sprintf("\\section{Title}\n")));
 addlistener(tb.listBtn, 'Clicked',    @(~,~) insertRaw(sprintf("\\begin{itemize}\n    \\item \n\\end{itemize}\n")));
 addlistener(tb.mathBtn, 'Clicked',    @(~,~) insertRaw(sprintf("\\begin{equation}\n    \n\\end{equation}\n")));
 addlistener(tb.figBtn, 'Clicked',     @(~,~) insertRaw(sprintf("\\begin{figure}[htbp]\n    \\centering\n    \\includegraphics[width=0.8\\textwidth]{filename}\n    \\caption{Caption}\n    \\label{fig:label}\n\\end{figure}\n")));
 addlistener(tb.tableBtn, 'Clicked',   @(~,~) insertRaw(sprintf("\\begin{table}[htbp]\n    \\centering\n    \\begin{tabular}{lcc}\n        \\toprule\n        A & B & C \\\\\\\\\n        \\midrule\n        1 & 2 & 3 \\\\\\\\\n        \\bottomrule\n    \\end{tabular}\n    \\caption{Caption}\n\\end{table}\n")));
 
-% event wiring — editor & preview
+% event wiring for editor & preview
 addlistener(editor, 'ValueChanged', @(~,~) onEditorChanged());
 addlistener(preview, 'Compiled', @(~,e) onCompiled(e));
 addlistener(preview, 'Error', @(~,e) onCompileError(e));
+
+% keyboard shortcuts — Ctrl/Cmd+Enter to compile (preventDefault stops newline insertion)
+editor.onKey("Ctrl+Enter", @(~,~) onCompile(), "PreventDefault", true);
+editor.onKey("Meta+Enter", @(~,~) onCompile(), "PreventDefault", true);
 
 % reactive bindings
 ic.utils.bind(editor, "cursorLine", sb.cursorLabel, "text", ...

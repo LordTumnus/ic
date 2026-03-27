@@ -252,3 +252,21 @@ export interface JsEffectEventData {
 export interface JsEffectRemoveEventData {
   id: string;
 }
+
+// ============================================================================
+// Keyboard Event Data
+// ============================================================================
+
+/** Data for @onKey / @updateKey / @offKey events from MATLAB. */
+export interface KeyEventData {
+  shortcut: string;
+  preventDefault?: boolean;
+  stopPropagation?: boolean;
+}
+
+/** Data published by KeyboardManager on shortcut match → MATLAB. */
+export interface KeyPressedEventData {
+  shortcut: string;
+  key: string;
+  code: string;
+}
