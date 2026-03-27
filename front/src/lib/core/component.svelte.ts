@@ -35,6 +35,7 @@ import EffectManager from './effect-manager.svelte';
 import { KeyboardManager } from './keyboard-manager';
 import StyleManager from './style-manager';
 import logger from './logger';
+import { cacheEmbeddedAssets } from '$lib/utils/asset-cache';
 
 /**
  * Normalize targets from MATLAB (handles single string vs array).
@@ -187,6 +188,7 @@ class Component implements Registrable {
     // This enables reactivity in the direction Svelte -> MATLAB
     const stateObj: Record<string, unknown> = {};
     for (const { name, value } of propDefinitions) {
+      cacheEmbeddedAssets(value);
       this._dataState[name] = value;
 
       Object.defineProperty(stateObj, name, {
@@ -355,6 +357,7 @@ class Component implements Registrable {
     for (const prop of properties) {
       this.subscribe(`@prop/${prop}`, (_id: string, _name: string, data: unknown) => {
         this._updatingFromMatlab = true;
+        cacheEmbeddedAssets(data);
         this._dataState[prop] = data;
         this._updatingFromMatlab = false;
       });

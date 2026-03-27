@@ -78,6 +78,39 @@ export function resolveAssetAsDataUri(asset: AssetData): string {
   return `data:${r.mime};base64,${b64}`;
 }
 
+/**
+ * Check if a value looks like an inline asset descriptor ({hash, mime, data}).
+ * If so, eagerly decode and cache it so later hash-only references resolve.
+ * Returns true if the value was an asset with inline data.
+ */
+function isInlineAsset(v: unknown): boolean {
+  if (v && typeof v === 'object' && 'hash' in v && 'mime' in v && 'data' in v) {
+    resolveAsset(v as AssetData);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Walk an arbitrary data structure and eagerly cache any embedded inline assets.
+ * Call this on incoming table data at dispatch time (before rendering) to ensure
+ * the cache is populated even if a subsequent update overwrites the full payload
+ * with hash-only stubs before the first render.
+ */
+export function cacheEmbeddedAssets(data: unknown): void {
+  if (!data || typeof data !== 'object') return;
+  if (isInlineAsset(data)) return;
+  if (Array.isArray(data)) {
+    for (const item of data) cacheEmbeddedAssets(item);
+    return;
+  }
+  for (const val of Object.values(data as Record<string, unknown>)) {
+    if (val && typeof val === 'object') {
+      if (!isInlineAsset(val)) cacheEmbeddedAssets(val);
+    }
+  }
+}
+
 /** Resolve an asset to a Blob object URL. Caller should revoke when done. */
 export function resolveAssetAsObjectUrl(asset: AssetData): string | null {
   const r = resolveAsset(asset);

@@ -13,6 +13,7 @@ function out = toTransport(data)
 %   - string.empty  → [] (JS null)
 %   - Inf scalar    → [] (JS null)
 %   - containers.Map→ struct (hyphens → underscores in keys)
+%   - table         → cell array of row structs (recurse cell values)
 %   - datetime      → char
 %   - categorical   → char
 %   - everything else (double, logical, char, uint8, …) → pass through
@@ -81,6 +82,26 @@ function out = toTransport(data)
          data{ii} = ic.utils.toTransport(data{ii});
       end
       out = data;
+      return
+   end
+
+   % MATLAB table → cell array of row structs (recurse cell values)
+   if istable(data)
+      vars = data.Properties.VariableNames;
+      n = height(data);
+      rows = cell(n, 1);
+      for ii = 1:n
+         row = struct();
+         for jj = 1:numel(vars)
+            val = data.(vars{jj})(ii, :);
+            if iscell(val) && isscalar(val)
+               val = val{1};
+            end
+            row.(vars{jj}) = ic.utils.toTransport(val);
+         end
+         rows{ii} = row;
+      end
+      out = rows;
       return
    end
 
