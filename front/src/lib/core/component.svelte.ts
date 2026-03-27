@@ -96,6 +96,18 @@ class Component implements Registrable {
   _childEntry: ChildEntry | null = null;
 
   /**
+   * Whether this component's Svelte snippet has been rendered to the DOM.
+   * Set to true inside createSnippet()'s setup() callback.
+   */
+  private _isMounted = false;
+
+  /** The wrapper element from createSnippet()'s setup(). */
+  private _wrapperElement: Element | null = null;
+
+  /** Callbacks waiting for the component to mount (flushed in setup()). */
+  private _mountedCallbacks: ((element: Element) => void)[] = [];
+
+  /**
    * Flag indicating this is a static child (pre-rendered in Svelte template).
    * @internal Used by container.ts for static composition
    */
@@ -411,8 +423,14 @@ class Component implements Registrable {
           props: this.svelteProps
         });
 
+        // Flush deferred operations — pass element directly since it may
+        // not yet be connected to the document (nested mount fragment).
+        this._flushMounted(element);
+
         // Return cleanup function
         return () => {
+          this._isMounted = false;
+          this._wrapperElement = null;
           StyleManager.instance.clearStyles(this.id);
           KeyboardManager.instance.unregister(this.id);
           if (this._svelteInstance) {
@@ -585,6 +603,30 @@ class Component implements Registrable {
       await unmount(this._svelteInstance, options);
       this._svelteInstance = null;
     }
+  }
+
+  /**
+   * Register a callback to run when this component's snippet is mounted to the DOM.
+   * If already mounted, the callback fires immediately (synchronously).
+   *
+   * Use this instead of polling/retrying for DOM element availability.
+   */
+  onMounted(callback: (element: Element) => void): void {
+    if (this._isMounted && this._wrapperElement) {
+      callback(this._wrapperElement);
+    } else {
+      this._mountedCallbacks.push(callback);
+    }
+  }
+
+  /** Flush all pending mount callbacks. Called from createSnippet()'s setup(). */
+  private _flushMounted(element: Element): void {
+    this._isMounted = true;
+    this._wrapperElement = element;
+    for (const cb of this._mountedCallbacks) {
+      cb(element);
+    }
+    this._mountedCallbacks = [];
   }
 
   /**

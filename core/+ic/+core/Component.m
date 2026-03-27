@@ -58,7 +58,7 @@ classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames & ...
    methods (Access = protected)
 
       function send(this, evt)
-         % delegate an event up the parent chain towards the view. If not yet attached, the event is buffered in Queue and delivered automatically by Container.insertChild() when the component is added.
+         % delegate an event up the parent chain towards the view. If not yet attached, the event is buffered in #ic.core.ComponentBase.Queue and delivered automatically by #ic.core.Container.insertChild when the component is added.
          if ~this.isAttached()
             this.Queue((end + 1):(end + length(evt))) = evt;
             return;

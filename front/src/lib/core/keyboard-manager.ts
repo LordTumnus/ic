@@ -7,6 +7,7 @@
  */
 
 import Registry from './registry';
+import type Component from './component.svelte';
 import logger from './logger';
 
 interface ParsedShortcut {
@@ -129,25 +130,28 @@ class KeyboardManager {
     logger.debug('KeyboardManager', 'Cleared all shortcuts', { componentId });
   }
 
-  private attachListener(componentId: string, state: ComponentKeyState, retries = 0): void {
+  private attachListener(componentId: string, state: ComponentKeyState): void {
     if (state.listener) return;
 
-    const element = document.getElementById(componentId);
-    if (!element) {
-      // element may not be mounted yet (async @insert). Retry next frame.
-      if (retries < 3) {
-        requestAnimationFrame(() => this.attachListener(componentId, state, retries + 1));
-        return;
-      }
-      logger.warn('KeyboardManager', 'Cannot find element for listener after retries', { componentId });
+    const component = Registry.instance.get(componentId) as Component | undefined;
+    if (!component) {
+      logger.warn('KeyboardManager', 'Cannot find component for listener', { componentId });
       return;
     }
+
+    // Defer until the component's snippet is rendered.
+    component.onMounted((element) => this.bindListener(componentId, state, element));
+  }
+
+  /** Bind the keydown listener to the component's wrapper element. */
+  private bindListener(componentId: string, state: ComponentKeyState, element: Element): void {
+    if (state.listener) return;
+
+    const htmlElement = element as HTMLElement;
 
     state.listener = (e: KeyboardEvent) => {
       for (const shortcut of state.shortcuts) {
         if (matchesEvent(shortcut, e)) {
-          // preventDefault also stops propagation to child handlers, since
-          // JS-driven components (e.g. CodeMirror) don't check defaultPrevented
           if (shortcut.preventDefault) {
             e.preventDefault();
             e.stopPropagation();
@@ -156,7 +160,7 @@ class KeyboardManager {
             e.stopPropagation();
           }
 
-          const component = Registry.instance.get(componentId);
+          const component = Registry.instance.get(componentId) as Component | undefined;
           if (component) {
             component.publish('@keyPressed', {
               shortcut: shortcut.original,
@@ -169,7 +173,7 @@ class KeyboardManager {
     };
 
     // capture phase so the listener fires BEFORE child handlers (e.g. CodeMirror)
-    element.addEventListener('keydown', state.listener, true);
+    htmlElement.addEventListener('keydown', state.listener, true);
   }
 
   private detachListener(componentId: string, state: ComponentKeyState): void {
