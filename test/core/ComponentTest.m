@@ -329,7 +329,7 @@ classdef ComponentTest < matlab.uitest.TestCase
             testCase.Frame.addChild(comp);
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
-            comp.style(":host", "backgroundColor", "#ff0000", "padding", "10px");
+            comp.css.style(":host", "backgroundColor", "#ff0000", "padding", "10px");
 
             styleEvents = testCase.Frame.View.Queue(...
                 [testCase.Frame.View.Queue.Name] == "@style");
@@ -343,8 +343,8 @@ classdef ComponentTest < matlab.uitest.TestCase
             comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
 
-            comp.style(":host", "color", "blue");
-            styles = comp.getStyle(":host");
+            comp.css.style(":host", "color", "blue");
+            styles = comp.css.getStyle(":host");
 
             testCase.verifyEqual(styles.color, "blue");
         end
@@ -353,10 +353,10 @@ classdef ComponentTest < matlab.uitest.TestCase
             % Verify clearStyle() publishes @clearStyle event
             comp = ic.core.Component(struct('ID', 'comp'));
             testCase.Frame.addChild(comp);
-            comp.style(":host", "color", "red");
+            comp.css.style(":host", "color", "red");
             testCase.Frame.View.Queue = ic.event.JsEvent.empty();
 
-            comp.clearStyle(":host");
+            comp.css.clearStyle(":host");
 
             clearEvents = testCase.Frame.View.Queue(...
                 [testCase.Frame.View.Queue.Name] == "@clearStyle");

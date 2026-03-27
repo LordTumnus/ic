@@ -63,17 +63,17 @@ classdef CircularProgressBar < ic.core.Component
 
         function this = styleTrack(this, varargin)
             % convenience method to apply CSS styles directly to the progress track (background portion). See #ic.mixin.Styleable for more details on how to specify styles.
-            this.style(".ic-circular-progress__track", varargin{:});
+            this.css.style(".ic-circular-progress__track", varargin{:});
         end
 
         function this = styleBar(this, varargin)
             % convenience method to apply CSS styles directly to the progress bar (arc portion). See #ic.mixin.Styleable for more details on how to specify styles.
-            this.style(".ic-circular-progress__bar", varargin{:});
+            this.css.style(".ic-circular-progress__bar", varargin{:});
         end
 
         function this = styleLabel(this, varargin)
             % convenience method to apply CSS styles directly to the label. See #ic.mixin.Styleable for more details on how to specify styles.
-            this.style(".ic-circular-progress__label", varargin{:});
+            this.css.style(".ic-circular-progress__label", varargin{:});
         end
     end
 end

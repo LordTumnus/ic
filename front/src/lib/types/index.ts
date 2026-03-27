@@ -231,6 +231,17 @@ export interface ClearGlobalStylesEventData {
   type: string;
 }
 
+/** Data for @keyframes events. */
+export interface KeyframesEventData {
+  name: string;
+  frames: Record<string, Record<string, string>>;
+}
+
+/** Data for @removeKeyframes events. */
+export interface RemoveKeyframesEventData {
+  name: string;
+}
+
 /** Data for @theme events. CSS variables as kebab-case keys with values ready for CSS. */
 export type ThemeEventData = Record<string, string>;
 

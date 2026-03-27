@@ -61,7 +61,7 @@ classdef ProgressBar < ic.core.Component
             % {example}
             %   pb.styleTrack("backgroundColor", "#e5e7eb");
             % {/example}
-            this.style(".ic-progress__track", varargin{:});
+            this.css.style(".ic-progress__track", varargin{:});
         end
 
         function this = styleBar(this, varargin)
@@ -69,7 +69,7 @@ classdef ProgressBar < ic.core.Component
             % {example}
             %   pb.styleBar("backgroundColor", "linear-gradient(to right, #ef4444, #f59e0b, #22c55e)");
             % {/example}
-            this.style(".ic-progress__bar", varargin{:});
+            this.css.style(".ic-progress__bar", varargin{:});
         end
     end
 end

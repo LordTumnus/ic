@@ -331,14 +331,14 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
 
             % regular properties go through the normal style() path
             if hasRegular
-                comp.style(selector, data.properties);
+                comp.css.style(selector, data.properties);
             end
 
             % CSS custom properties (--var) can't be MATLAB struct fields.
             % build the full CSS map from internal state + variables and
             % re-publish the @style event directly.
             if hasCssVars
-                existing = comp.getStyle(selector);
+                existing = comp.css.getStyle(selector);
                 fnames = fieldnames(existing);
                 if ~isempty(fnames)
                     kk = cellfun(@(f) char(ic.utils.toKebabCase(f)), ...
