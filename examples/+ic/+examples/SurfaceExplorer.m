@@ -37,7 +37,6 @@ rightPanel.Layout.Column = 2;
 
 frame = ic.Frame("Parent", rightPanel);
 frame.ColorScheme = "dark";
-frame.Debug = true;
 frame.css.style("", "backgroundColor", ...
     sprintf("#%02x%02x%02x", round(darkBg(1)*255), round(darkBg(2)*255), round(darkBg(3)*255)));
 
