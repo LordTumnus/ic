@@ -178,6 +178,23 @@ tbl.css.style(".ic-tbl__hcell--sticking", "borderRight", "1px solid #1e293b");
 % row number column
 tbl.css.style(".ic-tbl__cell--rownum", "color", "#e2e8f0", "fontSize", "10px");
 
+% price-flash keyframes: two identical pairs (a/b) so we can alternate
+% names each tick to force the browser to re-trigger the animation
+flashFrameUp = struct( ...
+    "from", struct("boxShadow", "inset 0 0 12px rgba(34,197,94,0.5)"), ...
+    "to",   struct("boxShadow", "inset 0 0 0 transparent"));
+flashFrameDown = struct( ...
+    "from", struct("boxShadow", "inset 0 0 12px rgba(239,68,68,0.5)"), ...
+    "to",   struct("boxShadow", "inset 0 0 0 transparent"));
+tbl.css.keyframes("flash-up-a",   flashFrameUp);
+tbl.css.keyframes("flash-up-b",   flashFrameUp);
+tbl.css.keyframes("flash-down-a", flashFrameDown);
+tbl.css.keyframes("flash-down-b", flashFrameDown);
+
+% track state for animation re-trigger
+prevPrices = masterData.Price;
+flashedSelectors = {};
+flashTick = 0;
 
 % ── event wiring ──────────────────────────────────────────────────────
 
@@ -234,6 +251,9 @@ end
 function tickPrices()
     n = height(masterData);
 
+    % snapshot prices before update
+    oldPrices = masterData.Price;
+
     % small price perturbation ±0.5%
     pctChange = 0.005 * randn(n, 1);
     masterData.Price = masterData.Price .* (1 + pctChange);
@@ -247,7 +267,49 @@ function tickPrices()
         masterData.Sparkline{i} = [spark(2:end), masterData.Price(i)];
     end
 
+    % clear previous tick's flash selectors (required to re-trigger)
+    for i = 1:numel(flashedSelectors)
+        tbl.css.clearStyle(flashedSelectors{i});
+    end
+
     applyFilter(searchBar.Value);
+
+    % batch flash: collect row indices per direction, emit 2 calls via :is()
+    direction = sign(masterData.Price - oldPrices);
+    displayedSymbols = tbl.Data.Symbol;
+    upRows = {};
+    downRows = {};
+    for i = 1:height(tbl.Data)
+        mIdx = find(masterData.Symbol == displayedSymbols(i), 1);
+        rowSel = sprintf(".ic-tbl__row[data-row-index='%d']", i - 1);
+        if direction(mIdx) > 0
+            upRows{end+1} = rowSel; %#ok<AGROW>
+        elseif direction(mIdx) < 0
+            downRows{end+1} = rowSel; %#ok<AGROW>
+        end
+    end
+
+    % alternate a/b suffix so animation name always changes → forces re-trigger
+    flashTick = flashTick + 1;
+    if mod(flashTick, 2) == 0
+        suffix = "-a";
+    else
+        suffix = "-b";
+    end
+
+    flashedSelectors = {};
+    if ~isempty(upRows)
+        sel = ":is(" + strjoin(string(upRows), ", ") + ") .ic-tbl__cell[data-field='Price']";
+        tbl.css.style(sel, "animation", "flash-up" + suffix + " 0.6s ease-out");
+        flashedSelectors{end+1} = sel;
+    end
+    if ~isempty(downRows)
+        sel = ":is(" + strjoin(string(downRows), ", ") + ") .ic-tbl__cell[data-field='Price']";
+        tbl.css.style(sel, "animation", "flash-down" + suffix + " 0.6s ease-out");
+        flashedSelectors{end+1} = sel;
+    end
+
+    prevPrices = masterData.Price;
 end
 
 function applyFilter(tags)
