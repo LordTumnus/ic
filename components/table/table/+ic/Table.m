@@ -30,137 +30,196 @@ classdef Table < ic.TableBase
 
     methods (Description = "Reactive")
         function out = removeRow(this, rowIndex)
-            % remove a row
-            arguments
+            % remove one or more rows by index.
+            % Multiple indices can be passed to batch removals into a
+            % single message to the view.
+            % {example}
+            %   tbl.removeRow(3)
+            %   tbl.removeRow(1, 4, 7)
+            % {/example}
+            arguments (Input)
                 this
-                % row index to remove
+            end
+            arguments (Input, Repeating)
+                % row index (1-based)
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
             end
-            assert(rowIndex <= height(this.Data), "ic:Table:RowOutOfRange", ...
-                "Row index %d exceeds table height %d.", rowIndex, height(this.Data));
 
-            % save selection
+            nRemoves = numel(rowIndex);
+            % collect and sort descending so earlier indices stay valid
+            indices = zeros(1, nRemoves);
+            for k = 1:nRemoves
+                indices(k) = rowIndex{k};
+            end
+            indices = unique(indices, 'sorted');
+
+            data = this.Data;
+            for k = 1:numel(indices)
+                assert(indices(k) <= height(data), "ic:Table:RowOutOfRange", ...
+                    "Row index %d exceeds table height %d.", indices(k), height(data));
+            end
+
             savedSel = this.Selection;
 
-            % remove row silently
-            data = this.Data;
-            data(rowIndex, :) = [];
-            this.setValueSilently('Data', data);
+            % remove rows (descending order to preserve indices)
+            removes = cell(1, numel(indices));
+            for k = numel(indices):-1:1
+                idx = indices(k);
+                data(idx, :) = [];
+                removes{k} = struct('index', idx - 1);
 
-            % adjust selection by type
-            switch savedSel.type
-                case 'row'
-                    vals = savedSel.value;
-                    vals(vals == rowIndex) = [];
-                    vals(vals > rowIndex) = vals(vals > rowIndex) - 1;
-                    if isempty(vals)
-                        savedSel = struct('type', 'none', 'value', []);
-                    else
-                        savedSel.value = vals;
-                    end
-                case 'cell'
-                    cells = savedSel.value;
-                    keep = [cells.row] ~= rowIndex;
-                    cells = cells(keep);
-                    for i = 1:numel(cells)
-                        if cells(i).row > rowIndex
-                            cells(i).row = cells(i).row - 1;
+                % adjust selection
+                switch savedSel.type
+                    case 'row'
+                        vals = savedSel.value;
+                        vals(vals == idx) = [];
+                        vals(vals > idx) = vals(vals > idx) - 1;
+                        if isempty(vals)
+                            savedSel = struct('type', 'none', 'value', []);
+                        else
+                            savedSel.value = vals;
                         end
-                    end
-                    if isempty(cells)
-                        savedSel = struct('type', 'none', 'value', []);
-                    else
-                        savedSel.value = cells;
-                    end
+                    case 'cell'
+                        cells = savedSel.value;
+                        keep = [cells.row] ~= idx;
+                        cells = cells(keep);
+                        for i = 1:numel(cells)
+                            if cells(i).row > idx
+                                cells(i).row = cells(i).row - 1;
+                            end
+                        end
+                        if isempty(cells)
+                            savedSel = struct('type', 'none', 'value', []);
+                        else
+                            savedSel.value = cells;
+                        end
+                end
             end
+
+            this.setValueSilently('Data', data);
             this.setValueSilently('Selection', savedSel);
 
-            out = this.publish("removeRow", struct('index', rowIndex - 1));
+            out = this.publish("removeRow", removes);
         end
 
         function out = removeColumn(this, field)
-            % remove a column by field name
-            arguments
+            % remove one or more columns by field name.
+            % Multiple field names can be passed to batch removals into a
+            % single message to the view.
+            % {example}
+            %   tbl.removeColumn("Price")
+            %   tbl.removeColumn("Price", "Volume", "Sector")
+            % {/example}
+            arguments (Input)
                 this
+            end
+            arguments (Input, Repeating)
                 % field name of the column to remove
                 field (1,1) string
             end
-            assert(ismember(field, this.Data.Properties.VariableNames), ...
-                "ic:Table:FieldNotFound", ...
-                "Field '%s' does not exist in Data.", field);
 
-            % save selection
+            nRemoves = numel(field);
+            removes = cell(1, nRemoves);
             savedSel = this.Selection;
+            data = this.Data;
 
-            % remove from Data silently
-            data = removevars(this.Data, field);
-            this.setValueSilently('Data', data);
+            for k = 1:nRemoves
+                f = field{k};
+                assert(ismember(f, data.Properties.VariableNames), ...
+                    "ic:Table:FieldNotFound", ...
+                    "Field '%s' does not exist in Data.", f);
 
-            % adjust selection by type
-            switch savedSel.type
-                case 'column'
-                    vals = string(savedSel.value);
-                    vals(vals == field) = [];
-                    if isempty(vals)
-                        savedSel = struct('type', 'none', 'value', []);
-                    else
-                        savedSel.value = vals;
-                    end
-                case 'cell'
-                    cells = savedSel.value;
-                    keep = ~strcmp({cells.field}, char(field));
-                    cells = cells(keep);
-                    if isempty(cells)
-                        savedSel = struct('type', 'none', 'value', []);
-                    else
-                        savedSel.value = cells;
-                    end
+                data = removevars(data, f);
+                removes{k} = struct('field', char(f));
+
+                % adjust selection
+                switch savedSel.type
+                    case 'column'
+                        vals = string(savedSel.value);
+                        vals(vals == f) = [];
+                        if isempty(vals)
+                            savedSel = struct('type', 'none', 'value', []);
+                        else
+                            savedSel.value = vals;
+                        end
+                    case 'cell'
+                        cells = savedSel.value;
+                        keep = ~strcmp({cells.field}, char(f));
+                        cells = cells(keep);
+                        if isempty(cells)
+                            savedSel = struct('type', 'none', 'value', []);
+                        else
+                            savedSel.value = cells;
+                        end
+                end
             end
+
+            this.setValueSilently('Data', data);
             this.setValueSilently('Selection', savedSel);
 
-            % publish event to view
-            out = this.publish("removeColumn", struct('field', char(field)));
+            out = this.publish("removeColumn", removes);
 
+            % remove from Columns definition
             cols = this.Columns;
-            idx = find(arrayfun(@(c) c.Field == field, cols), 1);
-            if ~isempty(idx)
-                cols(idx) = [];
-                this.Columns = cols;
+            for k = 1:nRemoves
+                idx = find(arrayfun(@(c) c.Field == field{k}, cols), 1);
+                if ~isempty(idx)
+                    cols(idx) = [];
+                end
             end
+            this.Columns = cols;
         end
 
         function out = editCell(this, rowIndex, field, value)
-            % update a single cell value programmatically
-            arguments
+            % update one or more cell values programmatically.
+            % Multiple edits can be batched into a single message to the
+            % view by passing repeating (rowIndex, field, value) triplets.
+            % {example}
+            %   tbl.editCell(1, "Price", 42.5)
+            %   tbl.editCell(1, "Price", 42.5, 2, "Price", 99.0, 3, "Name", "Foo")
+            % {/example}
+            arguments (Input)
                 this
-                % row index
+            end
+            arguments (Input, Repeating)
+                % row index (1-based)
                 rowIndex (1,1) double {mustBePositive, mustBeInteger}
                 % column field name
                 field (1,1) string
                 % new cell value
                 value
             end
-            assert(rowIndex <= height(this.Data), "ic:Table:RowOutOfRange", ...
-                "Row index %d exceeds table height %d.", rowIndex, height(this.Data));
-            assert(ismember(field, this.Data.Properties.VariableNames), ...
-                "ic:Table:FieldNotFound", ...
-                "Field '%s' does not exist in Data.", field);
 
-            % save selection
+            nEdits = numel(rowIndex);
+            edits = cell(1, nEdits);
+
+            % save selection once
             savedSel = this.Selection;
-
-            % modify cell silently
             data = this.Data;
-            data{rowIndex, field} = value;
-            this.setValueSilently('Data', data);
 
-            % restore selection
+            for k = 1:nEdits
+                assert(rowIndex{k} <= height(data), "ic:Table:RowOutOfRange", ...
+                    "Row index %d exceeds table height %d.", rowIndex{k}, height(data));
+                assert(ismember(field{k}, data.Properties.VariableNames), ...
+                    "ic:Table:FieldNotFound", ...
+                    "Field '%s' does not exist in Data.", field{k});
+
+                if iscell(data.(field{k}))
+                    data.(field{k}){rowIndex{k}} = value{k};
+                else
+                    data{rowIndex{k}, field{k}} = value{k};
+                end
+                edits{k} = struct( ...
+                    'rowIndex', rowIndex{k} - 1, ...
+                    'field', char(field{k}), ...
+                    'value', value{k});
+            end
+
+            % commit all changes silently as a single update
+            this.setValueSilently('Data', data);
             this.setValueSilently('Selection', savedSel);
 
-            out = this.publish("editCell", struct( ...
-                'rowIndex', rowIndex - 1, ...
-                'field', char(field), ...
-                'value', value));
+            out = this.publish("editCell", edits);
         end
     end
 end

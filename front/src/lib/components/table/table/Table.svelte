@@ -439,61 +439,87 @@
     return { success: true, data: null };
   };
   removeRow = (payload?: unknown): Resolution => {
-    const { index } = payload as { index: number };
-    if (index < 0 || index >= rows.length) {
-      return { success: false, data: `Row ${index} out of range` };
-    }
-    rows = rows.filter((_, i) => i !== index);
+    const items = Array.isArray(payload)
+      ? payload as { index: number }[]
+      : [payload as { index: number }];
 
-    // Adjust selection based on type (indices in selection are 1-based)
-    const oneBasedIdx = index + 1;
-    if (selection.type === 'row') {
-      const adjusted = (selection.value as number[])
-        .filter(v => v !== oneBasedIdx)
-        .map(v => v > oneBasedIdx ? v - 1 : v);
-      selection = adjusted.length > 0
-        ? { type: 'row', value: adjusted }
-        : NONE_SEL;
-    } else if (selection.type === 'cell') {
-      const adjusted = (selection.value as CellSelection[])
-        .filter(c => c.row !== oneBasedIdx)
-        .map(c => c.row > oneBasedIdx ? { ...c, row: c.row - 1 } : c);
-      selection = adjusted.length > 0
-        ? { type: 'cell', value: adjusted }
-        : NONE_SEL;
+    // Collect indices, sort descending so removals don't shift later indices
+    const indices = items.map(r => r.index).sort((a, b) => b - a);
+
+    for (const index of indices) {
+      if (index < 0 || index >= rows.length) {
+        return { success: false, data: `Row ${index} out of range` };
+      }
+      rows = rows.filter((_, i) => i !== index);
+
+      const oneBasedIdx = index + 1;
+      if (selection.type === 'row') {
+        const adjusted = (selection.value as number[])
+          .filter(v => v !== oneBasedIdx)
+          .map(v => v > oneBasedIdx ? v - 1 : v);
+        selection = adjusted.length > 0
+          ? { type: 'row', value: adjusted }
+          : NONE_SEL;
+      } else if (selection.type === 'cell') {
+        const adjusted = (selection.value as CellSelection[])
+          .filter(c => c.row !== oneBasedIdx)
+          .map(c => c.row > oneBasedIdx ? { ...c, row: c.row - 1 } : c);
+        selection = adjusted.length > 0
+          ? { type: 'cell', value: adjusted }
+          : NONE_SEL;
+      }
     }
-    // column and none — unaffected by row removal
     return { success: true, data: null };
   };
   removeColumn = (payload?: unknown): Resolution => {
-    const { field } = payload as { field: string };
+    const items = Array.isArray(payload)
+      ? payload as { field: string }[]
+      : [payload as { field: string }];
+
+    const fieldsToRemove = new Set(items.map(r => r.field));
+
+    // Remove all fields in a single pass over rows
     rows = rows.map(row => {
       const next = { ...row };
-      delete next[field];
+      for (const f of fieldsToRemove) delete next[f];
       return next;
     });
 
-    // Adjust selection based on type
-    if (selection.type === 'column') {
-      const adjusted = (selection.value as string[]).filter(f => f !== field);
-      selection = adjusted.length > 0
-        ? { type: 'column', value: adjusted }
-        : NONE_SEL;
-    } else if (selection.type === 'cell') {
-      const adjusted = (selection.value as CellSelection[]).filter(c => c.field !== field);
-      selection = adjusted.length > 0
-        ? { type: 'cell', value: adjusted }
-        : NONE_SEL;
+    // Adjust selection
+    for (const { field } of items) {
+      if (selection.type === 'column') {
+        const adjusted = (selection.value as string[]).filter(f => f !== field);
+        selection = adjusted.length > 0
+          ? { type: 'column', value: adjusted }
+          : NONE_SEL;
+      } else if (selection.type === 'cell') {
+        const adjusted = (selection.value as CellSelection[]).filter(c => c.field !== field);
+        selection = adjusted.length > 0
+          ? { type: 'cell', value: adjusted }
+          : NONE_SEL;
+      }
     }
-    // row and none — unaffected by column removal
     return { success: true, data: null };
   };
   editCell = (payload?: unknown): Resolution => {
-    const { rowIndex, field, value: newValue } = payload as { rowIndex: number; field: string; value: unknown };
-    if (rowIndex < 0 || rowIndex >= rows.length) {
-      return { success: false, data: `Row ${rowIndex} out of range` };
+    // Accept a single edit object or an array of edits
+    const edits = Array.isArray(payload)
+      ? payload as { rowIndex: number; field: string; value: unknown }[]
+      : [payload as { rowIndex: number; field: string; value: unknown }];
+
+    // Apply all edits in a single pass over the rows array
+    const touched = new Map<number, Record<string, unknown>>();
+    for (const { rowIndex, field, value } of edits) {
+      if (rowIndex < 0 || rowIndex >= rows.length) {
+        return { success: false, data: `Row ${rowIndex} out of range` };
+      }
+      if (!touched.has(rowIndex)) touched.set(rowIndex, {});
+      touched.get(rowIndex)![field] = value;
     }
-    rows = rows.map((row, i) => i === rowIndex ? { ...row, [field]: newValue } : row);
+    rows = rows.map((row, i) => {
+      const patch = touched.get(i);
+      return patch ? { ...row, ...patch } : row;
+    });
     return { success: true, data: null };
   };
   focusCell = (payload?: unknown): Resolution => {
