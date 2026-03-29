@@ -29,18 +29,20 @@ classdef (Abstract) Requestable < handle
 
     methods (Access = private)
         function handleFrontendRequest(this, payload, callback)
-            % processes an incoming request and sends the response back
+            % processes an incoming request and sends the response back.
             try
                 result = callback(this, payload.data);
                 response = struct('success', true, 'data', []);
                 response.data = result;
+                evt = ic.event.JsEvent(this.ID, ...
+                    "@resp/" + string(payload.id), response);
+                this.send(evt);
             catch ex
                 response = struct('success', false, 'data', ex.message);
+                evt = ic.event.JsEvent(this.ID, ...
+                    "@resp/" + string(payload.id), response);
+                this.send(evt);
             end
-            evt = ic.event.JsEvent(this.ID, ...
-                "@resp/" + string(payload.id), response);
-            % send directly to bypass publish
-            this.send(evt);
         end
     end
 

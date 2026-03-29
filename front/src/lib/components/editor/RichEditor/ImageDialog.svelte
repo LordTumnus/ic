@@ -2,6 +2,7 @@
   import type { Editor } from '@tiptap/core';
   import type { RequestFn } from '$lib/types';
   import { resolveIcon } from '$lib/utils/icons';
+  import { resolveAssetAsDataUri, type AssetData } from '$lib/utils/asset-cache';
 
   let {
     editor,
@@ -42,15 +43,13 @@
     try {
       const res = await request('browseImage', {});
       if (res.success && res.data) {
-        const data = res.data as { dataUri?: string; path?: string };
-        if (data.dataUri) {
-          // MATLAB returned the image directly as base64
+        const data = res.data as { asset?: AssetData };
+        if (data.asset) {
+          const dataUri = resolveAssetAsDataUri(data.asset);
           if (editor) {
-            editor.chain().focus().setImage({ src: data.dataUri, alt }).run();
+            editor.chain().focus().setImage({ src: dataUri, alt }).run();
             close();
           }
-        } else if (data.path) {
-          url = data.path;
         }
       }
       // If result was empty/cancelled, do nothing
@@ -80,7 +79,8 @@
       try {
         const res = await request('fetchImage', { url: src });
         if (res.success && res.data) {
-          const dataUri = (res.data as { dataUri: string }).dataUri;
+          const asset = (res.data as { asset: AssetData }).asset;
+          const dataUri = resolveAssetAsDataUri(asset);
           editor.chain().focus().setImage({ src: dataUri, alt }).run();
           close();
         } else {

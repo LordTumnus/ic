@@ -125,41 +125,16 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleBrowseImage(~)
-            % open a file dialog to select an image, then read and return the file as a base64-encoded data URI
+            % open a file dialog to select an image and return as ic.Asset.
             [file, folder] = uigetfile( ...
                 {'*.png;*.jpg;*.jpeg;*.gif;*.svg;*.webp;*.bmp;*.tif;*.tiff', ...
                  'Image Files'}, ...
                 'Select Image');
             if isequal(file, 0)
-                % User cancelled
                 result = [];
                 return
             end
-            src = fullfile(folder, file);
-
-            % read the file and return as data URI
-            bytes = fileread(src, Encoding="bytes");
-            [~, ~, ext] = fileparts(src);
-            ext = lower(ext);
-            mimeMap = dictionary( ...
-                ".png",  "image/png", ...
-                ".jpg",  "image/jpeg", ...
-                ".jpeg", "image/jpeg", ...
-                ".gif",  "image/gif", ...
-                ".svg",  "image/svg+xml", ...
-                ".webp", "image/webp", ...
-                ".bmp",  "image/bmp", ...
-                ".ico",  "image/x-icon", ...
-                ".tif",  "image/tiff", ...
-                ".tiff", "image/tiff");
-            if mimeMap.isKey(ext)
-                mime = mimeMap(ext);
-            else
-                mime = "image/png";
-            end
-
-            b64 = matlab.net.base64encode(bytes);
-            result = struct('dataUri', "data:" + mime + ";base64," + b64);
+            result = struct('asset', ic.Asset(fullfile(folder, file)));
         end
 
         function result = handleSavePdf(~, data)
@@ -190,39 +165,8 @@ classdef RichEditor < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleFetchImage(~, data)
-            % fetch an image from a URL or local file path, convert it to a base64-encoded data URI, and return the result
-            src = string(data.url);
-
-            % read URL or local file
-            if startsWith(src, "http://") || startsWith(src, "https://")
-                opts = weboptions('ContentType', 'binary', 'Timeout', 10);
-                bytes = webread(src, opts);
-            else
-                bytes = fileread(src, Encoding="bytes");
-            end
-
-            % detect MIME from extension
-            [~, ~, ext] = fileparts(src);
-            ext = lower(extractBefore(ext + "?", "?")); % strip query params
-            mimeMap = dictionary( ...
-                ".png",  "image/png", ...
-                ".jpg",  "image/jpeg", ...
-                ".jpeg", "image/jpeg", ...
-                ".gif",  "image/gif", ...
-                ".svg",  "image/svg+xml", ...
-                ".webp", "image/webp", ...
-                ".bmp",  "image/bmp", ...
-                ".ico",  "image/x-icon", ...
-                ".tif",  "image/tiff", ...
-                ".tiff", "image/tiff");
-            if mimeMap.isKey(ext)
-                mime = mimeMap(ext);
-            else
-                mime = "image/png";
-            end
-
-            b64 = matlab.net.base64encode(bytes);
-            result = struct('dataUri', "data:" + mime + ";base64," + b64);
+            % resolve an image URL or local file path as an ic.Asset.
+            result = struct('asset', ic.Asset(string(data.url)));
         end
     end
 end

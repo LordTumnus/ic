@@ -80,39 +80,8 @@ classdef Markdown < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleFetchImage(~, data)
-            src = string(data.url);
-
-            % read bytes, URL or local file
-            if startsWith(src, "http://") || startsWith(src, "https://")
-                opts = weboptions('ContentType', 'binary', 'Timeout', 10);
-                bytes = webread(src, opts);
-            else
-                % local file path
-                bytes = fileread(src, Encoding="bytes");
-            end
-
-            % detect MIME from extension
-            [~, ~, ext] = fileparts(src);
-            ext = lower(extractBefore(ext + "?", "?")); % strip query params
-            mimeMap = dictionary( ...
-                ".png",  "image/png", ...
-                ".jpg",  "image/jpeg", ...
-                ".jpeg", "image/jpeg", ...
-                ".gif",  "image/gif", ...
-                ".svg",  "image/svg+xml", ...
-                ".webp", "image/webp", ...
-                ".bmp",  "image/bmp", ...
-                ".ico",  "image/x-icon", ...
-                ".tif",  "image/tiff", ...
-                ".tiff", "image/tiff");
-            if mimeMap.isKey(ext)
-                mime = mimeMap(ext);
-            else
-                mime = "image/png";
-            end
-
-            b64 = matlab.net.base64encode(bytes);
-            result = struct('dataUri', "data:" + mime + ";base64," + b64);
+            % resolve an image URL or local file path as an ic.Asset.
+            result = struct('asset', ic.Asset(string(data.url)));
         end
     end
 end

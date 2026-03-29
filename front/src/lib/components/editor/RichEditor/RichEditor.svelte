@@ -26,6 +26,7 @@
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
   import type { Resolution, RequestFn } from '$lib/types';
+  import { resolveAssetAsDataUri, type AssetData } from '$lib/utils/asset-cache';
   import type { CssSize } from '$lib/utils/css';
   import { toSize } from '$lib/utils/css';
   import logger from '$lib/core/logger';
@@ -651,7 +652,8 @@
         request!('fetchImage', { url: src })
           .then((res) => {
             if (res.success && res.data) {
-              const dataUri = (res.data as { dataUri: string }).dataUri;
+              const asset = (res.data as { asset: AssetData }).asset;
+              const dataUri = resolveAssetAsDataUri(asset);
               imageCache.set(src, dataUri);
               editorEl?.querySelectorAll<HTMLImageElement>(`img[src="${CSS.escape(src)}"]`)
                 .forEach((el) => { el.src = dataUri; });

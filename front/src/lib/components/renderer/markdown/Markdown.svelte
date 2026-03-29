@@ -4,6 +4,7 @@
   import { toSize } from '$lib/utils/css';
   import { renderMermaid } from '$lib/utils/mermaid-renderer';
   import type { RequestFn } from '$lib/types';
+  import { resolveAssetAsDataUri, type AssetData } from '$lib/utils/asset-cache';
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
@@ -512,7 +513,8 @@
         request('fetchImage', { url: src })
           .then((res) => {
             if (res.success && res.data) {
-              const dataUri = (res.data as { dataUri: string }).dataUri;
+              const asset = (res.data as { asset: AssetData }).asset;
+              const dataUri = resolveAssetAsDataUri(asset);
               imageCache.set(src, dataUri);
               // Apply to all matching images currently in the DOM
               contentEl?.querySelectorAll<HTMLImageElement>(`img[src="${CSS.escape(src)}"]`)

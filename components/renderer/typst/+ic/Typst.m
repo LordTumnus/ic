@@ -172,8 +172,8 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
         end
 
         function result = handleResolveImages(data)
-            % Resolve image files requested by the Typst WASM compiler.
-            % Inlines file I/O, hashing, and MIME (Asset helpers are private).
+            % resolve image files requested by the Typst WASM compiler.
+            % returns ic.Asset objects
             paths = string(data.paths);
             outPaths = string.empty;
             outAssets = {};
@@ -182,58 +182,16 @@ classdef Typst < ic.core.Component & ic.mixin.Requestable
             for i = 1:numel(paths)
                 p = paths(i);
                 try
-                    if startsWith(p, "http://") || startsWith(p, "https://")
-                        [~, ~, ext] = fileparts(p);
-                        ext = regexprep(ext, '\?.*$', '');
-                        tmpFile = string(tempname) + ext;
-                        websave(tmpFile, p);
-                        c = onCleanup(@() delete(tmpFile));
-                        fid = fopen(tmpFile, 'rb');
-                        raw = fread(fid, Inf, '*uint8');
-                        fclose(fid);
-                    elseif isfile(p)
-                        fid = fopen(p, 'rb');
-                        raw = fread(fid, Inf, '*uint8');
-                        fclose(fid);
-                        [~, ~, ext] = fileparts(p);
-                    else
-                        resolved = fullfile(pwd, p);
-                        if ~isfile(resolved), continue; end
-                        fid = fopen(resolved, 'rb');
-                        raw = fread(fid, Inf, '*uint8');
-                        fclose(fid);
-                        [~, ~, ext] = fileparts(resolved);
+                    src = p;
+                    if ~startsWith(p, ["http://", "https://"]) && ~isfile(p)
+                        src = fullfile(pwd, p);
+                        if ~isfile(src), continue; end
                     end
-
-                    % Hash (pure-MATLAB fingerprint)
-                    d = double(uint8(raw(:)));
-                    n = numel(d);
-                    s1 = mod(sum(d .* mod((1:n)', 65521)), 2^52);
-                    s2 = mod(sum(d .* mod((1:n)' * 31, 65497)), 2^52);
-                    hash = sprintf('%x%013x%013x', n, s1, s2);
-
-                    % MIME from extension
-                    mimeMap = dictionary( ...
-                        [".svg",".png",".jpg",".jpeg",".gif",".bmp",".webp"], ...
-                        ["image/svg+xml","image/png","image/jpeg","image/jpeg", ...
-                         "image/gif","image/bmp","image/webp"]);
-                    ext = lower(ext);
-                    if isKey(mimeMap, ext)
-                        mime = mimeMap(ext);
-                    else
-                        mime = "application/octet-stream";
-                    end
-
-                    outPaths(end+1) = p;                            %#ok<AGROW>
-                    outAssets{end+1} = struct( ...                   %#ok<AGROW>
-                        'hash', hash, ...
-                        'mime', mime, ...
-                        'data', matlab.net.base64encode(raw));
+                    outPaths(end+1) = p;                   %#ok<AGROW>
+                    outAssets{end+1} = ic.Asset(src);       %#ok<AGROW>
                 catch ME
-                    outErrors{end+1} = struct( ...          %#ok<AGROW>
-                        'path', p, ...
-                        'message', ME.message);
-                    continue
+                    outErrors{end+1} = struct( ...         %#ok<AGROW>
+                        'path', p, 'message', ME.message);
                 end
             end
 
