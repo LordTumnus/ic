@@ -242,6 +242,12 @@ export interface RemoveKeyframesEventData {
   name: string;
 }
 
+/** Data for @vars events. Sets CSS custom properties on a scoped selector. */
+export interface VarsEventData {
+  selector: string;
+  vars: Record<string, string>;
+}
+
 /** Data for @theme events. CSS variables as kebab-case keys with values ready for CSS. */
 export type ThemeEventData = Record<string, string>;
 

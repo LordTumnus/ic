@@ -27,6 +27,7 @@ import type {
   ClearStyleEventData,
   KeyframesEventData,
   RemoveKeyframesEventData,
+  VarsEventData,
   JsEffectEventData,
   JsEffectRemoveEventData,
   KeyEventData
@@ -326,6 +327,10 @@ class Component implements Registrable {
       this.subscribe('@removeKeyframes', (_id, _name, data) => {
         const { name } = data as RemoveKeyframesEventData;
         StyleManager.instance.removeKeyframes(this.id, name);
+      });
+      this.subscribe('@vars', (_id, _name, data) => {
+        const { selector, vars } = data as VarsEventData;
+        StyleManager.instance.setVars(this.id, selector, vars);
       });
     }
 

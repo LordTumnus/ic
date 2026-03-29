@@ -94,6 +94,48 @@ classdef StyleBuilder < handle
                 "styles", cssStyles));
         end
 
+        function this = vars(this, selector, name, value)
+            % sets CSS custom properties (variables) on the given selector.
+            % unlike style(), this method accepts property names with -- prefixes
+            % that are not valid MATLAB struct field names. Names are used as-is
+            % with no camelCase conversion. The -- prefix is added automatically
+            % if not already present.
+            % {returns} the builder itself, for chaining {/returns}
+            % {example}
+            %   comp.css.vars("> *", "--ic-font-size", "14px")
+            %   comp.css.vars("", "--my-color", "red", "--my-gap", "8px")
+            % {/example}
+
+            arguments (Input)
+                this (1,1) ic.mixin.StyleBuilder
+                % CSS selector scoped to the component wrapper
+                selector (1,1) string
+            end
+
+            arguments (Input, Repeating)
+                % CSS custom property name (-- prefix added if missing)
+                name (1,1) string
+                % CSS custom property value
+                value (1,1) string
+            end
+
+            n = numel(name);
+            varKeys = cell(1, n);
+            varVals = cell(1, n);
+            for kk = 1:n
+                k = name{kk};
+                if ~startsWith(k, "--")
+                    k = "--" + k;
+                end
+                varKeys{kk} = char(k);
+                varVals{kk} = char(value{kk});
+            end
+
+            this.Component.publish("@vars", struct( ...
+                "selector", selector, ...
+                "vars", containers.Map(varKeys, varVals)));
+        end
+
         function styles = getStyle(this, selector)
             % returns the current styles for a selector.
             % {returns} the style struct, or an empty struct if none set {/returns}

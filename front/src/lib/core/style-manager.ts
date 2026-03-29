@@ -52,6 +52,26 @@ class StyleManager {
     this.ruleIndices.set(key, index);
   }
 
+  /** Set CSS custom properties (variables) for a selector within a component. */
+  setVars(componentId: string, selector: string, vars: Record<string, string>): void {
+    const key = `${componentId}:vars:${selector}`;
+    const scopedSelector = selector
+      ? `#${CSS.escape(componentId)} ${selector}`
+      : `#${CSS.escape(componentId)}`;
+    const cssText = Object.entries(vars)
+      .map(([prop, value]) => `${prop}: ${value}`)
+      .join('; ');
+    const rule = `${scopedSelector} { ${cssText} }`;
+
+    if (this.ruleIndices.has(key)) {
+      this.deleteRule(key);
+    }
+
+    const sheet = this.getSheet();
+    const index = sheet.insertRule(rule, sheet.cssRules.length);
+    this.ruleIndices.set(key, index);
+  }
+
   /** Clear a specific style rule. */
   clearStyle(componentId: string, selector: string): void {
     this.deleteRule(`${componentId}:${selector}`);
