@@ -28,6 +28,7 @@
     allowMultipleSelectionsExt,
     zebraStripesExt,
     uneditableLinesExt,
+    programmatic,
     highlightedLinesExt,
     rulersExt,
     indentGuidesExt,
@@ -279,6 +280,7 @@
         to: view.state.doc.length,
         insert: v,
       },
+      annotations: programmatic.of(true),
     });
     lineCount = view.state.doc.lines;
     updatingFromProp = false;

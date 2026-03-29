@@ -6,12 +6,16 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import {
+  Annotation,
   EditorState,
   Facet,
   StateField,
   type Extension,
   type Range,
 } from '@codemirror/state';
+
+/** Annotation to mark programmatic value updates — bypasses the lock filter. */
+export const programmatic = Annotation.define<boolean>();
 
 /**
  * Uneditable (sticky) lines: locks specific lines from user editing.
@@ -118,9 +122,9 @@ export function uneditableLines(lineNumbers: number[]): Extension {
       { decorations: (v) => v.decorations },
     ),
 
-    // Transaction filter: reject edits on locked lines
+    // Transaction filter: reject user edits on locked lines (programmatic updates pass through)
     EditorState.transactionFilter.of((tr) => {
-      if (!tr.docChanged) return tr;
+      if (!tr.docChanged || tr.annotation(programmatic)) return tr;
       const locked = getLockedLines(tr.startState);
       let dominated = false;
       tr.changes.iterChangedRanges((fromA, toA) => {
