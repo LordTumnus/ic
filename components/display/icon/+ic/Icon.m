@@ -1,9 +1,9 @@
 classdef Icon < ic.core.Component
-    % Display an SVG icon read from an #ic.asset.Asset.
+    % Display an SVG icon read from an #ic.Asset.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % icon asset source
-        Source ic.asset.Asset {ic.assets.mustBeIcon} = ic.asset.Asset("info")
+        Source ic.Asset {ic.assets.mustBeIcon} = ic.Asset("info")
 
         % size of the icon, in pixels or CSS string. The size is applied to both the width and height of the icon
         Size {ic.check.CssValidators.mustBeSize} = 16

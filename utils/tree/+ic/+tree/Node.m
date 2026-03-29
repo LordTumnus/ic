@@ -7,7 +7,7 @@ classdef Node < handle & ic.event.TransportData
         Label (1,1) string
 
         % icon to be displayed before the label
-        Icon ic.asset.Asset {ic.assets.mustBeIconOrImage} = ic.asset.Asset()
+        Icon ic.Asset {ic.assets.mustBeIconOrImage} = ic.Asset()
 
         % child nodes
         Children ic.tree.Node = ic.tree.Node.empty
@@ -22,7 +22,7 @@ classdef Node < handle & ic.event.TransportData
             arguments
                 % display text
                 label (1,1) string
-                opts.Icon ic.asset.Asset = ic.asset.Asset()
+                opts.Icon ic.Asset = ic.Asset()
                 opts.Data struct = struct.empty
             end
             this.Label = label;
@@ -44,7 +44,7 @@ classdef Node < handle & ic.event.TransportData
                 % display text for the new child
                 label (1,1) string
                 % optional icon for the new child
-                opts.Icon ic.asset.Asset = ic.asset.Asset()
+                opts.Icon ic.Asset = ic.Asset()
                 % optional data payload for the new child
                 opts.Data struct = struct.empty
             end

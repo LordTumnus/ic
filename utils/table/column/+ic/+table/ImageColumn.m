@@ -1,6 +1,6 @@
 classdef ImageColumn < ic.table.Column
     % image column that displays cell values as thumbnails with a hover preview popup.
-    % Cell data must be an #ic.asset.Asset (file or URL) per row.
+    % Cell data must be an #ic.Asset (file or URL) per row.
 
     properties
         % width of the hover preview popup, in pixels

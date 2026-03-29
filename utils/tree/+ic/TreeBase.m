@@ -108,7 +108,7 @@ classdef (Abstract) TreeBase < ic.core.Component
                 % display text for the new node
                 label (1,1) string
                 % optional icon for the new node
-                opts.Icon ic.asset.Asset = ic.asset.Asset()
+                opts.Icon ic.Asset = ic.Asset()
                 % optional data payload for the new node
                 opts.Data struct = struct.empty
             end

@@ -1,11 +1,11 @@
 classdef AssetRegistry < handle
    % per-view (uihtml) asset deduplication tracker.
-   % tracks which #ic.asset.Asset hashes have been sent to each #ic.core.View so that repeated references only transmit a {hash} stub instead of the full base64 payload.
+   % tracks which #ic.Asset hashes have been sent to each #ic.core.View so that repeated references only transmit a {hash} stub instead of the full base64 payload.
    % The #ic.core.View is responsible for activating the registry before encoding assets and for ensuring that view references in the registry are properly cleaned up on destruction.
 
    properties (Constant, Access = private)
       % singleton instance
-      Instance = ic.asset.AssetRegistry()
+      Instance = ic.AssetRegistry()
    end
 
    properties (Access = private)
@@ -37,7 +37,7 @@ classdef AssetRegistry < handle
    methods (Static, Access = private)
       function r = getInstance()
          % return the singleton instance.
-         r = ic.asset.AssetRegistry.Instance;
+         r = ic.AssetRegistry.Instance;
       end
    end
 
@@ -46,7 +46,7 @@ classdef AssetRegistry < handle
          % set the active view for the current encoding pass.
          % creates the view's sent-hash map on first call and registers a
          % cleanup listener for when the view is destroyed.
-         r = ic.asset.AssetRegistry.getInstance();
+         r = ic.AssetRegistry.getInstance();
          key = double(view);
          if ~r.ViewMap.isKey(key)
             r.ViewMap(key) = containers.Map();
@@ -56,20 +56,20 @@ classdef AssetRegistry < handle
       end
    end
 
-   methods (Static, Access = {?ic.asset.Asset})
+   methods (Static, Access = {?ic.Asset})
       function m = getUrlCache()
          % return the shared URL download cache (handle ref, safe to write to).
-         m = ic.asset.AssetRegistry.getInstance().UrlCache;
+         m = ic.AssetRegistry.getInstance().UrlCache;
       end
 
       function tf = hasSent(hash)
          % return true if this hash has already been sent to the active view.
-         tf = ic.asset.AssetRegistry.getInstance().CurrentSent.isKey(hash);
+         tf = ic.AssetRegistry.getInstance().CurrentSent.isKey(hash);
       end
 
       function markSent(hash)
          % record that this hash has been sent to the active view.
-         r = ic.asset.AssetRegistry.getInstance();
+         r = ic.AssetRegistry.getInstance();
          r.CurrentSent(hash) = true;
       end
    end

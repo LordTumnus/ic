@@ -72,7 +72,7 @@ classdef Accordion < ic.core.ComponentContainer
                 % whether the panel is disabled
                 props.Disabled (1,1) logical = false
                 % optional icon for the panel header
-                props.Icon ic.asset.Asset = ic.asset.Asset.empty
+                props.Icon ic.Asset = ic.Asset.empty
             end
 
             idx = this.NextPanelIndex;

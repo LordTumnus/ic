@@ -6,7 +6,7 @@ function mustBeIcon(asset)
       return
    end
    if asset.Type == "name"
-      return   % lucide format already validated by ic.asset.Asset constructor
+      return   % lucide format already validated by ic.Asset constructor
    end
    [~, ~, ext] = fileparts(asset.Value);
    ext = lower(regexprep(ext, '\?.*$', ''));

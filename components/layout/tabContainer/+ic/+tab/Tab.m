@@ -13,7 +13,7 @@ classdef Tab < ic.core.Component
         Disabled (1,1) logical = false
 
         % icon displayed before the label
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
 
         % whether the tab label can be renamed by double-clicking on it
         Editable (1,1) logical = false

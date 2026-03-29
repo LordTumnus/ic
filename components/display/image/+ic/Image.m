@@ -4,7 +4,7 @@ classdef Image < ic.core.Component
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % image asset source
-        Source ic.asset.Asset {ic.assets.mustBeImage} = ic.asset.Asset()
+        Source ic.Asset {ic.assets.mustBeImage} = ic.Asset()
 
         % width of the image, in pixels or as a CSS string
         Width {ic.check.CssValidators.mustBeSize} = "auto"

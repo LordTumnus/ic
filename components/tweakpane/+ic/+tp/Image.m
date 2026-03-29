@@ -3,7 +3,7 @@ classdef Image < ic.tp.Blade
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % image source
-        Source (1,1) ic.asset.Asset
+        Source (1,1) ic.Asset
 
         % display height in pixels
         Height (1,1) double = 100

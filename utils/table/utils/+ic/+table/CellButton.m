@@ -10,7 +10,7 @@ classdef CellButton
         Label (1,1) string = ""
 
         % icon displayed in the button
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
 
         % text displayed on hover
         Tooltip (1,1) string = ""

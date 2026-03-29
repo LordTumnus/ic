@@ -1,6 +1,6 @@
 classdef Typst < ic.core.Component & ic.mixin.Requestable
     % renders [Typst](https://typst.app/) markup as formatted SVG pages.
-    % Compilation happens client-side via [typst.ts](https://github.com/Myriad-Dreamin/typst.ts) v0.7 WASM. [Typst Universe](https://typst.app/universe/) packages are downloaded by MATLAB on demand as they appear in the value. Images referenced in the source are resolved by MATLAB and embedded as binary #ic.asset.Asset.
+    % Compilation happens client-side via [typst.ts](https://github.com/Myriad-Dreamin/typst.ts) v0.7 WASM. [Typst Universe](https://typst.app/universe/) packages are downloaded by MATLAB on demand as they appear in the value. Images referenced in the source are resolved by MATLAB and embedded as binary #ic.Asset.
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % Typst source text

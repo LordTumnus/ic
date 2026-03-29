@@ -4,8 +4,8 @@ classdef Asset < ic.event.TransportData
    %   - Lucide icon name
    %   - A local file path
    %   - A HTTP/HTTPS URL
-   % Any of these types are automatically detected when constructing from a string, so components that type a property as ic.asset.Asset get implicit string conversion.
-   % Assets from urls or files are hashed and cached in the #ic.asset.AssetRegistry to avoid redundant uploads to the frontend. If an asset has been sent before (hash match), only the hash is sent to the frontend; otherwise, the raw bytes are sent along with the hash and MIME type.
+   % Any of these types are automatically detected when constructing from a string, so components that type a property as ic.Asset get implicit string conversion.
+   % Assets from urls or files are hashed and cached in the #ic.AssetRegistry to avoid redundant uploads to the frontend. If an asset has been sent before (hash match), only the hash is sent to the frontend; otherwise, the raw bytes are sent along with the hash and MIME type.
 
    properties (SetAccess = immutable, Hidden)
       % source kind: "" (empty), "name" (Lucide), "file" (local path), or "url"
@@ -51,16 +51,16 @@ classdef Asset < ic.event.TransportData
          end
          % file or url → read raw bytes, compute hash
          if this.Type == "file"
-            [raw, ext] = ic.asset.Asset.readFile(this.Value);
-            hash = ic.asset.Asset.computeHash(raw);
+            [raw, ext] = ic.Asset.readFile(this.Value);
+            hash = ic.Asset.computeHash(raw);
          else
-            [raw, ext, hash] = ic.asset.Asset.cachedUrlDownload(this.Value);
+            [raw, ext, hash] = ic.Asset.cachedUrlDownload(this.Value);
          end
-         if ic.asset.AssetRegistry.hasSent(hash)
+         if ic.AssetRegistry.hasSent(hash)
             s = struct('hash', hash);
          else
-            ic.asset.AssetRegistry.markSent(hash);
-            mime = ic.asset.Asset.mimeFromExt(ext);
+            ic.AssetRegistry.markSent(hash);
+            mime = ic.Asset.mimeFromExt(ext);
             s = struct('hash', hash, 'mime', mime, ...
                        'data', string(matlab.net.base64encode(raw)));
          end
@@ -74,15 +74,15 @@ classdef Asset < ic.event.TransportData
    methods (Static, Access = private)
       function [raw, ext, hash] = cachedUrlDownload(url)
          % download a URL and return its bytes; caches by URL to skip repeated HTTP requests.
-         cache = ic.asset.AssetRegistry.getUrlCache();
+         cache = ic.AssetRegistry.getUrlCache();
          key = char(url);
          if cache.isKey(key)
             c = cache(key);
             raw = c.raw; ext = c.ext; hash = c.hash;
             return;
          end
-         [raw, ext] = ic.asset.Asset.downloadUrl(url);
-         hash = ic.asset.Asset.computeHash(raw);
+         [raw, ext] = ic.Asset.downloadUrl(url);
+         hash = ic.Asset.computeHash(raw);
          cache(key) = struct('raw', raw, 'ext', ext, 'hash', hash); %#ok<NASGU> handle
       end
 

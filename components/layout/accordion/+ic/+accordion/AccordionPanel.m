@@ -7,7 +7,7 @@ classdef AccordionPanel < ic.core.ComponentContainer
         Label (1,1) string = ""
 
         % icon displayed before the label
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
 
         % whether the panel content is expanded
         Open (1,1) logical = false

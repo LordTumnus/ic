@@ -345,7 +345,7 @@ Logo = cell(n, 1);
 logoFiles = downloadLogos(Symbol, BrandColor);
 for i = 1:n
     if logoFiles(i) ~= ""
-        Logo{i} = ic.asset.Asset(logoFiles(i));
+        Logo{i} = ic.Asset(logoFiles(i));
     end
 end
 

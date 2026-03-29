@@ -1,6 +1,6 @@
 classdef Latex < ic.core.Component & ic.mixin.Requestable
     % renders LaTeX markup as formatted PDF pages.
-    % Compilation happens client-side via [SwiftLaTeX](https://www.swiftlatex.com/)'s PdfTeX WASM engine (no internet required). Images referenced in the source are resolved by MATLAB and embedded as a binary #ic.asset.Asset
+    % Compilation happens client-side via [SwiftLaTeX](https://www.swiftlatex.com/)'s PdfTeX WASM engine (no internet required). Images referenced in the source are resolved by MATLAB and embedded as a binary #ic.Asset
     %
     % bundled packages:
     %   - math: amsmath, amssymb, mathtools, bm, xfrac, eucal, eufrak

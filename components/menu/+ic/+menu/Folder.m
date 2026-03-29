@@ -7,7 +7,7 @@ classdef Folder < ic.menu.Entry
         Label (1,1) string = ""
 
         % icon displayed before the label
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
 
         % nested menu entries displayed when the folder is expanded
         Children ic.menu.Entry = ic.menu.Entry.empty

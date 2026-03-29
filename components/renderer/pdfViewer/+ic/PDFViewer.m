@@ -4,7 +4,7 @@ classdef PDFViewer < ic.core.Component
 
     properties (SetObservable, AbortSet, Description = "Reactive")
         % PDF source as a file path or URL
-        Value ic.asset.Asset {ic.assets.mustBePdf} = ic.asset.Asset()
+        Value ic.Asset {ic.assets.mustBePdf} = ic.Asset()
 
         % toolbar display mode: "toolbar" (always visible) or "hover" (appears on mouse hover)
         ToolbarMode string {mustBeMember(ToolbarMode, ["toolbar", "hover"])} = "toolbar"

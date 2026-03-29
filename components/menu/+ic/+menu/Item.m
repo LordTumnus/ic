@@ -10,7 +10,7 @@ classdef Item < ic.menu.Entry
         Label (1,1) string = ""
 
         % icon displayed before the label
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
 
         % whether the item is grayed out and cannot be clicked
         Disabled (1,1) logical = false

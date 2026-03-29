@@ -9,7 +9,7 @@ classdef IconBox < ic.node.Node
         Label (1,1) string = ""
 
         % > ICON Lucide icon name, file path, or URL (auto-detected via ic.Asset)
-        Icon (1,1) ic.asset.Asset = ""
+        Icon (1,1) ic.Asset = ""
 
         % > BACKGROUNDCOLOR node fill color (empty = theme default)
         BackgroundColor (1,1) string = ""

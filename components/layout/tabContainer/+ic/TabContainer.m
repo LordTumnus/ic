@@ -132,7 +132,7 @@ classdef TabContainer < ic.core.ComponentContainer
                 % whether the tab is disabled
                 props.Disabled (1,1) logical = false
                 % optional icon for the tab header
-                props.Icon ic.asset.Asset = ic.asset.Asset.empty
+                props.Icon ic.Asset = ic.Asset.empty
             end
 
             idx = this.NextTabIndex;

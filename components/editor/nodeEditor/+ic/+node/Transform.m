@@ -19,7 +19,7 @@ classdef Transform < ic.node.Node
         Color (1,1) string = ""
 
         % > ICON header icon
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
 
         % > INPUTNUMBER number of input/output port pairs
         InputNumber (1,1) double {mustBePositive, mustBeInteger} = 1

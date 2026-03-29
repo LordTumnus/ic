@@ -20,7 +20,7 @@ classdef Toast < ic.core.Component & ic.mixin.Overlay
         Closable logical = true
 
         % custom icon displayed before the message. When empty, a default icon is shown based on the variant
-        Icon ic.asset.Asset = ic.asset.Asset.empty
+        Icon ic.Asset = ic.Asset.empty
     end
 
     properties (Access = private)

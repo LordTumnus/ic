@@ -7,7 +7,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    %   MATLAB → JS: components propagate their #ic.event.JsEvent up the tree until the view, responsible for calling __sendEventToHTMLSource(h, "ic", payload)__
    %   JS → MATLAB: uihtmls __HTMLEventReceivedFcn__ captures frontend events and routes them to the appropriate component handler via #ic.Frame.Registry lookup.
    %
-   % Before each send, #ic.asset.AssetRegistry.activate is called so
+   % Before each send, #ic.AssetRegistry.activate is called so
    % that asset deduplication (hash-only stubs for repeated assets) is
    % tracked for each view instance
 
@@ -81,7 +81,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
             events (1,:) ic.event.JsEvent
          end
          if this.Ready
-            ic.asset.AssetRegistry.activate(this);
+            ic.AssetRegistry.activate(this);
             payload = ic.utils.toTransport(events.toStruct());
             sendEventToHTMLSource(this.HTMLElement, "ic", payload);
          else
@@ -107,7 +107,7 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
          if ~isempty(this.Queue)
             pending = this.Queue;
             this.Queue = ic.event.JsEvent.empty();
-            ic.asset.AssetRegistry.activate(this);
+            ic.AssetRegistry.activate(this);
             payload = ic.utils.toTransport([pending.toStruct()]);
             sendEventToHTMLSource(this.HTMLElement, "ic", payload);
          end
