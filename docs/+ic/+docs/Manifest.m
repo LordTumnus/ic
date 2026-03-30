@@ -11,6 +11,7 @@ classdef Manifest
         % return the ordered section list for the documentation.
 
             s = @ic.docs.Manifest.section;
+            sub = @ic.docs.Manifest.sub;
 
             sections = [ ...
                 s("Core", [ ...
@@ -118,16 +119,17 @@ classdef Manifest
                 s("Panel", [ ...
                     "ic.Panel"
                 ]), ...
-                s("Renderers", [ ...
-                    "ic.Markdown"
-                    "ic.Latex"
-                    "ic.Typst"
-                    "ic.Mermaid"
-                    "+ic.mermaid"
-                    "ic.PDFViewer"
-                    "ic.CodeEditor"
-                ]), ...
-                s("Rich Editor", [ ...
+                s("Renderers", { ...
+                    "ic.Markdown", ...
+                    "ic.Latex", ...
+                    "ic.Typst", ...
+                    "ic.Mermaid", ...
+                    sub("Mermaid Configs", "+ic.mermaid"), ...
+                    "ic.PDFViewer", ...
+
+                }), ...
+                s("Editors", [ ...
+                    "ic.CodeEditor" ...
                     "ic.RichEditor"
                 ]), ...
                 s("Tree", [ ...
@@ -168,57 +170,87 @@ classdef Manifest
             ];
         end
 
+        function patterns = excluded()
+        % return patterns of classes/packages to exclude from documentation.
+        % exact names (e.g. "ic.NodeEditor") and package prefixes
+        % (e.g. "+ic.node") are supported.
+            patterns = [ ...
+                "ic.NodeEditor"
+                "+ic.node"
+                "+ic.internal"
+            ];
+        end
+
         function s = section(title, items)
         % create a section struct.
-            s = struct('title', title, 'items', {cellstr(items)});
+        % items is a cell array — elements are either char/string (class
+        % names) or subsection structs created by sub().
+            if isstring(items) || ischar(items)
+                items = cellstr(items);
+            end
+            s = struct('title', title, 'items', {items});
+        end
+
+        function ss = sub(title, items)
+        % create a subsection struct (nested group within a section).
+            ss = struct('title', title, 'items', {cellstr(items)});
         end
 
         function ordered = resolve(sections, allDocs)
         % expand +package entries and match against parsed docs.
-        % returns a struct array of sections, each with title and items
-        % (struct array of parsed docs in order).
+        % returns a struct array of sections. Each section has title and
+        % items (cell array). Items are either doc structs or subsection
+        % structs {subsection: title, items: [doc structs]}.
 
             allNames = string({allDocs.fullName});
             placed = false(size(allNames)); % track which docs are placed
+
+            % mark excluded items as already placed so they never appear
+            excl = ic.docs.Manifest.excluded();
+            for ee = 1:numel(excl)
+                pat = excl(ee);
+                if startsWith(pat, "+")
+                    pkg = extractAfter(pat, 1) + ".";
+                    placed = placed | startsWith(allNames, pkg);
+                else
+                    placed = placed | (allNames == pat);
+                end
+            end
 
             ordered = struct('title', {}, 'items', {});
 
             for ii = 1:numel(sections)
                 sec = sections(ii);
-                sectionItems = [];
+                sectionItems = {};
 
                 for jj = 1:numel(sec.items)
-                    entry = string(sec.items{jj});
+                    entry = sec.items{jj};
 
-                    if startsWith(entry, "+")
-                        % package expansion — find all classes in this package
-                        pkg = extractAfter(entry, 1) + ".";
-                        mask = startsWith(allNames, pkg) & ~placed;
-                        % exclude items that belong to a deeper sub-package
-                        % e.g., "+ic.table" should match ic.table.Column
-                        % but not ic.table.sub.Something
-                        remaining = extractAfter(allNames(mask), strlength(pkg));
-                        shallow = ~contains(remaining, ".");
-                        shallowIdx = find(mask);
-                        shallowIdx = shallowIdx(shallow);
-
-                        % sort alphabetically
-                        [~, sortOrder] = sort(allNames(shallowIdx));
-                        expandedIdx = shallowIdx(sortOrder);
-
-                        for kk = 1:numel(expandedIdx)
-                            idx = expandedIdx(kk);
-                            if ~placed(idx)
-                                sectionItems = [sectionItems, allDocs(idx)]; %#ok<AGROW>
-                                placed(idx) = true;
+                    if isstruct(entry) && isfield(entry, 'title')
+                        % subsection — resolve its items and wrap
+                        subItems = [];
+                        for kk = 1:numel(entry.items)
+                            resolved = ic.docs.Manifest.resolveEntry( ...
+                                string(entry.items{kk}), allNames, allDocs, placed);
+                            for mm = 1:numel(resolved.indices)
+                                placed(resolved.indices(mm)) = true;
                             end
+                            subItems = [subItems, resolved.docs]; %#ok<AGROW>
+                        end
+                        if ~isempty(subItems)
+                            sectionItems{end+1} = struct( ...
+                                'subsection', entry.title, ...
+                                'items', subItems); %#ok<AGROW>
                         end
                     else
-                        % exact match
-                        idx = find(allNames == entry, 1);
-                        if ~isempty(idx) && ~placed(idx)
-                            sectionItems = [sectionItems, allDocs(idx)]; %#ok<AGROW>
-                            placed(idx) = true;
+                        % plain entry (string)
+                        resolved = ic.docs.Manifest.resolveEntry( ...
+                            string(entry), allNames, allDocs, placed);
+                        for kk = 1:numel(resolved.indices)
+                            placed(resolved.indices(kk)) = true;
+                        end
+                        for kk = 1:numel(resolved.docs)
+                            sectionItems{end+1} = resolved.docs(kk); %#ok<AGROW>
                         end
                     end
                 end
@@ -226,26 +258,59 @@ classdef Manifest
                 if ~isempty(sectionItems)
                     ordered(end + 1) = struct( ...
                         'title', sec.title, ...
-                        'items', sectionItems); %#ok<AGROW>
+                        'items', {sectionItems}); %#ok<AGROW>
                 end
             end
 
             % catch-all: items not placed in any section
             unplaced = find(~placed);
             if ~isempty(unplaced)
-                % filter out hidden items
-                visible = [];
+                visible = {};
                 for kk = 1:numel(unplaced)
                     if ~allDocs(unplaced(kk)).hidden
-                        visible = [visible, allDocs(unplaced(kk))]; %#ok<AGROW>
+                        visible{end+1} = allDocs(unplaced(kk)); %#ok<AGROW>
                     end
                 end
                 if ~isempty(visible)
                     ordered(end + 1) = struct( ...
                         'title', "Other", ...
-                        'items', visible);
+                        'items', {visible});
                 end
             end
+        end
+
+        function result = resolveEntry(entry, allNames, allDocs, placed)
+        % resolve a single manifest entry (exact match or +package).
+        % returns struct with docs (array) and indices (array).
+            docs = [];
+            indices = [];
+
+            if startsWith(entry, "+")
+                pkg = extractAfter(entry, 1) + ".";
+                mask = startsWith(allNames, pkg) & ~placed;
+                remaining = extractAfter(allNames(mask), strlength(pkg));
+                shallow = ~contains(remaining, ".");
+                shallowIdx = find(mask);
+                shallowIdx = shallowIdx(shallow);
+                [~, sortOrder] = sort(allNames(shallowIdx));
+                expandedIdx = shallowIdx(sortOrder);
+
+                for kk = 1:numel(expandedIdx)
+                    idx = expandedIdx(kk);
+                    if ~placed(idx)
+                        docs = [docs, allDocs(idx)]; %#ok<AGROW>
+                        indices = [indices, idx]; %#ok<AGROW>
+                    end
+                end
+            else
+                idx = find(allNames == entry, 1);
+                if ~isempty(idx) && ~placed(idx)
+                    docs = allDocs(idx);
+                    indices = idx;
+                end
+            end
+
+            result = struct('docs', docs, 'indices', indices);
         end
 
     end

@@ -17,7 +17,7 @@ classdef (Abstract) ContainerBlade < ic.core.ComponentContainer
         BladeIndex (1,1) double = 0
     end
 
-    properties (Access = private)
+    properties (Access = private, Hidden)
         % monotonic counter for stable blade targets
         NextBladeIndex (1,1) double = 0
     end

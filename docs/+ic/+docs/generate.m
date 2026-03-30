@@ -19,7 +19,16 @@ function generate()
 
     totalItems = 0;
     for ii = 1:numel(ordered)
-        n = numel(ordered(ii).items);
+        items = ordered(ii).items;
+        n = 0;
+        for jj = 1:numel(items)
+            entry = items{jj};
+            if isstruct(entry) && isfield(entry, 'subsection')
+                n = n + numel(entry.items);
+            else
+                n = n + 1;
+            end
+        end
         fprintf('      %s: %d items\n', ordered(ii).title, n);
         totalItems = totalItems + n;
     end
@@ -36,7 +45,24 @@ function generate()
     for ii = 1:numel(ordered)
         sec = struct();
         sec.title = ordered(ii).title;
-        sec.items = num2cell(ordered(ii).items);
+        % items is a cell array; each element is either a doc struct or
+        % a subsection struct {subsection, items}. For doc structs, wrap
+        % in a cell so jsonencode produces [{...}, {subsection:...}, ...]
+        items = ordered(ii).items;
+        encoded = cell(1, numel(items));
+        for jj = 1:numel(items)
+            entry = items{jj};
+            if isstruct(entry) && isfield(entry, 'subsection')
+                % subsection: wrap its items in cells for consistent JSON
+                sub = struct();
+                sub.subsection = entry.subsection;
+                sub.items = num2cell(entry.items);
+                encoded{jj} = sub;
+            else
+                encoded{jj} = entry;
+            end
+        end
+        sec.items = encoded;
         sectionCells{ii} = sec;
     end
     output.sections = sectionCells;

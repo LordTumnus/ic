@@ -11,7 +11,7 @@ classdef TweakPane < ic.core.ComponentContainer
         Expanded (1,1) logical = true
     end
 
-    properties (Access = private)
+    properties (Access = private, Hidden)
         % monotonic counter for stable blade targets
         NextBladeIndex (1,1) double = 0
     end
