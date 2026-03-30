@@ -4,8 +4,8 @@ classdef View < matlab.ui.componentcontainer.ComponentContainer
    % Wraps a uihtml element that serves front/dist/index.html over a local
    % HTTPS server, and opens it in an <iframe> inside a uifigure.
    % Communication uses two named event channels:
-   %   MATLAB → JS: components propagate their #ic.event.JsEvent up the tree until the view, responsible for calling __sendEventToHTMLSource(h, "ic", payload)__
-   %   JS → MATLAB: uihtmls __HTMLEventReceivedFcn__ captures frontend events and routes them to the appropriate component handler via #ic.Frame.Registry lookup.
+   %  - MATLAB → JS: components propagate their #ic.event.JsEvent up the tree until the view, responsible for calling __sendEventToHTMLSource(h, "ic", payload)__
+   %  - JS → MATLAB: uihtmls __HTMLEventReceivedFcn__ captures frontend events and routes them to the appropriate component handler via #ic.Frame.Registry lookup.
    %
    % Before each send, #ic.AssetRegistry.activate is called so
    % that asset deduplication (hash-only stubs for repeated assets) is
