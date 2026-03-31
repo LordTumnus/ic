@@ -242,6 +242,10 @@
 
   .ic-tp__list {
     overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .ic-tp__list::-webkit-scrollbar {
+    display: none;
   }
 
   /* ===== ROW ===== */

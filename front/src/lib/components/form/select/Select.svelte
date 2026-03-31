@@ -579,6 +579,10 @@
   .ic-select__list {
     overflow-y: auto;
     padding: 4px 0;
+    scrollbar-width: none;
+  }
+  .ic-select__list::-webkit-scrollbar {
+    display: none;
   }
 
   /* ===== OPTIONS ===== */

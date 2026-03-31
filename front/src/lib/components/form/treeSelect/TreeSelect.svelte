@@ -666,14 +666,13 @@
     align-items: center;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
     gap: 3px;
     flex: 1;
     min-width: 0;
   }
 
-  .ic-ts__tags-area::-webkit-scrollbar { height: 3px; }
-  .ic-ts__tags-area::-webkit-scrollbar-track { background: transparent; }
-  .ic-ts__tags-area::-webkit-scrollbar-thumb { background: var(--ic-border); border-radius: 3px; }
+  .ic-ts__tags-area::-webkit-scrollbar { display: none; }
 
   .ic-ts__input {
     flex: 1;
@@ -762,6 +761,10 @@
   .ic-ts__search-list {
     overflow-y: auto;
     padding: 4px 0;
+    scrollbar-width: none;
+  }
+  .ic-ts__search-list::-webkit-scrollbar {
+    display: none;
   }
 
   .ic-ts__search-item {
@@ -844,6 +847,10 @@
     left: 0;
     max-width: 100%;
     overflow-x: auto;
+    scrollbar-width: none;
     padding: 0 12px 16px 0;
+  }
+  .ic-ts__cascade::-webkit-scrollbar {
+    display: none;
   }
 </style>
