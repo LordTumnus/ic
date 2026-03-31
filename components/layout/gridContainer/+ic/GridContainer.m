@@ -6,7 +6,6 @@ classdef GridContainer < ic.core.ComponentContainer
         Columns {ic.check.CssValidators.mustBeGridTemplate} = "1fr"
 
         % row track sizes as a CSS [grid-template-rows](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/grid-template-rows) string
-
         Rows {ic.check.CssValidators.mustBeGridTemplate} = "auto"
 
         % spacing between grid cells, in pixels or as a CSS string
