@@ -632,16 +632,10 @@
   .ic-tc__bar--scroll {
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
   }
   .ic-tc__bar--scroll::-webkit-scrollbar {
-    height: 3px;
-  }
-  .ic-tc__bar--scroll::-webkit-scrollbar-thumb {
-    background: var(--ic-muted-foreground);
-    border-radius: 1px;
-  }
-  .ic-tc__bar--scroll::-webkit-scrollbar-track {
-    background: transparent;
+    display: none;
   }
 
   .ic-tc__bar--wrap {

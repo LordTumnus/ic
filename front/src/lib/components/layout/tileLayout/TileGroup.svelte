@@ -308,14 +308,10 @@
     min-height: 0;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
   }
 
-  .ic-tg__bar::-webkit-scrollbar { height: 3px; }
-  .ic-tg__bar::-webkit-scrollbar-thumb {
-    background: var(--ic-muted-foreground);
-    border-radius: 1px;
-  }
-  .ic-tg__bar::-webkit-scrollbar-track { background: transparent; }
+  .ic-tg__bar::-webkit-scrollbar { display: none; }
 
   /* -- Tab button -- */
   .ic-tg__tab {
