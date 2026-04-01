@@ -288,12 +288,8 @@
   /* ═══════ ROW — matches TableRow.svelte .ic-tbl__row ═══════ */
   .ic-tt__row {
     display: flex;
-    box-shadow: inset 0 -1px 0 var(--ic-border);
     transition: background-color 0.08s ease;
     user-select: none;
-  }
-  .ic-tt__row:last-child {
-    box-shadow: none;
   }
   .ic-tt__row:hover {
     background: rgba(0, 0, 0, 0.03);
@@ -319,6 +315,7 @@
   .ic-tt__row--folder {
     cursor: pointer;
     font-weight: 500;
+    box-shadow: inset 0 -1px 0 var(--ic-border);
   }
 
   /* Leaf row */

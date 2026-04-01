@@ -102,7 +102,7 @@
     class="ic-tn__row"
     class:ic-tn__row--expanded={isExpanded}
     class:ic-tn__row--disabled={disabled || (!isFolder && selectable && atMaxSelections && !isItemSelected(node.key))}
-    style="padding-left: {showLine ? 0 : depth * INDENT_REM[size ?? 'md']}rem"
+    style="padding-left: {showLine ? 0 : (depth + 1) * INDENT_REM[size ?? 'md']}rem"
     role="treeitem"
     tabindex={-1}
     aria-expanded={isFolder ? isExpanded : undefined}
