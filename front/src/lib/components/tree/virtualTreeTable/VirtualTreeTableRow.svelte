@@ -16,6 +16,7 @@
     columns,
     columnWidths,
     expanderField,
+    nameField = '',
     size = 'md',
     showLine = false,
     disabled = false,
@@ -42,6 +43,7 @@
     columns: TableColumn[];
     columnWidths: number[];
     expanderField: string;
+    nameField?: string;
     size?: string;
     showLine?: boolean;
     disabled?: boolean;
@@ -76,7 +78,7 @@
   const folderOpenSvg = $derived(resolveIcon('folder-open', FOLDER_SIZES[size] ?? 14));
 
   function getCellValue(field: string): unknown {
-    if (field === expanderField) return node.name;
+    if (field === nameField) return node.name;
     return (node as VirtualTreeTableNode).data?.[field] ?? null;
   }
 
@@ -265,7 +267,7 @@
         oncontextmenu={(e: MouseEvent) => handleCellContextMenu(e, col)}
       >
         {#if isExpander}
-          <!-- Expander cell: guides + icon + label -->
+          <!-- Expander cell: guides + value -->
           <div class="ic-tt__expander">
             {#if showLine}
               <span class="ic-tt__guides">
@@ -286,18 +288,37 @@
               <span style="width: {depth * indent}rem; flex-shrink: 0"></span>
             {/if}
 
-            <span
-              class="ic-tt__content"
-              class:ic-tt__content--selected={selectable && selected}
-            >
+            {#if col.field === nameField}
+              <!-- Name column as expander: icon + name label -->
+              <span
+                class="ic-tt__content"
+                class:ic-tt__content--selected={selectable && selected}
+              >
+                {#if node.icon}
+                  {@const svg = resolveIcon(node.icon, ICON_SIZES[size] ?? 12)}
+                  {#if svg}
+                    <span class="ic-tt__icon">{@html svg}</span>
+                  {/if}
+                {/if}
+                <span class="ic-tt__label">{node.name}</span>
+              </span>
+            {:else}
+              <!-- Data column as expander: node icon + formatted cell value -->
               {#if node.icon}
                 {@const svg = resolveIcon(node.icon, ICON_SIZES[size] ?? 12)}
                 {#if svg}
                   <span class="ic-tt__icon">{@html svg}</span>
                 {/if}
               {/if}
-              <span class="ic-tt__label">{node.name}</span>
-            </span>
+              <TableCell
+                column={col}
+                value={cellValue}
+                editing={isEditing}
+                oncommitedit={(oldVal, newVal) => handleCommitEdit(col.field, oldVal, newVal)}
+                oncanceledit={oncanceledit}
+                oncellaction={(data) => handleCellAction(col.field, data)}
+              />
+            {/if}
           </div>
         {:else}
           <!-- Data cell: delegate to TableCell -->
@@ -542,5 +563,13 @@
   .ic-tt__cell > :global(.ic-tbl__cell) {
     flex: 1;
     min-width: 0;
+  }
+  /* Inside expander cell: TableCell takes remaining space, always left-aligned */
+  .ic-tt__expander > :global(.ic-tbl__cell) {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 0;
   }
 </style>

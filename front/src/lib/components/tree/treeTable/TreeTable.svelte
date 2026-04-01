@@ -121,13 +121,27 @@
   });
 
   // --- Columns ---
-  const visibleColumns = $derived(
-    columns.filter((c) => c.visible !== false),
-  );
+  // Reorder so the expander column is always first
+  const visibleColumns = $derived.by(() => {
+    const cols = columns.filter((c) => c.visible !== false);
+    if (!expanderColumn || cols.length === 0) return cols;
+    const idx = cols.findIndex((c) => c.field === expanderColumn);
+    if (idx <= 0) return cols; // already first or not found
+    const reordered = [...cols];
+    const [expCol] = reordered.splice(idx, 1);
+    reordered.unshift(expCol);
+    return reordered;
+  });
 
   // Resolve expander field: explicit or first column
   const expanderField = $derived(
     expanderColumn || (visibleColumns.length > 0 ? visibleColumns[0].field : ''),
+  );
+
+  // The "name field" is the first column in the user-defined order (before reordering).
+  // It always maps to node.name, regardless of which column is the expander.
+  const nameField = $derived(
+    columns.filter((c) => c.visible !== false)[0]?.field || '',
   );
 
   // Column widths
@@ -451,6 +465,7 @@
           columns={visibleColumns}
           {columnWidths}
           {expanderField}
+          {nameField}
           {size}
           {showLine}
           {disabled}
