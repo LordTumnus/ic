@@ -48,7 +48,16 @@ function out = toTransport(data)
 
    % TransportData protocol (Asset, Node, Column, Entry, Theme, …)
    if isa(data, 'ic.event.TransportData')
-      out = ic.utils.toTransport(data.toStruct());
+      if isscalar(data)
+         out = ic.utils.toTransport(data.toStruct());
+      else
+         n = numel(data);
+         c = cell(1, n);
+         for ii = 1:n
+            c{ii} = ic.utils.toTransport(data(ii).toStruct());
+         end
+         out = c;
+      end
       return
    end
 
