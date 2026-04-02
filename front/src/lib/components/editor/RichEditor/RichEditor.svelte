@@ -248,7 +248,7 @@
                 placement: 'top',
               },
             }),
-            Focus.configure({ className: 'has-focus', mode: 'deepest' }),
+            Focus.configure({ className: 'has-focus', mode: 'shallowest' }),
             FontFamily,
             CodeBlockLowlight.configure({ lowlight: lowlight as any }),
             CodeBlockLanguageSelector,
