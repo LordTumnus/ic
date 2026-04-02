@@ -143,11 +143,12 @@
     const svg = svgContainerEl.querySelector('svg');
     if (!svg) return;
 
-    // Make SVG fill the container and remove inline dimensions
-    svg.removeAttribute('height');
-    svg.style.width = '100%';
-    svg.style.height = '100%';
+    // Keep SVG at its natural size — read viewBox dimensions and pin them
+    const svgW = svg.viewBox?.baseVal?.width || svg.getBoundingClientRect().width || 1;
+    const svgH = svg.viewBox?.baseVal?.height || svg.getBoundingClientRect().height || 1;
     svg.style.maxWidth = 'none';
+    svg.setAttribute('width', String(svgW));
+    svg.setAttribute('height', String(svgH));
 
     // Create zoom behavior
     zoomBehavior = d3Zoom.zoom<HTMLDivElement, unknown>()
@@ -159,9 +160,11 @@
         currentZoom = k;
       });
 
-    // Apply to viewport
+    // Apply to viewport and set initial fit-to-view transform
     const sel = d3Selection.select(viewportEl);
     sel.call(zoomBehavior as any);
+    const fit = computeFitTransform();
+    if (fit) zoomBehavior.transform(sel, fit);
   }
 
   // ─── Manual render ──────────────────────────────────────────────────
@@ -185,6 +188,26 @@
     });
   }
 
+  // ─── Fit-to-viewport helper ────────────────────────────────────────────
+  const FIT_PAD = 16;
+
+  function computeFitTransform() {
+    if (!d3Zoom || !viewportEl || !svgContainerEl) return d3Zoom?.zoomIdentity;
+    const svg = svgContainerEl.querySelector('svg');
+    if (!svg) return d3Zoom.zoomIdentity;
+
+    const svgW = svg.viewBox?.baseVal?.width || parseFloat(svg.getAttribute('width') || '1');
+    const svgH = svg.viewBox?.baseVal?.height || parseFloat(svg.getAttribute('height') || '1');
+    const vpW = viewportEl.clientWidth;
+    const vpH = viewportEl.clientHeight;
+    const scaleX = (vpW - FIT_PAD * 2) / svgW;
+    const scaleY = (vpH - FIT_PAD * 2) / svgH;
+    const fitScale = Math.min(scaleX, scaleY, 1);
+    const tx = (vpW - svgW * fitScale) / 2;
+    const ty = (vpH - svgH * fitScale) / 2;
+    return d3Zoom.zoomIdentity.translate(tx, ty).scale(fitScale);
+  }
+
   // ─── Zoom actions ─────────────────────────────────────────────────────
   function doZoomIn() {
     if (!zoomBehavior || !d3Selection || !viewportEl) return;
@@ -201,7 +224,8 @@
   function doResetView() {
     if (!zoomBehavior || !d3Selection || !d3Zoom || !viewportEl) return;
     const sel = d3Selection.select(viewportEl) as any;
-    zoomBehavior.transform(sel.transition().duration(TRANSITION_MS), d3Zoom.zoomIdentity);
+    const fit = computeFitTransform();
+    if (fit) zoomBehavior.transform(sel.transition().duration(TRANSITION_MS), fit);
   }
 
   // ─── Method overrides ─────────────────────────────────────────────────
