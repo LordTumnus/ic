@@ -305,9 +305,15 @@ export async function renderTypstPdf(
  * groups are detected.
  */
 function extractPages(svgString: string): string[] {
+  // Parse via HTML parser — typst.ts SVG output can contain constructs
+  // that are invalid XML but valid in HTML's more lenient SVG parser.
   const parser = new DOMParser();
-  const doc = parser.parseFromString(svgString, 'image/svg+xml');
-  const svg = doc.documentElement;
+  const doc = parser.parseFromString(svgString, 'text/html');
+  const svg = doc.querySelector('svg');
+
+  if (!svg) {
+    return [svgString];
+  }
 
   // Find page groups — typst.ts uses data-page-width on page <g> elements
   let pageGroups = svg.querySelectorAll(':scope > g[data-page-width]');
