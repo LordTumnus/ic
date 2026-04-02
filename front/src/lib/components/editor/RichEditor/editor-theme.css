@@ -19,6 +19,17 @@
   margin-top: 0;
 }
 
+/* ── Placeholder ────────────────────────────────────────────────────── */
+.ic-rte__editor .ProseMirror .is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ic-muted-foreground);
+  font-style: italic;
+  opacity: 0.5;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
 /* ── Headings ────────────────────────────────────────────────────────── */
 .ic-rte__editor h1,
 .ic-rte__editor h2,

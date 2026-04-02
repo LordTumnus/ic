@@ -155,11 +155,15 @@
 
   // ── Computed ──────────────────────────────────────────
   const readingTime = $derived(Math.max(1, Math.ceil(wordCount / 200)));
-  const selectedWordCount = $derived.by(() => {
+  const hasTextSelection = $derived.by(() => {
     void txCount; // re-evaluate on transactions
-    if (!editor) return 0;
+    if (!editor) return false;
     const { from, to } = editor.state.selection;
-    if (from === to) return 0;
+    return from !== to;
+  });
+  const selectedWordCount = $derived.by(() => {
+    if (!hasTextSelection || !editor) return 0;
+    const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, ' ');
     return text.split(/\s+/).filter(Boolean).length;
   });
@@ -243,10 +247,6 @@
             Typography,
             BubbleMenu.configure({
               element: bubbleMenuEl,
-              tippyOptions: {
-                duration: [150, 100],
-                placement: 'top',
-              },
             }),
             Focus.configure({ className: 'has-focus', mode: 'shallowest' }),
             FontFamily,
@@ -587,12 +587,12 @@
   // ─── Placeholder sync ──────────────────────────────
   $effect(() => {
     if (!editor) return;
-    // TipTap placeholder doesn't support dynamic reconfiguration easily,
-    // so we update the data attribute on the element directly
-    const pm = editor.view.dom as HTMLElement;
-    if (pm) {
-      pm.setAttribute('data-placeholder', placeholderText);
-    }
+    // Reconfigure the placeholder extension with the new text
+    editor.extensionManager.extensions
+      .find((ext) => ext.name === 'placeholder')
+      ?.options && (editor.extensionManager.extensions.find((ext) => ext.name === 'placeholder')!.options.placeholder = placeholderText);
+    // Force decoration refresh
+    editor.view.dispatch(editor.state.tr);
   });
 
   // ─── Link click interception ────────────────────────
@@ -846,9 +846,10 @@
   let txCount = $state(0);
   $effect(() => {
     if (!editor) return;
+    const ed = editor;
     const handler = () => { txCount++; };
-    editor.on('transaction', handler);
-    return () => { editor!.off('transaction', handler); };
+    ed.on('transaction', handler);
+    return () => { ed.off('transaction', handler); };
   });
 </script>
 
@@ -895,8 +896,8 @@
   </div>
 
   <!-- Bubble menu (anchor element for TipTap BubbleMenu extension) -->
-  <div bind:this={bubbleMenuEl} style="position: absolute; visibility: hidden;">
-    {#if editor && !readOnly && !disabled}
+  <div bind:this={bubbleMenuEl} style="visibility: hidden; position: absolute; top: 0; left: 0;">
+    {#if editor && !readOnly && !disabled && hasTextSelection}
       <BubbleToolbar
         {editor}
         onLinkClick={openLinkDialog}
