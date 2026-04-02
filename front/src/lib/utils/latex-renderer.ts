@@ -51,7 +51,7 @@ interface CompileResult {
   log: string;
 }
 
-const ENGINE_PATH = './wasm/swiftlatex/swiftlatexpdftex.js';
+const ENGINE_PATH = '/wasm/swiftlatex/swiftlatexpdftex.js';
 
 class PdfTeXEngine {
   private worker: Worker | undefined;
@@ -195,13 +195,13 @@ const imageMap = new Map<string, string | null>();
 const BUNDLE_VERSION = '5';
 
 /** Bundled TeX Live packages (.sty, .cls, etc.) as JSON: { filename: content } */
-const TEXLIVE_BUNDLE_PATH = `./wasm/swiftlatex/texlive-bundle.json?v=${BUNDLE_VERSION}`;
+const TEXLIVE_BUNDLE_PATH = `/wasm/swiftlatex/texlive-bundle.json?v=${BUNDLE_VERSION}`;
 
 /** Bundled font files (.tfm, .pfb, .map) as JSON: { filename: base64 } */
-const TEXLIVE_FONTS_PATH = `./wasm/swiftlatex/texlive-fonts.json?v=${BUNDLE_VERSION}`;
+const TEXLIVE_FONTS_PATH = `/wasm/swiftlatex/texlive-fonts.json?v=${BUNDLE_VERSION}`;
 
 /** Pre-compiled LaTeX format file (the LaTeX kernel in binary form). */
-const FORMAT_FILE_PATH = `./wasm/swiftlatex/swiftlatexpdftex.fmt.bin?v=${BUNDLE_VERSION}`;
+const FORMAT_FILE_PATH = `/wasm/swiftlatex/swiftlatexpdftex.fmt.bin?v=${BUNDLE_VERSION}`;
 
 /**
  * Lazy-load the PdfTeX WASM engine on first use.
@@ -256,6 +256,12 @@ async function ensureEngine(): Promise<void> {
 }
 
 // ============================================================================
+// Compile queue — serializes concurrent compilations from multiple components
+// ============================================================================
+
+let compileQueue: Promise<void> = Promise.resolve();
+
+// ============================================================================
 // Compilation
 // ============================================================================
 
@@ -288,13 +294,22 @@ function injectPreamble(source: string): string {
  * Lazy-loads the WASM engine on first call. Returns PDF bytes on success
  * or an error message with the TeX log on failure.
  */
-export async function compileLaTeX(
+export function compileLaTeX(
   source: string,
 ): Promise<LatexCompileResult | LatexCompileError> {
   if (!source.trim()) {
-    return { message: 'Empty LaTeX source', log: '', ok: false };
+    return Promise.resolve({ message: 'Empty LaTeX source', log: '', ok: false });
   }
 
+  // Queue compilations so multiple components don't stomp on MemFS
+  const result = compileQueue.then(() => doCompile(source));
+  compileQueue = result.then(() => {}, () => {});
+  return result;
+}
+
+async function doCompile(
+  source: string,
+): Promise<LatexCompileResult | LatexCompileError> {
   try {
     await ensureEngine();
 
