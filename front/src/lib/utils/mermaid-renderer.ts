@@ -129,6 +129,10 @@ let mermaidModule: typeof import('mermaid') | null = null;
 let initPromise: Promise<void> | null = null;
 let renderCounter = 0;
 
+// Mutex: serialize initialize() + render() so concurrent instances
+// cannot stomp each other's theme variables.
+let renderQueue: Promise<unknown> = Promise.resolve();
+
 // ============================================================================
 // Rendering
 // ============================================================================
@@ -139,6 +143,9 @@ let renderCounter = 0;
  * Lazy-loads the mermaid library on first call. Reads `--ic-mermaid-*`
  * CSS vars from `element` to configure the base theme. Returns either
  * the SVG markup or an error message for invalid definitions.
+ *
+ * Renders are serialized: initialize() and render() run as an atomic
+ * pair so one instance's theme cannot leak into another's output.
  */
 export async function renderMermaid(
   definition: string,
@@ -149,19 +156,27 @@ export async function renderMermaid(
     return { message: 'Empty diagram definition', ok: false };
   }
 
-  try {
-    const el = element ?? document.documentElement;
-    await ensureLoaded(el, options);
-    const id = `ic-mermaid-${++renderCounter}`;
-    const { svg } = await mermaidModule!.default.render(id, definition.trim());
-    return { svg, ok: true };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // Clean up any orphaned render containers mermaid may have left
-    const orphan = document.getElementById(`dic-mermaid-${renderCounter}`);
-    orphan?.remove();
-    return { message, ok: false };
-  }
+  // Chain onto the render queue so initialize+render are atomic
+  const result = renderQueue.then(async () => {
+    try {
+      const el = element ?? document.documentElement;
+      await ensureLoaded(el, options);
+      const id = `ic-mermaid-${++renderCounter}`;
+      const { svg } = await mermaidModule!.default.render(id, definition.trim());
+      return { svg, ok: true } as RenderResult;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Clean up any orphaned render containers mermaid may have left
+      const orphan = document.getElementById(`dic-mermaid-${renderCounter}`);
+      orphan?.remove();
+      return { message, ok: false } as RenderError;
+    }
+  });
+
+  // Update the queue (swallow rejections so the chain never breaks)
+  renderQueue = result.then(() => {}, () => {});
+
+  return result;
 }
 
 // ============================================================================
