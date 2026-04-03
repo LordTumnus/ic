@@ -51,7 +51,9 @@ interface CompileResult {
   log: string;
 }
 
-const ENGINE_PATH = '/wasm/swiftlatex/swiftlatexpdftex.js';
+/** Vite base: './' in front (MATLAB relative paths), '/' in web (root-absolute). */
+const WASM_DIR = `${import.meta.env.BASE_URL}wasm/swiftlatex`;
+const ENGINE_PATH = `${WASM_DIR}/swiftlatexpdftex.js`;
 
 class PdfTeXEngine {
   private worker: Worker | undefined;
@@ -195,13 +197,13 @@ const imageMap = new Map<string, string | null>();
 const BUNDLE_VERSION = '5';
 
 /** Bundled TeX Live packages (.sty, .cls, etc.) as JSON: { filename: content } */
-const TEXLIVE_BUNDLE_PATH = `/wasm/swiftlatex/texlive-bundle.json?v=${BUNDLE_VERSION}`;
+const TEXLIVE_BUNDLE_PATH = `${WASM_DIR}/texlive-bundle.json?v=${BUNDLE_VERSION}`;
 
 /** Bundled font files (.tfm, .pfb, .map) as JSON: { filename: base64 } */
-const TEXLIVE_FONTS_PATH = `/wasm/swiftlatex/texlive-fonts.json?v=${BUNDLE_VERSION}`;
+const TEXLIVE_FONTS_PATH = `${WASM_DIR}/texlive-fonts.json?v=${BUNDLE_VERSION}`;
 
 /** Pre-compiled LaTeX format file (the LaTeX kernel in binary form). */
-const FORMAT_FILE_PATH = `/wasm/swiftlatex/swiftlatexpdftex.fmt.bin?v=${BUNDLE_VERSION}`;
+const FORMAT_FILE_PATH = `${WASM_DIR}/swiftlatexpdftex.fmt.bin?v=${BUNDLE_VERSION}`;
 
 /**
  * Lazy-load the PdfTeX WASM engine on first use.
