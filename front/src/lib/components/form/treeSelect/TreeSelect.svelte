@@ -5,6 +5,7 @@
   import Tag from '$lib/components/shared/Tag.svelte';
   import TreePanel from './TreePanel.svelte';
   import { resolveIcon } from '$lib/utils/icons';
+  import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
   import {
     type TreeNode,
     type FlatNode,
@@ -354,6 +355,15 @@
     searchFocusedIndex = -1;
   });
 
+  // Compute fixed position when dropdown opens
+  let ddPos = $state('');
+  $effect(() => {
+    if (isOpen && rootEl) {
+      const pos = computeDropdownPosition(rootEl, { dropdownHeight: 300 });
+      ddPos = dropdownStyle(pos);
+    }
+  });
+
   function handleFieldClick() {
     if (disabled) return;
     if (!isOpen) openDropdown();
@@ -547,7 +557,7 @@
   {#if isOpen}
     {#if isSearchMode}
       <!-- Flat search results (leaves only) -->
-      <div class="ic-ts__dropdown">
+      <div class="ic-ts__dropdown" style={ddPos}>
         <div class="ic-ts__search-list" style="max-height: {toSize(maxPopupHeight)};">
           {#each filteredFlat as node, i (node.key)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -592,7 +602,7 @@
       </div>
     {:else}
       <!-- Cascading tree panels (flex row, scrolls horizontally) -->
-      <div class="ic-ts__cascade">
+      <div class="ic-ts__cascade" style={ddPos}>
         <TreePanel
           nodes={treeState}
           {size}
@@ -746,11 +756,8 @@
 
   /* ===== DROPDOWN (search mode) ===== */
   .ic-ts__dropdown {
-    position: absolute;
+    position: fixed;
     z-index: 50;
-    top: calc(100% + 4px);
-    left: 0;
-    width: 100%;
     background: var(--ic-background);
     border: 1px solid var(--ic-border);
     border-radius: 3px;
@@ -841,11 +848,8 @@
 
   /* ===== CASCADE (tree panel mode, horizontal scroll) ===== */
   .ic-ts__cascade {
-    position: absolute;
+    position: fixed;
     z-index: 50;
-    top: calc(100% + 4px);
-    left: 0;
-    max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
     padding: 0 12px 16px 0;

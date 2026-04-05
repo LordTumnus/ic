@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
+  import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
 
   let {
     items = $bindable(['Option 1', 'Option 2', 'Option 3']),
@@ -262,6 +263,15 @@
     focusedIndex = -1;
   });
 
+  // Compute fixed position when dropdown opens
+  let ddPos = $state('');
+  $effect(() => {
+    if (isOpen && fieldEl) {
+      const pos = computeDropdownPosition(fieldEl, { dropdownHeight: maxPopupHeight + 40 });
+      ddPos = dropdownStyle(pos);
+    }
+  });
+
   // --- Methods ---
   onMount(() => {
     focus = (): Resolution => {
@@ -353,7 +363,7 @@
 
   <!-- Dropdown -->
   {#if isOpen}
-    <div bind:this={dropdownEl} class="ic-select__dropdown">
+    <div bind:this={dropdownEl} class="ic-select__dropdown" style={ddPos}>
       {#if searchable}
         <div class="ic-select__search-wrap">
           <input
@@ -531,11 +541,8 @@
 
   /* ===== DROPDOWN ===== */
   .ic-select__dropdown {
-    position: absolute;
+    position: fixed;
     z-index: 50;
-    top: calc(100% + 4px);
-    left: 0;
-    width: 100%;
     display: flex;
     flex-direction: column;
     background-color: var(--ic-background);

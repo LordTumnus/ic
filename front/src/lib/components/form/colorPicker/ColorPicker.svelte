@@ -110,14 +110,21 @@
     return below >= above ? 'bottom' : 'top';
   }
 
-  const popupStyle = $derived.by(() => {
+  // Compute fixed-position style so the popup escapes ancestor overflow containers
+  let popupFixedStyle = $state('');
+  $effect(() => {
+    if (!isOpen || !rootEl) return;
     const pos = popupPosition === 'best' ? resolvedPosition : popupPosition;
+    const rect = rootEl.getBoundingClientRect();
+    const gap = 4;
+    let top: number, left: number;
     switch (pos) {
-      case 'top': return 'bottom: calc(100% + 4px); left: 0;';
-      case 'right': return 'top: 0; left: calc(100% + 4px);';
-      case 'left': return 'top: 0; right: calc(100% + 4px);';
-      default: return 'top: calc(100% + 4px); left: 0;';
+      case 'top':    top = rect.top - 300 - gap;  left = rect.left; break;
+      case 'right':  top = rect.top;               left = rect.right + gap; break;
+      case 'left':   top = rect.top;               left = rect.left - 220 - gap; break;
+      default:       top = rect.bottom + gap;      left = rect.left; break;
     }
+    popupFixedStyle = `top: ${top}px; left: ${left}px`;
   });
 
   // --- Emit formatted value ---
@@ -289,7 +296,7 @@
 
   <!-- Popup -->
   {#if isOpen}
-    <div bind:this={popupEl} class="ic-color-picker__popup" style={popupStyle}>
+    <div bind:this={popupEl} class="ic-color-picker__popup" style={popupFixedStyle}>
       <SaturationValuePad
         hue={internalHue}
         bind:saturation={internalSatV}
@@ -398,7 +405,7 @@
 
   /* ── Popup ─────────────────────────────── */
   .ic-color-picker__popup {
-    position: absolute;
+    position: fixed;
     z-index: 50;
     display: flex;
     flex-direction: column;

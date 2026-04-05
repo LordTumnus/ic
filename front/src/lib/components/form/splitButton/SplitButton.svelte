@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Resolution, ChildEntries } from '$lib/types';
+  import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
 
   let {
     items = $bindable<string[] | string>([]),
@@ -122,6 +123,15 @@
       closePopup();
     }
   }
+
+  // Compute fixed position when popup opens
+  let ddPos = $state('');
+  $effect(() => {
+    if (isOpen && rootEl) {
+      const pos = computeDropdownPosition(rootEl, { offset: 3, matchWidth: false });
+      ddPos = dropdownStyle(pos);
+    }
+  });
 </script>
 
 <div
@@ -195,7 +205,7 @@
 
   <!-- Dropdown popup -->
   {#if isOpen}
-    <div class="ic-split-btn__popup">
+    <div class="ic-split-btn__popup" style={ddPos}>
       {#each itemList as item, i (item)}
         {@const hasDesc = !!descList[i]}
         <button
@@ -462,9 +472,7 @@
 
   /* ===== POPUP ===== */
   .ic-split-btn__popup {
-    position: absolute;
-    top: calc(100% + 3px);
-    left: 0;
+    position: fixed;
     z-index: 50;
     width: max-content;
     background-color: var(--ic-background);

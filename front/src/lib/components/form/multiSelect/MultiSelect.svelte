@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import type { Resolution } from '$lib/types';
   import Tag from '$lib/components/shared/Tag.svelte';
+  import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
 
   let {
     items = $bindable(['Option 1', 'Option 2', 'Option 3']),
@@ -306,6 +307,15 @@
     focusedOptionIndex = -1;
   });
 
+  // Compute fixed position when dropdown opens
+  let ddPos = $state('');
+  $effect(() => {
+    if (isOpen && fieldEl) {
+      const pos = computeDropdownPosition(fieldEl, { dropdownHeight: maxPopupHeight + 40 });
+      ddPos = dropdownStyle(pos);
+    }
+  });
+
   // --- Field click ---
   function handleFieldClick() {
     if (disabled) return;
@@ -422,7 +432,7 @@
 
   <!-- Dropdown -->
   {#if isOpen}
-    <div class="ic-ms__dropdown">
+    <div class="ic-ms__dropdown" style={ddPos}>
       <div
         class="ic-ms__list"
         role="listbox"
@@ -618,11 +628,8 @@
 
   /* ===== DROPDOWN ===== */
   .ic-ms__dropdown {
-    position: absolute;
+    position: fixed;
     z-index: 50;
-    top: calc(100% + 4px);
-    left: 0;
-    width: 100%;
     display: flex;
     flex-direction: column;
     background-color: var(--ic-background);
