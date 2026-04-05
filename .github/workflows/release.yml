@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: front
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: front
+
+      - name: Package release
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          STAGING="ic-${VERSION}"
+
+          # Copy everything, then remove what users don't need
+          rsync -a --exclude='.git' --exclude='web' --exclude='test' ./ "$STAGING/"
+
+          # Replace front source with just the built output
+          rm -rf "$STAGING/front/node_modules" "$STAGING/front/src" "$STAGING/front/.gitignore"
+          rm -f  "$STAGING/front/package.json" "$STAGING/front/package-lock.json"
+          rm -f  "$STAGING/front/tsconfig.json" "$STAGING/front/tsconfig.app.json" "$STAGING/front/tsconfig.node.json"
+          rm -f  "$STAGING/front/vite.config.ts" "$STAGING/front/svelte.config.js" "$STAGING/front/index.html"
+
+          # Clean up dev/CI files
+          rm -rf "$STAGING/.github" "$STAGING/.claude" "$STAGING/.vscode"
+
+          zip -r "ic-${VERSION}.zip" "$STAGING"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ic-*.zip
+          generate_release_notes: true
