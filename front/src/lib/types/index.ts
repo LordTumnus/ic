@@ -133,9 +133,15 @@ export interface MethodDefinition {
  * Used for both dynamic children (via @insert) and static children
  * (declared in MATLAB constructor). For standalone Svelte usage
  * without an IC Component backing, use the `entry()` helper.
+ *
+ * Headless components omit `snippet` (no DOM).
+ * Attachable components omit `snippet` but provide `attach`/`detach`
+ * for mounting into a parent-provided element.
  */
 export interface ChildEntry {
-  snippet: Snippet;
+  snippet?: Snippet;
+  attach?: (target: HTMLElement) => void;
+  detach?: () => void;
   id: string;
   type: string;
   props: Record<string, unknown>;

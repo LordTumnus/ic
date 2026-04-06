@@ -36,7 +36,7 @@ import logger from './logger';
  * reads/writes from `$state`-backed storage. This makes child data reactive
  * from the parent's Svelte template without mounting the child component.
  */
-function buildChildProxies(child: Component): Omit<ChildEntry, 'snippet'> {
+function buildChildProxies(child: Component): Omit<ChildEntry, 'snippet' | 'attach' | 'detach'> {
   const props: Record<string, any> = {};
   for (const name of child.propNames) {
     Object.defineProperty(props, name, {
@@ -85,6 +85,23 @@ function buildChildProxies(child: Component): Omit<ChildEntry, 'snippet'> {
   };
 }
 
+/**
+ * Build a complete ChildEntry for a child, handling headless/attachable modes.
+ */
+function buildChildEntry(child: Component): ChildEntry {
+  if (child.mixins.includes('headless')) {
+    return { ...buildChildProxies(child) };
+  }
+  if (child.mixins.includes('attachable')) {
+    return {
+      attach: (el: HTMLElement) => child.mountInto(el),
+      detach: () => child.unmountFrom(),
+      ...buildChildProxies(child)
+    };
+  }
+  return { snippet: child._snippet!, ...buildChildProxies(child) };
+}
+
 // ============================================================================
 // Batch mode — skip flushSync() during bulk event processing
 // ============================================================================
@@ -122,8 +139,14 @@ export async function handleInsert(
     child.svelteProps.staticChildren = await createStaticChildren(child, definition.staticChildren);
   }
 
-  const snippet = child.createSnippet();
-  child._snippet = snippet;
+  const isHeadless = child.mixins.includes('headless');
+  const isAttachable = child.mixins.includes('attachable');
+
+  // Create snippet only for normal components (not headless or attachable)
+  if (!isHeadless && !isAttachable) {
+    const snippet = child.createSnippet();
+    child._snippet = snippet;
+  }
 
   if (!parent._childEntries[target]) {
     // Auto-create the slot when @insert arrives before @prop/targets.
@@ -142,7 +165,7 @@ export async function handleInsert(
     }
   }
 
-  const childEntry: ChildEntry = { snippet, ...buildChildProxies(child) };
+  const childEntry = buildChildEntry(child);
   parent._childEntries[target].push(childEntry);
   child._childEntry = childEntry;
   parent.children.push(child);
@@ -175,6 +198,11 @@ export async function handleRemove(
 
   // Recursively deregister all descendants (handles nested static children)
   deregisterTree(child);
+
+  // Detach attachable components before removing
+  if (child._childEntry?.detach) {
+    child._childEntry.detach();
+  }
 
   // Remove entry from parent's child entries
   for (const slotName of Object.keys(parent._childEntries)) {
@@ -274,15 +302,26 @@ export async function handleReparent(
     return;
   }
 
-  // Create fresh snippet and entry for new parent
-  const newSnippet = child.createSnippet();
-  child._snippet = newSnippet;
+  const isHeadless = child.mixins.includes('headless');
+  const isAttachable = child.mixins.includes('attachable');
+
+  // Detach attachable from old parent before reparenting
+  if (isAttachable && child._childEntry?.detach) {
+    child._childEntry.detach();
+  }
+
+  // Create fresh snippet only for normal components
+  if (!isHeadless && !isAttachable) {
+    const newSnippet = child.createSnippet();
+    child._snippet = newSnippet;
+  }
   child._parentComponent = newParent;
 
   if (!newParent._childEntries[targetSlot]) {
     newParent._childEntries[targetSlot] = [];
   }
-  const newEntry: ChildEntry = { snippet: newSnippet, ...buildChildProxies(child) };
+
+  const newEntry = buildChildEntry(child);
   newParent._childEntries[targetSlot].push(newEntry);
   child._childEntry = newEntry;
 
@@ -304,7 +343,7 @@ export async function handleReorder(
 
   // Find the child
   const child = parent.children.find((c) => c.id === childId);
-  if (!child || !child._snippet) {
+  if (!child) {
     logger.warn('Container', '@reorder: Child not found', { childId });
     return;
   }
@@ -359,8 +398,14 @@ export async function createStaticChildren(
     child._parentComponent = parent;
 
     Registry.instance.register(child);
-    const snippet = child.createSnippet();
-    child._snippet = snippet;
+
+    const isHeadless = child.mixins.includes('headless');
+    const isAttachable = child.mixins.includes('attachable');
+
+    if (!isHeadless && !isAttachable) {
+      const snippet = child.createSnippet();
+      child._snippet = snippet;
+    }
 
     parent.children.push(child);
 
@@ -368,7 +413,7 @@ export async function createStaticChildren(
       result.set(def.target, []);
     }
 
-    const childEntry: ChildEntry = { snippet, ...buildChildProxies(child) };
+    const childEntry = buildChildEntry(child);
     child._childEntry = childEntry;
     result.get(def.target)!.push(childEntry);
 

@@ -307,8 +307,9 @@ class Component implements Registrable {
     this.subscribe('@reparent', (id, name, data) => handleReparent(this, id, name, data));
     this.subscribe('@reorder', (id, name, data) => handleReorder(this, id, name, data));
 
-    // Set up style handlers (only if component has Stylable mixin)
-    if (this.mixins.includes('stylable')) {
+    // Set up style handlers (only if component has Stylable mixin and is not headless)
+    const isHeadless = this.mixins.includes('headless');
+    if (this.mixins.includes('stylable') && !isHeadless) {
       this.subscribe('@style', (_id, _name, data) => {
         const { selector, styles } = data as StyleEventData;
         StyleManager.instance.setStyles(this.id, selector, styles);
@@ -334,8 +335,8 @@ class Component implements Registrable {
       });
     }
 
-    // JS effects (only if component has Effectable mixin)
-    if (this.mixins.includes('effectable')) {
+    // JS effects (only if component has Effectable mixin and is not headless)
+    if (this.mixins.includes('effectable') && !isHeadless) {
       this.subscribe('@jsEffect', (_id, _name, data) => {
         EffectManager.instance.createEffect(data as JsEffectEventData);
       });
@@ -344,8 +345,8 @@ class Component implements Registrable {
       });
     }
 
-    // Keyboard shortcuts (only if component has Keyable mixin)
-    if (this.mixins.includes('keyable')) {
+    // Keyboard shortcuts (only if component has Keyable mixin and is not headless)
+    if (this.mixins.includes('keyable') && !isHeadless) {
       KeyboardManager.instance.register(this.id);
       this.subscribe('@onKey', (_id, _name, data) => {
         const { shortcut, preventDefault, stopPropagation } = data as KeyEventData;
@@ -458,6 +459,47 @@ class Component implements Registrable {
         };
       }
     }));
+  }
+
+  /**
+   * Mount this component's Svelte instance into a parent-provided element.
+   * Used by attachable components instead of createSnippet().
+   * Sets the component ID on the target so StyleManager rules apply.
+   */
+  mountInto(target: HTMLElement): void {
+    if (!this._svelteComponent) {
+      logger.error('Component', 'Cannot mountInto: no Svelte component', {
+        componentId: this.id,
+        type: this.type
+      });
+      return;
+    }
+
+    // Stamp ID and type so StyleManager CSS rules match this element
+    target.id = this.id;
+    target.dataset.icType = this.type;
+
+    this._svelteInstance = mount(this._svelteComponent, {
+      target,
+      props: this.svelteProps
+    });
+
+    this._flushMounted(target);
+  }
+
+  /**
+   * Unmount this component from its attached element.
+   * Mirrors the cleanup logic from createSnippet()'s teardown.
+   */
+  unmountFrom(): void {
+    this._isMounted = false;
+    this._wrapperElement = null;
+    StyleManager.instance.clearStyles(this.id);
+    KeyboardManager.instance.unregister(this.id);
+    if (this._svelteInstance) {
+      unmount(this._svelteInstance);
+      this._svelteInstance = null;
+    }
   }
 
   /**

@@ -64,7 +64,10 @@ class Factory {
   async create(definition: ComponentDefinition): Promise<Component> {
     const { type, id, props, events, methods, mixins } = definition;
 
-    const svelteComp = await this.loadSvelteComponent(type);
+    // Headless components have no Svelte rendering
+    const svelteComp = mixins.includes('headless')
+      ? null
+      : await this.loadSvelteComponent(type);
 
     return new Component(id, type, props, events, methods, svelteComp, mixins);
   }
@@ -72,21 +75,28 @@ class Factory {
   /**
    * Synchronous create — returns Component directly when module is cached.
    * Returns null if the module hasn't been loaded yet.
+   * Headless components always succeed (no module needed).
    */
   createSync(definition: ComponentDefinition): Component | null {
-    const cached = this.moduleCache.get(definition.type);
-    if (!cached) return null;
     const { type, id, props, events, methods, mixins } = definition;
+
+    if (mixins.includes('headless')) {
+      return new Component(id, type, props, events, methods, null, mixins);
+    }
+
+    const cached = this.moduleCache.get(type);
+    if (!cached) return null;
     return new Component(id, type, props, events, methods, cached, mixins);
   }
 
   /**
    * Pre-load component modules into cache so createSync can be used.
+   * Headless types are skipped (no Svelte module to load).
    */
-  async preload(types: Iterable<string>): Promise<void> {
+  async preload(types: Iterable<string>, headlessTypes?: Set<string>): Promise<void> {
     const promises: Promise<void>[] = [];
     for (const type of types) {
-      if (!this.moduleCache.has(type)) {
+      if (!this.moduleCache.has(type) && !headlessTypes?.has(type)) {
         promises.push(this.loadSvelteComponent(type).then(() => {}));
       }
     }

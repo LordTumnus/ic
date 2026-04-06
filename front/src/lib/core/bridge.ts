@@ -116,12 +116,17 @@ class Bridge {
   /**
    * Collects all unique component types from @insert events (including
    * nested static children) so they can be pre-loaded before processing.
+   * Also identifies headless types that can skip Svelte module loading.
    */
-  private collectTypes(events: JsEvent[]): Set<string> {
+  private collectTypes(events: JsEvent[]): { types: Set<string>; headlessTypes: Set<string> } {
     const types = new Set<string>();
+    const headlessTypes = new Set<string>();
     const walk = (data: any) => {
       if (!data?.component?.type) return;
       types.add(data.component.type);
+      if (data.component.mixins?.includes('headless')) {
+        headlessTypes.add(data.component.type);
+      }
       if (data.component.staticChildren) {
         for (const sc of data.component.staticChildren) walk(sc);
       }
@@ -129,7 +134,7 @@ class Bridge {
     for (const e of events) {
       if (e.name === '@insert') walk(e.data);
     }
-    return types;
+    return { types, headlessTypes };
   }
 
   private dispatchSafeSync(event: JsEvent): void {
@@ -167,9 +172,10 @@ class Bridge {
       // Pre-load ALL component modules before dispatching any events.
       // After this, Factory.createSync() succeeds for every type, so
       // handlers run fully synchronously with no microtask yields.
-      const types = this.collectTypes(events);
+      // Headless types are excluded (they have no Svelte module).
+      const { types, headlessTypes } = this.collectTypes(events);
       if (types.size > 0) {
-        await Factory.instance.preload(types);
+        await Factory.instance.preload(types, headlessTypes);
       }
 
       // Dispatch all events synchronously — no await, no microtask gaps,
