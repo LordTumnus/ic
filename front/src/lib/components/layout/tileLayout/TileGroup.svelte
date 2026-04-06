@@ -16,10 +16,37 @@
     SHADOW_ITEM_MARKER_PROPERTY_NAME,
     SHADOW_PLACEHOLDER_ITEM_ID
   } from 'svelte-dnd-action';
-  import type { ChildEntries } from '$lib/types';
+  import type { ChildEntries, ChildEntry } from '$lib/types';
   import type { TileTabConfig, DropZone } from './tile-types';
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
   import TileOverlay from './TileOverlay.svelte';
+
+  interface AttachTabParams {
+    entry: ChildEntry | undefined;
+    target: string;
+  }
+
+  /** Svelte action: attach an IC Tab component into the tab header element. */
+  function attachTab(node: HTMLElement, params: AttachTabParams) {
+    let { entry, target } = params;
+
+    if (entry?.attach) entry.attach(node);
+
+    const onClose = () => onTabClose?.(groupId, target);
+    node.addEventListener('ic-tab-close', onClose);
+
+    return {
+      update(newParams: AttachTabParams) {
+        if (entry?.detach) entry.detach();
+        ({ entry, target } = newParams);
+        if (entry?.attach) entry.attach(node);
+      },
+      destroy() {
+        node.removeEventListener('ic-tab-close', onClose);
+        if (entry?.detach) entry.detach();
+      }
+    };
+  }
 
   const ICON_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };
   const FLIP_MS = 150;
@@ -203,6 +230,7 @@
     class:ic-tg__bar--sm={size === 'sm'}
     class:ic-tg__bar--md={size === 'md'}
     class:ic-tg__bar--lg={size === 'lg'}
+    class:ic-tg__bar--single={tabs.length <= 1}
     role="tablist"
     tabindex="0"
     aria-orientation="horizontal"
@@ -226,6 +254,7 @@
       {@const isShadow = item[SHADOW_ITEM_MARKER_PROPERTY_NAME]}
       {@const config = getConfig(target)}
       {@const active = target === selectedTab}
+      {@const tabEntry = childEntries[target]?.[0]}
       <div
         class="ic-tg__tab"
         class:ic-tg__tab--active={active}
@@ -243,19 +272,21 @@
           }
         }}
         animate:flip={{ duration: flipMs }}
+        use:attachTab={{ entry: tabEntry, target }}
       >
-        <span class="ic-tg__indicator" class:ic-tg__indicator--active={active}></span>
-        {#if config}
+        {#if !tabEntry?.attach && config}
+          <!-- Fallback: standalone usage without IC Tab component -->
+          <span class="ic-tab__indicator"></span>
           {#if config.icon}
             {@const iconSvg = resolveIcon(config.icon, ICON_SIZES[size] ?? 12)}
             {#if iconSvg}
-              <span class="ic-tg__icon">{@html iconSvg}</span>
+              <span class="ic-tab__icon">{@html iconSvg}</span>
             {/if}
           {/if}
-          <span class="ic-tg__label">{config.label}</span>
+          <span class="ic-tab__label">{config.label}</span>
           {#if config.closable && !disabled}
             <button
-              class="ic-tg__close"
+              class="ic-tab__close"
               tabindex={-1}
               aria-label="Close {config.label}"
               onpointerdown={(e) => handleClose(e, target)}
@@ -362,8 +393,8 @@
     background: var(--ic-secondary);
   }
 
-  /* -- Left indicator -- */
-  .ic-tg__indicator {
+  /* -- Left indicator (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tg__tab :global(.ic-tab__indicator) {
     position: absolute;
     left: 0;
     top: 0;
@@ -373,12 +404,12 @@
     transition: background-color 0.15s ease;
   }
 
-  .ic-tg__indicator--active {
+  .ic-tg__tab--active :global(.ic-tab__indicator) {
     background-color: var(--ic-primary);
   }
 
-  /* -- Icon -- */
-  .ic-tg__icon {
+  /* -- Icon (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tg__tab :global(.ic-tab__icon) {
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
@@ -386,16 +417,21 @@
     line-height: 0;
   }
 
-  /* -- Label -- */
-  .ic-tg__label {
+  /* Icon sizes per bar size variant */
+  .ic-tg__bar--sm .ic-tg__tab :global(.ic-tab__icon svg) { width: 12px; height: 12px; }
+  .ic-tg__bar--md .ic-tg__tab :global(.ic-tab__icon svg) { width: 14px; height: 14px; }
+  .ic-tg__bar--lg .ic-tg__tab :global(.ic-tab__icon svg) { width: 16px; height: 16px; }
+
+  /* -- Label (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tg__tab :global(.ic-tab__label) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.2;
   }
 
-  /* -- Close button -- */
-  .ic-tg__close {
+  /* -- Close button (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tg__tab :global(.ic-tab__close) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -412,17 +448,22 @@
     transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
     line-height: 0;
   }
-  .ic-tg__close svg { width: 8px; height: 8px; }
+  .ic-tg__tab :global(.ic-tab__close svg) { width: 8px; height: 8px; }
 
-  .ic-tg__tab:hover .ic-tg__close,
-  .ic-tg__tab--active .ic-tg__close {
+  .ic-tg__tab:hover :global(.ic-tab__close),
+  .ic-tg__tab--active :global(.ic-tab__close) {
     opacity: 0.7;
   }
 
-  .ic-tg__close:hover {
+  .ic-tg__tab :global(.ic-tab__close:hover) {
     opacity: 1;
     background-color: rgba(220, 50, 50, 0.15);
     color: var(--ic-destructive);
+  }
+
+  /* Hide close button when only one tab remains */
+  .ic-tg__bar--single .ic-tg__tab :global(.ic-tab__close) {
+    display: none;
   }
 
   /* -- Content area (overlay container only; panels render at TileLayout level) -- */

@@ -19,11 +19,42 @@
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, SHADOW_PLACEHOLDER_ITEM_ID } from 'svelte-dnd-action';
-  import type { ChildEntries } from '$lib/types';
+  import type { ChildEntries, ChildEntry } from '$lib/types';
   import type { TabConfig } from './tab-types';
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
 
   const ICON_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };
+
+  interface AttachTabParams {
+    entry: ChildEntry | undefined;
+    target: string;
+  }
+
+  /**
+   * Svelte action: attach an IC Tab component into the tab header element.
+   * Runs synchronously on element creation so there's no flash of empty content.
+   * Also listens for the bubbling "ic-tab-close" CustomEvent from Tab.svelte.
+   */
+  function attachTab(node: HTMLElement, params: AttachTabParams) {
+    let { entry, target } = params;
+
+    if (entry?.attach) entry.attach(node);
+
+    const onClose = () => tabClosed?.({ value: target });
+    node.addEventListener('ic-tab-close', onClose);
+
+    return {
+      update(newParams: AttachTabParams) {
+        if (entry?.detach) entry.detach();
+        ({ entry, target } = newParams);
+        if (entry?.attach) entry.attach(node);
+      },
+      destroy() {
+        node.removeEventListener('ic-tab-close', onClose);
+        if (entry?.detach) entry.detach();
+      }
+    };
+  }
 
   let {
     selectedTab = $bindable(''),
@@ -437,6 +468,7 @@
       class:ic-tc__bar--sm={size === 'sm'}
       class:ic-tc__bar--md={size === 'md'}
       class:ic-tc__bar--lg={size === 'lg'}
+      class:ic-tc__bar--single={tabTargets.length <= 1}
       role="tablist"
       tabindex="0"
       aria-orientation="horizontal"
@@ -461,6 +493,7 @@
         {@const active = target === selectedTab}
         {@const isHidden = tabOverflow === 'menu' && hiddenTargets.has(target)}
         {@const isEditing = editingTarget === target}
+        {@const tabEntry = childEntries[target]?.[0]}
         <div
           bind:this={tabElMap[target]}
           class="ic-tc__tab"
@@ -482,8 +515,8 @@
             }
           }}
           animate:flip={{ duration: FLIP_MS }}
+          use:attachTab={{ entry: tabEntry, target }}
         >
-          <span class="ic-tc__indicator" class:ic-tc__indicator--active={active}></span>
           {#if isEditing}
             <!-- svelte-ignore a11y_autofocus -->
             <input
@@ -496,18 +529,20 @@
               onmousedown={(e) => e.stopPropagation()}
               autofocus
             />
-          {:else if config}
+          {:else if !tabEntry?.attach && config}
+            <!-- Fallback: standalone usage without IC Tab component -->
+            <span class="ic-tab__indicator"></span>
             {#if config.icon}
               {@const iconSvg = resolveIcon(config.icon, ICON_SIZES[size] ?? 14)}
               {#if iconSvg}
-                <span class="ic-tc__icon">{@html iconSvg}</span>
+                <span class="ic-tab__icon">{@html iconSvg}</span>
               {/if}
             {/if}
-            <span class="ic-tc__label">{config.label}</span>
+            <span class="ic-tab__label">{config.label}</span>
             {#if config.closable && !disabled}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <button
-                class="ic-tc__close"
+                class="ic-tab__close"
                 tabindex={-1}
                 aria-label="Close {config.label}"
                 onpointerdown={(e) => handleClose(e, target)}
@@ -586,7 +621,7 @@
         role="tabpanel"
         aria-hidden={!active}
       >
-        {#if panelEntry}
+        {#if panelEntry?.snippet}
           {@render panelEntry.snippet()}
         {/if}
       </div>
@@ -706,9 +741,15 @@
     background: var(--ic-secondary);
   }
 
-  /* Editing state */
+  /* Editing state: hide attached Tab content, show edit input */
   .ic-tc__tab--editing {
     cursor: text;
+  }
+  .ic-tc__tab--editing :global(.ic-tab__indicator),
+  .ic-tc__tab--editing :global(.ic-tab__icon),
+  .ic-tc__tab--editing :global(.ic-tab__label),
+  .ic-tc__tab--editing :global(.ic-tab__close) {
+    display: none;
   }
 
   /* Inline rename input */
@@ -726,8 +767,8 @@
     line-height: 1.2;
   }
 
-  /* -- Left indicator -- */
-  .ic-tc__indicator {
+  /* -- Left indicator (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tc__tab :global(.ic-tab__indicator) {
     position: absolute;
     left: 0;
     top: 0;
@@ -738,12 +779,12 @@
     transition: background-color 0.15s ease;
   }
 
-  .ic-tc__indicator--active {
+  .ic-tc__tab--active :global(.ic-tab__indicator) {
     background-color: var(--ic-primary);
   }
 
-  /* -- Icon -- */
-  .ic-tc__icon {
+  /* -- Icon (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tc__tab :global(.ic-tab__icon) {
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
@@ -751,16 +792,21 @@
     line-height: 0;
   }
 
-  /* -- Label -- */
-  .ic-tc__label {
+  /* Icon sizes per bar size variant */
+  .ic-tc__bar--sm .ic-tc__tab :global(.ic-tc__icon svg) { width: 12px; height: 12px; }
+  .ic-tc__bar--md .ic-tc__tab :global(.ic-tc__icon svg) { width: 14px; height: 14px; }
+  .ic-tc__bar--lg .ic-tc__tab :global(.ic-tc__icon svg) { width: 16px; height: 16px; }
+
+  /* -- Label (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tc__tab :global(.ic-tab__label) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.2;
   }
 
-  /* -- Close button -- */
-  .ic-tc__close {
+  /* -- Close button (rendered by attached Tab.svelte or fallback) -- */
+  .ic-tc__tab :global(.ic-tab__close) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -777,18 +823,23 @@
     transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease;
     line-height: 0;
   }
-  .ic-tc__close svg { width: 8px; height: 8px; }
+  .ic-tc__tab :global(.ic-tc__close svg) { width: 8px; height: 8px; }
 
   /* Show close button on tab hover */
-  .ic-tc__tab:hover .ic-tc__close,
-  .ic-tc__tab--active .ic-tc__close {
+  .ic-tc__tab:hover :global(.ic-tab__close),
+  .ic-tc__tab--active :global(.ic-tab__close) {
     opacity: 0.7;
   }
 
-  .ic-tc__close:hover {
+  .ic-tc__tab :global(.ic-tc__close:hover) {
     opacity: 1;
     background-color: rgba(220, 50, 50, 0.15);
     color: var(--ic-destructive);
+  }
+
+  /* Hide close button when only one tab remains */
+  .ic-tc__bar--single .ic-tc__tab :global(.ic-tab__close) {
+    display: none;
   }
 
   /* -- Chevron >> button -- */
