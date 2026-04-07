@@ -465,8 +465,11 @@ class Component implements Registrable {
    * Mount this component's Svelte instance into a parent-provided element.
    * Used by attachable components instead of createSnippet().
    * Sets the component ID on the target so StyleManager rules apply.
+   *
+   * @param target - DOM element to mount into
+   * @param context - Optional Svelte context map (for components that need getContext)
    */
-  mountInto(target: HTMLElement): void {
+  mountInto(target: HTMLElement, context?: Map<any, any>): void {
     if (!this._svelteComponent) {
       logger.error('Component', 'Cannot mountInto: no Svelte component', {
         componentId: this.id,
@@ -481,7 +484,8 @@ class Component implements Registrable {
 
     this._svelteInstance = mount(this._svelteComponent, {
       target,
-      props: this.svelteProps
+      props: this.svelteProps,
+      context
     });
 
     this._flushMounted(target);

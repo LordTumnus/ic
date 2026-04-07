@@ -94,7 +94,7 @@ function buildChildEntry(child: Component): ChildEntry {
   }
   if (child.mixins.includes('attachable')) {
     return {
-      attach: (el: HTMLElement) => child.mountInto(el),
+      attach: (el: HTMLElement, ctx?: Map<any, any>) => child.mountInto(el, ctx),
       detach: () => child.unmountFrom(),
       ...buildChildProxies(child)
     };

@@ -1,4 +1,4 @@
-classdef (Abstract) ContainerBlade < ic.core.ComponentContainer
+classdef (Abstract) ContainerBlade < ic.core.ComponentContainer & ic.mixin.Attachable
     % abstract base for TweakPane structural containers
 
     properties (SetObservable, AbortSet, Description = "Reactive")

@@ -140,7 +140,7 @@ export interface MethodDefinition {
  */
 export interface ChildEntry {
   snippet?: Snippet;
-  attach?: (target: HTMLElement) => void;
+  attach?: (target: HTMLElement, context?: Map<any, any>) => void;
   detach?: () => void;
   id: string;
   type: string;

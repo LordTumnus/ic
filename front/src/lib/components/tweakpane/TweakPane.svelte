@@ -14,7 +14,7 @@
   import * as CamerakitPlugin from '@tweakpane/plugin-camerakit';
   import * as RotationPlugin from '@0b5vr/tweakpane-plugin-rotation';
   import * as TextareaPlugin from '@pangenerator/tweakpane-textarea-plugin';
-  import { setContext } from 'svelte';
+  import { setContext, getAllContexts } from 'svelte';
   import type { ChildEntries } from '$lib/types';
   import { applyIcTheme } from './tp-theme';
 
@@ -75,16 +75,45 @@
       (pane as Pane).expanded = expanded;
     }
   });
+
+  // Capture context so attachable blades can inherit it via mount()
+  const svelteCtx = getAllContexts();
+
+  // Attach/detach blade children into a hidden mount point
+  let mountEl: HTMLDivElement;
+  let attachedIds = new Set<string>();
+
+  $effect(() => {
+    if (!mountEl) return;
+    const currentIds = new Set<string>();
+
+    for (const target of bladeTargets) {
+      for (const child of childEntries[target] ?? []) {
+        currentIds.add(child.id);
+        if (!attachedIds.has(child.id) && child.attach) {
+          child.attach(mountEl, svelteCtx);
+        }
+      }
+    }
+
+    // Detach removed blades
+    for (const id of attachedIds) {
+      if (!currentIds.has(id)) {
+        for (const target of Object.keys(childEntries)) {
+          const entry = childEntries[target]?.find(e => e.id === id);
+          if (entry?.detach) entry.detach();
+        }
+      }
+    }
+
+    attachedIds = currentIds;
+  });
 </script>
 
 <div bind:this={containerEl} class="ic-tp"></div>
 
-<!-- Child blade snippets — they render no visible DOM, just manage Tweakpane bindings -->
-{#each bladeTargets as target (target)}
-  {#each childEntries[target] ?? [] as child (child.id)}
-    {@render child.snippet()}
-  {/each}
-{/each}
+<!-- Hidden mount point for attachable blade components (no visible DOM) -->
+<div bind:this={mountEl} style="display: none"></div>
 
 <style>
   .ic-tp {

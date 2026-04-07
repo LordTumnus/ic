@@ -8,7 +8,7 @@
   then expose each TabPageApi via indexed context.
 -->
 <script lang="ts">
-  import { getContext, setContext } from 'svelte';
+  import { getContext, setContext, getAllContexts } from 'svelte';
   import type { TpContext } from '../TweakPane.svelte';
   import type { ChildEntries } from '$lib/types';
   import type { TabApi, TabPageApi } from 'tweakpane';
@@ -87,11 +87,38 @@
       tab.hidden = h;
     }
   });
+
+  // Capture context (includes 'ic-tp' and 'ic-tp-tabs')
+  const svelteCtx = getAllContexts();
+
+  // Attach/detach tab page children
+  let mountEl: HTMLDivElement;
+  let attachedIds = new Set<string>();
+
+  $effect(() => {
+    if (!mountEl) return;
+    const currentIds = new Set<string>();
+
+    for (const target of bladeTargets) {
+      for (const child of childEntries[target] ?? []) {
+        currentIds.add(child.id);
+        if (!attachedIds.has(child.id) && child.attach) {
+          child.attach(mountEl, svelteCtx);
+        }
+      }
+    }
+
+    for (const id of attachedIds) {
+      if (!currentIds.has(id)) {
+        for (const target of Object.keys(childEntries)) {
+          const entry = childEntries[target]?.find(e => e.id === id);
+          if (entry?.detach) entry.detach();
+        }
+      }
+    }
+
+    attachedIds = currentIds;
+  });
 </script>
 
-<!-- Tab page snippets — each TpTabPage reads its TabPageApi from tabCtx -->
-{#each bladeTargets as target (target)}
-  {#each childEntries[target] ?? [] as child (child.id)}
-    {@render child.snippet()}
-  {/each}
-{/each}
+<div bind:this={mountEl} style="display: none"></div>
