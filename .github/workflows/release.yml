@@ -40,7 +40,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add -f front/dist
-          git commit -m "Add built frontend for ${GITHUB_REF_NAME}"
+
+          # Remove front source/config (keep only front/dist) and tests
+          git rm -rf --cached front/src front/node_modules front/.gitignore 2>/dev/null || true
+          git rm --cached front/package.json front/package-lock.json 2>/dev/null || true
+          git rm --cached front/tsconfig.json front/tsconfig.app.json front/tsconfig.node.json 2>/dev/null || true
+          git rm --cached front/vite.config.ts front/svelte.config.js front/index.html 2>/dev/null || true
+          git rm -rf --cached test 2>/dev/null || true
+
+          git commit -m "Release ${GITHUB_REF_NAME}"
 
           # Move the tag to this new commit
           git tag -f "${GITHUB_REF_NAME}"
