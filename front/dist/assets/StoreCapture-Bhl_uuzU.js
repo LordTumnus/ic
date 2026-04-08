@@ -1,0 +1,1 @@
+import{bt as e,n as t,xt as n}from"./disclose-version-BhTf5IXE.js";import{r}from"./store-BJFHGX64.js";function i(i,a){n(a,!0);let o=r();t(()=>a.onstore(o)),e()}export{i as t};

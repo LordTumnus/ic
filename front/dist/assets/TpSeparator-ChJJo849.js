@@ -1,0 +1,1 @@
+import{bt as e,et as t,r as n,vt as r,xt as i}from"./disclose-version-BhTf5IXE.js";function a(a,o){i(o,!0);let s=n(o,`bladeIndex`,11,0),c=r(`ic-tp`),l;t(()=>{let e=c.container;if(e)return l=e.addBlade({view:`separator`,index:s()}),()=>{l?.dispose(),l=void 0}}),e()}export{a as default};

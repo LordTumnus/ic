@@ -1,0 +1,1 @@
+var e=``+new URL(`typst_ts_renderer_bg-C1s5TJ5f.wasm`,import.meta.url).href;export{e as default};

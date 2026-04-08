@@ -1,0 +1,1 @@
+function e(e){return typeof e==`number`?`${e}px`:e}function t(e){return typeof e==`number`?`${e}px`:Array.isArray(e)?e.map(e=>`${e}px`).join(` `):e}function n(e){return typeof e==`number`?`${e}px`:Array.isArray(e)?e.map(e=>`${e}px`).join(` `):e}function r(e,t=24){return typeof e==`number`?e:t}export{t as i,r as n,e as r,n as t};

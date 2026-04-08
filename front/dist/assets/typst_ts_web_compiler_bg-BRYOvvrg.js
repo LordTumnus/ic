@@ -1,0 +1,1 @@
+var e=``+new URL(`typst_ts_web_compiler_bg-DISNo0zB.wasm`,import.meta.url).href;export{e as default};

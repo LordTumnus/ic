@@ -1,0 +1,1 @@
+function e(e,t={}){let{offset:n=4,dropdownHeight:r=200,matchWidth:i=!0}=t,a=e.getBoundingClientRect();return{top:window.innerHeight-a.bottom<r+n&&a.top>r+n?a.top-r-n:a.bottom+n,left:a.left,width:i?a.width:-1}}function t(e,t=``){let n=[`top: ${e.top}px`,`left: ${e.left}px`];return e.width>0&&n.push(`width: ${e.width}px`),t&&n.push(t),n.join(`; `)}export{t as n,e as t};
