@@ -16,6 +16,8 @@ import {
   foldKeymap,
   LanguageSupport,
   indentUnit,
+  indentService,
+  syntaxTree,
 } from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import {
@@ -131,7 +133,7 @@ async function loadLanguage(lang: string): Promise<Extension> {
         const mod = await import('codemirror-lang-latex');
         latexLang = mod.latex();
       }
-      return latexLang;
+      return [latexLang, latexIndentService];
     case 'plain':
     default:
       return [];
@@ -139,6 +141,34 @@ async function loadLanguage(lang: string): Promise<Extension> {
 }
 
 export { loadLanguage };
+
+// ─── LaTeX indentation override ─────────────────────────────
+// The upstream codemirror-lang-latex package indents inside Section,
+// Content, Group, and TextArgument nodes -- too aggressive for LaTeX.
+// This indentService overrides it: only indent inside \begin/\end
+// environments, otherwise continue the previous line's indentation.
+
+const envNodeNames = new Set([
+  'Environment', 'KnownEnvironment',
+  'DocumentEnvironment', 'TabularEnvironment', 'EquationEnvironment',
+  'EquationArrayEnvironment', 'VerbatimEnvironment', 'TikzPictureEnvironment',
+  'FigureEnvironment', 'ListEnvironment', 'TableEnvironment',
+]);
+
+const latexIndentService = indentService.of((context, pos) => {
+  const tree = syntaxTree(context.state);
+  let node = tree.resolveInner(pos, -1);
+
+  // Count how many environment ancestors wrap this position
+  let depth = 0;
+  let cur = node;
+  while (cur) {
+    if (envNodeNames.has(cur.name)) depth++;
+    cur = cur.parent;
+  }
+
+  return depth * context.unit.length;
+});
 
 // ─── Extension builders ──────────────────────────────────────
 // Each returns the Extension for its compartment's current value.
