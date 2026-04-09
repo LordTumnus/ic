@@ -8,11 +8,13 @@
   import type { BladeApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     disabled = $bindable(false),
     hidden = $bindable(false),
     bladeIndex = $bindable(0),
   }: {
+    id?: string;
     label?: string;
     disabled?: boolean;
     hidden?: boolean;

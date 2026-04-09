@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { Resolution, ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
   import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
 
   let {
+    id = '',
     items = $bindable<string[] | string>([]),
     itemDescriptions = $bindable<string[] | string>([]),
     variant = $bindable('primary'),
@@ -10,12 +12,14 @@
     size = $bindable('md'),
     disabled = $bindable(false),
     splitDirection = $bindable('right'),
-    childEntries = {} as ChildEntries,
+    iconMap = $bindable<Record<string, string>>({}),
+    childEntries = [] as ChildEntries,
     itemSelected,
     opened,
     closed,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: string[] | string;
     itemDescriptions?: string[] | string;
     variant?: string;
@@ -23,6 +27,7 @@
     size?: string;
     disabled?: boolean;
     splitDirection?: string;
+    iconMap?: Record<string, string>;
     childEntries?: ChildEntries;
     itemSelected?: (data?: unknown) => void;
     opened?: (data?: unknown) => void;
@@ -46,11 +51,18 @@
   );
   const mainLabel = $derived(itemList[0] ?? '');
   const bodyFocused = $derived(mainFocused || triggerFocused);
-  const hasMainIcon = $derived((childEntries.icon?.length ?? 0) > 0);
+  const iconEntries = $derived(childEntries.filter(c => c.type === 'ic.Icon' || c.type === 'ic.Image'));
+  const hasMainIcon = $derived(iconEntries.length > 0);
   const chevronSize = $derived(size === 'sm' ? 10 : size === 'lg' ? 14 : 12);
 
+  function getItemIconEntry(item: string) {
+    const iconId = iconMap?.[item];
+    if (!iconId) return null;
+    return childEntries.find(c => c.id === iconId) ?? null;
+  }
+
   function hasItemIcon(item: string): boolean {
-    return (childEntries[item]?.length ?? 0) > 0;
+    return getItemIconEntry(item) !== null;
   }
 
   // --- Focus method ---
@@ -134,7 +146,7 @@
   });
 </script>
 
-<div
+<div {id}
   bind:this={rootEl}
   class="ic-split-btn"
   class:ic-split-btn--right={splitDirection === 'right'}
@@ -166,8 +178,8 @@
     >
       {#if hasMainIcon}
         <span class="ic-split-btn__icon">
-          {#each childEntries.icon ?? [] as iconSnippet (iconSnippet)}
-            {@render iconSnippet.snippet()}
+          {#each iconEntries as iconSnippet (iconSnippet.id)}
+            <DynamicChild entry={iconSnippet} />
           {/each}
         </span>
       {/if}
@@ -214,10 +226,11 @@
           onkeydown={(e) => handleItemKeydown(e, i)}
         >
           {#if hasItemIcon(item)}
+            {@const itemIconEntry = getItemIconEntry(item)}
             <span class="ic-split-btn__item-icon">
-              {#each childEntries[item] ?? [] as s (s)}
-                {@render s.snippet()}
-              {/each}
+              {#if itemIconEntry}
+                <DynamicChild entry={itemIconEntry} />
+              {/if}
             </span>
           {/if}
           <div class="ic-split-btn__item-text">

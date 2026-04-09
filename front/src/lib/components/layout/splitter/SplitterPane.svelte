@@ -1,15 +1,18 @@
 <script lang="ts">
 	import { getContext, onMount, onDestroy } from 'svelte';
 	import type { ChildEntries } from '$lib/types';
+	import DynamicChild from '$lib/core/DynamicChild.svelte';
 	import type { SplitterContext } from './splitter-types';
 
 	let {
+		id = '',
 		size = $bindable<number | null>(null),
 		minSize = $bindable(0),
 		maxSize = $bindable(100),
 		snapSize = $bindable(0),
-		childEntries = { default: [] } as ChildEntries
+		childEntries = [] as ChildEntries
 	}: {
+		id?: string;
 		size?: number | null;
 		minSize?: number;
 		maxSize?: number;
@@ -40,6 +43,6 @@
 	});
 </script>
 
-{#each childEntries.default ?? [] as child (child)}
-	{@render child.snippet()}
+{#each childEntries as child (child.id)}
+	<DynamicChild entry={child} />
 {/each}

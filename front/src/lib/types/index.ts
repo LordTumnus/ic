@@ -2,7 +2,7 @@
  * Core types for MATLAB-JavaScript communication.
  */
 
-import type { Snippet } from 'svelte';
+import type { Component as SvelteComponent, Snippet } from 'svelte';
 
 
 /** HTML connector from MATLAB (uihtml htmlComponent object). */
@@ -59,16 +59,12 @@ export interface ComponentDefinition {
   methods: MethodDefinition[];
   /** Mixin capabilities present on this component (e.g. "stylable", "effectable") */
   mixins: string[];
-  /** Pre-rendered children declared in MATLAB constructor (recursive) */
-  staticChildren?: InsertEventData[];
 }
 
 /** Data for @insert events. Sent by PARENT to create a CHILD. */
 export interface InsertEventData {
   /** The component definition */
   component: ComponentDefinition;
-  /** Target container element name  */
-  target: string;
 }
 
 /** Data for @remove events. */
@@ -82,18 +78,14 @@ export interface ReparentEventData {
   id: string;
   /** New parent ID */
   parent: string;
-  /** Target container element name  */
-  target: string;
 }
 
 /** Data for @reorder events. */
 export interface ReorderEventData {
   /** Component being moved */
   id: string;
-  /** New index within the target (0-based) */
+  /** New index (0-based) */
   index: number;
-  /** Target container element name */
-  target: string;
 }
 
 /** Data for @prop events. */
@@ -123,25 +115,29 @@ export interface MethodDefinition {
 }
 
 /**
- * A child component entry: renderable snippet + reactive metadata.
+ * A child component entry: DynamicChild rendering fields + reactive metadata.
+ *
+ * `component` and `svelteProps` are used by DynamicChild.svelte to render the
+ * child inline via `<Comp {...svelteProps} />` (no wrapper div).
  *
  * `props` is a live reactive proxy into the child's data state.
- * `events` is a proxy into the child's event state — set a handler to intercept.
- * `methods` is a proxy into the child's method state — call to invoke.
+ * `events` is a proxy into the child's event state.
+ * `methods` is a proxy into the child's method state.
  * `meta` provides name lists for building inspector UIs.
  *
- * Used for both dynamic children (via @insert) and static children
- * (declared in MATLAB constructor). For standalone Svelte usage
- * without an IC Component backing, use the `entry()` helper.
- *
- * Headless components omit `snippet` (no DOM).
- * Attachable components omit `snippet` but provide `attach`/`detach`
- * for mounting into a parent-provided element.
+ * Headless components omit `component` (no DOM).
  */
 export interface ChildEntry {
+  /** Svelte component class for DynamicChild rendering. */
+  component?: SvelteComponent<Record<string, unknown>>;
+  /** Raw Svelte snippet fallback for standalone usage (e.g. DeveloperTools panels). */
   snippet?: Snippet;
-  attach?: (target: HTMLElement, context?: Map<any, any>) => void;
-  detach?: () => void;
+  /** Reactive props reference for DynamicChild rendering. */
+  svelteProps?: Record<string, unknown>;
+  /** Called by DynamicChild when the component's root element is in the DOM. */
+  onMounted?: (el: Element | null) => void;
+  /** Called by DynamicChild when the component is unmounted. */
+  onUnmounted?: () => void;
   id: string;
   type: string;
   props: Record<string, unknown>;
@@ -156,20 +152,14 @@ export interface ChildEntry {
 }
 
 /**
- * Children organized by target slot name.
- * Keys are target names defined in MATLAB's Targets property.
+ * Flat array of child entries. Containers filter by type/mixin when rendering.
  */
-export type ChildEntries = Record<string, ChildEntry[]>;
-
-/**
- * Map of static child targets to arrays of child entries.
- * Multiple children can share the same target slot.
- */
-export type StaticChildrenMap = Map<string, ChildEntry[]>;
+export type ChildEntries = ChildEntry[];
 
 /**
  * Create a minimal ChildEntry wrapping a raw Svelte snippet.
- * Use this for standalone Svelte usage (no IC Component backing).
+ * Used for standalone Svelte usage (e.g. DeveloperTools tab panels)
+ * where there is no IC Component backing.
  */
 export function entry(snippet: Snippet): ChildEntry {
   return {

@@ -9,6 +9,7 @@
   import type { BladeApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable<{ x1: number; y1: number; x2: number; y2: number }>({
       x1: 0.25,
@@ -21,6 +22,7 @@
     bladeIndex = $bindable(0),
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: { x1: number; y1: number; x2: number; y2: number };
     disabled?: boolean;

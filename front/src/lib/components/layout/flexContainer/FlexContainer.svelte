@@ -2,16 +2,19 @@
   import type { ChildEntries } from '$lib/types';
   import type { CssSpacing } from '$lib/utils/css';
   import { toSpacing } from '$lib/utils/css';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     direction = $bindable('row'),
     wrap = $bindable('nowrap'),
     justifyContent = $bindable('start'),
     alignItems = $bindable('stretch'),
     gap = $bindable<CssSpacing>(8),
     padding = $bindable<CssSpacing>(0),
-    childEntries = { default: [] } as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     direction?: 'row' | 'column' | 'row-reverse' | 'column-reverse';
     wrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
     justifyContent?: 'start' | 'center' | 'end' | 'space-between' | 'space-around' | 'space-evenly';
@@ -40,7 +43,7 @@
   };
 </script>
 
-<div
+<div {id}
   class="ic-flex"
   style:flex-direction={direction}
   style:flex-wrap={wrap}
@@ -49,8 +52,8 @@
   style:gap={toSpacing(gap)}
   style:padding={toSpacing(padding)}
 >
-  {#each childEntries.default ?? [] as child (child)}
-    {@render child.snippet()}
+  {#each childEntries as child (child.id)}
+    <DynamicChild entry={child} />
   {/each}
 </div>
 

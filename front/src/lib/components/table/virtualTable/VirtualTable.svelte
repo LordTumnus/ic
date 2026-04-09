@@ -18,6 +18,7 @@
   const BUFFER = 5; // rows above/below viewport to pre-render
 
   let {
+    id = '',
     // Reactive props (from TableBase — same as Table, minus `data`)
     columns = $bindable([] as TableColumn[]),
     disabled = $bindable(false),
@@ -54,6 +55,7 @@
     scrollToRow = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
     focusCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     columns?: TableColumn[];
     disabled?: boolean;
     size?: string;
@@ -529,7 +531,7 @@
   });
 </script>
 
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-vtbl"
   class:ic-tbl--sm={size === 'sm'}

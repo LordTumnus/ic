@@ -3,6 +3,7 @@
   import type { Resolution } from '$lib/types';
 
   let {
+    id = '',
     low = $bindable(0),
     high = $bindable(100),
     min = $bindable(0),
@@ -21,6 +22,7 @@
     highChanging,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     low?: number;
     high?: number;
     min?: number;
@@ -195,7 +197,7 @@
   });
 </script>
 
-<div
+<div {id}
   class="ic-range-slider"
   class:ic-range-slider--vertical={isVertical}
   class:ic-range-slider--sm={size === 'sm'}

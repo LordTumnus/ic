@@ -23,7 +23,6 @@ classdef TweakPane < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = string.empty;
         end
     end
 
@@ -304,13 +303,11 @@ classdef TweakPane < ic.core.ComponentContainer
 
     methods (Access = private)
         function insertBlade(this, blade)
-            % assigns index, target, and registers child
+            % assigns index and registers child
             idx = this.NextBladeIndex;
             this.NextBladeIndex = idx + 1;
-            target = sprintf("blade-%d", idx);
             blade.BladeIndex = idx;
-            this.Targets = [this.Targets, target];
-            this.addChild(blade, target);
+            this.addChild(blade);
         end
     end
 end

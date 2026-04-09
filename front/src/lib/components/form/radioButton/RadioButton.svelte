@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
   import logger from '$lib/core/logger';
 
   let {
+    id = '',
     items = $bindable([]),
     value = $bindable(''),
     label = $bindable(''),
@@ -12,10 +14,12 @@
     disabled = $bindable(false),
     labelPosition = $bindable('right'),
     orientation = $bindable('vertical'),
-    childEntries = {} as ChildEntries,
+    iconMap = $bindable<Record<string, string>>({}),
+    childEntries = [] as ChildEntries,
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: string[] | string;
     value?: string;
     label?: string;
@@ -24,6 +28,7 @@
     disabled?: boolean;
     labelPosition?: string;
     orientation?: string;
+    iconMap?: Record<string, string>;
     childEntries?: ChildEntries;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -45,8 +50,14 @@
     };
   });
 
+  function getIconEntry(item: string) {
+    const iconId = iconMap?.[item];
+    if (!iconId) return null;
+    return childEntries.find(c => c.id === iconId) ?? null;
+  }
+
   function hasIcon(item: string): boolean {
-    return (childEntries[item]?.length ?? 0) > 0;
+    return getIconEntry(item) !== null;
   }
 
   function handleSelect(item: string) {
@@ -57,7 +68,7 @@
   }
 </script>
 
-<div
+<div {id}
   bind:this={groupEl}
   class="ic-radio"
   class:ic-radio--sm={size === 'sm'}
@@ -82,11 +93,8 @@
       {#if labelPosition === 'left'}
         <span class="ic-radio__item-content">
           {#if hasIcon(item)}
-            <span class="ic-radio__icon">
-              {#each childEntries[item] ?? [] as iconSnippet (iconSnippet)}
-                {@render iconSnippet.snippet()}
-              {/each}
-            </span>
+            {@const iconEntry = getIconEntry(item)}
+            {#if iconEntry}<span class="ic-radio__icon"><DynamicChild entry={iconEntry} /></span>{/if}
           {/if}
           <span class="ic-radio__label">{item}</span>
         </span>
@@ -118,11 +126,8 @@
       {#if labelPosition === 'right'}
         <span class="ic-radio__item-content">
           {#if hasIcon(item)}
-            <span class="ic-radio__icon">
-              {#each childEntries[item] ?? [] as iconSnippet (iconSnippet)}
-                {@render iconSnippet.snippet()}
-              {/each}
-            </span>
+            {@const iconEntry = getIconEntry(item)}
+            {#if iconEntry}<span class="ic-radio__icon"><DynamicChild entry={iconEntry} /></span>{/if}
           {/if}
           <span class="ic-radio__label">{item}</span>
         </span>

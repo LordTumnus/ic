@@ -10,8 +10,8 @@
  * Must be in a .svelte.ts file for $state rune to work!
  */
 
-import { mount, unmount, createRawSnippet } from 'svelte';
-import type { Component as SvelteComponent, Snippet } from 'svelte';
+import { mount, unmount } from 'svelte';
+import type { Component as SvelteComponent } from 'svelte';
 import type {
   Registrable,
   EventCallback,
@@ -41,16 +41,6 @@ import logger from './logger';
 import { cacheEmbeddedAssets } from '$lib/utils/asset-cache';
 
 /**
- * Normalize targets from MATLAB (handles single string vs array).
- */
-function normalizeTargets(value: unknown): string[] {
-  if (Array.isArray(value)) return value;
-  if (typeof value === 'string') return [value];
-  return [];
-}
-
-
-/**
  * Component class - base class for all UI components.
  *
  * Implements `Registrable` so it can be registered in the Registry
@@ -75,11 +65,10 @@ class Component implements Registrable {
   children: Component[] = $state([]);
 
   /**
-   * Child entries organized by target slot name.
-   * Each entry wraps a snippet plus reactive proxies for props/events/methods.
+   * Flat array of child entries. Containers filter by type/mixin when rendering.
    * @internal Used by container.ts
    */
-  _childEntries: ChildEntries = $state({});
+  _childEntries: ChildEntries = $state([]);
 
   /**
    * Reference to parent component (for reparenting).
@@ -88,39 +77,27 @@ class Component implements Registrable {
   _parentComponent: Component | null = null;
 
   /**
-   * This component's snippet (created lazily, used when inserted into a parent).
-   * @internal Used by container.ts
-   */
-  _snippet: Snippet | null = null;
-
-  /**
    * This component's ChildEntry in its parent's _childEntries.
    * @internal Used by container.ts for reparenting
    */
   _childEntry: ChildEntry | null = null;
 
   /**
-   * Whether this component's Svelte snippet has been rendered to the DOM.
-   * Set to true inside createSnippet()'s setup() callback.
+   * Whether this component has been mounted to the DOM.
+   * Set to true by DynamicChild's $effect via notifyMounted().
    */
   private _isMounted = false;
 
-  /** The wrapper element from createSnippet()'s setup(). */
+  /** The root DOM element, found by DynamicChild via getElementById. */
   private _wrapperElement: Element | null = null;
 
   /** Callbacks waiting for the component to mount (flushed in setup()). */
   private _mountedCallbacks: ((element: Element) => void)[] = [];
 
-  /**
-   * Flag indicating this is a static child (pre-rendered in Svelte template).
-   * @internal Used by container.ts for static composition
-   */
-  _isStatic: boolean = false;
-
   /** Event subscriptions: event name → set of callbacks. */
   private subscriptions: Map<string, Set<EventCallback>> = new Map();
 
-  /** The mounted Svelte component instance (returned by mount()). */
+  /** The mounted Svelte instance (only used by root Frame's mount/unmount). */
   private _svelteInstance: Record<string, unknown> | null = null;
 
   /** The Svelte component class to use for mounting. */
@@ -245,18 +222,6 @@ class Component implements Registrable {
       });
     }
 
-    // Initialize child entry arrays from targets prop
-    const targetsProp = propDefinitions.find(p => p.name === 'targets');
-    this._childEntries = {} as ChildEntries;
-    for (const target of normalizeTargets(targetsProp?.value)) {
-      this._childEntries[target] = [];
-    }
-    // Always create the "overlay" slot — used by AllowsOverlay.addOverlay().
-    // Separated from Targets so addChild() can't route children here.
-    if (!this._childEntries['overlay']) {
-      this._childEntries['overlay'] = [];
-    }
-
     // Expose child entries as 'childEntries' prop
     Object.defineProperty(stateObj, 'childEntries', {
       get: () => this._childEntries,
@@ -283,11 +248,13 @@ class Component implements Registrable {
       configurable: true
     });
 
+    // Expose the component ID so Svelte components can set it on their root element
+    Object.defineProperty(stateObj, 'id', { value: id, enumerable: true });
+
     this.svelteProps = stateObj;
 
     // Set up built-in event handlers
     this._setupListeners(propDefinitions.map((p) => p.name), methodDefinitions.map((m) => m.name));
-    this._setupTargetsHandler();
 
     // Enable/disable event handlers based on MATLAB listener presence
     this.subscribe('@listenEvent', (_id, _name, data) => {
@@ -386,123 +353,6 @@ class Component implements Registrable {
         const result = methodFunc(data);
         this.publish(`@resp/${id}`, result);
       });
-    }
-  }
-
-  /**
-   * Set up handler to sync targets prop changes to _childEntries structure.
-   */
-  private _setupTargetsHandler(): void {
-    this.subscribe('@prop/targets', (_id, _name, data) => {
-      const newTargets = normalizeTargets(data);
-      const oldSlots = Object.keys(this._childEntries);
-
-      // Add new target slots
-      for (const target of newTargets) {
-        if (!this._childEntries[target]) {
-          this._childEntries[target] = [];
-        }
-      }
-
-      // Remove old target slots (Svelte auto-unmounts snippets via cleanup)
-      // Preserve "overlay" — it's managed by AllowsOverlay, not Targets.
-      const newTargetSet = new Set(newTargets);
-      for (const target of Object.keys(this._childEntries)) {
-        if (target !== 'overlay' && !newTargetSet.has(target)) {
-          const hadChildren = this._childEntries[target].length > 0;
-          if (hadChildren) {
-            logger.warn('Component', `@prop/targets: removing slot "${target}" that has ${this._childEntries[target].length} children!`, {
-              componentId: this.id
-            });
-          }
-          delete this._childEntries[target];
-        }
-      }
-    });
-  }
-
-  /**
-   * Create a Svelte snippet for this component.
-   *
-   */
-  createSnippet(): Snippet {
-    return createRawSnippet(() => ({
-      render: () => `<div style="display: contents" id="${this.id}" data-ic-type="${this.type}"></div>`,
-      setup: (element: Element) => {
-        if (!this._svelteComponent) {
-          logger.error('Component', 'Cannot create snippet: no Svelte component', {
-            componentId: this.id,
-            type: this.type
-          });
-          return;
-        }
-
-        this._svelteInstance = mount(this._svelteComponent, {
-          target: element,
-          props: this.svelteProps
-        });
-
-        // Flush deferred operations — pass element directly since it may
-        // not yet be connected to the document (nested mount fragment).
-        this._flushMounted(element);
-
-        // Return cleanup function
-        return () => {
-          this._isMounted = false;
-          this._wrapperElement = null;
-          StyleManager.instance.clearStyles(this.id);
-          KeyboardManager.instance.unregister(this.id);
-          if (this._svelteInstance) {
-            unmount(this._svelteInstance);
-            this._svelteInstance = null;
-          }
-        };
-      }
-    }));
-  }
-
-  /**
-   * Mount this component's Svelte instance into a parent-provided element.
-   * Used by attachable components instead of createSnippet().
-   * Sets the component ID on the target so StyleManager rules apply.
-   *
-   * @param target - DOM element to mount into
-   * @param context - Optional Svelte context map (for components that need getContext)
-   */
-  mountInto(target: HTMLElement, context?: Map<any, any>): void {
-    if (!this._svelteComponent) {
-      logger.error('Component', 'Cannot mountInto: no Svelte component', {
-        componentId: this.id,
-        type: this.type
-      });
-      return;
-    }
-
-    // Stamp ID and type so StyleManager CSS rules match this element
-    target.id = this.id;
-    target.dataset.icType = this.type;
-
-    this._svelteInstance = mount(this._svelteComponent, {
-      target,
-      props: this.svelteProps,
-      context
-    });
-
-    this._flushMounted(target);
-  }
-
-  /**
-   * Unmount this component from its attached element.
-   * Mirrors the cleanup logic from createSnippet()'s teardown.
-   */
-  unmountFrom(): void {
-    this._isMounted = false;
-    this._wrapperElement = null;
-    StyleManager.instance.clearStyles(this.id);
-    KeyboardManager.instance.unregister(this.id);
-    if (this._svelteInstance) {
-      unmount(this._svelteInstance);
-      this._svelteInstance = null;
     }
   }
 
@@ -683,7 +533,7 @@ class Component implements Registrable {
     }
   }
 
-  /** Flush all pending mount callbacks. Called from createSnippet()'s setup(). */
+  /** Flush all pending mount callbacks. Called via notifyMounted(). */
   private _flushMounted(element: Element): void {
     this._isMounted = true;
     this._wrapperElement = element;
@@ -700,6 +550,32 @@ class Component implements Registrable {
    */
   setSvelteComponent(component: SvelteComponent<Record<string, unknown>>): void {
     this._svelteComponent = component;
+  }
+
+  /** Expose the Svelte component class for DynamicChild rendering. */
+  get svelteComponentClass(): SvelteComponent<Record<string, unknown>> | null {
+    return this._svelteComponent;
+  }
+
+  /**
+   * Notify that this component has been mounted to the DOM.
+   * Called by DynamicChild's $effect after the component renders.
+   */
+  notifyMounted(element: Element | null): void {
+    if (element) {
+      this._flushMounted(element);
+    }
+  }
+
+  /**
+   * Notify that this component has been unmounted from the DOM.
+   * Called by DynamicChild's $effect cleanup.
+   */
+  notifyUnmounted(): void {
+    this._isMounted = false;
+    this._wrapperElement = null;
+    StyleManager.instance.clearStyles(this.id);
+    KeyboardManager.instance.unregister(this.id);
   }
 }
 

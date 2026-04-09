@@ -8,6 +8,7 @@
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
+    id = '',
     value = $bindable(''),
     height = $bindable<number | string>('100%'),
     toolbarOnHover = $bindable(true),
@@ -23,6 +24,7 @@
     renderOnChange = $bindable(true),
     render = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     height?: number | string;
     toolbarOnHover?: boolean;
@@ -251,7 +253,7 @@
 
 <!-- ─── Template ─────────────────────────────────────────────────────── -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-mermaid"
   style:height={heightCss}
   bind:this={containerEl}

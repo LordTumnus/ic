@@ -10,8 +10,10 @@
 <script lang="ts">
   import type { ChildEntries } from '$lib/types';
   import { resolveIcon } from '$lib/utils/icons';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     title = $bindable(''),
     open = $bindable(false),
     size = $bindable('md'),
@@ -19,10 +21,11 @@
     closeOnBackdropClick = $bindable(true),
     submitLabel = $bindable('OK'),
     cancelLabel = $bindable('Cancel'),
-    childEntries = { body: [], footer: [] } as ChildEntries,
+    childEntries = [] as ChildEntries,
     submitted,
     closed,
   }: {
+    id?: string;
     title?: string;
     open?: boolean;
     size?: string;
@@ -39,7 +42,11 @@
 
   const closeSvg = resolveIcon('x', 14);
 
-  const hasCustomFooter = $derived((childEntries.footer?.length ?? 0) > 0);
+  // Show default OK/Cancel buttons only when the DialogFooter sub-container is empty
+  const footerEntry = $derived(childEntries.find(c => c.type === 'ic.dialog.DialogFooter'));
+  const hasCustomFooter = $derived(
+    footerEntry ? (footerEntry.props.childEntries as any[])?.length > 0 : false
+  );
   const showSubmit = $derived(!hasCustomFooter && submitLabel !== '');
   const showCancel = $derived(!hasCustomFooter && cancelLabel !== '');
   const showDefaultFooter = $derived(showSubmit || showCancel);
@@ -79,7 +86,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-dialog"
   class:ic-dialog--open={open}
   onkeydown={handleKeydown}
@@ -119,21 +126,13 @@
         </div>
       {/if}
 
-      <!-- Body -->
-      <div class="ic-dialog__body">
-        {#each childEntries.body ?? [] as child (child)}
-          {@render child.snippet()}
-        {/each}
-      </div>
+      <!-- Children (DialogBody + DialogFooter rendered via DynamicChild) -->
+      {#each childEntries as child (child.id)}
+        <DynamicChild entry={child} />
+      {/each}
 
-      <!-- Footer: custom children OR default buttons -->
-      {#if hasCustomFooter}
-        <div class="ic-dialog__footer">
-          {#each childEntries.footer ?? [] as child (child)}
-            {@render child.snippet()}
-          {/each}
-        </div>
-      {:else if showDefaultFooter}
+      <!-- Default footer buttons (only if no custom DialogFooter) -->
+      {#if !hasCustomFooter && showDefaultFooter}
         <div class="ic-dialog__footer">
           {#if showCancel}
             <button
@@ -266,14 +265,6 @@
     background: rgba(0, 0, 0, 0.08);
   }
 
-  /* ===== BODY ===== */
-
-  .ic-dialog__body {
-    flex: 1 1 auto;
-    padding: 16px;
-    overflow: auto;
-    min-height: 0;
-  }
 
   /* ===== FOOTER ===== */
 

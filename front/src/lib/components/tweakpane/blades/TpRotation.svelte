@@ -8,6 +8,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable<Record<string, number>>({ x: 0, y: 0, z: 0 }),
     mode = $bindable<'euler' | 'quaternion'>('euler'),
@@ -19,6 +20,7 @@
     bladeIndex = $bindable(0),
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: Record<string, number>;
     mode?: 'euler' | 'quaternion';

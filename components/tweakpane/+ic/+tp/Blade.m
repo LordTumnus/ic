@@ -1,4 +1,4 @@
-classdef (Abstract) Blade < ic.core.Component & ic.mixin.Attachable
+classdef (Abstract) Blade < ic.core.Component
     % abstract base for all TweakPane leaf controls.
 
     properties (SetObservable, AbortSet, Description = "Reactive")

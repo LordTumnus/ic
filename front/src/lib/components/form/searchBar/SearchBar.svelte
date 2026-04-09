@@ -4,6 +4,7 @@
   import Tag from '$lib/components/shared/Tag.svelte';
 
   let {
+    id = '',
     value = $bindable<string[] | string | null>(null),
     placeholder = $bindable('Search...'),
     disabled = $bindable(false),
@@ -19,6 +20,7 @@
     focus = $bindable((): Resolution => ({ success: true, data: null })),
     clear = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string[] | string | null;
     placeholder?: string;
     disabled?: boolean;
@@ -249,7 +251,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-sb"
   class:ic-sb--sm={size === 'sm'}
   class:ic-sb--md={size === 'md'}

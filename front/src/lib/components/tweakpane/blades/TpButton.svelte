@@ -7,12 +7,14 @@
   import type { ButtonApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable('Button'),
     disabled = $bindable(false),
     hidden = $bindable(false),
     bladeIndex = $bindable(0),
     clicked,
   }: {
+    id?: string;
     label?: string;
     disabled?: boolean;
     hidden?: boolean;

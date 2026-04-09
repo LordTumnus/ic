@@ -2,8 +2,10 @@
   import type { ChildEntries } from '$lib/types';
   import type { CssGridTemplate, CssSpacing } from '$lib/utils/css';
   import { toGridTemplate, toSpacing } from '$lib/utils/css';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     columns = $bindable<CssGridTemplate>('1fr'),
     rows = $bindable<CssGridTemplate>('auto'),
     gap = $bindable<CssSpacing>(8),
@@ -11,8 +13,9 @@
     justifyItems = $bindable('stretch'),
     autoFlow = $bindable('row'),
     padding = $bindable<CssSpacing>(0),
-    childEntries = { default: [] } as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     columns?: CssGridTemplate;
     rows?: CssGridTemplate;
     gap?: CssSpacing;
@@ -24,7 +27,7 @@
   } = $props();
 </script>
 
-<div
+<div {id}
   class="ic-grid"
   style:grid-template-columns={toGridTemplate(columns)}
   style:grid-template-rows={toGridTemplate(rows)}
@@ -34,8 +37,8 @@
   style:grid-auto-flow={autoFlow}
   style:padding={toSpacing(padding)}
 >
-  {#each childEntries.default ?? [] as child (child)}
-    {@render child.snippet()}
+  {#each childEntries as child (child.id)}
+    <DynamicChild entry={child} />
   {/each}
 </div>
 

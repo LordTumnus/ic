@@ -50,10 +50,10 @@ classdef Popover < ic.core.ComponentContainer
 
             % static children
             this.Trigger = trigger;
-            this.addStaticChild(trigger, "trigger");
+            this.addChild(trigger);
 
             this.Panel = ic.popover.Panel(ID = this.ID + "-panel");
-            this.addStaticChild(this.Panel, "panel");
+            this.addChild(this.Panel);
 
             addlistener(trigger, 'ObjectBeingDestroyed', ...
                 @(~,~) safeDelete(this));

@@ -8,6 +8,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable<Record<string, number>>({ x: 0, y: 0 }),
     disabled = $bindable(false),
@@ -15,6 +16,7 @@
     bladeIndex = $bindable(0),
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: Record<string, number>;
     disabled?: boolean;

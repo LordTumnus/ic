@@ -11,8 +11,10 @@
 <script lang="ts">
   import type { ChildEntries } from '$lib/types';
   import { resolveIcon } from '$lib/utils/icons';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     title = $bindable(''),
     open = $bindable(false),
     side = $bindable('right'),
@@ -20,9 +22,10 @@
     closable = $bindable(true),
     overlay = $bindable(true),
     closeOnBackdropClick = $bindable(true),
-    childEntries = { body: [], header: [] } as ChildEntries,
+    childEntries = [] as ChildEntries,
     closed,
   }: {
+    id?: string;
     title?: string;
     open?: boolean;
     side?: string;
@@ -38,7 +41,8 @@
 
   const closeSvg = resolveIcon('x', 14);
 
-  const hasCustomHeader = $derived((childEntries.header?.length ?? 0) > 0);
+  // Filter children by type for header/body sections
+  // (DrawerHeader/DrawerBody types will be created later; for now all children go to body)
   const isHorizontal = $derived(side === 'left' || side === 'right');
 
   // Focus the panel when opened
@@ -71,7 +75,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-drawer"
   class:ic-drawer--open={open}
   onkeydown={handleKeydown}
@@ -105,14 +109,8 @@
     aria-label={title || 'Drawer'}
     tabindex="-1"
   >
-    <!-- Header -->
-    {#if hasCustomHeader}
-      <div class="ic-drawer__header">
-        {#each childEntries.header ?? [] as child (child)}
-          {@render child.snippet()}
-        {/each}
-      </div>
-    {:else if title || closable}
+    <!-- Header: title bar with close button -->
+    {#if title || closable}
       <div class="ic-drawer__header">
         {#if title}
           <h2 class="ic-drawer__title">{title}</h2>
@@ -129,12 +127,10 @@
       </div>
     {/if}
 
-    <!-- Body -->
-    <div class="ic-drawer__body">
-      {#each childEntries.body ?? [] as child (child)}
-        {@render child.snippet()}
-      {/each}
-    </div>
+    <!-- Render all children (DrawerHeader, DrawerBody, etc.) in order -->
+    {#each childEntries as child (child.id)}
+      <DynamicChild entry={child} />
+    {/each}
   </div>
 </div>
 
@@ -289,12 +285,4 @@
     background: rgba(0, 0, 0, 0.08);
   }
 
-  /* ===== BODY ===== */
-
-  .ic-drawer__body {
-    flex: 1 1 auto;
-    padding: 16px;
-    overflow: auto;
-    min-height: 0;
-  }
 </style>

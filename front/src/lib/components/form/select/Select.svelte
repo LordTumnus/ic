@@ -4,6 +4,7 @@
   import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
 
   let {
+    id = '',
     items = $bindable(['Option 1', 'Option 2', 'Option 3']),
     value = $bindable<string | null>(null),
     placeholder = $bindable('Select...'),
@@ -26,6 +27,7 @@
     open = $bindable((): Resolution => ({ success: true, data: null })),
     close = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: string | string[];
     value?: string | null;
     placeholder?: string;
@@ -297,7 +299,7 @@
   });
 </script>
 
-<div
+<div {id}
   bind:this={rootEl}
   class="ic-select"
   class:ic-select--sm={size === 'sm'}

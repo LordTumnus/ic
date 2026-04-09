@@ -17,6 +17,7 @@
   const toggleIcon = $derived(resizeIcon(revealed ? eyeOffRaw : eyeRaw, 16));
 
   let {
+    id = '',
     value = $bindable(''),
     placeholder = $bindable(''),
     variant = $bindable('primary'),
@@ -36,6 +37,7 @@
     selectAll = $bindable((): Resolution => ({ success: true, data: null })),
     clear = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     placeholder?: string;
     variant?: string;
@@ -102,7 +104,7 @@
   }
 </script>
 
-<div
+<div {id}
   class="ic-password"
   class:ic-password--sm={size === 'sm'}
   class:ic-password--md={size === 'md'}

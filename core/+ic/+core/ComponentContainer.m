@@ -29,22 +29,4 @@ classdef ComponentContainer < ic.core.Component & ...
       end
    end
 
-   methods (Access = ?ic.core.Container)
-      function definition = getComponentDefinition(this)
-         % extend the base component definition with static children.
-         % static children are registered via #ic.core.Container.addStaticChild in the MATLAB constructor and pre-rendered in the Svelte template.
-         definition = getComponentDefinition@ic.core.ComponentBase(this);
-
-         % collect static children for serialization
-         staticKids = this.Children([this.Children.IsStatic]);
-         definition.staticChildren = cell(1, numel(staticKids));
-         if ~isempty(staticKids)
-            for ii = 1:numel(staticKids)
-               definition.staticChildren{ii} = struct(...
-                   "component", getComponentDefinition(staticKids(ii)), ...
-                   "target", staticKids(ii).Target);
-            end
-         end
-      end
-   end
 end

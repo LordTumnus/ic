@@ -12,12 +12,14 @@
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
 
   let {
+    id = '',
     label = $bindable(''),
     closable = $bindable(false),
     disabled = $bindable(false),
     editable = $bindable(false),
     icon = $bindable<IconSource>(null),
   }: {
+    id?: string;
     label?: string;
     closable?: boolean;
     disabled?: boolean;

@@ -5,6 +5,7 @@
   import { resolveImageSource, type ImageSource } from '$lib/utils/icons';
 
   let {
+    id = '',
     source = $bindable<ImageSource>(null),
     width = $bindable<CssSize>('auto'),
     height = $bindable<CssSize>('auto'),
@@ -15,6 +16,7 @@
     loaded,
     error: errorEvent,
   }: {
+    id?: string;
     source?: ImageSource;
     width?: CssSize;
     height?: CssSize;
@@ -82,6 +84,7 @@
 
 {#if clicked}
   <button
+    {id}
     type="button"
     class="ic-image ic-image--clickable"
     style:width={toSize(width)}
@@ -93,6 +96,7 @@
   </button>
 {:else}
   <div
+    {id}
     class="ic-image"
     style:width={toSize(width)}
     style:height={toSize(height)}

@@ -12,6 +12,7 @@
   import logger from '$lib/core/logger';
 
   let {
+    id = '',
     // Reactive props (synced with MATLAB)
     label = $bindable(''),
     counter = $bindable(0),
@@ -28,6 +29,7 @@
     queryStyle = $bindable((): Resolution => ({ success: true, data: null })),
     triggerLog = $bindable((data: unknown): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     label?: string;
     counter?: number;
     enabled?: boolean;
@@ -98,7 +100,7 @@
   }
 </script>
 
-<div class="test-component" class:disabled={!enabled} data-testid="test-component" bind:this={element}>
+<div {id} class="test-component" class:disabled={!enabled} data-testid="test-component" bind:this={element}>
   <div class="header">
     <span class="label" data-testid="label">{label}</span>
     <span class="counter" data-testid="counter">{counter}</span>

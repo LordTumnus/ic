@@ -114,25 +114,21 @@ class Bridge {
   };
 
   /**
-   * Collects all unique component types from @insert events (including
-   * nested static children) so they can be pre-loaded before processing.
+   * Collects all unique component types from @insert events
+   * so they can be pre-loaded before processing.
    * Also identifies headless types that can skip Svelte module loading.
    */
   private collectTypes(events: JsEvent[]): { types: Set<string>; headlessTypes: Set<string> } {
     const types = new Set<string>();
     const headlessTypes = new Set<string>();
-    const walk = (data: any) => {
-      if (!data?.component?.type) return;
+    for (const e of events) {
+      if (e.name !== '@insert') continue;
+      const data = e.data as any;
+      if (!data?.component?.type) continue;
       types.add(data.component.type);
       if (data.component.mixins?.includes('headless')) {
         headlessTypes.add(data.component.type);
       }
-      if (data.component.staticChildren) {
-        for (const sc of data.component.staticChildren) walk(sc);
-      }
-    };
-    for (const e of events) {
-      if (e.name === '@insert') walk(e.data);
     }
     return { types, headlessTypes };
   }

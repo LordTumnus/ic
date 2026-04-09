@@ -9,6 +9,7 @@
   import ColorInput from './ColorInput.svelte';
 
   let {
+    id = '',
     value = $bindable('#3b82f6'),
     showAlpha = $bindable(false),
     format = $bindable('hex'),
@@ -22,6 +23,7 @@
     closed,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     showAlpha?: boolean;
     format?: string;
@@ -248,7 +250,7 @@
   });
 </script>
 
-<div
+<div {id}
   bind:this={rootEl}
   class="ic-color-picker"
   class:ic-color-picker--sm={size === 'sm'}

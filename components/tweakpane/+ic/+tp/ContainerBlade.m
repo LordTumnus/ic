@@ -1,4 +1,4 @@
-classdef (Abstract) ContainerBlade < ic.core.ComponentContainer & ic.mixin.Attachable
+classdef (Abstract) ContainerBlade < ic.core.ComponentContainer
     % abstract base for TweakPane structural containers
 
     properties (SetObservable, AbortSet, Description = "Reactive")
@@ -25,7 +25,6 @@ classdef (Abstract) ContainerBlade < ic.core.ComponentContainer & ic.mixin.Attac
     methods
         function this = ContainerBlade(props)
             this@ic.core.ComponentContainer(props);
-            this.Targets = string.empty;
         end
     end
 
@@ -306,13 +305,11 @@ classdef (Abstract) ContainerBlade < ic.core.ComponentContainer & ic.mixin.Attac
 
     methods (Access = protected)
         function insertBlade(this, blade)
-            % assigns index, target, and registers child
+            % assigns index and registers child
             idx = this.NextBladeIndex;
             this.NextBladeIndex = idx + 1;
-            target = sprintf("blade-%d", idx);
             blade.BladeIndex = idx;
-            this.Targets = [this.Targets, target];
-            this.addChild(blade, target);
+            this.addChild(blade);
         end
     end
 end

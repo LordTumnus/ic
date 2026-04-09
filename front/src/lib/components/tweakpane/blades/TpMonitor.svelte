@@ -9,6 +9,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable<number | string | boolean>(0),
     view = $bindable<'text' | 'graph'>('text'),
@@ -20,6 +21,7 @@
     hidden = $bindable(false),
     bladeIndex = $bindable(0),
   }: {
+    id?: string;
     label?: string;
     value?: number | string | boolean;
     view?: 'text' | 'graph';

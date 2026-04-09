@@ -4,19 +4,11 @@ classdef Component < ic.core.ComponentBase & matlab.mixin.SetGetExactNames & ...
                      ic.mixin.Keyable
    % concrete base for all IC UI components.
    % The constructor accepts a property struct from the subclass arguments block so every subclass gets a name-value constructor for free
-   % Components are inserted into the view into #ic.core.Containers by setting their #ic.core.Component.Parent and #ic.core.Component.Target properties.
+   % Components are inserted into containers via container.addChild(component).
 
    properties (SetAccess = {?ic.core.Container, ?ic.mixin.Registrable})
-      % owning container; empty until the component is inserted into a container. Set in #ic.core.Container.insertChild and #ic.core.Container.addStaticChild to establish the parent-child relationship.
+      % owning container; empty until the component is inserted via addChild.
       Parent = [] % ic.core.Container
-
-      % slot name within the parent container ("default" or a named target). Set in #ic.core.Container.insertChild and #ic.core.Container.addStaticChild to specify the target slot for this child component
-      Target string = string.empty()
-   end
-
-   properties (SetAccess = {?ic.core.Container, ?ic.mixin.Registrable}, Hidden)
-      % true for components pre-rendered in the Svelte template as static children. Static components skip the @insert / @remove lifecycle. See #ic.core.Container.addStaticChild for details
-      IsStatic logical = false
    end
 
 

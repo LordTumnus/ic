@@ -4,11 +4,13 @@
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
 
   let {
+    id = '',
     source = $bindable<IconSource>(null),
     size = $bindable<CssSize>(16),
     color = $bindable(''),
     strokeWidth = $bindable(2),
   }: {
+    id?: string;
     source?: IconSource;
     size?: CssSize;
     color?: string;
@@ -37,6 +39,7 @@
 </script>
 
 <span
+  {id}
   class="ic-icon"
   style:width={toSize(size)}
   style:height={toSize(size)}

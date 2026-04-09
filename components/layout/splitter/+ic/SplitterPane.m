@@ -56,7 +56,8 @@ classdef SplitterPane < ic.core.ComponentContainer
                 direction (1,1) string {mustBeMember(direction, ...
                     ["left", "right"])} = "left"
             end
-            idx = sscanf(this.Target, "pane-%d");
+            panes = this.Parent.Panes;
+            idx = find(arrayfun(@(p) p == this, panes), 1);
             this.Parent.collapsePane(idx, direction);
         end
     end

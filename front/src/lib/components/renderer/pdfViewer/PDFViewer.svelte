@@ -14,6 +14,7 @@
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
+    id = '',
     value = $bindable<AssetData | null>(null),
     toolbarMode = $bindable<string>('toolbar'),
     showZoomControls = $bindable(true),
@@ -37,6 +38,7 @@
     fitWidth = $bindable((): Resolution => ({ success: true, data: null })),
     fitPage = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: AssetData | null;
     toolbarMode?: string;
     showZoomControls?: boolean;
@@ -474,7 +476,7 @@
 <!-- ─── Controls snippet (shared between toolbar and hover) ──────────── -->
 {#snippet controls(mode: 'toolbar' | 'hover')}
   {#if showPageControls}
-    <div class="ic-pdfv__group">
+    <div {id} class="ic-pdfv__group">
       <button
         class="ic-pdfv__btn ic-pdfv__btn--{mode}"
         disabled={page <= 1}

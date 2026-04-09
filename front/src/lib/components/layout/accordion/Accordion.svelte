@@ -11,23 +11,24 @@
 -->
 <script lang="ts">
   import type { ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
   import { tick } from 'svelte';
 
   const ICON_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };
 
   let {
+    id = '',
     multiple = $bindable(true),
     size = $bindable<'sm' | 'md' | 'lg'>('md'),
     disabled = $bindable(false),
-    targets = $bindable<string[]>([]),
     panelToggled,
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     multiple?: boolean;
     size?: 'sm' | 'md' | 'lg';
     disabled?: boolean;
-    targets?: string[];
     panelToggled?: (data?: unknown) => void;
     childEntries?: ChildEntries;
   } = $props();
@@ -41,9 +42,9 @@
     disabled: boolean;
   }
 
-  function getConfig(target: string): PanelConfig | undefined {
-    const entry = childEntries[target]?.[0];
-    if (!entry || entry.props.label === undefined) return undefined;
+  const panelEntries = $derived(childEntries.filter(c => c.type === 'ic.accordion.AccordionPanel'));
+
+  function getConfigFromEntry(entry: import('$lib/types').ChildEntry): PanelConfig {
     return {
       label: (entry.props.label as string) ?? '',
       icon: (entry.props.icon as IconSource) ?? null,
@@ -51,8 +52,6 @@
       disabled: (entry.props.disabled as boolean) ?? false,
     };
   }
-
-  const panelTargets = $derived(targets.filter((t) => t.startsWith('panel-')));
 
   // --- Content element refs for animated collapse ---
 
@@ -75,23 +74,19 @@
     }, { once: true });
   }
 
-  function togglePanel(target: string) {
-    const config = getConfig(target);
-    if (!config || disabled || config.disabled) return;
-
-    const entry = childEntries[target]?.[0];
-    if (!entry) return;
+  function togglePanel(entry: import('$lib/types').ChildEntry) {
+    const config = getConfigFromEntry(entry);
+    if (disabled || config.disabled) return;
 
     const newOpen = !config.open;
-    const el = contentEls[target];
+    const el = contentEls[entry.id];
 
     // Single-open mode: close others first
     if (!multiple && newOpen) {
-      for (const t of panelTargets) {
-        if (t === target) continue;
-        const other = childEntries[t]?.[0];
-        if (other && (other.props.open as boolean)) {
-          const otherEl = contentEls[t];
+      for (const other of panelEntries) {
+        if (other.id === entry.id) continue;
+        if (other.props.open as boolean) {
+          const otherEl = contentEls[other.id];
           if (otherEl) animateClose(otherEl);
           other.props.open = false;
         }
@@ -120,74 +115,69 @@
       entry.props.open = false;
     }
 
-    panelToggled?.({ value: { target, open: newOpen } });
+    panelToggled?.({ value: { id: entry.id, open: newOpen } });
   }
 
-  function handleKeyDown(e: KeyboardEvent, target: string) {
+  function handleKeyDown(e: KeyboardEvent, entry: import('$lib/types').ChildEntry) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      togglePanel(target);
+      togglePanel(entry);
     }
   }
 </script>
 
-<div class="ic-ac" class:ic-ac--disabled={disabled}>
-  {#each panelTargets as target (target)}
-    {@const config = getConfig(target)}
-    {@const entry = childEntries[target]?.[0]}
-    {@const isOpen = config?.open ?? false}
-    {@const isDisabled = config?.disabled ?? false}
-    {#if config}
-      <div class="ic-ac__panel" class:ic-ac__panel--open={isOpen}>
-        <!-- Header -->
-        <div
-          class="ic-ac__header"
-          class:ic-ac__header--open={isOpen}
-          class:ic-ac__header--disabled={isDisabled}
-          class:ic-ac__header--sm={size === 'sm'}
-          class:ic-ac__header--md={size === 'md'}
-          class:ic-ac__header--lg={size === 'lg'}
-          role="button"
-          tabindex={isDisabled || disabled ? -1 : 0}
-          aria-expanded={isOpen}
-          aria-disabled={isDisabled || disabled}
-          onclick={() => togglePanel(target)}
-          onkeydown={(e) => handleKeyDown(e, target)}
-        >
-          <span class="ic-ac__indicator" class:ic-ac__indicator--open={isOpen}></span>
+<div {id} class="ic-ac" class:ic-ac--disabled={disabled}>
+  {#each panelEntries as panelEntry (panelEntry.id)}
+    {@const config = getConfigFromEntry(panelEntry)}
+    {@const isOpen = config.open}
+    {@const isDisabled = config.disabled}
+    <div class="ic-ac__panel" class:ic-ac__panel--open={isOpen}>
+      <!-- Header -->
+      <div
+        class="ic-ac__header"
+        class:ic-ac__header--open={isOpen}
+        class:ic-ac__header--disabled={isDisabled}
+        class:ic-ac__header--sm={size === 'sm'}
+        class:ic-ac__header--md={size === 'md'}
+        class:ic-ac__header--lg={size === 'lg'}
+        role="button"
+        tabindex={isDisabled || disabled ? -1 : 0}
+        aria-expanded={isOpen}
+        aria-disabled={isDisabled || disabled}
+        onclick={() => togglePanel(panelEntry)}
+        onkeydown={(e) => handleKeyDown(e, panelEntry)}
+      >
+        <span class="ic-ac__indicator" class:ic-ac__indicator--open={isOpen}></span>
 
-          <!-- Chevron -->
-          <span class="ic-ac__chevron" class:ic-ac__chevron--open={isOpen}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5"
-                    stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
+        <!-- Chevron -->
+        <span class="ic-ac__chevron" class:ic-ac__chevron--open={isOpen}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
 
-          {#if config.icon}
-            {@const iconSvg = resolveIcon(config.icon, ICON_SIZES[size] ?? 14)}
-            {#if iconSvg}
-              <span class="ic-ac__icon">{@html iconSvg}</span>
-            {/if}
+        {#if config.icon}
+          {@const iconSvg = resolveIcon(config.icon, ICON_SIZES[size] ?? 14)}
+          {#if iconSvg}
+            <span class="ic-ac__icon">{@html iconSvg}</span>
           {/if}
+        {/if}
 
-          <span class="ic-ac__label">{config.label}</span>
-        </div>
+        <span class="ic-ac__label">{config.label}</span>
+      </div>
 
-        <!-- Collapsible content -->
-        <div
-          bind:this={contentEls[target]}
-          class="ic-ac__content"
-          class:ic-ac__content--open={isOpen}
-        >
-          <div class="ic-ac__body">
-            {#if entry}
-              {@render entry.snippet()}
-            {/if}
-          </div>
+      <!-- Collapsible content -->
+      <div
+        bind:this={contentEls[panelEntry.id]}
+        class="ic-ac__content"
+        class:ic-ac__content--open={isOpen}
+      >
+        <div class="ic-ac__body">
+          <DynamicChild entry={panelEntry} />
         </div>
       </div>
-    {/if}
+    </div>
   {/each}
 </div>
 

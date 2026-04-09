@@ -7,6 +7,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable('#3b82f6'),
     showAlpha = $bindable(false),
@@ -16,6 +17,7 @@
     valueChanging,
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: string;
     showAlpha?: boolean;

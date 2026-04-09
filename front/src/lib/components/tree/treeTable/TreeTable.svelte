@@ -26,6 +26,7 @@
 
   // --- Props ---
   let {
+    id = '',
     items = $bindable<unknown>(null),
     value = $bindable<string[] | string | null>(null),
     columns = $bindable<TableColumn[]>([]),
@@ -64,6 +65,7 @@
     collapseAll = $bindable((): Resolution => ({ success: true, data: null })),
     editCell = $bindable((_data: { key: string; field: string; value: unknown }): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: unknown;
     value?: string[] | string | null;
     columns?: TableColumn[];
@@ -429,7 +431,7 @@
   }
 </script>
 
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-tt"
   class:ic-tt--sm={size === 'sm'}

@@ -1,4 +1,4 @@
-classdef Tab < ic.core.Component & ic.mixin.Attachable
+classdef Tab < ic.core.Component
     % header configuration for a tab within an #ic.TabContainer or #ic.TileLayout.
     % Tab is not a container, it simply holds the reactive properties for its tab header (label, icon, closable, disabled) and a reference to its paired #ic.tab.TabPanel. Create tabs via #ic.TabContainer.addTab or #ic.TileLayout.addTab, not directly.
 

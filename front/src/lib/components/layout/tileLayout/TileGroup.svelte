@@ -16,34 +16,24 @@
     SHADOW_ITEM_MARKER_PROPERTY_NAME,
     SHADOW_PLACEHOLDER_ITEM_ID
   } from 'svelte-dnd-action';
-  import type { ChildEntries, ChildEntry } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import type { TileTabConfig, DropZone } from './tile-types';
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
   import TileOverlay from './TileOverlay.svelte';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
-  interface AttachTabParams {
-    entry: ChildEntry | undefined;
-    target: string;
-  }
-
-  /** Svelte action: attach an IC Tab component into the tab header element. */
-  function attachTab(node: HTMLElement, params: AttachTabParams) {
-    let { entry, target } = params;
-
-    if (entry?.attach) entry.attach(node);
-
+  /** Svelte action: listen for bubbling ic-tab-close CustomEvent from Tab.svelte. */
+  function listenTabClose(node: HTMLElement, target: string) {
     const onClose = () => onTabClose?.(groupId, target);
     node.addEventListener('ic-tab-close', onClose);
-
     return {
-      update(newParams: AttachTabParams) {
-        if (entry?.detach) entry.detach();
-        ({ entry, target } = newParams);
-        if (entry?.attach) entry.attach(node);
+      update(newTarget: string) {
+        node.removeEventListener('ic-tab-close', onClose);
+        target = newTarget;
+        node.addEventListener('ic-tab-close', () => onTabClose?.(groupId, target));
       },
       destroy() {
         node.removeEventListener('ic-tab-close', onClose);
-        if (entry?.detach) entry.detach();
       }
     };
   }
@@ -63,7 +53,7 @@
     size = 'sm' as 'sm' | 'md' | 'lg',
     disabled = false,
     dragEnabled = true,
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
     onTabClick,
     onTabClose,
     overlayZone = null as DropZone | null,
@@ -93,7 +83,7 @@
   // --- Tab config resolution (from ChildEntry proxy) ---
 
   function getConfig(target: string): TileTabConfig | undefined {
-    const entry = childEntries[target]?.[0];
+    const entry = childEntries.find(e => e.id === target);
     if (entry && entry.props.label !== undefined) {
       return {
         label: (entry.props.label as string) ?? '',
@@ -254,7 +244,7 @@
       {@const isShadow = item[SHADOW_ITEM_MARKER_PROPERTY_NAME]}
       {@const config = getConfig(target)}
       {@const active = target === selectedTab}
-      {@const tabEntry = childEntries[target]?.[0]}
+      {@const tabEntry = childEntries.find(e => e.id === target)}
       <div
         class="ic-tg__tab"
         class:ic-tg__tab--active={active}
@@ -272,9 +262,12 @@
           }
         }}
         animate:flip={{ duration: flipMs }}
-        use:attachTab={{ entry: tabEntry, target }}
+        id={tabEntry?.id}
+        use:listenTabClose={target}
       >
-        {#if !tabEntry?.attach && config}
+        {#if tabEntry?.component}
+          <DynamicChild entry={tabEntry} />
+        {:else if config}
           <!-- Fallback: standalone usage without IC Tab component -->
           <span class="ic-tab__indicator"></span>
           {#if config.icon}

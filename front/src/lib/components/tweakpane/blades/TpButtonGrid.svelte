@@ -8,6 +8,7 @@
   import type { BladeApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     items = $bindable<string[]>([]),
     columns = $bindable(2),
@@ -16,6 +17,7 @@
     bladeIndex = $bindable(0),
     clicked,
   }: {
+    id?: string;
     label?: string;
     items?: string[];
     columns?: number;

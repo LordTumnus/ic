@@ -9,6 +9,7 @@
   import type { BladeApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     source = $bindable<string | { hash: string; mime: string; data: string } | null>(null),
     height = $bindable(100),
@@ -18,6 +19,7 @@
     bladeIndex = $bindable(0),
     clicked,
   }: {
+    id?: string;
     label?: string;
     source?: string | { hash: string; mime: string; data: string } | null;
     height?: number;

@@ -52,8 +52,8 @@ classdef Splitter < ic.core.ComponentContainer
             if isempty(this.Children)
                 panes = ic.SplitterPane.empty();
             else
-                panes = this.Children( ...
-                    startsWith([this.Children.Target], "pane-"));
+                mask = arrayfun(@(c) isa(c, 'ic.SplitterPane'), this.Children);
+                panes = this.Children(mask);
             end
         end
 
@@ -70,16 +70,12 @@ classdef Splitter < ic.core.ComponentContainer
                 props.?ic.SplitterPane
             end
             idx = numel(this.Panes);
-            target = sprintf("pane-%d", idx);
 
             props.ID = this.ID + "-pane-" + idx;
             args = namedargs2cell(props);
             pane = ic.SplitterPane(args{:});
 
-            % update targets before adding child
-            this.Targets = this.generatePaneTargets(idx + 1);
-
-            this.addChild(pane, target);
+            this.addChild(pane);
         end
     end
 
@@ -107,26 +103,13 @@ classdef Splitter < ic.core.ComponentContainer
     end
 
     methods (Hidden)
-        function validateChild(this, child, target)
+        function validateChild(this, child)
             assert(isa(child, "ic.SplitterPane"), ...
                 "ic:Splitter:InvalidChild", ...
                 "Splitter only accepts SplitterPane children. " + ...
                 "Use splitter.addPane() to create panes.");
 
-            % check pane slot is not already occupied
-            existing = this.getChildrenInTarget(target);
-            if ~isempty(existing)
-                error('ic:Splitter:PaneOccupied', ...
-                    'Target "%s" is already occupied.', target);
-            end
-
-            validateChild@ic.core.ComponentContainer(this, child, target);
-        end
-    end
-
-    methods (Access = private)
-        function targets = generatePaneTargets(~, numPanes)
-            targets = "pane-" + string(0:numPanes-1);
+            validateChild@ic.core.ComponentContainer(this, child);
         end
     end
 

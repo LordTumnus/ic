@@ -11,6 +11,7 @@
   ];
 
   let {
+    id = '',
     value = $bindable(0),
     min = $bindable(0),
     max = $bindable(100),
@@ -25,6 +26,7 @@
     labelPosition = $bindable('right'),
     orientation = $bindable('horizontal'),
   }: {
+    id?: string;
     value?: number;
     min?: number;
     max?: number;
@@ -117,7 +119,7 @@
   );
 </script>
 
-<div
+<div {id}
   class="ic-progress"
   class:ic-progress--vertical={isVertical}
   class:ic-progress--sm={size === 'sm'}

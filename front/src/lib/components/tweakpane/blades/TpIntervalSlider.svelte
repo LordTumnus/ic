@@ -8,6 +8,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable<{ min: number; max: number }>({ min: 0, max: 100 }),
     min = $bindable(0),
@@ -17,6 +18,7 @@
     bladeIndex = $bindable(0),
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: { min: number; max: number };
     min?: number;

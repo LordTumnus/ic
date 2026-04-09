@@ -43,6 +43,7 @@
 
   // ─── Props ───────────────────────────────────────────
   let {
+    id = '',
     // Data props
     value = $bindable(''),
     language = $bindable('matlab'),
@@ -100,6 +101,7 @@
     unfoldAll = $bindable((): Resolution => ({ success: true, data: null })),
     scrollToLine = $bindable((_line: number): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     language?: string;
     readOnly?: boolean;
@@ -538,7 +540,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="ic-ce" style:height={toSize(height)} onkeydown={handleGlobalKeyDown}>
+<div {id} class="ic-ce" style:height={toSize(height)} onkeydown={handleGlobalKeyDown}>
   {#if showSearch}
     <div class="ic-ce__search" role="search">
       <div class="ic-ce__search-row">

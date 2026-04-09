@@ -8,6 +8,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable(''),
     items = $bindable<string[]>([]),
@@ -17,6 +18,7 @@
     bladeIndex = $bindable(0),
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: string;
     items?: string[];

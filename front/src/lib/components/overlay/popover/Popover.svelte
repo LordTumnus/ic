@@ -13,29 +13,32 @@
   z-index: 50 (same as dropdowns).
 -->
 <script lang="ts">
-  import type { StaticChildrenMap } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import {
     computePosition,
     type Side,
     type PopoverAlign,
   } from '$lib/utils/popover-utils';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     open = $bindable(false),
     side = $bindable('bottom'),
     align = $bindable('center'),
     offset = $bindable(4),
     avoidCollisions = $bindable(true),
-    staticChildren = new Map() as StaticChildrenMap,
+    childEntries = [] as ChildEntries,
     opened,
     closed,
   }: {
+    id?: string;
     open?: boolean;
     side?: string;
     align?: string;
     offset?: number;
     avoidCollisions?: boolean;
-    staticChildren?: StaticChildrenMap;
+    childEntries?: ChildEntries;
     opened?: (data?: unknown) => void;
     closed?: (data?: unknown) => void;
   } = $props();
@@ -51,8 +54,8 @@
   // panelOpen gates visibility until position is computed (prevents 1-frame flash)
   const panelOpen = $derived(open && positionReady);
 
-  const triggerSlot = $derived(staticChildren.get('trigger') ?? []);
-  const panelSlot = $derived(staticChildren.get('panel') ?? []);
+  const panelSlot = $derived(childEntries.filter(c => c.type === 'ic.popover.Panel'));
+  const triggerSlot = $derived(childEntries.filter(c => c.type !== 'ic.popover.Panel'));
 
   // ── Positioning ───────────────────────────────────────────
   function recalculate() {
@@ -159,7 +162,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   bind:this={rootEl}
   class="ic-popover"
   onkeydown={handleKeydown}
@@ -167,8 +170,8 @@
   <!-- Trigger (static child) -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div class="ic-popover__trigger" onclick={toggle}>
-    {#each triggerSlot as child}
-      {@render child.snippet()}
+    {#each triggerSlot as child (child.id)}
+      <DynamicChild entry={child} />
     {/each}
   </div>
 
@@ -181,8 +184,8 @@
     style:left="{posLeft}px"
   >
     <!-- Panel content (static child) -->
-    {#each panelSlot as child}
-      {@render child.snippet()}
+    {#each panelSlot as child (child.id)}
+      <DynamicChild entry={child} />
     {/each}
   </div>
 </div>

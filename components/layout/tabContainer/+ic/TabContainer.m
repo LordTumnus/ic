@@ -18,7 +18,7 @@ classdef TabContainer < ic.core.ComponentContainer
     end
 
     properties (SetObservable, AbortSet, SetAccess = {?ic.TabContainer, ?ic.mixin.Reactive}, Description = "Reactive")
-        % target string of the currently selected tab (e.g. "tab-0"). Set by the framework when the user clicks a tab
+        % ID of the currently selected tab. Set by the framework when the user clicks a tab
         SelectedTab (1,1) string = ""
     end
 
@@ -45,25 +45,25 @@ classdef TabContainer < ic.core.ComponentContainer
     events (Description = "Reactive")
         % fires when the selected tab changes
         % {payload}
-        % value | char: target string of the newly selected tab (e.g. 'tab-0')
+        % value | char: ID of the newly selected tab
         % {/payload}
         ValueChanged
 
         % fires when a tab's close button is clicked. The tab is automatically deleted after this event
         % {payload}
-        % value | char: target string of the closed tab
+        % value | char: ID of the closed tab
         % {/payload}
         TabClosed
 
         % fires when tabs are reordered via drag-and-drop
         % {payload}
-        % value | cell array: ordered list of tab target strings after reordering
+        % value | cell array: ordered list of tab IDs after reordering
         % {/payload}
         TabReordered
 
         % fires when a tab label is edited via double-click
         % {payload}
-        % value | struct: struct with fields 'target' (char) and 'label' (char)
+        % value | struct: struct with fields 'id' (char) and 'label' (char)
         % {/payload}
         TabRenamed
     end
@@ -79,6 +79,16 @@ classdef TabContainer < ic.core.ComponentContainer
             % auto-delete tabs when closed from the UI
             addlistener(this, 'TabClosed', ...
                 @(~, e) this.removeTab(e.Data.value));
+        end
+
+        function tab = findTabById(this, id)
+            % find a Tab child by its ID
+            tabs = this.Tabs;
+            mask = arrayfun(@(t) t.ID == id, tabs);
+            idx = find(mask, 1);
+            assert(~isempty(idx), "ic:TabContainer:TabNotFound", ...
+                "No tab with ID '%s'", id);
+            tab = tabs(idx);
         end
 
         function tabs = get.Tabs(this)
@@ -106,7 +116,7 @@ classdef TabContainer < ic.core.ComponentContainer
                 tab = ic.tab.Tab.empty();
                 return;
             end
-            mask = arrayfun(@(t) t.Target == this.SelectedTab, tabs);
+            mask = arrayfun(@(t) t.ID == this.SelectedTab, tabs);
             idx = find(mask, 1);
             if isempty(idx)
                 tab = ic.tab.Tab.empty();
@@ -138,9 +148,6 @@ classdef TabContainer < ic.core.ComponentContainer
             idx = this.NextTabIndex;
             this.NextTabIndex = idx + 1;
 
-            tabTarget = sprintf("tab-%d", idx);
-            panelTarget = sprintf("panel-%d", idx);
-
             % build Tab
             tabProps = struct();
             tabProps.ID = this.ID + "-tab-" + idx;
@@ -164,50 +171,47 @@ classdef TabContainer < ic.core.ComponentContainer
             % link Tab to Panel
             tab.Panel = panel;
 
-            % register targets before adding children
-            this.Targets = [this.Targets, tabTarget, panelTarget];
-            this.addChild(tab, tabTarget);
-            this.addChild(panel, panelTarget);
+            this.addChild(tab);
+            this.addChild(panel);
 
-            % listen for direct delete(tab) and clean up selection/targets
+            % listen for direct delete(tab) and clean up selection
             addlistener(tab, 'ObjectBeingDestroyed', ...
                 @(src, ~) this.handleTabDestroyed(src));
 
             % auto-select first tab
             if this.SelectedTab == ""
-                this.SelectedTab = tabTarget;
+                this.SelectedTab = tab.ID;
             end
         end
 
-        function removeTab(this, tabOrTarget)
+        function removeTab(this, tabOrId)
             % remove and delete a tab from the container.
-            % Accepts a #ic.tab.Tab handle or a target string
+            % Accepts a #ic.tab.Tab handle or a tab ID string
             % {example}
             %   tc.removeTab(tab);
-            %   tc.removeTab("tab-2");
+            %   tc.removeTab(tab.ID);
             % {/example}
             arguments
                 this
-                % handle of the tab to remove, or target string
-                tabOrTarget
+                % handle of the tab to remove, or tab ID string
+                tabOrId
             end
 
-            if isstring(tabOrTarget) || ischar(tabOrTarget)
-                target = string(tabOrTarget);
-                tab = this.findTabByTarget(target);
+            if isstring(tabOrId) || ischar(tabOrId)
+                tabId = string(tabOrId);
+                tab = this.findTabById(tabId);
             else
-                tab = tabOrTarget;
-                target = tab.Target;
+                tab = tabOrId;
+                tabId = tab.ID;
             end
 
             panel = tab.Panel;
-            panelTarget = panel.Target;
-            wasSelected = (this.SelectedTab == target);
+            wasSelected = (this.SelectedTab == tabId);
 
             % find adjacent tab for re-selection
             tabs = this.Tabs;
-            tabTargets = arrayfun(@(t) t.Target, tabs);
-            pos = find(tabTargets == target, 1);
+            tabIds = arrayfun(@(t) t.ID, tabs);
+            pos = find(tabIds == tabId, 1);
 
             % guard and delete
             this.IsRemovingTab = true;
@@ -215,17 +219,13 @@ classdef TabContainer < ic.core.ComponentContainer
             if isvalid(panel), delete(panel); end
             this.IsRemovingTab = false;
 
-            % remove both targets
-            this.Targets(this.Targets == target | ...
-                         this.Targets == panelTarget) = [];
-
             % adjust selection: prefer previous tab, fall back to first
             if wasSelected
                 remainingTabs = this.Tabs;
                 n = numel(remainingTabs);
                 if n > 0
                     newPos = max(pos - 1, 1);
-                    this.SelectedTab = remainingTabs(newPos).Target;
+                    this.SelectedTab = remainingTabs(newPos).ID;
                 else
                     this.SelectedTab = "";
                 end
@@ -242,18 +242,18 @@ classdef TabContainer < ic.core.ComponentContainer
                 % handle of the tab to select
                 tab (1,1) ic.tab.Tab
             end
-            this.SelectedTab = tab.Target;
+            this.SelectedTab = tab.ID;
         end
     end
 
     methods (Hidden)
-        function validateChild(this, child, target)
+        function validateChild(this, child)
             assert(isa(child, "ic.tab.Tab") || isa(child, "ic.tab.TabPanel"), ...
                 "ic:TabContainer:InvalidChild", ...
                 "TabContainer only accepts Tab and TabPanel children. " + ...
                 "Use tc.addTab() to create tabs.");
 
-            validateChild@ic.core.ComponentContainer(this, child, target);
+            validateChild@ic.core.ComponentContainer(this, child);
         end
     end
 
@@ -262,23 +262,19 @@ classdef TabContainer < ic.core.ComponentContainer
             if ~isvalid(this), return; end
             if this.IsRemovingTab, return; end
 
-            target = tab.Target;
+            tabId = tab.ID;
             panel = tab.Panel;
-            wasSelected = (this.SelectedTab == target);
+            wasSelected = (this.SelectedTab == tabId);
 
             % find position before removing (for previous-tab selection)
-            tabTargets = this.Targets(startsWith(this.Targets, "tab-"));
-            pos = find(tabTargets == target, 1);
+            tabs = this.Tabs;
+            tabIds = arrayfun(@(t) t.ID, tabs);
+            pos = find(tabIds == tabId, 1);
 
             % remove panel
             if ~isempty(panel) && isvalid(panel)
-                panelTarget = panel.Target;
                 delete(panel);
-                this.Targets(this.Targets == panelTarget) = [];
             end
-
-            % remove tab target
-            this.Targets(this.Targets == target) = [];
 
             % adjust selection: prefer previous tab
             if wasSelected
@@ -286,20 +282,11 @@ classdef TabContainer < ic.core.ComponentContainer
                 n = numel(remainingTabs);
                 if n > 0
                     newPos = max(pos - 1, 1);
-                    this.SelectedTab = remainingTabs(newPos).Target;
+                    this.SelectedTab = remainingTabs(newPos).ID;
                 else
                     this.SelectedTab = "";
                 end
             end
-        end
-
-        function tab = findTabByTarget(this, target)
-            tabs = this.Tabs;
-            mask = arrayfun(@(t) t.Target == target, tabs);
-            idx = find(mask, 1);
-            assert(~isempty(idx), "ic:TabContainer:TabNotFound", ...
-                "No tab with target '%s'", target);
-            tab = tabs(idx);
         end
     end
 end

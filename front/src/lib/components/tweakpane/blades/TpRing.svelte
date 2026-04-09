@@ -8,6 +8,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable(0),
     min = $bindable(0),
@@ -21,6 +22,7 @@
     valueChanging,
     valueChanged,
   }: {
+    id?: string;
     label?: string;
     value?: number;
     min?: number;

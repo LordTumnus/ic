@@ -13,6 +13,7 @@
 
   // --- Props ---
   let {
+    id = '',
     value = $bindable<string[] | string | null>(null),
     searchValue = $bindable<string[] | string | null>(null),
     disabled = $bindable(false),
@@ -44,6 +45,7 @@
     // Framework
     request,
   }: {
+    id?: string;
     value?: string[] | string | null;
     searchValue?: string[] | string | null;
     disabled?: boolean;
@@ -202,7 +204,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-vft"
   class:ic-vft--sm={size === 'sm'}

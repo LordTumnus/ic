@@ -3,6 +3,7 @@
   import type { Resolution } from '$lib/types';
 
   let {
+    id = '',
     value = $bindable(0),
     min = $bindable(0),
     max = $bindable(100),
@@ -19,6 +20,7 @@
     valueChanging,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: number;
     min?: number;
     max?: number;
@@ -240,7 +242,7 @@
   });
 </script>
 
-<div
+<div {id}
   class="ic-knob"
   class:ic-knob--primary={variant === 'primary'}
   class:ic-knob--secondary={variant === 'secondary'}

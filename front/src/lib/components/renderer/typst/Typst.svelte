@@ -25,6 +25,7 @@
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
+    id = '',
     value = $bindable(''),
     height = $bindable<CssSize>('100%'),
     toolbarOnHover = $bindable(true),
@@ -50,6 +51,7 @@
     renderOnChange = $bindable(true),
     render = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     height?: CssSize;
     toolbarOnHover?: boolean;
@@ -537,7 +539,7 @@
 
 <!-- ─── Template ─────────────────────────────────────────────────────── -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-typst"
   class:ic-typst--multi={isMultiPage}
   style:height={heightCss}

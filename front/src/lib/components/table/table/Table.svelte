@@ -21,6 +21,7 @@
   const NONE_SEL: SelectionState = { type: 'none', value: null };
 
   let {
+    id = '',
     // Reactive props
     data = $bindable(null as unknown),
     columns = $bindable([] as TableColumn[]),
@@ -56,6 +57,7 @@
     editCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
     focusCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     data?: unknown;
     columns?: TableColumn[];
     disabled?: boolean;
@@ -537,7 +539,7 @@
   });
 </script>
 
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-tbl"
   class:ic-tbl--sm={size === 'sm'}

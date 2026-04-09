@@ -11,6 +11,7 @@
   ];
 
   let {
+    id = '',
     value = $bindable(0),
     min = $bindable(0),
     max = $bindable(100),
@@ -27,6 +28,7 @@
     startAngle = $bindable(0),
     sweepAngle = $bindable(360),
   }: {
+    id?: string;
     value?: number;
     min?: number;
     max?: number;
@@ -210,7 +212,7 @@
   );
 </script>
 
-<div
+<div {id}
   class="ic-circular-progress"
   role="progressbar"
   aria-valuenow={indeterminate ? undefined : displayValue}

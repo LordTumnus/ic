@@ -27,6 +27,14 @@ classdef Drawer < ic.core.ComponentContainer & ic.mixin.Overlay
         CloseOnBackdropClick logical = true
     end
 
+    properties (SetAccess = immutable)
+        % container for the drawer header content
+        Header ic.drawer.DrawerHeader
+
+        % container for the drawer body content. Add children here.
+        Body ic.drawer.DrawerBody
+    end
+
     events (Description = "Reactive")
         % fires when the user dismisses the drawer (close button, Escape, or backdrop click)
         Closed
@@ -39,7 +47,10 @@ classdef Drawer < ic.core.ComponentContainer & ic.mixin.Overlay
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = ["body", "header"];
+            this.Header = ic.drawer.DrawerHeader();
+            this.addChild(this.Header);
+            this.Body = ic.drawer.DrawerBody();
+            this.addChild(this.Body);
         end
 
         function open(this)
@@ -79,6 +90,18 @@ classdef Drawer < ic.core.ComponentContainer & ic.mixin.Overlay
             effect = this.jsEffect(component, this, sprintf( ...
                 "(c, dw) => { c.el?.addEventListener('%s', () => { dw.props.open = false; dw.props.closed?.({}); }); }", ...
                 event));
+        end
+    end
+
+    methods (Hidden)
+        function validateChild(~, child)
+            % Drawer only accepts its own sub-containers.
+            % Use drawer.Body.addChild(...) or drawer.Header.addChild(...) instead.
+            if ~isa(child, 'ic.drawer.DrawerBody') && ~isa(child, 'ic.drawer.DrawerHeader')
+                error("ic:Drawer:InvalidChild", ...
+                    "Cannot add children to Drawer directly. " + ...
+                    "Use drawer.Body.addChild(...) or drawer.Header.addChild(...) instead.");
+            end
         end
     end
 end

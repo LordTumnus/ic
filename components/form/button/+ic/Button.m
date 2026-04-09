@@ -48,12 +48,11 @@ classdef Button < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = "icon";
         end
 
         function icon = get.Icon(this)
             for child = this.Children
-                if child.Target == "icon"
+                if isa(child, 'ic.Icon') || isa(child, 'ic.Image')
                     icon = child;
                     return;
                 end
@@ -64,19 +63,16 @@ classdef Button < ic.core.ComponentContainer
         function set.Icon(this, icon)
             delete(this.Icon);
             if ~isempty(icon)
-                this.addChild(icon, "icon");
+                this.addChild(icon);
             end
         end
 
     end
     methods (Hidden)
-        function validateChild(~, child, target)
-            % checks target is "icon" and child is ic.Icon or ic.Image
-            assert(target == "icon", "ic:Button:InvalidTarget", ...
-                "Buttons only support children in an 'icon' target");
+        function validateChild(~, child)
             assert(isa(child, "ic.Icon") || isa(child, "ic.Image"), ...
                 "ic:Button:InvalidChild", ...
-                "Button 'icon' target only accepts ic.Icon or ic.Image components");
+                "Button only accepts ic.Icon or ic.Image children.");
         end
     end
 

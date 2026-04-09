@@ -13,6 +13,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import type { ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
   import type { TileNode, TileLeaf, DragState, DropZone } from './tile-types';
   import {
     genId,
@@ -29,26 +30,29 @@
   import TileGroup from './TileGroup.svelte';
 
   let {
+    id = '',
     gutterSize = $bindable(3),
     size = $bindable<'sm' | 'md' | 'lg'>('sm'),
     disabled = $bindable(false),
     dragEnabled = $bindable(true),
-    targets = $bindable<string[]>([]),
     tabClosed,
     tabMoved,
     layoutChanged,
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     gutterSize?: number;
     size?: 'sm' | 'md' | 'lg';
     disabled?: boolean;
     dragEnabled?: boolean;
-    targets?: string[];
     tabClosed?: (data: { value: string }) => void;
     tabMoved?: (data: { value: { tab: string; fromGroup: string; toGroup: string } }) => void;
     layoutChanged?: (data: { value: string }) => void;
     childEntries?: ChildEntries;
   } = $props();
+
+  const tabEntries = $derived(childEntries.filter(c => c.type === 'ic.tab.Tab'));
+  const panelEntries = $derived(childEntries.filter(c => c.type === 'ic.tab.TabPanel'));
 
   // ─── Tab bar height estimates (padding + font + border) per size ──
   const BAR_HEIGHTS: Record<string, number> = { sm: 21, md: 24, lg: 29 };
@@ -169,23 +173,23 @@
   let tree = $state<TileNode>({ type: 'leaf', id: genId('leaf'), tabs: [], selectedTab: '' });
 
   /**
-   * Sync tabs from MATLAB's `targets` into the tree.
+   * Sync tabs from tabEntries into the tree.
    *
    * Uses untrack() when reading `tree` so this effect ONLY re-runs when
-   * `targets` changes — not when the tree is mutated by drag operations.
+   * `tabEntries` changes — not when the tree is mutated by drag operations.
    * This prevents the fragile read/write loop that caused spurious
    * re-adds and tab misplacement.
    */
   $effect(() => {
-    // Reactive dependency: only `targets`
-    const allTabTargets = targets.filter((t) => t.startsWith('tab-'));
+    // Reactive dependency: only `tabEntries`
+    const allTabIds = tabEntries.map(e => e.id);
 
     // Read tree WITHOUT subscribing — we just need its current value
     const currentTree = untrack(() => tree);
     const treeTabs = new Set(collectAllTabs(currentTree));
 
-    // Add new tabs (present in targets but missing from tree)
-    const newTabs = allTabTargets.filter((t) => !treeTabs.has(t));
+    // Add new tabs (present in entries but missing from tree)
+    const newTabs = allTabIds.filter((t) => !treeTabs.has(t));
     if (newTabs.length > 0) {
       let updated = currentTree;
       const firstLeafId = findFirstLeaf(updated)?.id;
@@ -197,8 +201,8 @@
       }
     }
 
-    // Remove stale tabs (present in tree but missing from targets)
-    const currentSet = new Set(allTabTargets);
+    // Remove stale tabs (present in tree but missing from entries)
+    const currentSet = new Set(allTabIds);
     const treeTabs2 = collectAllTabs(untrack(() => tree));
     const removed = treeTabs2.filter((t) => !currentSet.has(t));
     if (removed.length > 0) {
@@ -235,18 +239,29 @@
     active: boolean;
   }
 
+  // Map tab ID → panel ID by index pairing
+  const tabToPanelId = $derived(() => {
+    const map = new Map<string, string>();
+    for (let i = 0; i < tabEntries.length && i < panelEntries.length; i++) {
+      map.set(tabEntries[i].id, panelEntries[i].id);
+    }
+    return map;
+  });
+
   let panelRects = $derived.by(() => {
     const bh = BAR_HEIGHTS[size] ?? 21;
+    const mapping = tabToPanelId();
     const result: PanelRect[] = [];
     for (const rect of layout.leaves) {
-      for (const tabTgt of rect.leaf.tabs) {
+      for (const tabId of rect.leaf.tabs) {
+        const panelId = mapping.get(tabId) ?? tabId;
         result.push({
-          target: tabTgt.replace('tab-', 'panel-'),
+          target: panelId,
           x: rect.x,
           y: rect.y + bh,
           w: rect.w,
           h: Math.max(0, rect.h - bh),
-          active: tabTgt === rect.leaf.selectedTab
+          active: tabId === rect.leaf.selectedTab
         });
       }
     }
@@ -368,7 +383,7 @@
     document.addEventListener('mousemove', handleGlobalMouseMove);
   }
 
-  function handleGroupConsider(groupId: string, items: { id: string; [key: string]: unknown }[]) {
+  function handleGroupConsider(groupId: string, items: { id: string }[]) {
     const leaf = findLeafById(tree, groupId);
     if (!leaf) return;
 
@@ -385,7 +400,7 @@
     }
   }
 
-  function handleGroupFinalize(groupId: string, items: { id: string; [key: string]: unknown }[]) {
+  function handleGroupFinalize(groupId: string, items: { id: string }[]) {
     // Guard: dndzone may fire finalize on both source and target zones
     // for cross-group center drops. Only process the first one.
     if (finalizeProcessed) return;
@@ -595,17 +610,17 @@
   Keyed {#each} preserves existing TileGroup instances when the tree mutates,
   which is critical for IC snippet mounts surviving splits/merges.
 -->
-<div class="ic-tl" class:ic-tl--resizing={isResizing} bind:this={containerEl}>
+<div {id} class="ic-tl" class:ic-tl--resizing={isResizing} bind:this={containerEl}>
   <!-- Panels: rendered ONCE per target, keyed so they persist across tab moves -->
   {#each panelRects as panel (panel.target)}
-    {@const panelEntry = childEntries[panel.target]?.[0]}
+    {@const panelEntry = panelEntries.find(e => e.id === panel.target)}
     <div
       class="ic-tl__panel"
       class:ic-tl__panel--active={panel.active}
       style="left:{panel.x}px;top:{panel.y}px;width:{panel.w}px;height:{panel.h}px;"
     >
       {#if panelEntry}
-        {@render panelEntry.snippet()}
+        <DynamicChild entry={panelEntry} />
       {/if}
     </div>
   {/each}

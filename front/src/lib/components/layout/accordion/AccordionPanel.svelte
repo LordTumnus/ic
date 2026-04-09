@@ -8,14 +8,17 @@
 <script lang="ts">
   import type { ChildEntries } from '$lib/types';
   import type { IconSource } from '$lib/utils/icons';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     label = $bindable(''),
     icon = $bindable<IconSource>(null),
     open = $bindable(false),
     disabled = $bindable(false),
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     label?: string;
     icon?: IconSource;
     open?: boolean;
@@ -24,6 +27,6 @@
   } = $props();
 </script>
 
-{#each childEntries.default ?? [] as child (child)}
-  {@render child.snippet()}
+{#each childEntries as child (child.id)}
+  <DynamicChild entry={child} />
 {/each}

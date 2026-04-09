@@ -1,5 +1,6 @@
 <script lang="ts">
   let {
+    id = '',
     text = $bindable(''),
     variant = $bindable('body'),
     size = $bindable('md'),
@@ -9,6 +10,7 @@
     truncate = $bindable(false),
     selectable = $bindable(true),
   }: {
+    id?: string;
     text?: string;
     variant?: string;
     size?: string;
@@ -21,6 +23,7 @@
 </script>
 
 <span
+  {id}
   class="ic-label ic-label--{variant} ic-label--{size} ic-label--{weight} ic-label--{color}"
   class:ic-label--truncate={truncate}
   class:ic-label--no-select={!selectable}

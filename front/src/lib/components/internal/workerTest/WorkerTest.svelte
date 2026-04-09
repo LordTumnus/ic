@@ -10,8 +10,10 @@
   import type { PublishFn } from '$lib/types';
 
   let {
+    id = '',
     publish,
   }: {
+    id?: string;
     publish?: PublishFn;
   } = $props();
 
@@ -48,7 +50,7 @@
   }
 </script>
 
-<div class="ic-wt">
+<div {id} class="ic-wt">
   <div class="ic-wt__header">Web Worker Capability Test</div>
 
   {#if running}

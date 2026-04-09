@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
   import logger from '$lib/core/logger';
 
   let {
+    id = '',
     items = $bindable([]),
     value = $bindable([]),
     multiselect = $bindable(false),
@@ -12,10 +14,12 @@
     size = $bindable('md'),
     disabled = $bindable(false),
     iconPosition = $bindable('left'),
-    childEntries = {} as ChildEntries,
+    iconMap = $bindable<Record<string, string>>({}),
+    childEntries = [] as ChildEntries,
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: string[] | string;
     value?: string[] | string;
     multiselect?: boolean;
@@ -24,6 +28,7 @@
     size?: string;
     disabled?: boolean;
     iconPosition?: string;
+    iconMap?: Record<string, string>;
     childEntries?: ChildEntries;
     valueChanged?: (data?: unknown) => void;
     focus?: () => Resolution;
@@ -48,8 +53,14 @@
     };
   });
 
+  function getIconEntry(item: string) {
+    const iconId = iconMap?.[item];
+    if (!iconId) return null;
+    return childEntries.find(c => c.id === iconId) ?? null;
+  }
+
   function hasIcon(item: string): boolean {
-    return (childEntries[item]?.length ?? 0) > 0;
+    return getIconEntry(item) !== null;
   }
 
   function handleClick(item: string) {
@@ -74,7 +85,7 @@
   }
 </script>
 
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-seg-btn"
   class:ic-seg-btn--sm={size === 'sm'}
@@ -99,10 +110,11 @@
       onclick={() => handleClick(item)}
     >
       {#if hasIcon(item)}
+        {@const iconEntry = getIconEntry(item)}
         <span class="ic-seg-btn__icon" class:ic-seg-btn__icon--right={iconPosition === 'right'}>
-          {#each childEntries[item] ?? [] as iconSnippet (iconSnippet)}
-            {@render iconSnippet.snippet()}
-          {/each}
+          {#if iconEntry}
+            <DynamicChild entry={iconEntry} />
+          {/if}
         </span>
       {/if}
 

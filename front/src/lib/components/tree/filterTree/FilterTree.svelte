@@ -25,6 +25,7 @@
 
   // --- Props ---
   let {
+    id = '',
     items = $bindable<TreeNodeData[] | TreeNodeData | null>([]),
     value = $bindable<string[] | string | null>(null),
     searchValue = $bindable<string[] | string | null>(null),
@@ -58,6 +59,7 @@
     expandAll = $bindable((): Resolution => ({ success: true, data: null })),
     collapseAll = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: TreeNodeData[] | TreeNodeData | null;
     value?: string[] | string | null;
     searchValue?: string[] | string | null;
@@ -281,7 +283,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-ft"
   class:ic-ft--sm={size === 'sm'}

@@ -734,7 +734,7 @@
 					class="ic-dt-css__add-selector"
 					type="text"
 					bind:value={newSelector}
-					placeholder="> *"
+					placeholder=""
 					onkeydown={(e) => handleNewRuleKeydown(e, componentId)}
 				/>
 				<!-- svelte-ignore a11y_autofocus -->

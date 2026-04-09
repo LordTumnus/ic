@@ -4,6 +4,7 @@
   import logger from '$lib/core/logger';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable('off'),
     variant = $bindable('primary'),
@@ -12,6 +13,7 @@
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     label?: string;
     value?: string;
     variant?: string;
@@ -41,7 +43,7 @@
   }
 </script>
 
-<button
+<button {id}
   bind:this={buttonEl}
   class="ic-toggle-btn"
   class:ic-toggle-btn--on={isOn}

@@ -9,7 +9,6 @@ classdef TabPanel < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = "default";
         end
     end
 end

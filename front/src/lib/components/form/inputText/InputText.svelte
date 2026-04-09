@@ -4,6 +4,7 @@
   import logger from '$lib/core/logger';
 
   let {
+    id = '',
     value = $bindable(''),
     placeholder = $bindable(''),
     variant = $bindable('primary'),
@@ -27,6 +28,7 @@
     selectAll = $bindable((): Resolution => ({ success: true, data: null })),
     clear = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     placeholder?: string;
     variant?: string;
@@ -105,7 +107,7 @@
   }
 </script>
 
-<div
+<div {id}
   class="ic-input-text"
   class:ic-input-text--sm={size === 'sm'}
   class:ic-input-text--md={size === 'md'}

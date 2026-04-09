@@ -22,10 +22,6 @@ classdef Accordion < ic.core.ComponentContainer
     properties (Access = private)
         % monotonic counter
         NextPanelIndex (1,1) double = 0
-
-        % guard flag: prevents handlePanelDestroyed from duplicating
-        % cleanup that removePanel already handles.
-        IsRemovingPanel (1,1) logical = false
     end
 
     events (Description = "Reactive")
@@ -78,8 +74,6 @@ classdef Accordion < ic.core.ComponentContainer
             idx = this.NextPanelIndex;
             this.NextPanelIndex = idx + 1;
 
-            panelTarget = sprintf("panel-%d", idx);
-
             % build AccordionPanel
             panelProps = struct();
             panelProps.ID = this.ID + "-panel-" + idx;
@@ -91,41 +85,33 @@ classdef Accordion < ic.core.ComponentContainer
             args = namedargs2cell(panelProps);
             panel = ic.accordion.AccordionPanel(args{:});
 
-            % register target and add child
-            this.Targets = [this.Targets, panelTarget];
-            this.addChild(panel, panelTarget);
-
-            % listen for direct delete(panel) and clean up targets
-            addlistener(panel, 'ObjectBeingDestroyed', ...
-                @(src, ~) this.handlePanelDestroyed(src));
+            this.addChild(panel);
         end
 
-        function removePanel(this, panelOrTarget)
+        function removePanel(this, panelOrId)
             % remove and delete a panel from the accordion.
             % {example}
             %   acc.removePanel(p);
             % {/example}
             arguments
                 this
-                % #ic.accordion.AccordionPanel handle or target string to remove
-                panelOrTarget
+                % #ic.accordion.AccordionPanel handle or panel ID string to remove
+                panelOrId
             end
 
-            if isstring(panelOrTarget) || ischar(panelOrTarget)
-                target = string(panelOrTarget);
-                panel = this.findPanelByTarget(target);
+            if isstring(panelOrId) || ischar(panelOrId)
+                panelId = string(panelOrId);
+                panels = this.Panels;
+                mask = arrayfun(@(p) p.ID == panelId, panels);
+                idx = find(mask, 1);
+                assert(~isempty(idx), "ic:Accordion:PanelNotFound", ...
+                    "No panel with ID '%s'", panelId);
+                panel = panels(idx);
             else
-                panel = panelOrTarget;
-                target = panel.Target;
+                panel = panelOrId;
             end
 
-            % Guard and delete
-            this.IsRemovingPanel = true;
             delete(panel);
-            this.IsRemovingPanel = false;
-
-            % Remove target
-            this.Targets(this.Targets == target) = [];
         end
 
         function expandAll(this)
@@ -146,32 +132,13 @@ classdef Accordion < ic.core.ComponentContainer
     end
 
     methods (Hidden)
-        function validateChild(this, child, target)
+        function validateChild(this, child)
             assert(isa(child, "ic.accordion.AccordionPanel"), ...
                 "ic:Accordion:InvalidChild", ...
                 "Accordion only accepts AccordionPanel children. " + ...
                 "Use acc.addPanel() to create panels.");
 
-            validateChild@ic.core.ComponentContainer(this, child, target);
-        end
-    end
-
-    methods (Access = private)
-        function handlePanelDestroyed(this, panel)
-            if ~isvalid(this), return; end
-            if this.IsRemovingPanel, return; end
-
-            target = panel.Target;
-            this.Targets(this.Targets == target) = [];
-        end
-
-        function panel = findPanelByTarget(this, target)
-            panels = this.Panels;
-            mask = arrayfun(@(p) p.Target == target, panels);
-            idx = find(mask, 1);
-            assert(~isempty(idx), "ic:Accordion:PanelNotFound", ...
-                "No panel with target '%s'", target);
-            panel = panels(idx);
+            validateChild@ic.core.ComponentContainer(this, child);
         end
     end
 end

@@ -23,6 +23,7 @@
   const SAFETY_TIMEOUT_MS = TRANSITION_MS + 50;
 
   let {
+    id = '',
     value = $bindable(''),
     variant = $bindable('primary'),
     duration = $bindable(3),
@@ -32,6 +33,7 @@
     publish,
     dismiss = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     variant?: string;
     duration?: number;
@@ -109,7 +111,7 @@
   });
 </script>
 
-<div
+<div {id}
   bind:this={portalEl}
   class="ic-toast-portal"
   use:toastPortal={position}

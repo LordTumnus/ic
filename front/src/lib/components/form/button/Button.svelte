@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     label = $bindable(''),
     variant = $bindable('primary'),
     fill = $bindable('solid'),
@@ -10,10 +12,11 @@
     size = $bindable('md'),
     disabled = $bindable(false),
     iconPosition = $bindable('left'),
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
     clicked,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     label?: string;
     variant?: string;
     fill?: string;
@@ -28,7 +31,8 @@
 
   let buttonEl: HTMLButtonElement;
 
-  const hasIcon = $derived((childEntries.icon?.length ?? 0) > 0);
+  const iconEntries = $derived(childEntries.filter(c => c.type === 'ic.Icon' || c.type === 'ic.Image'));
+  const hasIcon = $derived(iconEntries.length > 0);
   const iconOnly = $derived(hasIcon && !label);
 
   onMount(() => {
@@ -45,7 +49,7 @@
   }
 </script>
 
-<button
+<button {id}
   bind:this={buttonEl}
   class="ic-btn"
   class:ic-btn--primary={variant === 'primary'}
@@ -67,8 +71,8 @@
 >
   {#if hasIcon && iconPosition === 'left'}
     <span class="ic-btn__icon">
-      {#each childEntries.icon ?? [] as iconSnippet}
-        {@render iconSnippet.snippet()}
+      {#each iconEntries as iconSnippet (iconSnippet.id)}
+        <DynamicChild entry={iconSnippet} />
       {/each}
     </span>
   {/if}
@@ -79,8 +83,8 @@
 
   {#if hasIcon && iconPosition === 'right'}
     <span class="ic-btn__icon">
-      {#each childEntries.icon ?? [] as iconSnippet}
-        {@render iconSnippet.snippet()}
+      {#each iconEntries as iconSnippet (iconSnippet.id)}
+        <DynamicChild entry={iconSnippet} />
       {/each}
     </span>
   {/if}

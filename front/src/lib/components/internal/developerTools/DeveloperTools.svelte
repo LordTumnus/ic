@@ -9,7 +9,8 @@
   The single $effect is for the one-time async componentInfo fetch from MATLAB.
 -->
 <script lang="ts">
-	import { entry, type StaticChildrenMap, type RequestFn } from '$lib/types';
+	import { entry, type ChildEntries, type RequestFn } from '$lib/types';
+	import DynamicChild from '$lib/core/DynamicChild.svelte';
 	import type { ComponentInfo } from './devtools-types';
 	import logger from '$lib/core/logger';
 	import { showHighlight, hideHighlight } from './panels/dom/dom-utils';
@@ -23,16 +24,18 @@
 	import ConsolePanel from './panels/ConsolePanel.svelte';
 
 	let {
-		staticChildren = new Map() as StaticChildrenMap,
+		id = '',
+		childEntries = [] as ChildEntries,
 		request
 	}: {
-		staticChildren?: StaticChildrenMap;
+		id?: string;
+		childEntries?: ChildEntries;
 		request?: RequestFn;
 	} = $props();
 
 	// --- Static child access ---
 
-	const childSlot = $derived(staticChildren.get('component') ?? []);
+	const childSlot = $derived(childEntries);
 	const child = $derived(childSlot[0]);
 
 	// --- Component metadata (fetched once from MATLAB) ---
@@ -63,15 +66,9 @@
 
 	// --- Tab state (TabContainer uses target-based selection) ---
 
-	const TAB_TARGETS = [
-		'tab-0', 'panel-0',   // Properties
-		'tab-1', 'panel-1',   // Events
-		'tab-2', 'panel-2',   // Methods
-		'tab-3', 'panel-3',   // Styles
-		'tab-4', 'panel-4',   // DOM
-		'tab-5', 'panel-5',   // Console
-	];
-	let selectedTab = $state('tab-0');
+	const TAB_IDS = ['dt-tab-0', 'dt-tab-1', 'dt-tab-2', 'dt-tab-3', 'dt-tab-4', 'dt-tab-5'];
+	const PANEL_IDS = ['dt-panel-0', 'dt-panel-1', 'dt-panel-2', 'dt-panel-3', 'dt-panel-4', 'dt-panel-5'];
+	let selectedTab = $state(TAB_IDS[0]);
 
 	// --- Resizable split ---
 
@@ -150,7 +147,7 @@
 
 </script>
 
-<div
+<div {id}
 	class="ic-dt"
 	class:ic-dt--dragging={dragging}
 	bind:this={containerEl}
@@ -163,7 +160,7 @@
 		role="presentation"
 	>
 		{#if child}
-			{@render child.snippet()}
+			<DynamicChild entry={child} />
 		{:else}
 			<div class="ic-dt__empty">No component</div>
 		{/if}
@@ -236,27 +233,27 @@
 		{/snippet}
 
 		<TabContainer
-			targets={TAB_TARGETS}
 			bind:selectedTab
 			tabOverflow="menu"
 			dragEnabled={true}
 			size="lg"
 			tabConfigs={{
-				'tab-0': { label: 'Properties', closable: false, disabled: false, editable: false, icon: 'sliders-horizontal' },
-				'tab-1': { label: 'Events', closable: false, disabled: false, editable: false, icon: 'zap' },
-				'tab-2': { label: 'Methods', closable: false, disabled: false, editable: false, icon: 'play' },
-				'tab-3': { label: 'Styles', closable: false, disabled: false, editable: false, icon: 'paintbrush' },
-				'tab-4': { label: 'DOM', closable: false, disabled: false, editable: false, icon: 'code-xml' },
-				'tab-5': { label: 'Console', closable: false, disabled: false, editable: false, icon: 'terminal' },
+				[TAB_IDS[0]]: { label: 'Properties', closable: false, disabled: false, editable: false, icon: 'sliders-horizontal' },
+				[TAB_IDS[1]]: { label: 'Events', closable: false, disabled: false, editable: false, icon: 'zap' },
+				[TAB_IDS[2]]: { label: 'Methods', closable: false, disabled: false, editable: false, icon: 'play' },
+				[TAB_IDS[3]]: { label: 'Styles', closable: false, disabled: false, editable: false, icon: 'paintbrush' },
+				[TAB_IDS[4]]: { label: 'DOM', closable: false, disabled: false, editable: false, icon: 'code-xml' },
+				[TAB_IDS[5]]: { label: 'Console', closable: false, disabled: false, editable: false, icon: 'terminal' },
 			}}
-			childEntries={{
-				'panel-0': [entry(panelProperties)],
-				'panel-1': [entry(panelEvents)],
-				'panel-2': [entry(panelMethods)],
-				'panel-3': [entry(panelStyles)],
-				'panel-4': [entry(panelDom)],
-				'panel-5': [entry(panelConsole)],
-			}}
+			childEntries={[
+				...TAB_IDS.map(id => ({ ...entry(undefined as never), id, type: 'ic.tab.Tab' })),
+				{ ...entry(panelProperties), id: PANEL_IDS[0], type: 'ic.tab.TabPanel' },
+				{ ...entry(panelEvents), id: PANEL_IDS[1], type: 'ic.tab.TabPanel' },
+				{ ...entry(panelMethods), id: PANEL_IDS[2], type: 'ic.tab.TabPanel' },
+				{ ...entry(panelStyles), id: PANEL_IDS[3], type: 'ic.tab.TabPanel' },
+				{ ...entry(panelDom), id: PANEL_IDS[4], type: 'ic.tab.TabPanel' },
+				{ ...entry(panelConsole), id: PANEL_IDS[5], type: 'ic.tab.TabPanel' },
+			]}
 		/>
 	</div>
 </div>

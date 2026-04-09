@@ -26,6 +26,12 @@ classdef SplitButton < ic.core.ComponentContainer
         % layout of the split button and dropdown chevron
         SplitDirection string {mustBeMember(SplitDirection, ...
             ["right", "bottom"])} = "right"
+
+    end
+
+    properties (Description = "Reactive", SetObservable, Access = ?ic.mixin.Reactive)
+        % maps item names to icon component IDs for per-item icon rendering
+        IconMap struct = struct()
     end
 
     properties (Dependent)
@@ -55,34 +61,28 @@ classdef SplitButton < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = ["icon", this.Items];
         end
 
         function icon = get.MainIcon(this)
-            mask = arrayfun(@(c) c.Target == "icon", this.Children);
-            if any(mask)
-                icon = this.Children(mask);
-            else
-                icon = ic.Icon.empty();
+            % first icon/image child is the main icon
+            for child = this.Children
+                if isa(child, 'ic.Icon') || isa(child, 'ic.Image')
+                    icon = child;
+                    return;
+                end
             end
+            icon = ic.Icon.empty();
         end
 
         function set.MainIcon(this, icon)
             delete(this.MainIcon);
             if ~isempty(icon)
-                this.addChild(icon, "icon");
+                this.addChild(icon);
             end
         end
 
         function set.Items(this, val)
-            removed = setdiff(this.Items, val);
-            for child = this.Children
-                if ismember(child.Target, removed)
-                    delete(child);
-                end
-            end
             this.Items = val;
-            this.Targets = ["icon", val];
         end
 
         function setIcon(this, item, icon)
@@ -100,10 +100,15 @@ classdef SplitButton < ic.core.ComponentContainer
             end
             assert(ismember(item, this.Items), "ic:SplitButton:InvalidItem", ...
                 "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
-            mask = arrayfun(@(child) child.Target == item, this.Children);
-            delete(this.Children(mask));
+            existing = this.getIcon(item);
+            if ~isempty(existing), delete(existing); end
             if ~isempty(icon)
-                this.addChild(icon, item);
+                this.addChild(icon);
+                this.IconMap.(matlab.lang.makeValidName(item)) = icon.ID;
+            else
+                if isfield(this.IconMap, matlab.lang.makeValidName(item))
+                    this.IconMap = rmfield(this.IconMap, matlab.lang.makeValidName(item));
+                end
             end
         end
 
@@ -117,25 +122,22 @@ classdef SplitButton < ic.core.ComponentContainer
             end
             assert(ismember(item, this.Items), "ic:SplitButton:InvalidItem", ...
                 "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
-            for child = this.Children
-                if child.Target == item
-                    icon = child;
-                    return;
-                end
+            itemIdx = find(this.Items == item, 1);
+            icons = this.Children(arrayfun(@(c) isa(c, 'ic.Icon') || isa(c, 'ic.Image'), this.Children));
+            % first icon is MainIcon, item icons start at index 2
+            iconIdx = itemIdx + 1;
+            if iconIdx <= numel(icons)
+                icon = icons(iconIdx);
+            else
+                icon = [];
             end
-            icon = [];
         end
     end
     methods (Hidden)
-        function validateChild(this, child, target)
-            % ensures children are icons/images in valid targets
+        function validateChild(~, child)
             assert(isa(child, "ic.Icon") || isa(child, "ic.Image"), ...
                 "ic:SplitButton:InvalidChild", ...
                 "SplitButton only accepts ic.Icon or ic.Image children.");
-            assert(target == "icon" || ismember(target, this.Items), ...
-                "ic:SplitButton:InvalidTarget", ...
-                "Target must be 'icon' or one of Items: %s.", ...
-                strjoin(this.Items, ", "));
         end
     end
 

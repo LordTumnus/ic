@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Resolution, ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     value = $bindable('off'),
     label = $bindable(''),
     variant = $bindable('primary'),
@@ -10,10 +12,11 @@
     disabled = $bindable(false),
     indeterminate = $bindable(false),
     labelPosition = $bindable('right'),
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     label?: string;
     variant?: string;
@@ -30,7 +33,8 @@
   let focused = $state(false);
 
   const isOn = $derived(value === 'on');
-  const hasIcon = $derived((childEntries.icon?.length ?? 0) > 0);
+  const iconEntries = $derived(childEntries.filter(c => c.type === 'ic.Icon' || c.type === 'ic.Image'));
+  const hasIcon = $derived(iconEntries.length > 0);
 
   onMount(() => {
     focus = (): Resolution => {
@@ -53,7 +57,7 @@
   }
 </script>
 
-<label
+<label {id}
   class="ic-checkbox"
   class:ic-checkbox--sm={size === 'sm'}
   class:ic-checkbox--md={size === 'md'}
@@ -91,8 +95,8 @@
     {:else if isOn}
       {#if hasIcon}
         <span class="ic-checkbox__icon">
-          {#each childEntries.icon ?? [] as iconSnippet (iconSnippet)}
-            {@render iconSnippet.snippet()}
+          {#each iconEntries as iconSnippet (iconSnippet.id)}
+            <DynamicChild entry={iconSnippet} />
           {/each}
         </span>
       {:else}

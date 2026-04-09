@@ -28,6 +28,12 @@ classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
     properties (SetAccess = immutable)
         % whether the dialog is automatically deleted after the Submitted or Closed event fires
         DestroyOnClose logical = true
+
+        % container for the dialog body content. Add children here.
+        Body ic.dialog.DialogBody
+
+        % container for the dialog footer buttons. Add children here to replace the default OK/Cancel buttons.
+        Footer ic.dialog.DialogFooter
     end
 
     events (Description = "Reactive")
@@ -45,7 +51,10 @@ classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = ["body", "footer"];
+            this.Body = ic.dialog.DialogBody();
+            this.addChild(this.Body);
+            this.Footer = ic.dialog.DialogFooter();
+            this.addChild(this.Footer);
             addlistener(this, 'Submitted', @(src, ~) src.autoDestroy());
             addlistener(this, 'Closed', @(src, ~) src.autoDestroy());
         end
@@ -100,6 +109,18 @@ classdef Dialog < ic.core.ComponentContainer & ic.mixin.Overlay
             effect = this.jsEffect(component, this, sprintf( ...
                 "(c, dlg) => { c.el?.addEventListener('%s', () => { dlg.props.open = false; dlg.props.closed?.({}); }); }", ...
                 event));
+        end
+    end
+
+    methods (Hidden)
+        function validateChild(~, child)
+            % Dialog only accepts its own sub-containers.
+            % Use dialog.Body.addChild(...) or dialog.Footer.addChild(...) instead.
+            if ~isa(child, 'ic.dialog.DialogBody') && ~isa(child, 'ic.dialog.DialogFooter')
+                error("ic:Dialog:InvalidChild", ...
+                    "Cannot add children to Dialog directly. " + ...
+                    "Use dialog.Body.addChild(...) or dialog.Footer.addChild(...) instead.");
+            end
         end
     end
 

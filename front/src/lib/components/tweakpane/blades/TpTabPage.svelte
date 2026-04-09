@@ -4,22 +4,23 @@
   then overrides 'ic-tp' context so child blades attach to this page.
 -->
 <script lang="ts">
-  import { getContext, setContext, getAllContexts } from 'svelte';
+  import { getContext, setContext } from 'svelte';
   import type { TpContext } from '../TweakPane.svelte';
   import type { TpTabGroupContext } from './TpTabGroup.svelte';
   import type { ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     label = $bindable(''),
     pageIndex = $bindable(0),
     bladeIndex = $bindable(0),
-    targets = $bindable<string[]>([]),
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     label?: string;
     pageIndex?: number;
     bladeIndex?: number;
-    targets?: string[];
     childEntries?: ChildEntries;
   } = $props();
 
@@ -29,11 +30,6 @@
   const ctx: TpContext = $state({ container: undefined });
   setContext('ic-tp', ctx);
 
-  const bladeTargets = $derived(
-    (Array.isArray(targets) ? targets : targets ? [targets] : []).filter((t: string) =>
-      t.startsWith('blade-'),
-    ),
-  );
 
   $effect(() => {
     const pages = tabCtx.pages;
@@ -49,37 +45,9 @@
     };
   });
 
-  // Capture context (includes overridden 'ic-tp' pointing to this tab page)
-  const svelteCtx = getAllContexts();
 
-  // Attach/detach sub-blade children
-  let mountEl: HTMLDivElement;
-  let attachedIds = new Set<string>();
-
-  $effect(() => {
-    if (!mountEl) return;
-    const currentIds = new Set<string>();
-
-    for (const target of bladeTargets) {
-      for (const child of childEntries[target] ?? []) {
-        currentIds.add(child.id);
-        if (!attachedIds.has(child.id) && child.attach) {
-          child.attach(mountEl, svelteCtx);
-        }
-      }
-    }
-
-    for (const id of attachedIds) {
-      if (!currentIds.has(id)) {
-        for (const target of Object.keys(childEntries)) {
-          const entry = childEntries[target]?.find(e => e.id === id);
-          if (entry?.detach) entry.detach();
-        }
-      }
-    }
-
-    attachedIds = currentIds;
-  });
 </script>
 
-<div bind:this={mountEl} style="display: none"></div>
+{#each childEntries as child (child.id)}
+  <DynamicChild entry={child} />
+{/each}

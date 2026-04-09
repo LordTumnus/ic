@@ -244,7 +244,7 @@ function rebuildSliders(n)
 
         lbl = ic.Label("Text", string(letters(k)), "Variant", "code", "Size", "sm", "Weight", "bold");
         row.addChild(lbl);
-        lbl.css.style("> *", "width", "20px", "textAlign", "center", "flexShrink", "0");
+        lbl.css.style("", "width", "20px", "textAlign", "center", "flexShrink", "0");
 
         defaultVal = 1;
         if k <= numel(oldValues)
@@ -256,7 +256,7 @@ function rebuildSliders(n)
             "Value", defaultVal, ...
             "ShowValue", true, "Size", "sm");
         row.addChild(s);
-        s.css.style("> *", "flex", "1", "minWidth", "0");
+        s.css.style("", "flex", "1", "minWidth", "0");
 
         sliderHandles{end+1} = s; %#ok<AGROW>
         sliderRows{end+1} = row; %#ok<AGROW>
@@ -340,7 +340,7 @@ varPanel.addChild(countRow);
 countRow.addChild(ic.Label("Text", "Count", "Variant", "caption", "Size", "sm"));
 ctrl.countInput = ic.InputText("Value", "3", "Size", "sm");
 countRow.addChild(ctrl.countInput);
-ctrl.countInput.css.style("> *", "width", "60px");
+ctrl.countInput.css.style("", "width", "60px");
 
 ctrl.varSliderBox = ic.FlexContainer("Direction", "column", "Gap", 6, "Padding", [4 8 8 8]);
 varPanel.addChild(ctrl.varSliderBox);
@@ -371,7 +371,7 @@ ctrl.cmapSelect = ic.Select( ...
     "Value", "parula", ...
     "Size", "sm");
 cmapRow.addChild(ctrl.cmapSelect);
-ctrl.cmapSelect.css.style("> *", "flex", "1");
+ctrl.cmapSelect.css.style("", "flex", "1");
 
 ctrl.gridSwitch = addLabeledSwitch(dispBox, "Grid");
 ctrl.colorbarSwitch = addLabeledSwitch(dispBox, "Colorbar");
@@ -390,7 +390,7 @@ function sb = buildStatusBar(frame)
 container = ic.FlexContainer("Direction", "row", "Gap", 12, "Padding", [2 8], "AlignItems", "center");
 frame.addChild(container);
 container.css.fill();
-container.css.style("> *", ...
+container.css.style("", ...
     "borderTop", "1px solid var(--ic-border)", ...
     "background", "var(--ic-muted)", ...
     "minHeight", "24px");
@@ -400,7 +400,7 @@ container.addChild(sb.statusLabel);
 
 spacer = ic.FlexContainer();
 container.addChild(spacer);
-spacer.css.style("> *", "flex", "1");
+spacer.css.style("", "flex", "1");
 
 sb.timeLabel = ic.Label("Text", "0 ms", "Variant", "caption", "Size", "sm", "Color", "muted");
 container.addChild(sb.timeLabel);
@@ -421,11 +421,11 @@ parent.addChild(row);
 
 lbl = ic.Label("Text", labelText, "Variant", "caption", "Size", "sm");
 row.addChild(lbl);
-lbl.css.style("> *", "width", "70px", "flexShrink", "0");
+lbl.css.style("", "width", "70px", "flexShrink", "0");
 
 s = ic.Slider("Min", minVal, "Max", maxVal, "Step", step, "Value", value, "ShowValue", true, "Size", "sm");
 row.addChild(s);
-s.css.style("> *", "flex", "1", "minWidth", "0");
+s.css.style("", "flex", "1", "minWidth", "0");
 end
 
 function sw = addLabeledSwitch(parent, labelText)

@@ -12,14 +12,6 @@ classdef (Abstract) Registrable < handle
             end
             if ~isempty(frame)
                 ic.mixin.Registrable.registerSubtreeWithFrame(component, frame);
-                % also register static children added before attachment
-                if isa(component, "ic.core.Container")
-                    for child = component.Children
-                        if child.IsStatic
-                            ic.mixin.Registrable.registerSubtreeWithFrame(child, frame);
-                        end
-                    end
-                end
             end
         end
 

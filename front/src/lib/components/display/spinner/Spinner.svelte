@@ -1,10 +1,12 @@
 <script lang="ts">
   let {
+    id = '',
     kind = $bindable('ring'),
     size = $bindable('md'),
     variant = $bindable('primary'),
     speed = $bindable('normal'),
   }: {
+    id?: string;
     kind?: string;
     size?: string;
     variant?: string;
@@ -41,7 +43,7 @@
   const bars = Array.from({ length: barCount }, (_, i) => i);
 </script>
 
-<div
+<div {id}
   class="ic-spinner"
   class:ic-spinner--primary={variant === 'primary'}
   class:ic-spinner--secondary={variant === 'secondary'}

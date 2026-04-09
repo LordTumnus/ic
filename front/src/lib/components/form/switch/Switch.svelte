@@ -4,6 +4,7 @@
   import logger from '$lib/core/logger';
 
   let {
+    id = '',
     value = $bindable('off'),
     variant = $bindable('primary'),
     shape = $bindable('square'),
@@ -13,6 +14,7 @@
     valueChanged,
     focus = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string;
     variant?: string;
     shape?: string;
@@ -43,7 +45,7 @@
   }
 </script>
 
-<div
+<div {id}
   class="ic-switch"
   class:ic-switch--sm={size === 'sm'}
   class:ic-switch--md={size === 'md'}

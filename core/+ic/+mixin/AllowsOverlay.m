@@ -19,7 +19,7 @@ classdef (Abstract) AllowsOverlay < handle
                     "Only overlay components can be added via addOverlay. " + ...
                     "'%s' does not inherit from ic.mixin.Overlay.", class(child));
             end
-            this.insertChild(child, "overlay");
+            this.insertChild(child);
         end
     end
 

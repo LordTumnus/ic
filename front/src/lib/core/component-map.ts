@@ -22,6 +22,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Test components (for integration testing)
   'ic.test.TestComponent': modules['../components/test/TestComponent.svelte'],
   'ic.test.TestStaticContainer': modules['../components/test/TestStaticContainer.svelte'],
+  'ic.test.ProbeContainer': modules['../components/test/ProbeContainer.svelte'],
 
   // Display components
   'ic.Icon': modules['../components/display/icon/Icon.svelte'],
@@ -34,7 +35,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Editor components
   'ic.CodeEditor': modules['../components/editor/codeEditor/CodeEditor.svelte'],
   'ic.RichEditor': modules['../components/editor/RichEditor/RichEditor.svelte'],
-  'ic.NodeEditor': modules['../components/editor/nodeEditor/NodeEditor.svelte'],
+  //'ic.NodeEditor': modules['../components/editor/nodeEditor/NodeEditor.svelte'],
   'ic.node.Port': modules['../components/editor/nodeEditor/PortProxy.svelte'],
   'ic.node.Transform': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
   'ic.node.BasicGroup': modules['../components/editor/nodeEditor/NodeProxy.svelte'],
@@ -129,7 +130,11 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   // Overlay components
   'ic.Toast': modules['../components/overlay/toast/Toast.svelte'],
   'ic.Dialog': modules['../components/overlay/dialog/Dialog.svelte'],
+  'ic.dialog.DialogBody': modules['../components/overlay/dialog/DialogBody.svelte'],
+  'ic.dialog.DialogFooter': modules['../components/overlay/dialog/DialogFooter.svelte'],
   'ic.Drawer': modules['../components/overlay/drawer/Drawer.svelte'],
+  'ic.drawer.DrawerHeader': modules['../components/overlay/drawer/DrawerHeader.svelte'],
+  'ic.drawer.DrawerBody': modules['../components/overlay/drawer/DrawerBody.svelte'],
   'ic.Popover': modules['../components/overlay/popover/Popover.svelte'],
   'ic.popover.Panel': modules['../components/overlay/popover/PopoverPanel.svelte'],
 

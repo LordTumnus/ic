@@ -22,12 +22,12 @@ classdef StyleBuilder < handle
         function this = style(this, selector, varargin)
             % applies CSS styles to elements matching the CSS selector.
             % Styles are merged with any existing styles for the selector, and properties set to "" are removed. The complete style object for the selector is published to the view on each update, so it's recommended to batch multiple style changes together by passing an object or using the fluent helpers.
-            % The selector should target children or descendants of the component wrapper, not the wrapper itself. For example, to set styles on all direct children, use "> *". See the [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Selectors) reference for more details and examples
+            % Use "" (empty) to style the component root element, or a CSS selector for descendants. See the [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Selectors) reference for details
             % {returns} the builder itself, for chaining {/returns}
             % {example}
-            %   comp.css.style("> *", "width", "100%")
-            %   comp.css.style(".label", "color", "red")
-            %   comp.css.style("> *", struct("flex", "1", "margin", "5px"))
+            %   comp.css.style("", "width", "100%")         % targets root element
+            %   comp.css.style(".label", "color", "red")  % targets descendant
+            %   comp.css.style("", struct("flex", "1", "margin", "5px"))
             % {/example}
 
             arguments (Input)
@@ -102,7 +102,7 @@ classdef StyleBuilder < handle
             % if not already present.
             % {returns} the builder itself, for chaining {/returns}
             % {example}
-            %   comp.css.vars("> *", "--ic-font-size", "14px")
+            %   comp.css.vars("", "--ic-font-size", "14px")
             %   comp.css.vars("", "--my-color", "red", "--my-gap", "8px")
             % {/example}
 
@@ -199,7 +199,7 @@ classdef StyleBuilder < handle
             %   comp.css.keyframes("slide", ...
             %       "0%",   struct("transform", "translateX(0)"), ...
             %       "100%", struct("transform", "translateX(100px)"))
-            %   comp.css.style("> *", "animationName", "fadeIn", "animationDuration", "1s")
+            %   comp.css.style("", "animationName", "fadeIn", "animationDuration", "1s")
             % {/example}
 
             arguments (Input)
@@ -265,17 +265,17 @@ classdef StyleBuilder < handle
     methods
         function this = fillWidth(this)
             % sets width to 100%.
-            this.style("> *", "width", "100%");
+            this.style("", "width", "100%");
         end
 
         function this = fillHeight(this)
             % sets height to 100%.
-            this.style("> *", "height", "100%");
+            this.style("", "height", "100%");
         end
 
         function this = fill(this)
             % sets both width and height to 100%.
-            this.style("> *", "width", "100%", "height", "100%");
+            this.style("", "width", "100%", "height", "100%");
         end
 
         function this = width(this, value)
@@ -285,7 +285,7 @@ classdef StyleBuilder < handle
                 % size value (numeric → px, string → verbatim CSS)
                 value {ic.check.CssValidators.mustBeSize}
             end
-            this.style("> *", "width", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "width", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = height(this, value)
@@ -295,7 +295,7 @@ classdef StyleBuilder < handle
                 % size value (numeric → px, string → verbatim CSS)
                 value {ic.check.CssValidators.mustBeSize}
             end
-            this.style("> *", "height", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "height", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = minWidth(this, value)
@@ -304,7 +304,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
             end
-            this.style("> *", "minWidth", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "minWidth", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = minHeight(this, value)
@@ -313,7 +313,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
             end
-            this.style("> *", "minHeight", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "minHeight", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = maxWidth(this, value)
@@ -322,7 +322,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
             end
-            this.style("> *", "maxWidth", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "maxWidth", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = maxHeight(this, value)
@@ -331,7 +331,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSize}
             end
-            this.style("> *", "maxHeight", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "maxHeight", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = flex(this, grow, shrink, basis)
@@ -346,7 +346,7 @@ classdef StyleBuilder < handle
                 basis = "auto"
             end
             basisValue = ic.mixin.StyleBuilder.toCssValue(basis);
-            this.style("> *", "flex", sprintf("%g %g %s", grow, shrink, basisValue));
+            this.style("", "flex", sprintf("%g %g %s", grow, shrink, basisValue));
         end
 
         function this = flexGrow(this, value)
@@ -355,7 +355,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeNonnegative} = 1
             end
-            this.style("> *", "flexGrow", string(value));
+            this.style("", "flexGrow", string(value));
         end
 
         function this = flexShrink(this, value)
@@ -364,7 +364,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeNonnegative} = 1
             end
-            this.style("> *", "flexShrink", string(value));
+            this.style("", "flexShrink", string(value));
         end
 
         function this = flexBasis(this, value)
@@ -373,7 +373,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value = "auto"
             end
-            this.style("> *", "flexBasis", ic.mixin.StyleBuilder.toCssValue(value));
+            this.style("", "flexBasis", ic.mixin.StyleBuilder.toCssValue(value));
         end
 
         function this = alignSelf(this, value)
@@ -383,7 +383,7 @@ classdef StyleBuilder < handle
                 value (1,1) string {mustBeMember(value, ...
                     ["auto", "start", "center", "end", "stretch", "baseline"])} = "auto"
             end
-            this.style("> *", "alignSelf", value);
+            this.style("", "alignSelf", value);
         end
 
         function this = margin(this, value)
@@ -392,7 +392,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSpacing}
             end
-            this.style("> *", "margin", ic.mixin.StyleBuilder.toSpacingValue(value));
+            this.style("", "margin", ic.mixin.StyleBuilder.toSpacingValue(value));
         end
 
         function this = padding(this, value)
@@ -401,12 +401,12 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value {ic.check.CssValidators.mustBeSpacing}
             end
-            this.style("> *", "padding", ic.mixin.StyleBuilder.toSpacingValue(value));
+            this.style("", "padding", ic.mixin.StyleBuilder.toSpacingValue(value));
         end
 
         function this = hide(this)
             % hides the component (display: none).
-            this.style("> *", "display", "none");
+            this.style("", "display", "none");
         end
 
         function this = show(this, displayType)
@@ -415,17 +415,17 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 displayType (1,1) string = "block"
             end
-            this.style("> *", "display", displayType);
+            this.style("", "display", displayType);
         end
 
         function this = invisible(this)
             % makes the component invisible but preserves its layout space.
-            this.style("> *", "visibility", "hidden");
+            this.style("", "visibility", "hidden");
         end
 
         function this = visible(this)
             % makes the component visible.
-            this.style("> *", "visibility", "visible");
+            this.style("", "visibility", "visible");
         end
 
         function this = opacity(this, value)
@@ -434,7 +434,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeInRange(value, 0, 1)}
             end
-            this.style("> *", "opacity", string(value));
+            this.style("", "opacity", string(value));
         end
 
         function this = position(this, type)
@@ -444,7 +444,7 @@ classdef StyleBuilder < handle
                 type (1,1) string {mustBeMember(type, ...
                     ["static", "relative", "absolute", "fixed", "sticky"])}
             end
-            this.style("> *", "position", type);
+            this.style("", "position", type);
         end
 
         function this = zIndex(this, value)
@@ -453,7 +453,7 @@ classdef StyleBuilder < handle
                 this (1,1) ic.mixin.StyleBuilder
                 value (1,1) double {mustBeInteger}
             end
-            this.style("> *", "zIndex", string(value));
+            this.style("", "zIndex", string(value));
         end
 
         function this = overflow(this, value)
@@ -463,7 +463,7 @@ classdef StyleBuilder < handle
                 value (1,1) string {mustBeMember(value, ...
                     ["visible", "hidden", "scroll", "auto", "clip"])}
             end
-            this.style("> *", "overflow", value);
+            this.style("", "overflow", value);
         end
 
         function this = overflowX(this, value)
@@ -473,7 +473,7 @@ classdef StyleBuilder < handle
                 value (1,1) string {mustBeMember(value, ...
                     ["visible", "hidden", "scroll", "auto", "clip"])}
             end
-            this.style("> *", "overflowX", value);
+            this.style("", "overflowX", value);
         end
 
         function this = overflowY(this, value)
@@ -483,7 +483,7 @@ classdef StyleBuilder < handle
                 value (1,1) string {mustBeMember(value, ...
                     ["visible", "hidden", "scroll", "auto", "clip"])}
             end
-            this.style("> *", "overflowY", value);
+            this.style("", "overflowY", value);
         end
     end
 

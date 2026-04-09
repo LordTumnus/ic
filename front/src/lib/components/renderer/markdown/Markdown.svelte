@@ -8,6 +8,7 @@
 
   // ─── Props ────────────────────────────────────────────────────────────
   let {
+    id = '',
     value = $bindable(''),
     height = $bindable<CssSize>('100%'),
     lineWrapping = $bindable(true),
@@ -31,6 +32,7 @@
     // Request function (for MATLAB-side image fetching)
     request,
   }: {
+    id?: string;
     value?: string;
     height?: CssSize;
     lineWrapping?: boolean;
@@ -581,7 +583,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-md"
   class:ic-md--wrap={lineWrapping}
   style:height={toSize(height)}

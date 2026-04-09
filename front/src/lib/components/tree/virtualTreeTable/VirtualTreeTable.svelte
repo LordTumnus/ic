@@ -19,6 +19,7 @@
 
   // --- Props ---
   let {
+    id = '',
     // Reactive props
     value = $bindable<string[] | string | null>(null),
     columns = $bindable([] as TableColumn[]),
@@ -58,6 +59,7 @@
     collapseAll = $bindable((): Resolution => ({ success: true, data: null })),
     editCell = $bindable((_data?: unknown): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     value?: string[] | string | null;
     columns?: TableColumn[];
     expanderColumn?: string;
@@ -501,7 +503,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   bind:this={containerEl}
   class="ic-vtt"
   class:ic-tbl--sm={size === 'sm'}

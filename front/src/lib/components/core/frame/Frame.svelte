@@ -7,14 +7,17 @@
 -->
 <script lang="ts">
   import type { ChildEntries, ThemeEventData } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   interface Props {
+    id?: string;
     childEntries: ChildEntries;
     theme?: ThemeEventData;
     colorScheme?: 'light' | 'dark';
   }
 
   let {
+    id = '',
     childEntries,
     theme = {},
     colorScheme = $bindable('light'),
@@ -38,18 +41,18 @@
     return styles.join('; ');
   });
 
-  const children = $derived(childEntries.default ?? []);
-  const overlays = $derived(childEntries.overlay ?? []);
+  const children = $derived(childEntries.filter(c => !c.meta.mixins.includes('overlay')));
+  const overlays = $derived(childEntries.filter(c => c.meta.mixins.includes('overlay')));
 </script>
 
-<div id="ic-frame" class="ic-frame" style={themeStyle}>
-  {#each children as child (child)}
-    {@render child.snippet()}
+<div id={id || 'ic-frame'} class="ic-frame" style={themeStyle}>
+  {#each children as child (child.id)}
+    <DynamicChild entry={child} />
   {/each}
 
   <!-- Overlay layer — renders at root level, above normal content -->
-  {#each overlays as overlay (overlay)}
-    {@render overlay.snippet()}
+  {#each overlays as overlay (overlay.id)}
+    <DynamicChild entry={overlay} />
   {/each}
 </div>
 

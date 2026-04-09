@@ -8,9 +8,10 @@
   then expose each TabPageApi via indexed context.
 -->
 <script lang="ts">
-  import { getContext, setContext, getAllContexts } from 'svelte';
+  import { getContext, setContext } from 'svelte';
   import type { TpContext } from '../TweakPane.svelte';
   import type { ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
   import type { TabApi, TabPageApi } from 'tweakpane';
 
   export interface TpTabGroupContext {
@@ -18,16 +19,16 @@
   }
 
   let {
+    id = '',
     disabled = $bindable(false),
     hidden = $bindable(false),
     bladeIndex = $bindable(0),
-    targets = $bindable<string[]>([]),
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     disabled?: boolean;
     hidden?: boolean;
     bladeIndex?: number;
-    targets?: string[];
     childEntries?: ChildEntries;
   } = $props();
 
@@ -37,12 +38,6 @@
   const tabCtx: TpTabGroupContext = $state({ pages: [] });
   setContext('ic-tp-tabs', tabCtx);
 
-  const bladeTargets = $derived(
-    (Array.isArray(targets) ? targets : targets ? [targets] : []).filter((t: string) =>
-      t.startsWith('blade-'),
-    ),
-  );
-
   let tab: TabApi | undefined;
 
   $effect(() => {
@@ -50,16 +45,11 @@
     if (!container) return;
 
     // Collect page titles from child entries
-    const pageTargets = bladeTargets;
     const pageTitles: string[] = [];
 
-    for (const target of pageTargets) {
-      const entries = childEntries[target] ?? [];
-      for (const entry of entries) {
-        // Read label prop from child entry
-        const label = entry.props?.label ?? '';
-        pageTitles.push(label || 'Tab');
-      }
+    for (const entry of childEntries) {
+      const label = (entry.props?.label as string) ?? '';
+      pageTitles.push(label || 'Tab');
     }
 
     if (pageTitles.length === 0) return;
@@ -88,37 +78,9 @@
     }
   });
 
-  // Capture context (includes 'ic-tp' and 'ic-tp-tabs')
-  const svelteCtx = getAllContexts();
 
-  // Attach/detach tab page children
-  let mountEl: HTMLDivElement;
-  let attachedIds = new Set<string>();
-
-  $effect(() => {
-    if (!mountEl) return;
-    const currentIds = new Set<string>();
-
-    for (const target of bladeTargets) {
-      for (const child of childEntries[target] ?? []) {
-        currentIds.add(child.id);
-        if (!attachedIds.has(child.id) && child.attach) {
-          child.attach(mountEl, svelteCtx);
-        }
-      }
-    }
-
-    for (const id of attachedIds) {
-      if (!currentIds.has(id)) {
-        for (const target of Object.keys(childEntries)) {
-          const entry = childEntries[target]?.find(e => e.id === id);
-          if (entry?.detach) entry.detach();
-        }
-      }
-    }
-
-    attachedIds = currentIds;
-  });
 </script>
 
-<div bind:this={mountEl} style="display: none"></div>
+{#each childEntries as child (child.id)}
+  <DynamicChild entry={child} />
+{/each}

@@ -7,8 +7,10 @@
   import type { BladeApi } from 'tweakpane';
 
   let {
+    id = '',
     bladeIndex = $bindable(0),
   }: {
+    id?: string;
     bladeIndex?: number;
   } = $props();
 

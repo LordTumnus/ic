@@ -1,26 +1,29 @@
 <script lang="ts">
 	import { setContext } from 'svelte';
-	import type { Resolution, ChildEntries, ChildEntry } from '$lib/types';
+	import type { Resolution, ChildEntries } from '$lib/types';
+	import DynamicChild from '$lib/core/DynamicChild.svelte';
 	import type { PaneConfig, PaneHandle } from './splitter-types';
 	import logger from '$lib/core/logger';
 
 	let {
+		id = '',
 		direction = $bindable<'horizontal' | 'vertical'>('horizontal'),
 		gutterSize = $bindable(5),
 		disabled = $bindable(false),
-		targets = $bindable<string[]>([]),
 		collapsePane = $bindable((_data: { index: number; direction: string }): Resolution => ({ success: true, data: null })),
 		resized,
-		childEntries = {} as ChildEntries
+		childEntries = [] as ChildEntries
 	}: {
+		id?: string;
 		direction?: 'horizontal' | 'vertical';
 		gutterSize?: number;
 		disabled?: boolean;
-		targets?: string[];
 		collapsePane?: (data: { index: number; direction: string }) => Resolution;
 		resized?: (data: { sizes: number[] }) => void;
 		childEntries?: ChildEntries;
 	} = $props();
+
+	const paneEntries = $derived(childEntries.filter(c => c.type === 'ic.SplitterPane'));
 
 	// --- Container & measurement ---
 
@@ -136,16 +139,11 @@
 
 	// --- Helpers ---
 
-	function getPaneEntry(index: number): ChildEntry | undefined {
-		const target = `pane-${index}`;
-		return childEntries[target]?.[0];
-	}
-
 	function getAvailableSize(): number {
 		if (!containerEl) return 0;
 		const containerSize =
 			direction === 'horizontal' ? containerEl.offsetWidth : containerEl.offsetHeight;
-		const gutterTotal = Math.max(0, targets.length - 1) * gutterSize;
+		const gutterTotal = Math.max(0, paneEntries.length - 1) * gutterSize;
 		return containerSize - gutterTotal;
 	}
 
@@ -261,7 +259,7 @@
 	// --- Pane styles ---
 
 	const paneStyles = $derived.by(() => {
-		const n = targets.length;
+		const n = paneEntries.length;
 		if (n === 0) return [];
 
 		const sizes = localSizes.length === n ? localSizes : Array(n).fill(100 / n);
@@ -299,7 +297,7 @@
 		collapsePane = (data: { index: number; direction: string }): Resolution => {
 			const { index, direction: dir } = data;
 			const effectiveSizes =
-				localSizes.length === targets.length ? localSizes : equalize(paneConfigs);
+				localSizes.length === paneEntries.length ? localSizes : equalize(paneConfigs);
 
 			if (index < 0 || index >= effectiveSizes.length) {
 				logger.error('Splitter', 'Collapse index out of bounds', {
@@ -349,22 +347,19 @@
 	});
 </script>
 
-<div
+<div {id}
 	class="ic-splitter"
 	class:ic-splitter-vertical={direction === 'vertical'}
 	class:ic-splitter-dragging={isDragging}
 	bind:this={containerEl}
 >
-	{#each targets as target, i (target)}
-		{@const paneEntry = getPaneEntry(i)}
+	{#each paneEntries as paneEntry, i (paneEntry.id)}
 		<!-- Pane -->
 		<div class="ic-splitter-pane" style={paneStyles[i] ?? ''}>
-			{#if paneEntry}
-				{@render paneEntry.snippet()}
-			{/if}
+			<DynamicChild entry={paneEntry} />
 		</div>
 		<!-- Gutter (between panes, not after last) -->
-		{#if i < targets.length - 1}
+		{#if i < paneEntries.length - 1}
 			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 			<div
 				class="ic-splitter-gutter"

@@ -5,6 +5,7 @@
   import { computeDropdownPosition, dropdownStyle } from '$lib/utils/dropdown-position';
 
   let {
+    id = '',
     items = $bindable(['Option 1', 'Option 2', 'Option 3']),
     value = $bindable<string[] | string | null>(null),
     placeholder = $bindable('Select...'),
@@ -24,6 +25,7 @@
     open = $bindable((): Resolution => ({ success: true, data: null })),
     close = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: string | string[];
     value?: string[] | string | null;
     placeholder?: string;
@@ -353,7 +355,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   bind:this={rootEl}
   class="ic-ms"
   class:ic-ms--sm={size === 'sm'}

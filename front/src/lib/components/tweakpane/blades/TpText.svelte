@@ -7,6 +7,7 @@
   import type { BindingApi } from 'tweakpane';
 
   let {
+    id = '',
     label = $bindable(''),
     value = $bindable(''),
     disabled = $bindable(false),
@@ -15,6 +16,7 @@
     valueChanged,
     submitted,
   }: {
+    id?: string;
     label?: string;
     value?: string;
     disabled?: boolean;

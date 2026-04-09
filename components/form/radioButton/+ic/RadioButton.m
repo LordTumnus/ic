@@ -30,6 +30,11 @@ classdef RadioButton < ic.core.ComponentContainer
             ["vertical", "horizontal"])} = "vertical"
     end
 
+    properties (Description = "Reactive", SetObservable, Access = ?ic.mixin.Reactive)
+        % maps item names to icon component IDs for per-item icon rendering
+        IconMap struct = struct()
+    end
+
     events (Description = "Reactive")
         % triggered when the user selects a different option
         % {payload}
@@ -45,19 +50,10 @@ classdef RadioButton < ic.core.ComponentContainer
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.Targets = this.Items;
         end
 
         function set.Items(this, val)
-            % delete icons in targets that are being removed
-            removed = setdiff(this.Items, val);
-            for child = this.Children
-                if ismember(child.Target, removed)
-                    delete(child);
-                end
-            end
             this.Items = val;
-            this.Targets = val;
         end
 
         function set.Value(this, val)
@@ -85,12 +81,17 @@ classdef RadioButton < ic.core.ComponentContainer
                 "Item '%s' not found. Items: %s.", item, strjoin(this.Items, ", "));
 
             % remove existing icon in this slot
-            mask = arrayfun(@(c) c.Target == item, this.Children);
-            delete(this.Children(mask));
+            existing = this.getIcon(item);
+            if ~isempty(existing), delete(existing); end
 
             % add new icon if provided
             if ~isempty(icon)
-                this.addChild(icon, item);
+                this.addChild(icon);
+                this.IconMap.(matlab.lang.makeValidName(item)) = icon.ID;
+            else
+                if isfield(this.IconMap, matlab.lang.makeValidName(item))
+                    this.IconMap = rmfield(this.IconMap, matlab.lang.makeValidName(item));
+                end
             end
         end
 
@@ -102,23 +103,24 @@ classdef RadioButton < ic.core.ComponentContainer
                 % one of the #ic.RadioButton.Items to get the icon for
                 item (1,1) string
             end
-            mask = arrayfun(@(c) c.Target == item, this.Children);
-            if any(mask)
-                icon = this.Children(mask);
+            itemIdx = find(this.Items == item, 1);
+            if isempty(itemIdx)
+                icon = ic.Icon.empty();
                 return;
             end
-            icon = ic.Icon.empty();
+            icons = this.Children(arrayfun(@(c) isa(c, 'ic.Icon'), this.Children));
+            if itemIdx <= numel(icons)
+                icon = icons(itemIdx);
+            else
+                icon = ic.Icon.empty();
+            end
         end
 
     end
     methods (Hidden)
-        function validateChild(this, child, target)
-            % ensures only ic.Icon children in item-named targets
+        function validateChild(~, child)
             assert(isa(child, "ic.Icon"), "ic:RadioButton:InvalidChild", ...
                 "RadioButton only accepts ic.Icon children.");
-            assert(ismember(target, this.Items), "ic:RadioButton:InvalidTarget", ...
-                "Target '%s' must match one of the Items: %s.", ...
-                target, strjoin(this.Items, ", "));
         end
     end
 

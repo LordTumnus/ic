@@ -8,21 +8,22 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { Resolution, ChildEntries, StaticChildrenMap } from '$lib/types';
+  import type { Resolution, ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
+    id = '',
     title = $bindable('Static Container'),
     childCounter = $bindable(0),
-    childEntries = { default: [] } as ChildEntries,
-    staticChildren = new Map() as StaticChildrenMap,
+    childEntries = [] as ChildEntries,
 
     // Method handler (MATLAB calls this, we provide implementation)
     getState = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     title?: string;
     childCounter?: number;
     childEntries?: ChildEntries;
-    staticChildren?: StaticChildrenMap;
     getState?: () => Resolution;
   } = $props();
 
@@ -36,8 +37,8 @@
     };
   });
 
-  // Access the static children by target name (returns array, take first)
-  const childSlot = $derived(staticChildren.get('child') ?? []);
+  // Access the static child (first entry in the flat array)
+  const childSlot = $derived(childEntries);
   const child = $derived(childSlot[0]);
 
   // FRONTEND-ONLY WIRING: Bidirectional sync between parent and child counter
@@ -67,21 +68,21 @@
   });
 </script>
 
-<div class="test-static-container" data-testid="test-static-container">
+<div {id} class="test-static-container" data-testid="test-static-container">
   <div class="title" data-testid="container-title">{title}</div>
   <div class="child-counter" data-testid="child-counter">Child counter: {childCounter}</div>
 
   <div class="child-slot" data-testid="child-slot">
-    {#each childSlot as staticChild}
-      {@render staticChild.snippet()}
+    {#each childSlot as staticChild (staticChild.id)}
+      <DynamicChild entry={staticChild} />
     {:else}
       <span class="empty-slot">No static child</span>
     {/each}
   </div>
 
   <div class="dynamic-slot" data-testid="dynamic-slot">
-    {#each childEntries.default ?? [] as dynamicChild}
-      {@render dynamicChild.snippet()}
+    {#each childEntries.slice(1) as dynamicChild (dynamicChild.id)}
+      <DynamicChild entry={dynamicChild} />
     {/each}
   </div>
 </div>

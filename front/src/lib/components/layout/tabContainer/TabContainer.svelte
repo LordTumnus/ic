@@ -19,63 +19,49 @@
   import { tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, SHADOW_PLACEHOLDER_ITEM_ID } from 'svelte-dnd-action';
-  import type { ChildEntries, ChildEntry } from '$lib/types';
+  import type { ChildEntries } from '$lib/types';
   import type { TabConfig } from './tab-types';
   import { resolveIcon, type IconSource } from '$lib/utils/icons';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   const ICON_SIZES: Record<string, number> = { sm: 12, md: 14, lg: 16 };
 
-  interface AttachTabParams {
-    entry: ChildEntry | undefined;
-    target: string;
-  }
-
-  /**
-   * Svelte action: attach an IC Tab component into the tab header element.
-   * Runs synchronously on element creation so there's no flash of empty content.
-   * Also listens for the bubbling "ic-tab-close" CustomEvent from Tab.svelte.
-   */
-  function attachTab(node: HTMLElement, params: AttachTabParams) {
-    let { entry, target } = params;
-
-    if (entry?.attach) entry.attach(node);
-
+  /** Svelte action: listen for bubbling ic-tab-close CustomEvent from Tab.svelte. */
+  function listenTabClose(node: HTMLElement, target: string) {
     const onClose = () => tabClosed?.({ value: target });
     node.addEventListener('ic-tab-close', onClose);
-
     return {
-      update(newParams: AttachTabParams) {
-        if (entry?.detach) entry.detach();
-        ({ entry, target } = newParams);
-        if (entry?.attach) entry.attach(node);
+      update(newTarget: string) {
+        node.removeEventListener('ic-tab-close', onClose);
+        target = newTarget;
+        node.addEventListener('ic-tab-close', () => tabClosed?.({ value: target }));
       },
       destroy() {
         node.removeEventListener('ic-tab-close', onClose);
-        if (entry?.detach) entry.detach();
       }
     };
   }
 
   let {
+    id = '',
     selectedTab = $bindable(''),
     tabOverflow = $bindable<'scroll' | 'wrap' | 'menu'>('scroll'),
     disabled = $bindable(false),
     dragEnabled = $bindable(true),
     size = $bindable<'sm' | 'md' | 'lg'>('md'),
-    targets = $bindable<string[]>([]),
     valueChanged,
     tabClosed,
     tabReordered,
     tabRenamed,
-    childEntries = {} as ChildEntries,
+    childEntries = [] as ChildEntries,
     tabConfigs,
   }: {
+    id?: string;
     selectedTab?: string;
     tabOverflow?: 'scroll' | 'wrap' | 'menu';
     disabled?: boolean;
     dragEnabled?: boolean;
     size?: 'sm' | 'md' | 'lg';
-    targets?: string[];
     valueChanged?: (data: { value: string }) => void;
     tabClosed?: (data: { value: string }) => void;
     tabReordered?: (data: { value: string[] }) => void;
@@ -84,6 +70,14 @@
     tabConfigs?: Record<string, TabConfig>;
   } = $props();
 
+  // --- Tab/panel filtering from flat childEntries ---
+
+  const tabEntries = $derived(childEntries.filter(c => c.type === 'ic.tab.Tab'));
+  const panelEntries = $derived(childEntries.filter(c => c.type === 'ic.tab.TabPanel'));
+
+  // Stable ID lists derived from entries (used like the old tabIds/panelTargets)
+  const tabIds = $derived(tabEntries.map(e => e.id));
+
   // --- Tab config resolution ---
 
   /**
@@ -91,22 +85,19 @@
    * IC-backed entries have reactive props (label, icon, etc.) via proxy.
    * Standalone usage provides static config via tabConfigs prop.
    */
-  function getConfig(target: string): TabConfig | undefined {
-    const entry = childEntries[target]?.[0];
+  function getConfig(tabId: string): TabConfig | undefined {
+    const entry = tabEntries.find(e => e.id === tabId);
     if (entry && entry.props.label !== undefined) {
       return {
         label: (entry.props.label as string) ?? '',
-        closable: tabTargets.length > 1 && ((entry.props.closable as boolean) ?? false),
+        closable: tabEntries.length > 1 && ((entry.props.closable as boolean) ?? false),
         disabled: (entry.props.disabled as boolean) ?? false,
         editable: (entry.props.editable as boolean) ?? false,
         icon: (entry.props.icon as IconSource) ?? null,
       };
     }
-    return tabConfigs?.[target];
+    return tabConfigs?.[tabId];
   }
-
-  const tabTargets = $derived(targets.filter((t) => t.startsWith('tab-')));
-  const panelTargets = $derived(targets.filter((t) => t.startsWith('panel-')));
 
   // --- DnD ---
 
@@ -121,7 +112,7 @@
 
   $effect(() => {
     if (!isDragging) {
-      dndItems = tabTargets.map(t => ({ id: t }));
+      dndItems = tabIds.map(t => ({ id: t }));
     }
   });
 
@@ -141,14 +132,7 @@
     isDragging = false;
     document.documentElement.style.removeProperty('--_tc-cursor');
     dndItems = e.detail.items;
-    const newTargets: string[] = [];
-    for (const item of dndItems) {
-      if (item.id === SHADOW_PLACEHOLDER_ITEM_ID) continue;
-      const suffix = item.id.replace('tab-', '');
-      newTargets.push(`tab-${suffix}`, `panel-${suffix}`);
-    }
 
-    targets = newTargets;
     tabReordered?.({
       value: dndItems
         .filter(it => it.id !== SHADOW_PLACEHOLDER_ITEM_ID)
@@ -184,35 +168,35 @@
       return;
     }
 
-    const n = tabTargets.length;
+    const n = tabIds.length;
     if (n === 0) return;
 
-    const currentIdx = tabTargets.indexOf(selectedTab);
+    const currentIdx = tabIds.indexOf(selectedTab);
     let current = currentIdx >= 0 ? currentIdx : 0;
 
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       let next = (current + 1) % n;
       for (let tries = 0; tries < n; tries++) {
-        if (!getConfig(tabTargets[next])?.disabled) break;
+        if (!getConfig(tabIds[next])?.disabled) break;
         next = (next + 1) % n;
       }
-      selectedTab = tabTargets[next];
+      selectedTab = tabIds[next];
       valueChanged?.({ value: selectedTab });
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
       let prev = (current - 1 + n) % n;
       for (let tries = 0; tries < n; tries++) {
-        if (!getConfig(tabTargets[prev])?.disabled) break;
+        if (!getConfig(tabIds[prev])?.disabled) break;
         prev = (prev - 1 + n) % n;
       }
-      selectedTab = tabTargets[prev];
+      selectedTab = tabIds[prev];
       valueChanged?.({ value: selectedTab });
     } else if (e.key === 'Home') {
       e.preventDefault();
       for (let i = 0; i < n; i++) {
-        if (!getConfig(tabTargets[i])?.disabled) {
-          selectedTab = tabTargets[i];
+        if (!getConfig(tabIds[i])?.disabled) {
+          selectedTab = tabIds[i];
           valueChanged?.({ value: selectedTab });
           break;
         }
@@ -220,8 +204,8 @@
     } else if (e.key === 'End') {
       e.preventDefault();
       for (let i = n - 1; i >= 0; i--) {
-        if (!getConfig(tabTargets[i])?.disabled) {
-          selectedTab = tabTargets[i];
+        if (!getConfig(tabIds[i])?.disabled) {
+          selectedTab = tabIds[i];
           valueChanged?.({ value: selectedTab });
           break;
         }
@@ -254,7 +238,7 @@
 
     // Force hidden tabs visible via inline style (don't clear hiddenTargets
     // or the chevron flashes away during measurement)
-    for (const t of tabTargets) {
+    for (const t of tabIds) {
       const el = tabElMap[t];
       if (el) el.style.display = 'inline-flex';
     }
@@ -263,7 +247,7 @@
       requestAnimationFrame(() => {
         isMeasuring = false;
         cachedWidths = {};
-        for (const t of tabTargets) {
+        for (const t of tabIds) {
           const el = tabElMap[t];
           if (el) {
             cachedWidths[t] = el.offsetWidth;
@@ -280,7 +264,7 @@
     if (!barEl || Object.keys(cachedWidths).length === 0) return;
 
     // Spot-check: stale widths -> re-measure
-    const probe = tabTargets[0];
+    const probe = tabIds[0];
     if (probe && tabElMap[probe]) {
       const actual = tabElMap[probe].offsetWidth;
       if (Math.abs(actual - (cachedWidths[probe] ?? 0)) > 2) {
@@ -290,7 +274,7 @@
     }
 
     const barWidth = barEl.clientWidth;
-    const totalWidth = tabTargets.reduce((sum, t) => sum + (cachedWidths[t] ?? 0), 0);
+    const totalWidth = tabIds.reduce((sum, t) => sum + (cachedWidths[t] ?? 0), 0);
 
     if (totalWidth <= barWidth) {
       hiddenTargets = new Set();
@@ -301,7 +285,7 @@
     const hidden = new Set<string>();
 
     let used = 0;
-    for (const t of tabTargets) {
+    for (const t of tabIds) {
       const w = cachedWidths[t] ?? 0;
       if (used + w <= available) {
         used += w;
@@ -314,8 +298,8 @@
     if (selectedTab && hidden.has(selectedTab)) {
       hidden.delete(selectedTab);
       used += cachedWidths[selectedTab] ?? 0;
-      for (let i = tabTargets.length - 1; i >= 0 && used > available; i--) {
-        const t = tabTargets[i];
+      for (let i = tabIds.length - 1; i >= 0 && used > available; i--) {
+        const t = tabIds[i];
         if (t === selectedTab || hidden.has(t)) continue;
         hidden.add(t);
         used -= cachedWidths[t] ?? 0;
@@ -326,7 +310,7 @@
   }
 
   $effect(() => {
-    void tabTargets; void size; void tabOverflow;
+    void tabIds; void size; void tabOverflow;
     if (tabOverflow === 'menu') {
       measureAndCompute();
     } else {
@@ -366,7 +350,7 @@
     let pending = false;
     const mo = new MutationObserver(() => {
       if (pending || isMeasuring) return;
-      const probe = tabTargets[0];
+      const probe = tabIds[0];
       if (!probe || !tabElMap[probe] || cachedWidths[probe] === undefined) return;
       const actual = tabElMap[probe].offsetWidth;
       if (Math.abs(actual - cachedWidths[probe]) > 2) {
@@ -400,7 +384,7 @@
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== getConfig(target)?.label) {
       // Update via ChildEntry proxy for instant reactivity
-      const entry = childEntries[target]?.[0];
+      const entry = tabEntries.find(e => e.id === target);
       if (entry && entry.props.label !== undefined) {
         entry.props.label = trimmed;
       }
@@ -452,11 +436,11 @@
 
   // Ordered list of hidden targets for the menu dropdown (preserves tab order)
   const hiddenTargetsList = $derived(
-    tabTargets.filter(t => hiddenTargets.has(t))
+    tabIds.filter(t => hiddenTargets.has(t))
   );
 </script>
 
-<div class="ic-tc" class:ic-tc--disabled={disabled}>
+<div {id} class="ic-tc" class:ic-tc--disabled={disabled}>
   <!-- Bar wrapper (positioning context for menu popup) -->
   <div class="ic-tc__bar-wrap" bind:this={barWrapEl}>
     <div
@@ -468,7 +452,7 @@
       class:ic-tc__bar--sm={size === 'sm'}
       class:ic-tc__bar--md={size === 'md'}
       class:ic-tc__bar--lg={size === 'lg'}
-      class:ic-tc__bar--single={tabTargets.length <= 1}
+      class:ic-tc__bar--single={tabIds.length <= 1}
       role="tablist"
       tabindex="0"
       aria-orientation="horizontal"
@@ -493,7 +477,7 @@
         {@const active = target === selectedTab}
         {@const isHidden = tabOverflow === 'menu' && hiddenTargets.has(target)}
         {@const isEditing = editingTarget === target}
-        {@const tabEntry = childEntries[target]?.[0]}
+        {@const tabEntry = tabEntries.find(e => e.id === target)}
         <div
           bind:this={tabElMap[target]}
           class="ic-tc__tab"
@@ -515,7 +499,8 @@
             }
           }}
           animate:flip={{ duration: FLIP_MS }}
-          use:attachTab={{ entry: tabEntry, target }}
+          id={tabEntry?.id}
+          use:listenTabClose={target}
         >
           {#if isEditing}
             <!-- svelte-ignore a11y_autofocus -->
@@ -529,7 +514,9 @@
               onmousedown={(e) => e.stopPropagation()}
               autofocus
             />
-          {:else if !tabEntry?.attach && config}
+          {:else if tabEntry?.component}
+            <DynamicChild entry={tabEntry} />
+          {:else if config}
             <!-- Fallback: standalone usage without IC Tab component -->
             <span class="ic-tab__indicator"></span>
             {#if config.icon}
@@ -609,20 +596,19 @@
     {/if}
   </div>
 
-  <!-- Content panels -->
+  <!-- Content panels (paired by index: tabEntries[i] ↔ panelEntries[i]) -->
   <div class="ic-tc__content">
-    {#each panelTargets as target (target)}
-      {@const tabTarget = 'tab-' + target.replace('panel-', '')}
-      {@const active = tabTarget === selectedTab}
-      {@const panelEntry = childEntries[target]?.[0]}
+    {#each panelEntries as panelEntry, i (panelEntry.id)}
+      {@const pairedTab = tabEntries[i]}
+      {@const active = pairedTab?.id === selectedTab}
       <div
         class="ic-tc__panel"
         class:ic-tc__panel--active={active}
         role="tabpanel"
         aria-hidden={!active}
       >
-        {#if panelEntry?.snippet}
-          {@render panelEntry.snippet()}
+        {#if panelEntry.component}
+          <DynamicChild entry={panelEntry} />
         {/if}
       </div>
     {/each}

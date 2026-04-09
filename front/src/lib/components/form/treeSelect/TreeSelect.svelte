@@ -26,6 +26,7 @@
 
   // --- Props ---
   let {
+    id = '',
     items = $bindable<TreeNode[] | TreeNode | null>([]),
     value = $bindable<string[] | string | null>(null),
     placeholder = $bindable('Select...'),
@@ -54,6 +55,7 @@
     expandAll = $bindable((): Resolution => ({ success: true, data: null })),
     collapseAll = $bindable((): Resolution => ({ success: true, data: null })),
   }: {
+    id?: string;
     items?: TreeNode[] | TreeNode | null;
     value?: string[] | string | null;
     placeholder?: string;
@@ -478,7 +480,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   bind:this={rootEl}
   class="ic-ts"
   class:ic-ts--sm={size === 'sm'}

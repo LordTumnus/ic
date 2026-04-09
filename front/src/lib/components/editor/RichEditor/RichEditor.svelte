@@ -55,6 +55,7 @@
 
   // ─── Props ───────────────────────────────────────────
   let {
+    id = '',
     // Data props
     value = $bindable(''),
     height = $bindable<CssSize>('100%'),
@@ -91,6 +92,7 @@
     // Request function (for MATLAB-side image fetching)
     request,
   }: {
+    id?: string;
     value?: string;
     height?: CssSize;
     readOnly?: boolean;
@@ -855,7 +857,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
+<div {id}
   class="ic-rte"
   class:ic-rte--focus-mode={focusMode}
   class:ic-rte--disabled={disabled}

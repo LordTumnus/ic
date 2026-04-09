@@ -28,7 +28,7 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             this@ic.core.ComponentContainer(props);
             this.InspectedComponent = component;
 
-            this.addStaticChild(component, "component");
+            this.addChild(component);
 
             % register request handlers for the inspector frontend
             this.onRequest("getComponentInfo", @(comp, ~) comp.handleGetComponentInfo());
@@ -116,14 +116,10 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             % children (recursive for containers)
             childInfos = {};
             if isa(comp, 'ic.core.Container')
-                for tt = 1:numel(comp.Targets)
-                    target = comp.Targets(tt);
-                    kids = comp.getChildrenInTarget(target);
-                    for cc = 1:numel(kids)
-                        ci = this.getInfoForComponent(kids(cc));
-                        ci.target = char(target);
-                        childInfos{end+1} = ci; %#ok<AGROW>
-                    end
+                kids = comp.Children;
+                for cc = 1:numel(kids)
+                    ci = this.getInfoForComponent(kids(cc));
+                    childInfos{end+1} = ci; %#ok<AGROW>
                 end
             end
 
@@ -429,16 +425,14 @@ classdef DeveloperTools < ic.core.ComponentContainer & ic.mixin.Requestable
             % depth-first search through container children for a component ID.
             comp = [];
             if ~isa(container, 'ic.core.Container'), return; end
-            for tt = 1:numel(container.Targets)
-                kids = container.getChildrenInTarget(container.Targets(tt));
-                for cc = 1:numel(kids)
-                    if kids(cc).ID == targetId
-                        comp = kids(cc);
-                        return;
-                    end
-                    comp = this.searchChildren(kids(cc), targetId);
-                    if ~isempty(comp), return; end
+            kids = container.Children;
+            for cc = 1:numel(kids)
+                if kids(cc).ID == targetId
+                    comp = kids(cc);
+                    return;
                 end
+                comp = this.searchChildren(kids(cc), targetId);
+                if ~isempty(comp), return; end
             end
         end
     end

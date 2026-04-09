@@ -1,16 +1,19 @@
 <script lang="ts">
   import type { ChildEntries } from '$lib/types';
+  import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   let {
-    childEntries = { default: [] } as ChildEntries,
+    id = '',
+    childEntries = [] as ChildEntries,
   }: {
+    id?: string;
     childEntries?: ChildEntries;
   } = $props();
 </script>
 
-<div class="ic-panel">
-  {#each childEntries.default ?? [] as child (child)}
-    {@render child.snippet()}
+<div {id} class="ic-panel">
+  {#each childEntries as child (child.id)}
+    <DynamicChild entry={child} />
   {/each}
 </div>
 

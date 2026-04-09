@@ -139,11 +139,11 @@ class KeyboardManager {
       return;
     }
 
-    // Defer until the component's snippet is rendered.
+    // Defer until the component is mounted (DynamicChild's $effect calls notifyMounted).
     component.onMounted((element) => this.bindListener(componentId, state, element));
   }
 
-  /** Bind the keydown listener to the component's wrapper element. */
+  /** Bind the keydown listener to the component's root element. */
   private bindListener(componentId: string, state: ComponentKeyState, element: Element): void {
     if (state.listener) return;
 

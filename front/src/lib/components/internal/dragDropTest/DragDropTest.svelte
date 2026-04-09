@@ -18,12 +18,14 @@
   }
 
   let {
+    id = '',
     listA: listAProp = [],
     listB: listBProp = [],
     disabled = false,
     orderChanged,
     publish,
   }: {
+    id?: string;
     listA?: DndItem[];
     listB?: DndItem[];
     disabled?: boolean;
@@ -74,7 +76,7 @@
   }
 </script>
 
-<div class="ic-ddt">
+<div {id} class="ic-ddt">
   <div class="ic-ddt__header">Drag & Drop Test</div>
   <div class="ic-ddt__meta">
     svelte-dnd-action — mouse-based DnD (bypasses CEF HTML5 DnD block)
