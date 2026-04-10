@@ -11,8 +11,8 @@
 <script lang="ts">
   import L from 'leaflet';
   import 'leaflet/dist/leaflet.css';
-  import { setContext } from 'svelte';
-  import type { ChildEntries } from '$lib/types';
+  import { setContext, onMount, untrack } from 'svelte';
+  import type { ChildEntries, Resolution } from '$lib/types';
   import DynamicChild from '$lib/core/DynamicChild.svelte';
 
   // Fix Leaflet default marker icon paths broken by Vite bundler
@@ -37,8 +37,29 @@
     id = '',
     center = $bindable<[number, number]>([51.505, -0.09]),
     zoom = $bindable(13),
+    minZoom = $bindable(0),
+    maxZoom = $bindable(19),
+    maxBounds = $bindable<number[][] | null>(null),
+    zoomControl = $bindable(true),
+    allowDragging = $bindable(true),
+    scrollWheelZoom = $bindable(true),
+    doubleClickZoom = $bindable(true),
+    keyboard = $bindable(true),
     height = $bindable('400px'),
     childEntries = [] as ChildEntries,
+    // Events
+    click,
+    doubleClick,
+    moveEnd,
+    zoomEnd,
+    // Methods
+    setView = $bindable((_data: { center: number[]; zoom: number }): Resolution => ({ success: true, data: null })),
+    panTo = $bindable((_data: { latlng: number[] }): Resolution => ({ success: true, data: null })),
+    fitBounds = $bindable((_data: { bounds: number[][] }): Resolution => ({ success: true, data: null })),
+    zoomIn = $bindable((): Resolution => ({ success: true, data: null })),
+    zoomOut = $bindable((): Resolution => ({ success: true, data: null })),
+    invalidateSize = $bindable((): Resolution => ({ success: true, data: null })),
+    // Framework
     publish,
     subscribe,
     request,
@@ -46,35 +67,38 @@
     id?: string;
     center?: [number, number];
     zoom?: number;
+    minZoom?: number;
+    maxZoom?: number;
+    maxBounds?: number[][] | null;
+    zoomControl?: boolean;
+    allowDragging?: boolean;
+    scrollWheelZoom?: boolean;
+    doubleClickZoom?: boolean;
+    keyboard?: boolean;
     height?: string;
     childEntries?: ChildEntries;
+    click?: (data: { latlng: [number, number] }) => void;
+    doubleClick?: (data: { latlng: [number, number] }) => void;
+    moveEnd?: (data: { center: [number, number]; zoom: number; bounds: number[][] }) => void;
+    zoomEnd?: (data: { zoom: number }) => void;
+    setView?: (data: { center: number[]; zoom: number }) => Resolution;
+    panTo?: (data: { latlng: number[] }) => Resolution;
+    fitBounds?: (data: { bounds: number[][] }) => Resolution;
+    zoomIn?: () => Resolution;
+    zoomOut?: () => Resolution;
+    invalidateSize?: () => Resolution;
     publish?: (name: string, data?: unknown) => void;
     subscribe?: (name: string, callback: (...args: unknown[]) => void) => () => void;
     request?: (name: string, data?: unknown) => Promise<{ success: boolean; data: unknown }>;
   } = $props();
 
   let containerEl: HTMLDivElement;
+  let mapInstance: L.Map | undefined;
 
-  // Debounced spinner visibility: show after 300ms of loading, hide after 500ms of idle.
-  // Prevents flickering on quick load-finish-load cycles.
-  let showSpinner = $state(false);
-  let showTimer: ReturnType<typeof setTimeout> | undefined;
-  let hideTimer: ReturnType<typeof setTimeout> | undefined;
-
-  $effect(() => {
-    const loading = ctx.loading;
-    if (loading) {
-      clearTimeout(hideTimer);
-      showTimer = setTimeout(() => { showSpinner = true; }, 300);
-    } else {
-      clearTimeout(showTimer);
-      hideTimer = setTimeout(() => { showSpinner = false; }, 500);
-    }
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  });
+  // Track the last values synced FROM Leaflet, so the prop→Leaflet $effect
+  // can distinguish MATLAB-driven changes from user-interaction echoes.
+  let leafletCenter: [number, number] = [center[0], center[1]];
+  let leafletZoom: number = zoom;
 
   // Reactive context: children depend on ctx.target in their $effects
   const ctx: MapContext = $state({ target: undefined, loading: false });
@@ -89,24 +113,177 @@
   };
   setContext('ic-map-utils', mapUtils);
 
+  // Debounced spinner visibility
+  let showSpinner = $state(false);
+  let showTimer: ReturnType<typeof setTimeout> | undefined;
+  let hideTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => {
+    const loading = ctx.loading;
+    if (loading) {
+      clearTimeout(hideTimer);
+      showTimer = setTimeout(() => {
+        showSpinner = true;
+      }, 300);
+    } else {
+      clearTimeout(showTimer);
+      hideTimer = setTimeout(() => {
+        showSpinner = false;
+      }, 500);
+    }
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  });
+
+  // --- Map initialization ---
+  // This $effect must only depend on containerEl. Everything else is
+  // untracked so prop changes don't destroy and recreate the map.
   $effect(() => {
     if (!containerEl) return;
 
-    const map = L.map(containerEl, {
-      center: [center[0], center[1]],
-      zoom,
-      zoomControl: true,
-      attributionControl: false,
+    const map = untrack(() => {
+      const m = L.map(containerEl, {
+        center: [center[0], center[1]],
+        zoom,
+        minZoom,
+        maxZoom,
+        zoomControl,
+        attributionControl: false,
+        dragging: allowDragging,
+        scrollWheelZoom,
+        doubleClickZoom,
+        keyboard,
+      });
+
+      if (maxBounds && Array.isArray(maxBounds) && maxBounds.length === 2) {
+        m.setMaxBounds(L.latLngBounds(
+          [maxBounds[0][0], maxBounds[0][1]],
+          [maxBounds[1][0], maxBounds[1][1]],
+        ));
+      }
+
+      L.control.attribution({ prefix: 'Leaflet' }).addTo(m);
+
+      // --- Map events → MATLAB ---
+      m.on('click', (e: L.LeafletMouseEvent) => {
+        click?.({ latlng: [e.latlng.lat, e.latlng.lng] });
+      });
+      m.on('dblclick', (e: L.LeafletMouseEvent) => {
+        doubleClick?.({ latlng: [e.latlng.lat, e.latlng.lng] });
+      });
+      m.on('moveend', () => {
+        const c = m.getCenter();
+        const z = m.getZoom();
+        const b = m.getBounds();
+        const prevCenter = leafletCenter;
+        leafletCenter = [c.lat, c.lng];
+        leafletZoom = z;
+        center = leafletCenter;
+        zoom = leafletZoom;
+        // Only fire MoveEnd when the center actually changed (not on pure zoom)
+        const centerMoved =
+          Math.abs(prevCenter[0] - c.lat) > 1e-6 ||
+          Math.abs(prevCenter[1] - c.lng) > 1e-6;
+        if (centerMoved) {
+          moveEnd?.({
+            center: [c.lat, c.lng],
+            zoom: z,
+            bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]],
+          });
+        }
+      });
+      m.on('zoomend', () => {
+        zoomEnd?.({ zoom: m.getZoom() });
+      });
+
+      return m;
     });
 
-    // Add attribution without clickable links (links break uihtml)
-    L.control.attribution({ prefix: 'Leaflet' }).addTo(map);
-
+    mapInstance = map;
     ctx.target = map;
 
     return () => {
       ctx.target = undefined;
+      mapInstance = undefined;
       map.remove();
+    };
+  });
+
+  // --- Sync props → Leaflet ---
+  // Only call setView when the prop values differ from what Leaflet last
+  // reported (i.e. the change came from MATLAB, not from user interaction).
+  $effect(() => {
+    const c = center;
+    const z = zoom;
+    if (!mapInstance) return;
+    const fromLeaflet =
+      Math.abs(c[0] - leafletCenter[0]) < 1e-6 &&
+      Math.abs(c[1] - leafletCenter[1]) < 1e-6 &&
+      z === leafletZoom;
+    if (!fromLeaflet) {
+      mapInstance.setView([c[0], c[1]], z);
+    }
+  });
+
+  // Sync interaction toggles
+  $effect(() => {
+    if (!mapInstance) return;
+    const d = allowDragging;
+    if (d) mapInstance.dragging.enable(); else mapInstance.dragging.disable();
+  });
+  $effect(() => {
+    if (!mapInstance) return;
+    const s = scrollWheelZoom;
+    if (s) mapInstance.scrollWheelZoom.enable(); else mapInstance.scrollWheelZoom.disable();
+  });
+  $effect(() => {
+    if (!mapInstance) return;
+    const d = doubleClickZoom;
+    if (d) mapInstance.doubleClickZoom.enable(); else mapInstance.doubleClickZoom.disable();
+  });
+  $effect(() => {
+    if (!mapInstance) return;
+    const k = keyboard;
+    if (k) mapInstance.keyboard.enable(); else mapInstance.keyboard.disable();
+  });
+  $effect(() => {
+    if (!mapInstance) return;
+    const mn = minZoom;
+    const mx = maxZoom;
+    mapInstance.setMinZoom(mn);
+    mapInstance.setMaxZoom(mx);
+  });
+
+  // --- Methods ---
+  onMount(() => {
+    setView = (data): Resolution => {
+      mapInstance?.setView([data.center[0], data.center[1]], data.zoom);
+      return { success: true, data: null };
+    };
+    panTo = (data): Resolution => {
+      mapInstance?.panTo([data.latlng[0], data.latlng[1]]);
+      return { success: true, data: null };
+    };
+    fitBounds = (data): Resolution => {
+      mapInstance?.fitBounds([
+        [data.bounds[0][0], data.bounds[0][1]],
+        [data.bounds[1][0], data.bounds[1][1]],
+      ]);
+      return { success: true, data: null };
+    };
+    zoomIn = (): Resolution => {
+      mapInstance?.zoomIn();
+      return { success: true, data: null };
+    };
+    zoomOut = (): Resolution => {
+      mapInstance?.zoomOut();
+      return { success: true, data: null };
+    };
+    invalidateSize = (): Resolution => {
+      mapInstance?.invalidateSize();
+      return { success: true, data: null };
     };
   });
 </script>

@@ -30,6 +30,14 @@ classdef TileLayer < ic.map.Layer
         MaxNativeZoom (1,1) double = 19
     end
 
+    events (Description = "Reactive")
+        % fires when visible tiles start loading
+        FetchStart
+
+        % fires when all visible tiles have finished loading
+        FetchEnd
+    end
+
     methods
         function this = TileLayer(props)
             arguments

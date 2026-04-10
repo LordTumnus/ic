@@ -79,8 +79,10 @@ export class ProxiedTileLayer extends L.TileLayer {
   private pendingPrefetch = new Set<string>();
   private inflight = new Set<string>();
   private viewportInflight = new Set<string>();
-  /** Callback to notify the parent about viewport loading state changes */
+  /** Callback for viewport loading state (visible tiles only, drives spinner) */
   public onLoadingChange?: (loading: boolean) => void;
+  /** Callback for total loading state (viewport + prefetch, drives FetchEnd) */
+  public onAllLoadingChange?: (loading: boolean) => void;
 
   constructor(options: ProxiedTileLayerOptions) {
     // Pass empty string as url — we override createTile entirely
@@ -140,6 +142,7 @@ export class ProxiedTileLayer extends L.TileLayer {
     }
 
     this.inflight.add(key);
+    if (this.inflight.size === 1) this.onAllLoadingChange?.(true);
     if (viewport) {
       this.viewportInflight.add(key);
       if (this.viewportInflight.size === 1) this.onLoadingChange?.(true);
@@ -172,6 +175,7 @@ export class ProxiedTileLayer extends L.TileLayer {
       this.inflight.delete(key);
       this.viewportInflight.delete(key);
       if (this.viewportInflight.size === 0) this.onLoadingChange?.(false);
+      if (this.inflight.size === 0) this.onAllLoadingChange?.(false);
     }
   }
 

@@ -20,6 +20,9 @@
     visible = $bindable(true),
     opacity = $bindable(1.0),
     layerIndex = $bindable(0),
+    // Events
+    fetchStart,
+    fetchEnd,
   }: {
     id?: string;
     provider?: string;
@@ -30,12 +33,19 @@
     visible?: boolean;
     opacity?: number;
     layerIndex?: number;
+    fetchStart?: (data: Record<string, never>) => void;
+    fetchEnd?: (data: Record<string, never>) => void;
   } = $props();
 
   const mapCtx = getContext<MapContext>('ic-map');
   const mapUtils = getContext<{ request?: RequestFn }>('ic-map-utils');
 
   let layer: ProxiedTileLayer | undefined;
+
+  // Debounced fetch events: avoid flickering on quick load cycles
+  let fetchShowTimer: ReturnType<typeof setTimeout> | undefined;
+  let fetchHideTimer: ReturnType<typeof setTimeout> | undefined;
+  let isFetching = false;
 
   function resolveUrlTemplate(): string {
     // If explicit URL is provided, use it; otherwise resolve from provider preset
@@ -71,6 +81,26 @@
 
     layer.onLoadingChange = (loading) => {
       mapCtx.loading = loading;
+      // FetchStart fires when viewport tiles start loading (debounced)
+      if (loading) {
+        clearTimeout(fetchHideTimer);
+        if (!isFetching) {
+          fetchShowTimer = setTimeout(() => {
+            isFetching = true;
+            fetchStart?.({});
+          }, 300);
+        }
+      }
+    };
+    layer.onAllLoadingChange = (loading) => {
+      // FetchEnd fires when ALL tiles (viewport + prefetch) are done
+      if (!loading) {
+        clearTimeout(fetchShowTimer);
+        fetchHideTimer = setTimeout(() => {
+          if (isFetching) fetchEnd?.({});
+          isFetching = false;
+        }, 500);
+      }
     };
 
     layer.addTo(target as L.Map);

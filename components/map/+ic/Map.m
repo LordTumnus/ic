@@ -10,15 +10,116 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
         % current zoom level
         Zoom (1,1) double = 13
 
+        % minimum allowed zoom level
+        MinZoom (1,1) double = 0
+
+        % maximum allowed zoom level
+        MaxZoom (1,1) double = 19
+
+        % restrict the map viewport to these bounds as [[south,west];[north,east]], or empty for no restriction
+        MaxBounds double = []
+
+        % whether the built-in zoom buttons are shown
+        ZoomControl (1,1) logical = true
+
+        % whether the user can drag the map
+        AllowDragging (1,1) logical = true
+
+        % whether the scroll wheel zooms the map
+        ScrollWheelZoom (1,1) logical = true
+
+        % whether double-clicking zooms the map
+        DoubleClickZoom (1,1) logical = true
+
+        % whether keyboard arrows and +/- navigate the map
+        Keyboard (1,1) logical = true
+
         % css height of the map container
         Height (1,1) string = "400px"
+    end
+
+    events (Description = "Reactive")
+        % fires when the user clicks the map
+        % {payload}
+        % latlng | 1x2 double: [lat, lng] of the clicked point
+        % {/payload}
+        Click
+
+        % fires when the user double-clicks the map
+        % {payload}
+        % latlng | 1x2 double: [lat, lng] of the double-clicked point
+        % {/payload}
+        DoubleClick
+
+        % fires after the map finishes panning or zooming
+        % {payload}
+        % center | 1x2 double: [lat, lng] of the new center
+        % zoom   | double: new zoom level
+        % bounds | 2x2 double: [[south,west];[north,east]]
+        % {/payload}
+        MoveEnd
+
+        % fires after the map finishes a zoom animation
+        % {payload}
+        % zoom | double: new zoom level
+        % {/payload}
+        ZoomEnd
+    end
+
+    methods (Description = "Reactive")
+        function out = setView(this, center, zoom)
+            % animate the map to a new center and zoom level
+            arguments
+                this
+                % [lat, lng] target center
+                center (1,2) double
+                % target zoom level
+                zoom (1,1) double
+            end
+            out = this.publish("setView", struct('center', center, 'zoom', zoom));
+        end
+
+        function out = panTo(this, latlng)
+            % smooth pan to a position
+            arguments
+                this
+                % [lat, lng] target position
+                latlng (1,2) double
+            end
+            out = this.publish("panTo", struct('latlng', latlng));
+        end
+
+        function out = fitBounds(this, bounds)
+            % fit the map to geographic bounds
+            arguments
+                this
+                % [[south,west];[north,east]] bounds
+                bounds (2,2) double
+            end
+            out = this.publish("fitBounds", struct('bounds', bounds));
+        end
+
+        function out = zoomIn(this)
+            % zoom in by one level
+            out = this.publish("zoomIn", []);
+        end
+
+        function out = zoomOut(this)
+            % zoom out by one level
+            out = this.publish("zoomOut", []);
+        end
+
+        function out = invalidateSize(this)
+            % recalculate map size after its container has been resized
+            out = this.publish("invalidateSize", []);
+        end
     end
 
     properties (Access = private, Hidden)
         % monotonic counter for stable child ordering
         NextLayerIndex (1,1) double = 0
 
-        % tile cache: containers.Map("z/x/y" → struct with data, mime)
+        % tile cache: containers.Map(url → struct with data, mime)
         TileCache
     end
 
