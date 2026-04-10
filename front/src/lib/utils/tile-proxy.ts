@@ -79,13 +79,17 @@ export class ProxiedTileLayer extends L.TileLayer {
   private pendingPrefetch = new Set<string>();
   private inflight = new Set<string>();
   private viewportInflight = new Set<string>();
+  private currentZoom = -1;
+  /** Queued tile requests waiting for zoom to settle */
+  private pendingTiles: { key: string; tileUrl: string; img: HTMLImageElement; done: L.DoneCallback }[] = [];
+  private zoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   /** Callback for viewport loading state (visible tiles only, drives spinner) */
   public onLoadingChange?: (loading: boolean) => void;
   /** Callback for total loading state (viewport + prefetch, drives FetchEnd) */
   public onAllLoadingChange?: (loading: boolean) => void;
 
   constructor(options: ProxiedTileLayerOptions) {
-    // Pass empty string as url — we override createTile entirely
+    // Pass empty string as url — we override createTile entirely.
     super('', options);
     this.requestFn = options.requestFn;
     this.urlTemplate = options.urlTemplate;
@@ -97,6 +101,7 @@ export class ProxiedTileLayer extends L.TileLayer {
     img.alt = '';
     img.setAttribute('role', 'presentation');
 
+    // Serve from cache immediately (no debounce needed)
     const cached = this.tileCache.get(key);
     if (cached) {
       img.src = cached;
@@ -104,20 +109,71 @@ export class ProxiedTileLayer extends L.TileLayer {
       return img;
     }
 
-    const tileUrl = this.buildTileUrl(coords);
-    this.fetchTile(key, tileUrl, true).then((dataUri) => {
-      if (dataUri) {
-        img.src = dataUri;
-        done(undefined, img);
-      } else {
-        done(new Error('Tile fetch failed'), img);
-      }
-    });
+    const intZoom = Math.round(coords.z);
+    const zoomChanged = intZoom !== this.currentZoom;
 
-    // Schedule prefetch for surrounding tiles
-    this.schedulePrefetch(coords);
+    if (zoomChanged) {
+      // Zoom is changing: queue this tile and debounce.
+      // When zoom settles (150ms of no new tiles), flush the queue.
+      this.currentZoom = intZoom;
+      this.pendingPrefetch.clear();
+      if (this.prefetchTimer) {
+        clearTimeout(this.prefetchTimer);
+        this.prefetchTimer = null;
+      }
+    }
+
+    const tileUrl = this.buildTileUrl(coords);
+
+    if (zoomChanged || this.zoomDebounceTimer) {
+      // Zoom in flux: queue and debounce
+      this.pendingTiles.push({ key, tileUrl, img, done });
+      if (this.zoomDebounceTimer) clearTimeout(this.zoomDebounceTimer);
+      this.zoomDebounceTimer = setTimeout(() => {
+        this.zoomDebounceTimer = null;
+        this.flushPendingTiles();
+      }, 150);
+    } else {
+      // Same zoom (panning): fetch immediately
+      this.fetchTile(key, tileUrl, true).then((dataUri) => {
+        if (dataUri) {
+          img.src = dataUri;
+          done(undefined, img);
+        } else {
+          done(new Error('Tile fetch failed'), img);
+        }
+      });
+      this.schedulePrefetch(coords);
+    }
 
     return img;
+  }
+
+  /** Flush queued tiles after zoom has settled */
+  private flushPendingTiles(): void {
+    const tiles = this.pendingTiles.splice(0);
+    for (const { key, tileUrl, img, done } of tiles) {
+      // Check cache first (might have been cached from a previous zoom level)
+      const cached = this.tileCache.get(key);
+      if (cached) {
+        img.src = cached;
+        setTimeout(() => done(undefined, img), 0);
+        continue;
+      }
+      this.fetchTile(key, tileUrl, true).then((dataUri) => {
+        if (dataUri) {
+          img.src = dataUri;
+          done(undefined, img);
+        } else {
+          done(new Error('Tile fetch failed'), img);
+        }
+      });
+    }
+    // Prefetch neighbors of the last tile (representative of current viewport)
+    if (tiles.length > 0) {
+      const last = tiles[tiles.length - 1].key.split('/').map(Number);
+      this.schedulePrefetch({ z: last[0], x: last[1], y: last[2] } as L.Coords);
+    }
   }
 
   /** Fetch a single tile, deduplicating inflight requests.
@@ -209,7 +265,6 @@ export class ProxiedTileLayer extends L.TileLayer {
       if (this.tileCache.has(key) || this.inflight.has(key)) continue;
       const [z, x, y] = key.split('/').map(Number);
       const tileUrl = this.buildTileUrl({ z, x, y } as L.Coords);
-      // Fire and forget: prefetch populates cache for later use
       this.fetchTile(key, tileUrl);
     }
   }

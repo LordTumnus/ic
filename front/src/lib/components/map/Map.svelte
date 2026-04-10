@@ -11,6 +11,7 @@
 <script lang="ts">
   import L from 'leaflet';
   import 'leaflet/dist/leaflet.css';
+  import '$lib/utils/smooth-wheel-zoom'; // registers SmoothWheelZoom handler
   import { setContext, onMount, untrack } from 'svelte';
   import type { ChildEntries, Resolution } from '$lib/types';
   import DynamicChild from '$lib/core/DynamicChild.svelte';
@@ -152,7 +153,10 @@
         zoomControl,
         attributionControl: false,
         dragging: allowDragging,
-        scrollWheelZoom,
+        scrollWheelZoom: false,       // disabled: smooth plugin handles it
+        smoothWheelZoom: scrollWheelZoom, // enable smooth zoom if scroll zoom is on
+        smoothSensitivity: 1,
+        zoomSnap: 0,                  // allow fractional zoom levels
         doubleClickZoom,
         keyboard,
       });
@@ -236,7 +240,10 @@
   $effect(() => {
     if (!mapInstance) return;
     const s = scrollWheelZoom;
-    if (s) mapInstance.scrollWheelZoom.enable(); else mapInstance.scrollWheelZoom.disable();
+    const handler = (mapInstance as any).smoothWheelZoom;
+    if (handler) {
+      if (s) handler.enable(); else handler.disable();
+    }
   });
   $effect(() => {
     if (!mapInstance) return;
