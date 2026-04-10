@@ -30,6 +30,7 @@
 
   export interface MapContext {
     target: L.Map | L.LayerGroup | undefined;
+    loading: boolean;
   }
 
   let {
@@ -54,8 +55,29 @@
 
   let containerEl: HTMLDivElement;
 
+  // Debounced spinner visibility: show after 300ms of loading, hide after 500ms of idle.
+  // Prevents flickering on quick load-finish-load cycles.
+  let showSpinner = $state(false);
+  let showTimer: ReturnType<typeof setTimeout> | undefined;
+  let hideTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => {
+    const loading = ctx.loading;
+    if (loading) {
+      clearTimeout(hideTimer);
+      showTimer = setTimeout(() => { showSpinner = true; }, 300);
+    } else {
+      clearTimeout(showTimer);
+      hideTimer = setTimeout(() => { showSpinner = false; }, 500);
+    }
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  });
+
   // Reactive context: children depend on ctx.target in their $effects
-  const ctx: MapContext = $state({ target: undefined });
+  const ctx: MapContext = $state({ target: undefined, loading: false });
   setContext('ic-map', ctx);
 
   // Also expose request in context so child layers (e.g. TileLayer) can use it.
@@ -89,15 +111,41 @@
   });
 </script>
 
-<div {id} bind:this={containerEl} class="ic-map" style:height></div>
+<div class="ic-map-wrapper" style:height>
+  <div {id} bind:this={containerEl} class="ic-map"></div>
+  {#if showSpinner}
+    <div class="ic-map-spinner"></div>
+  {/if}
+</div>
 
 {#each childEntries as child (child.id)}
   <DynamicChild entry={child} />
 {/each}
 
 <style>
+  .ic-map-wrapper {
+    position: relative;
+    width: 100%;
+  }
   .ic-map {
     width: 100%;
+    height: 100%;
     min-height: 100px;
+  }
+  .ic-map-spinner {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 1000;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0, 0, 0, 0.15);
+    border-top-color: rgba(0, 0, 0, 0.4);
+    border-radius: 50%;
+    animation: ic-spin 0.8s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes ic-spin {
+    to { transform: rotate(360deg); }
   }
 </style>

@@ -69,11 +69,16 @@
       attribution,
     });
 
+    layer.onLoadingChange = (loading) => {
+      mapCtx.loading = loading;
+    };
+
     layer.addTo(target as L.Map);
 
     return () => {
       layer?.remove();
       layer = undefined;
+      mapCtx.loading = false;
     };
   });
 

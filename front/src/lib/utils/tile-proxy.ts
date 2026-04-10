@@ -1,6 +1,12 @@
 /**
  * ProxiedTileLayer — custom Leaflet TileLayer that fetches tiles through
  * the IC framework's request() mechanism (MATLAB webread proxy).
+ *
+ * Features:
+ * - Tiles fetched via request('getTile', {z,x,y,url}) → MATLAB webread
+ * - Frontend LRU cache (max 500 tiles)
+ * - Debounced batch prefetch of neighboring tiles
+ * - CSS loading animation on pending tiles
  */
 import L from 'leaflet';
 import type { RequestFn } from '$lib/types';
@@ -25,10 +31,56 @@ export interface ProxiedTileLayerOptions extends L.TileLayerOptions {
   requestFn: RequestFn;
 }
 
+/** Simple LRU cache: Map insertion order + size cap */
+class TileLRU {
+  private map = new Map<string, string>();
+  private maxSize: number;
+
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
+
+  get(key: string): string | undefined {
+    const val = this.map.get(key);
+    if (val !== undefined) {
+      // Move to end (most recently used)
+      this.map.delete(key);
+      this.map.set(key, val);
+    }
+    return val;
+  }
+
+  set(key: string, value: string): void {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    }
+    this.map.set(key, value);
+    // Evict oldest entries if over capacity
+    while (this.map.size > this.maxSize) {
+      const oldest = this.map.keys().next().value;
+      if (oldest !== undefined) this.map.delete(oldest);
+    }
+  }
+
+  has(key: string): boolean {
+    return this.map.has(key);
+  }
+
+  clear(): void {
+    this.map.clear();
+  }
+}
+
 export class ProxiedTileLayer extends L.TileLayer {
   private requestFn: RequestFn;
   private urlTemplate: string;
-  private tileCache: Map<string, string> = new Map();
+  private tileCache = new TileLRU(500);
+  private prefetchTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingPrefetch = new Set<string>();
+  private inflight = new Set<string>();
+  private viewportInflight = new Set<string>();
+  /** Callback to notify the parent about viewport loading state changes */
+  public onLoadingChange?: (loading: boolean) => void;
 
   constructor(options: ProxiedTileLayerOptions) {
     // Pass empty string as url — we override createTile entirely
@@ -46,47 +98,124 @@ export class ProxiedTileLayer extends L.TileLayer {
     const cached = this.tileCache.get(key);
     if (cached) {
       img.src = cached;
-      // Use setTimeout to avoid synchronous done() call which can cause
-      // issues with Leaflet's tile loading state machine
       setTimeout(() => done(undefined, img), 0);
       return img;
     }
 
-    // Build the full URL for this tile (MATLAB will fetch it)
     const tileUrl = this.buildTileUrl(coords);
+    this.fetchTile(key, tileUrl, true).then((dataUri) => {
+      if (dataUri) {
+        img.src = dataUri;
+        done(undefined, img);
+      } else {
+        done(new Error('Tile fetch failed'), img);
+      }
+    });
 
-    logger.info('tile-proxy', `requesting tile ${key}, url: ${tileUrl}`);
-    this.requestFn('getTile', { z: coords.z, x: coords.x, y: coords.y, url: tileUrl } as TileRequestData)
-      .then((res) => {
-        logger.info('tile-proxy', `response for ${key}: success=${res.success}, dataType=${typeof res.data}`);
-        if (res.success) {
-          const tileData = res.data as TileResponse;
-          if (!tileData.data || !tileData.mime) {
-            logger.warn('tile-proxy', `missing data/mime in response for ${key}: ${JSON.stringify(Object.keys(tileData))}`);
-            done(new Error('Missing tile data'), img);
-            return;
-          }
-          const dataUri = `data:${tileData.mime};base64,${tileData.data}`;
-          this.tileCache.set(key, dataUri);
-          img.src = dataUri;
-          done(undefined, img);
-        } else {
-          logger.warn('tile-proxy', `error for ${key}: ${String(res.data)}`);
-          done(new Error(String(res.data)), img);
-        }
-      })
-      .catch((err) => {
-        logger.warn('tile-proxy', `catch for ${key}: ${err}`);
-        done(err, img);
-      });
+    // Schedule prefetch for surrounding tiles
+    this.schedulePrefetch(coords);
 
     return img;
+  }
+
+  /** Fetch a single tile, deduplicating inflight requests.
+   *  viewport=true means this tile is visible; only viewport tiles affect the loading spinner. */
+  private async fetchTile(key: string, tileUrl: string, viewport = false): Promise<string | null> {
+    // Check cache again (might have been prefetched)
+    const cached = this.tileCache.get(key);
+    if (cached) return cached;
+
+    // Skip if already in flight
+    if (this.inflight.has(key)) {
+      // Wait for inflight to complete by polling cache
+      return new Promise((resolve) => {
+        const check = setInterval(() => {
+          const val = this.tileCache.get(key);
+          if (val || !this.inflight.has(key)) {
+            clearInterval(check);
+            resolve(val ?? null);
+          }
+        }, 50);
+      });
+    }
+
+    this.inflight.add(key);
+    if (viewport) {
+      this.viewportInflight.add(key);
+      if (this.viewportInflight.size === 1) this.onLoadingChange?.(true);
+    }
+    try {
+      const res = await this.requestFn('getTile', {
+        z: parseInt(key.split('/')[0]),
+        x: parseInt(key.split('/')[1]),
+        y: parseInt(key.split('/')[2]),
+        url: tileUrl,
+      } as TileRequestData);
+
+      if (res.success) {
+        const tileData = res.data as TileResponse;
+        if (tileData.data && tileData.mime) {
+          const dataUri = `data:${tileData.mime};base64,${tileData.data}`;
+          this.tileCache.set(key, dataUri);
+          return dataUri;
+        }
+        logger.warn('tile-proxy', `missing data/mime for ${key}`);
+        return null;
+      } else {
+        logger.warn('tile-proxy', `error for ${key}: ${String(res.data)}`);
+        return null;
+      }
+    } catch (err) {
+      logger.warn('tile-proxy', `catch for ${key}: ${err}`);
+      return null;
+    } finally {
+      this.inflight.delete(key);
+      this.viewportInflight.delete(key);
+      if (this.viewportInflight.size === 0) this.onLoadingChange?.(false);
+    }
+  }
+
+  /** Schedule prefetch of 4 direct neighbors (N/S/E/W), debounced 200ms */
+  private schedulePrefetch(coords: L.Coords): void {
+    const neighbors = [
+      { dx: 0, dy: -1 }, // north
+      { dx: 0, dy:  1 }, // south
+      { dx: -1, dy: 0 }, // west
+      { dx:  1, dy: 0 }, // east
+    ];
+    for (const { dx, dy } of neighbors) {
+      const key = `${coords.z}/${coords.x + dx}/${coords.y + dy}`;
+      if (!this.tileCache.has(key) && !this.inflight.has(key)) {
+        this.pendingPrefetch.add(key);
+      }
+    }
+
+    if (this.prefetchTimer) clearTimeout(this.prefetchTimer);
+    this.prefetchTimer = setTimeout(() => {
+      this.executePrefetch();
+    }, 200);
+  }
+
+  /** Fire off prefetch requests for all pending neighbors */
+  private executePrefetch(): void {
+    const keys = [...this.pendingPrefetch];
+    this.pendingPrefetch.clear();
+
+    for (const key of keys) {
+      if (this.tileCache.has(key) || this.inflight.has(key)) continue;
+      const [z, x, y] = key.split('/').map(Number);
+      const tileUrl = this.buildTileUrl({ z, x, y } as L.Coords);
+      // Fire and forget: prefetch populates cache for later use
+      this.fetchTile(key, tileUrl);
+    }
   }
 
   /** Update the URL template (e.g. when provider changes) */
   setUrlTemplate(urlTemplate: string): void {
     this.urlTemplate = urlTemplate;
     this.tileCache.clear();
+    this.inflight.clear();
+    this.pendingPrefetch.clear();
     this.redraw();
   }
 
