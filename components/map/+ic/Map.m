@@ -150,6 +150,19 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             layer = ic.map.TileLayer(args{:});
             this.insertLayer(layer);
         end
+
+        function layer = addMarker(this, props)
+            % add a point marker
+            % {returns} the new #ic.map.Marker {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Marker properties
+                props.?ic.map.Marker
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Marker(args{:});
+            this.insertLayer(layer);
+        end
     end
 
     methods (Access = protected)
