@@ -144,6 +144,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.internal.WorkerTest': modules['../components/internal/workerTest/WorkerTest.svelte'],
   'ic.internal.DragDropTest': modules['../components/internal/dragDropTest/DragDropTest.svelte'],
 
+  // Map components
+  'ic.Map': modules['../components/map/Map.svelte'],
+
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],
   'ic.tp.Slider': modules['../components/tweakpane/blades/TpSlider.svelte'],
