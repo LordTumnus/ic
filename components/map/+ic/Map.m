@@ -189,6 +189,45 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             layer = ic.map.Polygon(args{:});
             this.insertLayer(layer);
         end
+
+        function layer = addCircle(this, props)
+            % add a circle with radius in meters
+            % {returns} the new #ic.map.Circle {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Circle properties
+                props.?ic.map.Circle
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Circle(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addRectangle(this, props)
+            % add an axis-aligned rectangle
+            % {returns} the new #ic.map.Rectangle {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Rectangle properties
+                props.?ic.map.Rectangle
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Rectangle(args{:});
+            this.insertLayer(layer);
+        end
+
+        function ctrl = addScaleControl(this, props)
+            % add a distance scale bar
+            % {returns} the new #ic.map.ScaleControl {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.ScaleControl properties
+                props.?ic.map.ScaleControl
+            end
+            args = namedargs2cell(props);
+            ctrl = ic.map.ScaleControl(args{:});
+            this.insertLayer(ctrl);
+        end
     end
 
     methods (Access = protected)
