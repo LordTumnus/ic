@@ -216,6 +216,19 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             this.insertLayer(layer);
         end
 
+        function layer = addDivMarker(this, props)
+            % add a custom HTML marker (can hold IC child components)
+            % {returns} the new #ic.map.DivMarker {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.DivMarker properties
+                props.?ic.map.DivMarker
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.DivMarker(args{:});
+            this.insertLayer(layer);
+        end
+
         function ctrl = addScaleControl(this, props)
             % add a distance scale bar
             % {returns} the new #ic.map.ScaleControl {/returns}

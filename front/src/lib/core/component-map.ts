@@ -152,6 +152,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.map.Polygon': modules['../components/map/layers/MapPolygon.svelte'],
   'ic.map.Circle': modules['../components/map/layers/MapCircle.svelte'],
   'ic.map.Rectangle': modules['../components/map/layers/MapRectangle.svelte'],
+  'ic.map.DivMarker': modules['../components/map/layers/MapDivMarker.svelte'],
   'ic.map.ScaleControl': modules['../components/map/controls/MapScaleControl.svelte'],
 
   // Tweakpane components
