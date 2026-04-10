@@ -4,9 +4,6 @@ classdef (Abstract) Layer < ic.core.Component
     properties (SetObservable, AbortSet, Description = "Reactive")
         % whether this layer is visible
         Visible (1,1) logical = true
-
-        % layer opacity (0 to 1)
-        Opacity (1,1) double = 1.0
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", Hidden)

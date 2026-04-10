@@ -28,6 +28,9 @@ classdef TileLayer < ic.map.Layer
 
         % maximum zoom at which the provider has native tiles
         MaxNativeZoom (1,1) double = 19
+
+        % tile layer opacity (0 to 1)
+        Opacity (1,1) double = 1.0
     end
 
     events (Description = "Reactive")

@@ -163,6 +163,32 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             layer = ic.map.Marker(args{:});
             this.insertLayer(layer);
         end
+
+        function layer = addPolyline(this, props)
+            % add a line path
+            % {returns} the new #ic.map.Polyline {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Polyline properties
+                props.?ic.map.Polyline
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Polyline(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addPolygon(this, props)
+            % add a closed polygon
+            % {returns} the new #ic.map.Polygon {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Polygon properties
+                props.?ic.map.Polygon
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Polygon(args{:});
+            this.insertLayer(layer);
+        end
     end
 
     methods (Access = protected)

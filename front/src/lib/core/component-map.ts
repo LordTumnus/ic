@@ -148,6 +148,8 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.Map': modules['../components/map/Map.svelte'],
   'ic.map.TileLayer': modules['../components/map/layers/MapTileLayer.svelte'],
   'ic.map.Marker': modules['../components/map/layers/MapMarker.svelte'],
+  'ic.map.Polyline': modules['../components/map/layers/MapPolyline.svelte'],
+  'ic.map.Polygon': modules['../components/map/layers/MapPolygon.svelte'],
 
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],

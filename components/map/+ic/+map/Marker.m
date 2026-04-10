@@ -37,6 +37,9 @@ classdef Marker < ic.map.Layer
 
         % pixel offset from the top-left of the icon to the anchor point (tip). default: center-bottom.
         IconAnchor (1,2) double = [0, 0]
+
+        % marker opacity (0 to 1)
+        Opacity (1,1) double = 1.0
     end
 
     events (Description = "Reactive")
