@@ -229,6 +229,32 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             this.insertLayer(layer);
         end
 
+        function layer = addPopup(this, props)
+            % add a standalone popup at a fixed geographic position
+            % {returns} the new #ic.map.Popup {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Popup properties
+                props.?ic.map.Popup
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Popup(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addTooltip(this, props)
+            % add a standalone tooltip at a fixed geographic position
+            % {returns} the new #ic.map.Tooltip {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.Tooltip properties
+                props.?ic.map.Tooltip
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.Tooltip(args{:});
+            this.insertLayer(layer);
+        end
+
         function ctrl = addScaleControl(this, props)
             % add a distance scale bar
             % {returns} the new #ic.map.ScaleControl {/returns}

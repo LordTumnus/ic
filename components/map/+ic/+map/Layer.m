@@ -4,6 +4,9 @@ classdef (Abstract) Layer < ic.core.Component
     properties (SetObservable, AbortSet, Description = "Reactive")
         % whether this layer is visible
         Visible (1,1) logical = true
+
+        % display name for this layer; used by LayersControl for identification
+        Name (1,1) string = ""
     end
 
     properties (SetObservable, AbortSet, Description = "Reactive", Hidden)
