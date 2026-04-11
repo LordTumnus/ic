@@ -153,6 +153,8 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.map.Circle': modules['../components/map/layers/MapCircle.svelte'],
   'ic.map.Rectangle': modules['../components/map/layers/MapRectangle.svelte'],
   'ic.map.DivMarker': modules['../components/map/layers/MapDivMarker.svelte'],
+  'ic.map.LayerGroup': modules['../components/map/layers/MapLayerGroup.svelte'],
+  'ic.map.FeatureGroup': modules['../components/map/layers/MapFeatureGroup.svelte'],
   'ic.map.Popup': modules['../components/map/layers/MapPopup.svelte'],
   'ic.map.Tooltip': modules['../components/map/layers/MapTooltip.svelte'],
   'ic.map.ScaleControl': modules['../components/map/controls/MapScaleControl.svelte'],

@@ -216,6 +216,32 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             this.insertLayer(layer);
         end
 
+        function layer = addLayerGroup(this, props)
+            % add a layer group to organize child layers
+            % {returns} the new #ic.map.LayerGroup {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.LayerGroup properties
+                props.?ic.map.LayerGroup
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.LayerGroup(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addFeatureGroup(this, props)
+            % add a feature group with event propagation and fitBounds support
+            % {returns} the new #ic.map.FeatureGroup {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.FeatureGroup properties
+                props.?ic.map.FeatureGroup
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.FeatureGroup(args{:});
+            this.insertLayer(layer);
+        end
+
         function layer = addDivMarker(this, props)
             % add a custom HTML marker (can hold IC child components)
             % {returns} the new #ic.map.DivMarker {/returns}
