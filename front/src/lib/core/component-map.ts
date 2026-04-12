@@ -155,6 +155,8 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.map.DivMarker': modules['../components/map/layers/MapDivMarker.svelte'],
   'ic.map.LayerGroup': modules['../components/map/layers/MapLayerGroup.svelte'],
   'ic.map.FeatureGroup': modules['../components/map/layers/MapFeatureGroup.svelte'],
+  'ic.map.GeoJSON': modules['../components/map/layers/MapGeoJSON.svelte'],
+  'ic.map.ImageOverlay': modules['../components/map/layers/MapImageOverlay.svelte'],
   'ic.map.Popup': modules['../components/map/layers/MapPopup.svelte'],
   'ic.map.Tooltip': modules['../components/map/layers/MapTooltip.svelte'],
   'ic.map.ScaleControl': modules['../components/map/controls/MapScaleControl.svelte'],
