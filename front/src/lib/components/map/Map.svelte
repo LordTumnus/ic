@@ -15,6 +15,7 @@
   import { setContext, onMount, untrack } from 'svelte';
   import type { ChildEntries, Resolution } from '$lib/types';
   import DynamicChild from '$lib/core/DynamicChild.svelte';
+  import logger from '$lib/core/logger';
 
   // Fix Leaflet default marker icon paths broken by Vite bundler
   import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -32,6 +33,20 @@
   export interface MapContext {
     target: L.Map | L.LayerGroup | undefined;
     loading: boolean;
+  }
+
+  export interface LayerRegistryEntry {
+    id: string;
+    name: string;
+    type: 'tile' | 'layergroup' | 'featuregroup';
+    getVisible: () => boolean;
+    setVisible: (v: boolean) => void;
+  }
+
+  export interface LayerRegistry {
+    entries: LayerRegistryEntry[];
+    register: (entry: LayerRegistryEntry) => void;
+    deregister: (id: string) => void;
   }
 
   let {
@@ -113,6 +128,30 @@
     get subscribe() { return subscribe; },
   };
   setContext('ic-map-utils', mapUtils);
+
+  // Layer registry: layers register here so MapLayersControl can discover them.
+  // Plain object wrapper -- only `entries` is reactive ($state). This prevents
+  // effects that call register/deregister from re-running due to deep tracking.
+  let registryEntries: LayerRegistryEntry[] = $state([]);
+  const layerRegistry: LayerRegistry = {
+    get entries() { return registryEntries; },
+    register(entry: LayerRegistryEntry) {
+      if (registryEntries.some(e => e.id === entry.id)) {
+        logger.warn('LayerRegistry', `Duplicate registration ignored for id: ${entry.id}`);
+        return;
+      }
+      registryEntries.push(entry);
+    },
+    deregister(id: string) {
+      const idx = registryEntries.findIndex(e => e.id === id);
+      if (idx !== -1) {
+        registryEntries.splice(idx, 1);
+      } else {
+        logger.warn('LayerRegistry', `Deregister called for unknown layer id: ${id}`);
+      }
+    },
+  };
+  setContext('ic-map-layers', layerRegistry);
 
   // Debounced spinner visibility
   let showSpinner = $state(false);

@@ -88,19 +88,20 @@
 
 <style>
   :global(.ic-coord-display) {
-    background: #1a1a1a;
-    color: #e0e0e0;
+    background: var(--ic-secondary);
+    color: var(--ic-foreground);
     font-family: 'Roboto Mono', 'Consolas', monospace;
     font-size: 11px;
+    font-variant-numeric: tabular-nums;
     padding: 4px 8px 4px 12px;
     border-radius: 2px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-    border: 1px solid #333;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--ic-border);
     min-width: 140px;
     text-align: center;
     user-select: none;
     /* Grip dots on left edge */
-    background-image: radial-gradient(circle, #555 1px, transparent 1px);
+    background-image: radial-gradient(circle, var(--ic-muted-foreground) 1px, transparent 1px);
     background-size: 4px 4px;
     background-position: 3px center;
     background-repeat: repeat-y;

@@ -7,9 +7,10 @@
 <script lang="ts">
   import L from 'leaflet';
   import { getContext, setContext, untrack, onMount } from 'svelte';
-  import type { MapContext } from '../Map.svelte';
+  import type { MapContext, LayerRegistry } from '../Map.svelte';
   import type { ChildEntries, Resolution } from '$lib/types';
   import DynamicChild from '$lib/core/DynamicChild.svelte';
+  import logger from '$lib/core/logger';
 
   let {
     id = '',
@@ -33,11 +34,13 @@
 
   const parentCtx = getContext<MapContext>('ic-map');
   const mapUtils = getContext('ic-map-utils');
+  const layerRegistry = getContext<LayerRegistry>('ic-map-layers');
 
   // Override context: children add to this group
   const ctx: MapContext = $state({ target: undefined, loading: false });
   setContext('ic-map', ctx);
   setContext('ic-map-utils', mapUtils);
+  setContext('ic-map-layers', layerRegistry);
 
   let featureGroup: L.FeatureGroup | undefined;
 
@@ -58,10 +61,30 @@
     });
     ctx.target = featureGroup;
 
+    // Register with layer registry (untracked to avoid re-triggering this effect)
+    const entryId = untrack(() => id || crypto.randomUUID());
+    const displayName = untrack(() => name || 'Feature Group');
+    untrack(() => {
+      if (layerRegistry) {
+        layerRegistry.register({
+          id: entryId,
+          name: displayName,
+          type: 'featuregroup',
+          getVisible: () => visible,
+          setVisible: (v: boolean) => { visible = v; },
+        });
+        logger.info('MapFeatureGroup', `Registered in layer control: "${displayName}"`);
+      }
+    });
+
     return () => {
       ctx.target = undefined;
       featureGroup?.remove();
       featureGroup = undefined;
+      if (layerRegistry) {
+        layerRegistry.deregister(entryId);
+        logger.info('MapFeatureGroup', `Deregistered from layer control: "${displayName}"`);
+      }
     };
   });
 

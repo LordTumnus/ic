@@ -332,6 +332,19 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             ctrl = ic.map.CoordinateDisplay(args{:});
             this.insertLayer(ctrl);
         end
+
+        function ctrl = addLayersControl(this, props)
+            % add a layer visibility toggle control
+            % {returns} the new #ic.map.LayersControl {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.LayersControl properties
+                props.?ic.map.LayersControl
+            end
+            args = namedargs2cell(props);
+            ctrl = ic.map.LayersControl(args{:});
+            this.insertLayer(ctrl);
+        end
     end
 
     methods (Access = protected)

@@ -161,6 +161,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.map.Tooltip': modules['../components/map/layers/MapTooltip.svelte'],
   'ic.map.ScaleControl': modules['../components/map/controls/MapScaleControl.svelte'],
   'ic.map.CoordinateDisplay': modules['../components/map/controls/MapCoordinateDisplay.svelte'],
+  'ic.map.LayersControl': modules['../components/map/controls/MapLayersControl.svelte'],
 
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],

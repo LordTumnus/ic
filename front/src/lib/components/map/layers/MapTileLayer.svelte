@@ -5,15 +5,17 @@
 -->
 <script lang="ts">
   import { getContext, untrack } from 'svelte';
-  import type { MapContext } from '../Map.svelte';
+  import type { MapContext, LayerRegistry } from '../Map.svelte';
   import type { RequestFn } from '$lib/types';
   import { ProxiedTileLayer } from '$lib/utils/tile-proxy';
   import { tileProviders } from '$lib/utils/tile-providers';
+  import logger from '$lib/core/logger';
 
   let {
     id = '',
     provider = $bindable('openstreetmap'),
     url = $bindable(''),
+    name = $bindable(''),
     subdomains = $bindable('abc'),
     tileSize = $bindable(256),
     maxNativeZoom = $bindable(19),
@@ -27,6 +29,7 @@
     id?: string;
     provider?: string;
     url?: string;
+    name?: string;
     subdomains?: string;
     tileSize?: number;
     maxNativeZoom?: number;
@@ -39,6 +42,7 @@
 
   const mapCtx = getContext<MapContext>('ic-map');
   const mapUtils = getContext<{ request?: RequestFn }>('ic-map-utils');
+  const layerRegistry = getContext<LayerRegistry>('ic-map-layers');
 
   let layer: ProxiedTileLayer | undefined;
 
@@ -105,10 +109,30 @@
 
     layer.addTo(target as L.Map);
 
+    // Register with layer registry (untracked to avoid re-triggering this effect)
+    const entryId = untrack(() => id || crypto.randomUUID());
+    const displayName = untrack(() => name || provider || 'Tile Layer');
+    untrack(() => {
+      if (layerRegistry) {
+        layerRegistry.register({
+          id: entryId,
+          name: displayName,
+          type: 'tile',
+          getVisible: () => visible,
+          setVisible: (v: boolean) => { visible = v; },
+        });
+        logger.info('MapTileLayer', `Registered in layer control: "${displayName}"`);
+      }
+    });
+
     return () => {
       layer?.remove();
       layer = undefined;
       mapCtx.loading = false;
+      if (layerRegistry) {
+        layerRegistry.deregister(entryId);
+        logger.info('MapTileLayer', `Deregistered from layer control: "${displayName}"`);
+      }
     };
   });
 
