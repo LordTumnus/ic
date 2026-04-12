@@ -242,6 +242,32 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             this.insertLayer(layer);
         end
 
+        function layer = addGeoJSON(this, props)
+            % add a GeoJSON feature collection layer
+            % {returns} the new #ic.map.GeoJSON {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.GeoJSON properties
+                props.?ic.map.GeoJSON
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.GeoJSON(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addImageOverlay(this, props)
+            % add an image overlay on geographic bounds
+            % {returns} the new #ic.map.ImageOverlay {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.ImageOverlay properties
+                props.?ic.map.ImageOverlay
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.ImageOverlay(args{:});
+            this.insertLayer(layer);
+        end
+
         function layer = addDivMarker(this, props)
             % add a custom HTML marker (can hold IC child components)
             % {returns} the new #ic.map.DivMarker {/returns}

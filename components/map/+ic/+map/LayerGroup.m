@@ -127,6 +127,30 @@ classdef LayerGroup < ic.map.Layer & ic.core.Container
             this.insertLayer(layer);
         end
 
+        function layer = addGeoJSON(this, props)
+            % add a GeoJSON feature collection to this group
+            % {returns} the new #ic.map.GeoJSON {/returns}
+            arguments
+                this
+                props.?ic.map.GeoJSON
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.GeoJSON(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addImageOverlay(this, props)
+            % add an image overlay to this group
+            % {returns} the new #ic.map.ImageOverlay {/returns}
+            arguments
+                this
+                props.?ic.map.ImageOverlay
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.ImageOverlay(args{:});
+            this.insertLayer(layer);
+        end
+
         function layer = addLayerGroup(this, props)
             % add a nested layer group
             % {returns} the new #ic.map.LayerGroup {/returns}
