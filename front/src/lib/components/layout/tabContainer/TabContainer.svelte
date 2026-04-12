@@ -16,7 +16,7 @@
   DnD: svelte-dnd-action on the tab bar for reordering.
 -->
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { flip } from 'svelte/animate';
   import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, SHADOW_PLACEHOLDER_ITEM_ID } from 'svelte-dnd-action';
   import type { ChildEntries } from '$lib/types';
@@ -110,10 +110,20 @@
   let isDragging = $state(false);
   const FLIP_MS = 150;
 
+  // Flip duration: FLIP_MS during drag for smooth reorder animation,
+  // 0 on finalize to prevent the "ghost flies back" visual artifact.
+  let flipMs = $derived(isDragging ? FLIP_MS : 0);
+
+  // Sync dndItems from tabIds prop.
+  // Uses untrack(isDragging) so this effect ONLY re-runs when `tabIds` changes,
+  // not when isDragging toggles (which would fight svelte-dnd-action).
   $effect(() => {
-    if (!isDragging) {
-      dndItems = tabIds.map(t => ({ id: t }));
+    const newItems = tabIds.map(t => ({ id: t }));
+    if (untrack(() => isDragging)) {
+      isDragging = false;
+      document.documentElement.style.removeProperty('--_tc-cursor');
     }
+    dndItems = newItems;
   });
 
   function handleConsider(e: CustomEvent<{ items: DndTabItem[] }>) {
@@ -498,7 +508,7 @@
               handleTabClick(target);
             }
           }}
-          animate:flip={{ duration: FLIP_MS }}
+          animate:flip={{ duration: flipMs }}
           id={tabEntry?.id}
           use:listenTabClose={target}
         >
