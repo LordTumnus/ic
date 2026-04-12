@@ -345,6 +345,45 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             ctrl = ic.map.LayersControl(args{:});
             this.insertLayer(ctrl);
         end
+
+        function layer = addWmsLayer(this, props)
+            % add a WMS (Web Map Service) tile layer
+            % {returns} the new #ic.map.WmsLayer {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.WmsLayer properties
+                props.?ic.map.WmsLayer
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.WmsLayer(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addHeatLayer(this, props)
+            % add a heatmap visualization layer
+            % {returns} the new #ic.map.HeatLayer {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.HeatLayer properties
+                props.?ic.map.HeatLayer
+            end
+            args = namedargs2cell(props);
+            layer = ic.map.HeatLayer(args{:});
+            this.insertLayer(layer);
+        end
+
+        function ctrl = addMeasureControl(this, props)
+            % add a distance and area measurement tool
+            % {returns} the new #ic.map.MeasureControl {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.MeasureControl properties
+                props.?ic.map.MeasureControl
+            end
+            args = namedargs2cell(props);
+            ctrl = ic.map.MeasureControl(args{:});
+            this.insertLayer(ctrl);
+        end
     end
 
     methods (Access = protected)
@@ -387,9 +426,13 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
                 raw = webread(tileUrl, opts);
                 b64 = string(matlab.net.base64encode(raw));
 
-                % Detect mime from URL extension
-                [~, ~, ext] = fileparts(regexprep(tileUrl, '\?.*$', ''));
-                mime = ic.Map.mimeFromExt(ext);
+                % Detect mime: prefer explicit field (WMS), fall back to extension
+                if isfield(data, 'mime') && strlength(string(data.mime)) > 0
+                    mime = string(data.mime);
+                else
+                    [~, ~, ext] = fileparts(regexprep(tileUrl, '\?.*$', ''));
+                    mime = ic.Map.mimeFromExt(ext);
+                end
 
                 result = struct('data', b64, 'mime', mime);
                 this.TileCache(cacheKey) = result;

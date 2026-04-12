@@ -162,6 +162,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.map.ScaleControl': modules['../components/map/controls/MapScaleControl.svelte'],
   'ic.map.CoordinateDisplay': modules['../components/map/controls/MapCoordinateDisplay.svelte'],
   'ic.map.LayersControl': modules['../components/map/controls/MapLayersControl.svelte'],
+  'ic.map.WmsLayer': modules['../components/map/layers/MapWmsLayer.svelte'],
+  'ic.map.HeatLayer': modules['../components/map/layers/MapHeatLayer.svelte'],
+  'ic.map.MeasureControl': modules['../components/map/controls/MapMeasureControl.svelte'],
 
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],

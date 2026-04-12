@@ -32,7 +32,7 @@ export interface ProxiedTileLayerOptions extends L.TileLayerOptions {
 }
 
 /** Simple LRU cache: Map insertion order + size cap */
-class TileLRU {
+export class TileLRU {
   private map = new Map<string, string>();
   private maxSize: number;
 

@@ -38,7 +38,7 @@
   export interface LayerRegistryEntry {
     id: string;
     name: string;
-    type: 'tile' | 'layergroup' | 'featuregroup';
+    type: 'tile' | 'layergroup' | 'featuregroup' | 'wms' | 'heat';
     getVisible: () => boolean;
     setVisible: (v: boolean) => void;
   }

@@ -95,6 +95,7 @@
     "jspdf": "^4.2.0",
     "katex": "^0.16.33",
     "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
     "lowlight": "^3.3.0",
     "lucide-static": "^0.563.0",
     "markdown-it": "^14.1.1",
