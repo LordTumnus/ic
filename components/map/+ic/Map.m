@@ -319,6 +319,19 @@ classdef Map < ic.core.ComponentContainer & ic.mixin.Requestable
             ctrl = ic.map.ScaleControl(args{:});
             this.insertLayer(ctrl);
         end
+
+        function ctrl = addCoordinateDisplay(this, props)
+            % add a cursor coordinate readout control
+            % {returns} the new #ic.map.CoordinateDisplay {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.map.CoordinateDisplay properties
+                props.?ic.map.CoordinateDisplay
+            end
+            args = namedargs2cell(props);
+            ctrl = ic.map.CoordinateDisplay(args{:});
+            this.insertLayer(ctrl);
+        end
     end
 
     methods (Access = protected)
