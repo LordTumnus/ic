@@ -1,39 +1,73 @@
 # IC Framework
 
-Build rich, reactive apps in MATLAB with modern web components.
+<a href="https://uk.mathworks.com/matlabcentral/fileexchange/183586-ic-figure-components"><img src="https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg" width="144.5"></a>
 
-IC lets you create interactive components inside figures that are directly controlled from MATLAB.
+Interactive components for MATLAB figures.
+
+<p align="center">
+  <img src="media/hero.gif" alt="IC Framework demo" width="100%">
+</p>
+
+## Components
+
+| | |
+|---|---|
+| **Form** | Button, ToggleButton, Slider, RangeSlider, Knob, Switch, Checkbox, RadioButton, SegmentedButton, Select, MultiSelect, TreeSelect, ColorPicker, SplitButton, InputText, TextArea, Password, SearchBar |
+| **Display** | Label, Image, ProgressBar, CircularProgressBar, Spinner |
+| **Data** | Table, VirtualTable, Tree, VirtualTree, FilterTree, VirtualFilterTree, TreeTable, VirtualTreeTable |
+| **Layout** | FlexContainer, GridContainer, Splitter, TabContainer, TileLayout, Accordion, Panel |
+| **Renderers** | Latex, Markdown, Typst, Mermaid, PDFViewer |
+| **Editors** | CodeEditor, RichEditor, NodeEditor |
+| **Maps** | Leaflet-based maps with markers, polylines, polygons, GeoJSON, WMS, heatmaps |
+| **Overlays** | Dialog, Drawer, Toast, Popover |
+| **Tweakpane** | Parameter tuning panel with slider, color, point, bezier, rotation blades and more |
+
+## Quick start
+
+Create a figure, add a grid layout, and insert an `ic.Frame` -- that's where your components live.
 
 ```matlab
 fig = uifigure();
-layout = uigridlayout(fig, "RowHeight", {'1x'}, "ColumnWidth", {'1x'});
-
-frame = ic.Frame("Parent", layout);
-
-slider = ic.Slider("Min", 0, "Max", 100, "Value", 50);
-label  = ic.Label("Text", "Value: 50");
-
-frame.addChild(slider);
-frame.addChild(label);
-
-addlistener(slider, 'ValueChanged', @(~, e) ...
-    set(label, "Text", "Value: " + e.Data.value));
+gl  = uigridlayout(fig, "RowHeight", {'1x'}, "ColumnWidth", {'1x'});
+frame = ic.Frame("Parent", gl);
 ```
 
-## Documentation
+## Examples
 
-Full docs, interactive playgrounds, and API reference at **[ic-matlab.netlify.app](https://ic-matlab.netlify.app/)**.
+### LaTeX Editor
+
+<!-- TODO: gif -->
+
+Full LaTeX editor with live preview, PDF export, and figure capture.
+
+```matlab
+ic.examples.LatexEditor
+```
+
+### Surface Explorer
+
+<!-- TODO: gif -->
+
+3D surface plot with TweakPane controls.
+
+```matlab
+ic.examples.SurfaceExplorer
+```
 
 ## Getting started
 
-1. Download IC from the [MATLAB File Exchange](https://www.mathworks.com/matlabcentral/fileexchange/) or clone this repo
+1. Download from the [File Exchange](https://uk.mathworks.com/matlabcentral/fileexchange/183586-ic-figure-components) or clone this repo
 2. Add the framework to your MATLAB path
-3. Create a uifigure and an `ic.Frame`
+3. Run one of the examples above
+
+## Documentation
+
+[ic-matlab.netlify.app](https://ic-matlab.netlify.app/)
 
 ## Requirements
 
-- MATLAB R2024b or later
+MATLAB R2024b or later.
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE).
