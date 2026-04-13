@@ -30,7 +30,8 @@ import type {
   VarsEventData,
   JsEffectEventData,
   JsEffectRemoveEventData,
-  KeyEventData
+  KeyEventData,
+  BinaryPushData
 } from '../types';
 import Bridge from './bridge';
 import { handleInsert, handleRemove, handleReorder, handleReparent } from './container';
@@ -39,6 +40,7 @@ import { KeyboardManager } from './keyboard-manager';
 import StyleManager from './style-manager';
 import logger from './logger';
 import { cacheEmbeddedAssets } from '$lib/utils/asset-cache';
+import { fetchBinary } from '$lib/utils/binary-channel';
 
 /**
  * Component class - base class for all UI components.
@@ -247,6 +249,50 @@ class Component implements Registrable {
       enumerable: true,
       configurable: true
     });
+
+    // Binary channel (only for components with BinaryChannel mixin)
+    if (this.mixins.includes('binarychannel')) {
+      Object.defineProperty(stateObj, 'onBinary', {
+        value: (channel: string, callback: (buffer: ArrayBuffer) => void): Unsubscribe => {
+          return this.subscribe(`@binary/${channel}`, async (_id, _name, data) => {
+            const { file, v } = data as BinaryPushData;
+            const buffer = await fetchBinary(file, v);
+            callback(buffer);
+          });
+        },
+        enumerable: true,
+        configurable: true
+      });
+
+      Object.defineProperty(stateObj, 'requestBinary', {
+        value: async (channel: string, data?: unknown): Promise<ArrayBuffer> => {
+          const requestId = crypto.randomUUID();
+          return new Promise<ArrayBuffer>((resolve, reject) => {
+            const unsub = this.subscribe(`@binaryResp/${requestId}`, async (_id, _name, respData) => {
+              unsub();
+              const resp = respData as BinaryPushData | { error: string };
+              if ('error' in resp) {
+                reject(new Error(resp.error));
+                return;
+              }
+              try {
+                resolve(await fetchBinary(resp.file, resp.v));
+              } catch (e) {
+                reject(e);
+              }
+            });
+            Bridge.instance.send([{
+              component: this.id,
+              name: `@binaryRequest/${channel}`,
+              data: { id: requestId, data },
+              id: requestId
+            }]);
+          });
+        },
+        enumerable: true,
+        configurable: true
+      });
+    }
 
     // Expose the component ID so Svelte components can set it on their root element
     Object.defineProperty(stateObj, 'id', { value: id, enumerable: true });

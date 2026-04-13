@@ -283,3 +283,23 @@ export interface KeyPressedEventData {
   key: string;
   code: string;
 }
+
+// ============================================================================
+// Binary Channel Event Data
+// ============================================================================
+
+/** Data for @binary/{channel} push events from MATLAB. */
+export interface BinaryPushData {
+  /** Relative path to the binary file (e.g. "binary/ic-abc123/terrain.bin") */
+  file: string;
+  /** Monotonic version counter for cache-busting */
+  v: number;
+  /** Byte count of the written data */
+  size: number;
+}
+
+/** Subscribe to binary data pushes from MATLAB. Returns an unsubscribe function. */
+export type OnBinaryFn = (channel: string, callback: (buffer: ArrayBuffer) => void) => Unsubscribe;
+
+/** Request binary data from MATLAB (pull pattern). */
+export type RequestBinaryFn = (channel: string, data?: unknown) => Promise<ArrayBuffer>;
