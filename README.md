@@ -8,6 +8,44 @@ Interactive components for MATLAB figures.
   <img src="media/hero.gif" alt="IC Framework demo" width="100%">
 </p>
 
+## Quick start
+
+Create a figure and insert an `ic.Frame`. The frame is the root component of the IC framework: any other component can be nested inside with `addChild()`
+
+```matlab
+fig = uifigure();
+gl  = uigridlayout(fig, "RowHeight", {'1x'}, "ColumnWidth", {'1x'});
+frame = ic.Frame("Parent", gl);
+frame.addChild(ic.Button()); % add any component!
+```
+
+## Examples
+
+### LaTeX Editor
+
+Full LaTeX editor with live preview, PDF export, and figure capture.
+
+<p align="center">
+  <img src="media/latex.gif" alt="IC Framework demo" width="100%">
+</p>
+
+```matlab
+ic.examples.LatexEditor();
+```
+
+### Surface Explorer
+
+
+3D surface plot with TweakPane controls.
+
+<p align="center">
+  <img src="media/surface.gif" alt="IC Framework demo" width="100%">
+</p>
+
+```matlab
+ic.examples.SurfaceExplorer();
+```
+
 ## Components
 
 | | |
@@ -22,41 +60,9 @@ Interactive components for MATLAB figures.
 | **Overlays** | Dialog, Drawer, Toast, Popover |
 | **Tweakpane** | Parameter tuning panel with slider, color, point, bezier, rotation blades and more |
 
-## Quick start
-
-Create a figure, add a grid layout, and insert an `ic.Frame` -- that's where your components live.
-
-```matlab
-fig = uifigure();
-gl  = uigridlayout(fig, "RowHeight", {'1x'}, "ColumnWidth", {'1x'});
-frame = ic.Frame("Parent", gl);
-```
-
-## Examples
-
-### LaTeX Editor
-
-<!-- TODO: gif -->
-
-Full LaTeX editor with live preview, PDF export, and figure capture.
-
-```matlab
-ic.examples.LatexEditor
-```
-
-### Surface Explorer
-
-<!-- TODO: gif -->
-
-3D surface plot with TweakPane controls.
-
-```matlab
-ic.examples.SurfaceExplorer
-```
-
 ## Getting started
 
-1. Download from the [File Exchange](https://uk.mathworks.com/matlabcentral/fileexchange/183586-ic-figure-components) or clone this repo
+1. Download from the [File Exchange](https://uk.mathworks.com/matlabcentral/fileexchange/183586-ic-figure-components) or from the latest release from Github
 2. Add the framework to your MATLAB path
 3. Run one of the examples above
 
