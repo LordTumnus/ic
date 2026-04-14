@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { setContext, onMount, untrack } from 'svelte';
-  import { CesiumWidget, SceneMode, Color } from '@cesium/engine';
+  import { CesiumWidget, SceneMode, Color, Ion } from '@cesium/engine';
   import '@cesium/engine/Source/Widget/CesiumWidget.css';
   import { initCesium } from '$lib/utils/cesium-init';
   import DynamicChild from '$lib/core/DynamicChild.svelte';
@@ -37,6 +37,7 @@
     height = $bindable('400px'),
     sceneMode = $bindable<'3D' | '2D' | 'Columbus'>('3D'),
     enableAtmosphere = $bindable(true),
+    ionToken = $bindable(''),
     childEntries = [] as ChildEntries,
     // Framework-injected
     publish,
@@ -48,6 +49,7 @@
     height?: string;
     sceneMode?: '3D' | '2D' | 'Columbus';
     enableAtmosphere?: boolean;
+    ionToken?: string;
     childEntries?: ChildEntries;
     publish?: PublishFn;
     subscribe?: SubscribeFn;
@@ -100,6 +102,10 @@
       // A dark gray-blue makes the sphere pop against the atmosphere.
       w.scene.globe.baseColor = Color.fromCssColorString('#1e293b');
 
+      // Keep Cesium defaults for LOD refinement (SSE=2) and tile cache
+      // size (~100). Our MATLAB webread is serial, so tighter LOD just
+      // piles up requests; the GPU tile cache already dominates memory.
+
       widget = w;
       ctx.widget = w;
       logger.info('Globe', 'CesiumWidget ready', { sceneMode });
@@ -115,6 +121,14 @@
         widget = undefined;
       }
     };
+  });
+
+  // Sync Cesium Ion access token. This is a global module-level setting in
+  // CesiumJS — once set, it authenticates ALL subsequent Ion-backed asset
+  // requests (terrain, 3D Tiles, imagery). Effect runs whenever ionToken
+  // changes; safe to set repeatedly.
+  $effect(() => {
+    Ion.defaultAccessToken = ionToken;
   });
 
   // Sync prop → widget for enableAtmosphere.

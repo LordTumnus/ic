@@ -13,19 +13,22 @@ classdef Globe < ic.core.ComponentContainer & ...
 
         % whether the sky atmosphere (blue halo around the globe) is rendered
         EnableAtmosphere (1,1) logical = true
+
+        % Cesium Ion access token. Required for Ion-hosted assets like Cesium World Terrain (#ic.globe.Terrain) and Cesium OSM Buildings.
+        IonToken (1,1) string = ""
     end
 
     properties (SetAccess = private)
         % child #ic.globe.Camera controlling the view
         Camera
+
+        % child #ic.globe.Terrain controlling 3D elevation
+        Terrain
     end
 
     properties (Access = private, Hidden)
         % monotonic counter for stable child ordering
         NextLayerIndex (1,1) double = 0
-
-        % tile cache: containers.Map(url -> uint8 bytes)
-        TileCache
     end
 
     methods
@@ -35,14 +38,21 @@ classdef Globe < ic.core.ComponentContainer & ...
                 props.ID (1,1) string = "ic-" + matlab.lang.internal.uuid()
             end
             this@ic.core.ComponentContainer(props);
-            this.TileCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
 
-            % register the binary tile request handler
+            % register binary request handlers
             this.onBinaryRequest("tile", @(comp, data) comp.handleGetTile(data));
+            this.onBinaryRequest("terrain", @(comp, data) comp.handleGetHttpBytes(data));
+
+            % JSON request handler for Cesium Ion asset endpoint resolution.
+            this.onRequest("resolveIonAsset", @(comp, data) comp.handleResolveIonAsset(data));
 
             % attach the camera child
             this.Camera = ic.globe.Camera();
             this.addChild(this.Camera);
+
+            % attach the terrain child (singleton; defaults to disabled)
+            this.Terrain = ic.globe.Terrain();
+            this.addChild(this.Terrain);
         end
     end
 
@@ -73,18 +83,27 @@ classdef Globe < ic.core.ComponentContainer & ...
 
     methods (Access = private)
         function raw = handleGetTile(this, data)
-            % fetch one tile via webread, cache by URL, return raw uint8 bytes.
-            tileUrl = string(data.url);
-            cacheKey = char(tileUrl);
+            raw = this.handleGetHttpBytes(data);
+        end
 
-            if this.TileCache.isKey(cacheKey)
-                raw = this.TileCache(cacheKey);
-                return;
+        function raw = handleGetHttpBytes(~, data)
+            url = string(data.url);
+            opts = weboptions('ContentType', 'binary', 'Timeout', 30);
+            raw = webread(url, opts);
+        end
+
+        function result = handleResolveIonAsset(this, data)
+            if this.IonToken == ""
+                error("ic:Globe:noIonToken", ...
+                    "IonToken is empty; set g.IonToken before using Ion-hosted assets.");
             end
-
-            opts = weboptions('ContentType', 'binary', 'Timeout', 10);
-            raw = webread(tileUrl, opts);
-            this.TileCache(cacheKey) = raw;
+            assetId = double(data.assetId);
+            url = sprintf('https://api.cesium.com/v1/assets/%d/endpoint', assetId);
+            opts = weboptions( ...
+                'HeaderFields', {'Authorization', sprintf('Bearer %s', this.IonToken)}, ...
+                'ContentType', 'json', ...
+                'Timeout', 15);
+            result = webread(url, opts);
         end
     end
 end
