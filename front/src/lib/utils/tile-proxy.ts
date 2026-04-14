@@ -31,16 +31,16 @@ export interface ProxiedTileLayerOptions extends L.TileLayerOptions {
   requestFn: RequestFn;
 }
 
-/** Simple LRU cache: Map insertion order + size cap */
-export class TileLRU {
-  private map = new Map<string, string>();
+/** Simple LRU cache: Map insertion order + size cap. Generic over value type. */
+export class TileLRU<T = string> {
+  private map = new Map<string, T>();
   private maxSize: number;
 
   constructor(maxSize: number) {
     this.maxSize = maxSize;
   }
 
-  get(key: string): string | undefined {
+  get(key: string): T | undefined {
     const val = this.map.get(key);
     if (val !== undefined) {
       // Move to end (most recently used)
@@ -50,7 +50,7 @@ export class TileLRU {
     return val;
   }
 
-  set(key: string, value: string): void {
+  set(key: string, value: T): void {
     if (this.map.has(key)) {
       this.map.delete(key);
     }
