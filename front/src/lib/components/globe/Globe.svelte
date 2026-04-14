@@ -18,6 +18,7 @@
   import DynamicChild from '$lib/core/DynamicChild.svelte';
   import logger from '$lib/core/logger';
   import type { ChildEntries, PublishFn, SubscribeFn, RequestFn } from '$lib/types';
+  import type { RequestBinaryFn } from '$lib/utils/cesium-imagery-provider';
 
   export interface GlobeContext {
     widget: CesiumWidget | undefined;
@@ -28,6 +29,7 @@
     publish: PublishFn | undefined;
     subscribe: SubscribeFn | undefined;
     request: RequestFn | undefined;
+    requestBinary: RequestBinaryFn | undefined;
   }
 
   let {
@@ -40,6 +42,7 @@
     publish,
     subscribe,
     request,
+    requestBinary,
   }: {
     id?: string;
     height?: string;
@@ -49,6 +52,7 @@
     publish?: PublishFn;
     subscribe?: SubscribeFn;
     request?: RequestFn;
+    requestBinary?: RequestBinaryFn;
   } = $props();
 
   let containerEl: HTMLDivElement;
@@ -63,6 +67,7 @@
     get publish() { return publish; },
     get subscribe() { return subscribe; },
     get request() { return request; },
+    get requestBinary() { return requestBinary; },
   };
   setContext('ic-globe-utils', globeUtils);
 

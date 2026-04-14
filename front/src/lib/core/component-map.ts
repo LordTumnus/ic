@@ -168,6 +168,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
 
   // Globe (CesiumJS 3D)
   'ic.Globe': modules['../components/globe/Globe.svelte'],
+  'ic.globe.TileLayer': modules['../components/globe/layers/GlobeTileLayer.svelte'],
 
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],

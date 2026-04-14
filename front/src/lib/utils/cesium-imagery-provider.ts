@@ -120,8 +120,11 @@ export function createProxiedImageryProvider(
     }
 
     // Browser sniffs image format (PNG/JPEG/WebP) from binary content.
+    // imageOrientation: 'flipY' gives a GL-ready bitmap (bottom-left origin);
+    // without it every tile renders upside-down because CesiumJS uploads
+    // tiles to WebGL textures expecting Y-up orientation.
     const blob = new Blob([buffer]);
-    return createImageBitmap(blob);
+    return createImageBitmap(blob, { imageOrientation: 'flipY' });
   };
 
   return provider;
