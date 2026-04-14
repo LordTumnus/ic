@@ -55,6 +55,12 @@ export interface ProxiedImageryProviderOptions {
    * in-flight requests). Useful for a loading spinner overlay.
    */
   onLoadingChange?: (loading: boolean) => void;
+
+  /** Max concurrent binary requests to MATLAB. Default 6. */
+  maxInFlight?: number;
+
+  /** Max queued requests waiting for a slot. When full, oldest is dropped. Default 12. */
+  maxQueued?: number;
 }
 
 /**
@@ -85,6 +91,39 @@ export function createProxiedImageryProvider(
   const cache = new TileLRU<ArrayBuffer>(options.cacheSize ?? 800);
   const inflight = new Map<string, Promise<ArrayBuffer>>();
 
+  // Concurrency limit + LIFO queue for the MATLAB binary channel.
+  // Prevents rapid camera motion (flyTo, drag, zoom) from flooding
+  // MATLAB's single-threaded event loop. When the queue is saturated,
+  // requestImage returns `undefined` synchronously so CesiumJS knows to
+  // retry on a later frame — NOT to mark the tile as permanently failed.
+  const maxInFlight = options.maxInFlight ?? 6;
+  const maxQueued = options.maxQueued ?? 12;
+  let inFlightCount = 0;
+  // LIFO queue: newer requests processed first, matching what the
+  // camera view actually needs right now.
+  const queue: Array<() => void> = [];
+
+  function isSaturated(): boolean {
+    return inFlightCount >= maxInFlight && queue.length >= maxQueued;
+  }
+
+  function acquire(): Promise<void> {
+    if (inFlightCount < maxInFlight) {
+      inFlightCount++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      queue.push(() => { inFlightCount++; resolve(); });
+    });
+  }
+
+  function release(): void {
+    inFlightCount--;
+    // LIFO: pop the most recently queued request
+    const next = queue.pop();
+    if (next) next();
+  }
+
   const provider = new UrlTemplateImageryProvider({
     url,
     credit: attribution ? new Credit(attribution) : undefined,
@@ -94,22 +133,50 @@ export function createProxiedImageryProvider(
   // Override requestImage to fetch via binary channel instead of HTTP.
   // The parent class still handles tile-grid math, credits, and the
   // rest of the ImageryProvider contract.
-  provider.requestImage = async function (x, y, level) {
+  provider.requestImage = function (x, y, level) {
     const key = `${level}/${x}/${y}`;
+
+    // Serve from cache if we already have the bytes (no scheduling needed)
+    const cached = cache.get(key);
+    if (cached) {
+      return createImageBitmap(new Blob([cached]), { imageOrientation: 'flipY' });
+    }
+
+    // Saturation back-pressure: tell CesiumJS to retry this tile on a
+    // later frame. Returning undefined is the contract for "too busy" —
+    // CesiumJS re-calls requestImage automatically (vs rejecting, which
+    // would be interpreted as a permanent fetch failure).
+    // Exception: if this tile is already in-flight, we still attach to
+    // its promise rather than asking CesiumJS to retry (no extra work).
+    if (!inflight.has(key) && isSaturated()) {
+      return undefined;
+    }
+
     const tileUrl = buildTileUrl(url, level, x, y);
 
-    let buffer = cache.get(key);
-    if (!buffer) {
-      // Dedup in-flight requests for the same tile
-      let promise = inflight.get(key);
-      if (!promise) {
-        promise = requestBinary(channel, { z: level, x, y, url: tileUrl });
-        inflight.set(key, promise);
-        if (inflight.size === 1) onLoadingChange?.(true);
-      }
+    let promise = inflight.get(key);
+    if (!promise) {
+      promise = (async () => {
+        await acquire();
+        try {
+          return await requestBinary(channel, { z: level, x, y, url: tileUrl });
+        } finally {
+          release();
+        }
+      })();
+      inflight.set(key, promise);
+      if (inflight.size === 1) onLoadingChange?.(true);
+    }
+
+    return (async () => {
       try {
-        buffer = await promise;
+        const buffer = await promise!;
         cache.set(key, buffer);
+        // Browser sniffs image format (PNG/JPEG/WebP) from binary content.
+        // imageOrientation: 'flipY' gives a GL-ready bitmap (bottom-left
+        // origin); without it every tile renders upside-down because
+        // CesiumJS uploads tiles to WebGL textures expecting Y-up.
+        return createImageBitmap(new Blob([buffer]), { imageOrientation: 'flipY' });
       } catch (err) {
         logger.warn('cesium-imagery-provider', `tile fetch failed ${key}: ${err}`);
         throw err;
@@ -117,14 +184,7 @@ export function createProxiedImageryProvider(
         inflight.delete(key);
         if (inflight.size === 0) onLoadingChange?.(false);
       }
-    }
-
-    // Browser sniffs image format (PNG/JPEG/WebP) from binary content.
-    // imageOrientation: 'flipY' gives a GL-ready bitmap (bottom-left origin);
-    // without it every tile renders upside-down because CesiumJS uploads
-    // tiles to WebGL textures expecting Y-up orientation.
-    const blob = new Blob([buffer]);
-    return createImageBitmap(blob, { imageOrientation: 'flipY' });
+    })();
   };
 
   return provider;

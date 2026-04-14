@@ -15,6 +15,11 @@ classdef Globe < ic.core.ComponentContainer & ...
         EnableAtmosphere (1,1) logical = true
     end
 
+    properties (SetAccess = private)
+        % child #ic.globe.Camera controlling the view
+        Camera
+    end
+
     properties (Access = private, Hidden)
         % monotonic counter for stable child ordering
         NextLayerIndex (1,1) double = 0
@@ -34,6 +39,10 @@ classdef Globe < ic.core.ComponentContainer & ...
 
             % register the binary tile request handler
             this.onBinaryRequest("tile", @(comp, data) comp.handleGetTile(data));
+
+            % attach the camera child
+            this.Camera = ic.globe.Camera();
+            this.addChild(this.Camera);
         end
     end
 
