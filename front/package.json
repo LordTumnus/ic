@@ -34,6 +34,7 @@
   "dependencies": {
     "@0b5vr/tweakpane-plugin-rotation": "^0.2.0",
     "@aarkue/tiptap-math-extension": "^1.4.0",
+    "@cesium/engine": "^24.0.0",
     "@codemirror/autocomplete": "^6.20.1",
     "@codemirror/commands": "^6.10.2",
     "@codemirror/lang-css": "^6.3.1",
@@ -117,6 +118,7 @@
     "svelte-dnd-action": "^0.9.69",
     "tiptap-markdown": "^0.9.0",
     "tweakpane": "^4.0.5",
+    "vite-plugin-static-copy": "^4.0.1",
     "vite-plugin-wasm": "^3.5.0"
   }
 }
