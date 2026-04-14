@@ -276,7 +276,9 @@ class Component implements Registrable {
                 return;
               }
               try {
-                resolve(await fetchBinary(resp.file, resp.v));
+                const buffer = await fetchBinary(resp.file, resp.v);
+                this.publish(`@binaryEvict/${requestId}`, null);
+                resolve(buffer);
               } catch (e) {
                 reject(e);
               }

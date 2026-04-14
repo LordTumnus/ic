@@ -113,13 +113,20 @@ classdef (Abstract) BinaryChannel < handle
         end
 
         function handleBinaryRequest(this, channel, payload, callback)
-            % processes an incoming binary request: invokes the callback, writes the result, and sends the file path back.
+            % processes an incoming binary request: invokes the callback, writes the result to a per-request file, and sends the file path back. Registers a one-shot evict listener to clean up after the frontend fetches the file.
             try
                 result = callback(this, payload.data);
-                this.writeBinary(channel, uint8(result(:)));
 
-                relativePath = "binary/" + this.ID + "/" + channel + ".bin";
-                v = this.BinaryVersions(channel);
+                perRequestChannel = channel + "_" + string(payload.id);
+                this.writeBinary(perRequestChannel, uint8(result(:)));
+
+                relativePath = "binary/" + this.ID + "/" + perRequestChannel + ".bin";
+                v = this.BinaryVersions(perRequestChannel);
+
+                evictEvent = "@binaryEvict/" + string(payload.id);
+                this.subscribe(evictEvent, @(comp, name, ~) ...
+                    comp.handleBinaryEvict(name, perRequestChannel));
+
                 response = struct( ...
                     'file', relativePath, ...
                     'v', v, ...
@@ -133,6 +140,18 @@ classdef (Abstract) BinaryChannel < handle
                     struct('error', ex.message));
                 this.send(evt);
             end
+        end
+
+        function handleBinaryEvict(this, evictEventName, perRequestChannel)
+            % fires once after the frontend confirms a binary fetch completed. % Delete the backing file and remove the one-shot subscription
+            filePath = fullfile(this.getBinaryDir(), perRequestChannel + ".bin");
+            if isfile(filePath)
+                delete(filePath);
+            end
+            if this.BinaryVersions.isKey(perRequestChannel)
+                this.BinaryVersions(perRequestChannel) = [];
+            end
+            this.unsubscribe(evictEventName);
         end
     end
 
