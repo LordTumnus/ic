@@ -166,6 +166,9 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.map.HeatLayer': modules['../components/map/layers/MapHeatLayer.svelte'],
   'ic.map.MeasureControl': modules['../components/map/controls/MapMeasureControl.svelte'],
 
+  // Globe (CesiumJS 3D)
+  'ic.Globe': modules['../components/globe/Globe.svelte'],
+
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],
   'ic.tp.Slider': modules['../components/tweakpane/blades/TpSlider.svelte'],
