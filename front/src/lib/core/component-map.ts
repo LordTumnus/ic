@@ -171,6 +171,7 @@ const componentMap: Record<string, () => Promise<unknown>> = {
   'ic.globe.Camera': modules['../components/globe/layers/GlobeCamera.svelte'],
   'ic.globe.TileLayer': modules['../components/globe/layers/GlobeTileLayer.svelte'],
   'ic.globe.Terrain': modules['../components/globe/layers/GlobeTerrain.svelte'],
+  'ic.globe.Tileset3D': modules['../components/globe/layers/GlobeTileset3D.svelte'],
 
   // Tweakpane components
   'ic.TweakPane': modules['../components/tweakpane/TweakPane.svelte'],

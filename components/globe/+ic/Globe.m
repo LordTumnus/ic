@@ -42,6 +42,7 @@ classdef Globe < ic.core.ComponentContainer & ...
             % register binary request handlers
             this.onBinaryRequest("tile", @(comp, data) comp.handleGetTile(data));
             this.onBinaryRequest("terrain", @(comp, data) comp.handleGetHttpBytes(data));
+            this.onBinaryRequest("tileset3d", @(comp, data) comp.handleGetHttpBytes(data));
 
             % JSON request handler for Cesium Ion asset endpoint resolution.
             this.onRequest("resolveIonAsset", @(comp, data) comp.handleResolveIonAsset(data));
@@ -67,6 +68,19 @@ classdef Globe < ic.core.ComponentContainer & ...
             end
             args = namedargs2cell(props);
             layer = ic.globe.TileLayer(args{:});
+            this.insertLayer(layer);
+        end
+
+        function layer = addTileset3D(this, props)
+            % add a streaming 3D Tiles layer (photogrammetry, buildings, point clouds).
+            % {returns} the new #ic.globe.Tileset3D {/returns}
+            arguments
+                this
+                % name-value pairs for #ic.globe.Tileset3D properties
+                props.?ic.globe.Tileset3D
+            end
+            args = namedargs2cell(props);
+            layer = ic.globe.Tileset3D(args{:});
             this.insertLayer(layer);
         end
     end
