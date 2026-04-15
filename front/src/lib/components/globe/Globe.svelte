@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { setContext, onMount, untrack } from 'svelte';
-  import { CesiumWidget, SceneMode, Color, Ion } from '@cesium/engine';
+  import { CesiumWidget, SceneMode, Color, Ion, Terrain, type TerrainProvider } from '@cesium/engine';
   import '@cesium/engine/Source/Widget/CesiumWidget.css';
   import { initCesium } from '$lib/utils/cesium-init';
   import DynamicChild from '$lib/core/DynamicChild.svelte';
@@ -30,6 +30,13 @@
     subscribe: SubscribeFn | undefined;
     request: RequestFn | undefined;
     requestBinary: RequestBinaryFn | undefined;
+    /**
+     * GlobeTerrain calls this once it has built its TerrainProvider.
+     * Resolves the deferred promise that was passed to CesiumWidget
+     * at construction time, so Cesium upgrades terrain *in place*
+     * instead of swapping (which causes a one-frame imagery flash).
+     */
+    resolveTerrain: (provider: TerrainProvider) => void;
   }
 
   let {
@@ -60,6 +67,19 @@
   let containerEl: HTMLDivElement;
   let widget: CesiumWidget | undefined;
 
+  // Deferred terrain provider. Constructed once at the top level so it
+  // can be passed to the CesiumWidget constructor as `terrain: new
+  // Terrain(promise)`. GlobeTerrain.svelte resolves it via the
+  // `resolveTerrain` util when its provider is built. If no GlobeTerrain
+  // mounts (or it's disabled), the promise stays pending forever and
+  // Cesium continues rendering the ellipsoid — exactly what we want.
+  // Initial-promise resolution upgrades terrain in place without the
+  // surface-rebuild flash that scene.setTerrain() causes.
+  let terrainResolver: ((provider: TerrainProvider) => void) | undefined;
+  const terrainPromise = new Promise<TerrainProvider>((resolve) => {
+    terrainResolver = resolve;
+  });
+
   // Reactive context so children's $effects re-run when `widget` appears.
   const ctx: GlobeContext = $state({ widget: undefined, loading: false });
   setContext('ic-globe', ctx);
@@ -70,6 +90,10 @@
     get subscribe() { return subscribe; },
     get request() { return request; },
     get requestBinary() { return requestBinary; },
+    resolveTerrain(provider: TerrainProvider) {
+      terrainResolver?.(provider);
+      terrainResolver = undefined; // single-shot
+    },
   };
   setContext('ic-globe-utils', globeUtils);
 
@@ -96,6 +120,11 @@
         baseLayer: false,           // no imagery — commit 5 wires this
         skyAtmosphere: enableAtmosphere ? undefined : false,
         sceneMode: sceneModeEnum(sceneMode),
+        // Pre-bind a deferred terrain so child GlobeTerrain can resolve
+        // it without triggering the swap-frame flash that
+        // scene.setTerrain() produces. Pending = ellipsoid; resolved =
+        // upgrade in place. If no GlobeTerrain mounts, stays pending.
+        terrain: new Terrain(terrainPromise),
       }));
 
       // Visible globe color until an imagery layer is added (commit 5).

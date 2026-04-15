@@ -68,6 +68,11 @@
   // or when destroying the component.
   let activeProvider: CesiumTerrainProvider | undefined;
 
+  // Whether we've already resolved Globe's deferred terrain promise.
+  // First install resolves it (in-place upgrade, no flash). Subsequent
+  // provider changes use scene.setTerrain (will visibly swap).
+  let installedOnce = false;
+
   // Build the (Cesium)TerrainProvider asynchronously. Returns undefined
   // on failure (already logged + error event already fired).
   async function buildProvider(
@@ -150,10 +155,19 @@
       const newProvider = await buildProvider(p, u, globeUtils);
       if (disposed || !newProvider) return;
 
-      // setTerrain swaps providers without recreating the globe surface.
-      // Wrapping in `Terrain(Promise.resolve(...))` matches the API
-      // shape Cesium expects since the move from synchronous providers.
-      widget.scene.setTerrain(new Terrain(Promise.resolve(newProvider)));
+      if (!installedOnce && globeUtils.resolveTerrain) {
+        // First install: resolve the deferred terrain promise that was
+        // bound at CesiumWidget construction time. Cesium upgrades from
+        // ellipsoid to terrain in place — no surface rebuild, no flash.
+        globeUtils.resolveTerrain(newProvider);
+        installedOnce = true;
+      } else {
+        // Subsequent provider changes (user switched providers at
+        // runtime): use scene.setTerrain — there will be a swap, but at
+        // that point the user already has imagery rendered and is
+        // actively interacting, so a brief blip is acceptable.
+        widget.scene.setTerrain(new Terrain(Promise.resolve(newProvider)));
+      }
       activeProvider = newProvider;
       logger.info('GlobeTerrain', 'terrain installed', { provider: p });
       loaded?.({ provider: p });
